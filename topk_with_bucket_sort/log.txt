@@ -1,0 +1,34 @@
+running exps with numDocs: 1000000
+timeMsGpuBucketSort: 0.149536 ms
+timeMsGpuFullSort: 0.361635 ms
+timeMsCpuFullSort: 91.3641 ms
+
+
+running exps with numDocs: 2000000
+timeMsGpuBucketSort: 0.218179 ms
+timeMsGpuFullSort: 0.603158 ms
+timeMsCpuFullSort: 190.035 ms
+
+
+running exps with numDocs: 4000000
+timeMsGpuBucketSort: 0.327264 ms
+timeMsGpuFullSort: 2.68067 ms
+timeMsCpuFullSort: 400.164 ms
+
+
+running exps with numDocs: 8000000
+timeMsGpuBucketSort: 0.693267 ms
+timeMsGpuFullSort: 7.51532 ms
+timeMsCpuFullSort: 840.211 ms
+
+
+running exps with numDocs: 16000000
+timeMsGpuBucketSort: 1.27703 ms
+timeMsGpuFullSort: 16.3598 ms
+timeMsCpuFullSort: 1760.95 ms
+
+
+running exps with numDocs: 32000000
+timeMsGpuBucketSort: 2.43154 ms
+timeMsGpuFullSort: 35.1512 ms
+timeMsCpuFullSort: 3652.81 ms
