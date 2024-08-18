@@ -14,7 +14,7 @@ using namespace std;
         cudaError_t status = (func);                                                                                               \
         if (status != cudaSuccess)                                                                                                 \
         {                                                                                                                          \
-            string error = "CUDA API failed at line " + to_string(__LINE__) + " with error: " + cudaGetErrorString(status) + "\n"; \
+            string error = "[topk_baseline.cu] CUDA API failed at line " + to_string(__LINE__) + " with error: " + cudaGetErrorString(status) + "\n"; \
             throw runtime_error(error);                                                                                            \
         }                                                                                                                          \
     }
