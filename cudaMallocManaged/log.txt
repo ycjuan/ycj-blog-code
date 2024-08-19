@@ -1,0 +1,12 @@
+kNumDocs: 1000000, kEmbDim: 128, kMetaSize: 2, kGetSetCount: 200
+d_docEmb, d_reqEmb, d_rst, d_meta
+timeMs: 2.10341 ms
+d_docEmb_managed, d_reqEmb, d_rst, d_meta
+timeMs: 2.10693 ms
+d_docEmb_managed, d_reqEmb, d_rst_managed, d_meta
+timeMs: 2.1025 ms
+d_docEmb, d_reqEmb, d_rst, d_meta_managed
+timeMs: 2.10218 ms
+timeMs: 2.10462 ms
+doSet = 0, timeMs: 0.005863 ms
+doSet = 1, timeMs: 0.000055 ms
