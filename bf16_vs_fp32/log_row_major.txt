@@ -1,0 +1,10 @@
+Running experiment with numDocs=1000000, embDim=1024, density=0.5
+data type = fp32, accumulator type = fp64, time = 20.3839225769 ms, rmse = 0.0000000000
+data type = fp32, accumulator type = fp32, time = 20.3094673157 ms, rmse = 0.0000005784
+data type = float4, accumulator type = fp64, time = 20.1643066406 ms, rmse = 0.0000000557
+data type = bf16, accumulator type = fp64, time = 10.2703418732 ms, rmse = 0.0028229675
+data type = bf16, accumulator type = fp32, time = 10.2775354385 ms, rmse = 0.0028229675
+data type = bf16, accumulator type = bf16, time = 10.2595272064 ms, rmse = 0.0374484099
+data type = bf162, accumulator type = fp64, time = 10.1516799927 ms, rmse = 0.0033368927
+data type = bf162, accumulator type = fp32, time = 10.1397466660 ms, rmse = 0.0033368927
+data type = bf162, accumulator type = bf16, time = 10.1355390549 ms, rmse = 0.0270339083
