@@ -42,33 +42,41 @@ float computeRMSE(const vector<Doc> &v_rstA, const vector<Doc> &v_rstB)
     return rmse / rms;
 }
 
-void genRandEmbFP32(float *d_emb, int numDocs, int embDim)
+vector<vector<float>> genRandEmb(int numDocs, int embDim)
 {
     default_random_engine generator;
     uniform_real_distribution<float> distribution(-1.0, 1.0);
+    vector<vector<float>> emb2D(numDocs, vector<float>(embDim));
     for (int i = 0; i < numDocs; i++)
     {
         double normSum = 0;
         for (int j = 0; j < embDim; j++)
         {
-            float &v = d_emb[getMemAddr(i, j, numDocs, embDim)];
+            float &v = emb2D[i][j];
             v = distribution(generator);
             normSum += v * v;
         }
         double normalizer = 1.0 / sqrt(normSum);
         for (int j = 0; j < embDim; j++)
-            d_emb[getMemAddr(i, j, numDocs, embDim)] *= normalizer;
+            emb2D[i][j] *= normalizer;
     }
 }
 
-void copyAsBF16(float *d_fp32, __nv_bfloat16 *d_bf16, int numDocs, int embDim)
+void copyAsFP32(const vector<vector<float>> &emb2D, float *d_fp32, int numDocs, int embDim)
 {
     for (int i = 0; i < numDocs; i++)
         for (int j = 0; j < embDim; j++)
-            d_bf16[getMemAddr(i, j, numDocs, embDim)] = (__nv_bfloat16)d_fp32[getMemAddr(i, j, numDocs, embDim)];
+            d_fp32[getMemAddr(i, j, numDocs, embDim)] = emb2D[i][j];
 }
 
-void copyAsBF162(float *d_fp32, __nv_bfloat162 *d_bf162, int numDocs, int embDim)
+void copyAsBF16(const vector<vector<float>> &emb2D, __nv_bfloat16 *d_bf16, int numDocs, int embDim)
+{
+    for (int i = 0; i < numDocs; i++)
+        for (int j = 0; j < embDim; j++)
+            d_bf16[getMemAddr(i, j, numDocs, embDim)] = (__nv_bfloat16)emb2D[i][j];
+}
+
+void copyAsBF162(const vector<vector<float>> &emb2D, __nv_bfloat162 *d_bf162, int numDocs, int embDim)
 {
     int embDim2 = embDim / 2;
     assert(embDim2 * 2 == embDim);
@@ -76,14 +84,15 @@ void copyAsBF162(float *d_fp32, __nv_bfloat162 *d_bf162, int numDocs, int embDim
     {
         for (int j2 = 0; j2 < embDim2; j2++)
         {
-            float float1 = d_fp32[getMemAddr(i, j2*2, numDocs, embDim)];
-            float float2 = d_fp32[getMemAddr(i, j2*2+1, numDocs, embDim)];
+            int j = j2 * 2;
+            float float1 = emb2D[i][j];
+            float float2 = emb2D[i][j+1];
             d_bf162[getMemAddr(i, j2, numDocs, embDim2)] = __floats2bfloat162_rn(float1, float2);
         }
     }
 }
 
-void copyAsFloat4(float *d_fp32, float4 *d_float4, int numDocs, int embDim)
+void copyAsFloat4(const vector<vector<float>> &emb2D, float4 *d_float4, int numDocs, int embDim)
 {
     int embDim4 = embDim / 4;
     assert(embDim4 * 4 == embDim);
@@ -91,15 +100,32 @@ void copyAsFloat4(float *d_fp32, float4 *d_float4, int numDocs, int embDim)
     {
         for (int j4 = 0; j4 < embDim4; j4++)
         {
-            d_float4[getMemAddr(i, j4, numDocs, embDim4)].x = d_fp32[getMemAddr(i, j4*4, numDocs, embDim)];
-            d_float4[getMemAddr(i, j4, numDocs, embDim4)].y = d_fp32[getMemAddr(i, j4*4+1, numDocs, embDim)];
-            d_float4[getMemAddr(i, j4, numDocs, embDim4)].z = d_fp32[getMemAddr(i, j4*4+2, numDocs, embDim)];
-            d_float4[getMemAddr(i, j4, numDocs, embDim4)].w = d_fp32[getMemAddr(i, j4*4+3, numDocs, embDim)];
+            int j = j4 * 4;
+            d_float4[getMemAddr(i, j4, numDocs, embDim4)].x = emb2D[i][j];
+            d_float4[getMemAddr(i, j4, numDocs, embDim4)].y = emb2D[i][j+1];
+            d_float4[getMemAddr(i, j4, numDocs, embDim4)].z = emb2D[i][j+2];
+            d_float4[getMemAddr(i, j4, numDocs, embDim4)].w = emb2D[i][j+3];
         }
     }
 }
 
-void genRandActiveDocs(Doc *d_doc, int numDocs, int numActiveDocs)
+vector<Doc> referenceAlgo(const vector<vector<float>> &docEmb2D, const vector<vector<float>> &reqEmb2D, const vector<Doc> &v_doc)
+{
+    int numDocs = docEmb2D.size();
+    int embDim = docEmb2D[0].size();
+    vector<Doc> v_rst(numDocs);
+    for (auto doc : v_rst)
+    {
+        int i = doc.docIdx;
+        doc.score = 0;
+        for (int j = 0; j < embDim; j++)
+            doc.score += docEmb2D[i][j] * reqEmb2D[0][j];
+        v_rst
+    }
+    return v_doc;
+}
+
+vector<Doc> genRandActiveDocs(int numDocs, int numActiveDocs)
 {
     vector<Doc> v_doc(numDocs);
     for (int i = 0; i < numDocs; i++)
@@ -111,7 +137,10 @@ void genRandActiveDocs(Doc *d_doc, int numDocs, int numActiveDocs)
     assert(v_doc[0].docIdx != 0);
     assert(v_doc[numDocs-1].docIdx != numDocs-1);
     v_doc.resize(numActiveDocs);
-    CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numActiveDocs * sizeof(Doc), cudaMemcpyHostToDevice));
+    sort(v_doc.begin(), v_doc.end(), [](const Doc &a, const Doc &b) { return a.docIdx < b.docIdx; });
+    for (int i = 0; i < numActiveDocs-1; i++)
+        assert(v_doc[i].docIdx < v_doc[i+1].docIdx);
+    return v_doc;
 }
 
 void runExp(int numDocs, int embDim, float density)
@@ -119,23 +148,27 @@ void runExp(int numDocs, int embDim, float density)
     cout << "Running experiment with numDocs=" << numDocs << ", embDim=" << embDim << ", density=" << density << endl;
 
     int numActiveDocs = (int)(numDocs * density);
+    vector<vector<float>> docEmb2D = genRandEmb(numDocs, embDim);
+    vector<vector<float>> reqEmb2D = genRandEmb(1, embDim);
+    
+    vector<Doc> v_doc = genRandActiveDocs(numDocs, numActiveDocs);
+    Doc *d_doc = nullptr;
+    CHECK_CUDA(cudaMallocManaged(&d_doc, numActiveDocs * sizeof(Doc)));
+    CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numActiveDocs * sizeof(Doc), cudaMemcpyHostToDevice));
 
     float *d_docEmb_fp32 = nullptr;
     float *d_reqEmb_fp32 = nullptr;
-    Doc *d_doc = nullptr;
     CHECK_CUDA(cudaMallocManaged(&d_docEmb_fp32, numDocs * embDim * sizeof(float)));
     CHECK_CUDA(cudaMallocManaged(&d_reqEmb_fp32, embDim * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&d_doc, numActiveDocs * sizeof(Doc)));
-    genRandEmbFP32(d_docEmb_fp32, numDocs, embDim);
-    genRandEmbFP32(d_reqEmb_fp32, 1, embDim);
-    genRandActiveDocs(d_doc, numDocs, numActiveDocs);
+    copyAsFP32(docEmb2D, d_docEmb_fp32, numDocs, embDim);
+    copyAsFP32(reqEmb2D, d_reqEmb_fp32, 1, embDim);
 
     __nv_bfloat16 *d_docEmb_bf16 = nullptr;
     __nv_bfloat16 *d_reqEmb_bf16 = nullptr;
     CHECK_CUDA(cudaMallocManaged(&d_docEmb_bf16, numDocs * embDim * sizeof(__nv_bfloat16)));
     CHECK_CUDA(cudaMallocManaged(&d_reqEmb_bf16, embDim * sizeof(__nv_bfloat16)));
-    copyAsBF16(d_docEmb_fp32, d_docEmb_bf16, numDocs, embDim);
-    copyAsBF16(d_reqEmb_fp32, d_reqEmb_bf16, 1, embDim);
+    copyAsBF16(docEmb2D, d_docEmb_bf16, numDocs, embDim);
+    copyAsBF16(reqEmb2D, d_reqEmb_bf16, 1, embDim);
 
     int embDim2 = embDim / 2;
     assert(embDim2 * 2 == embDim);
@@ -143,8 +176,8 @@ void runExp(int numDocs, int embDim, float density)
     __nv_bfloat162 *d_reqEmb_bf162 = nullptr;
     CHECK_CUDA(cudaMallocManaged(&d_docEmb_bf162, numDocs * embDim2 * sizeof(__nv_bfloat162)));
     CHECK_CUDA(cudaMallocManaged(&d_reqEmb_bf162, embDim2 * sizeof(__nv_bfloat162)));
-    copyAsBF162(d_docEmb_fp32, d_docEmb_bf162, numDocs, embDim);
-    copyAsBF162(d_reqEmb_fp32, d_reqEmb_bf162, 1, embDim);
+    copyAsBF162(docEmb2D, d_docEmb_bf162, numDocs, embDim);
+    copyAsBF162(reqEmb2D, d_reqEmb_bf162, 1, embDim);
 
     int embDim4 = embDim / 4;
     assert(embDim4 * 4 == embDim);
@@ -152,8 +185,8 @@ void runExp(int numDocs, int embDim, float density)
     float4 *d_reqEmb_float4 = nullptr;
     CHECK_CUDA(cudaMallocManaged(&d_docEmb_float4, numDocs * embDim4 * sizeof(float4)));
     CHECK_CUDA(cudaMallocManaged(&d_reqEmb_float4, embDim4 * sizeof(float4)));
-    copyAsFloat4(d_docEmb_fp32, d_docEmb_float4, numDocs, embDim);
-    copyAsFloat4(d_reqEmb_fp32, d_reqEmb_float4, 1, embDim);
+    copyAsFloat4(docEmb2D, d_docEmb_float4, numDocs, embDim);
+    copyAsFloat4(reqEmb2D, d_reqEmb_float4, 1, embDim);
     cudaDeviceSynchronize();
 
     float timeMs, rmse;
