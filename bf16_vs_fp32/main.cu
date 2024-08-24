@@ -31,7 +31,7 @@ float computeRMSE(const vector<Doc> &v_rstA, const vector<Doc> &v_rstB)
     double squaredErrorSum = 0;
     for (int i = 0; i < v_rstA.size(); i++)
     {
-        double diff = (v_rstA[i].score - v_rstB[i].score) / v_rstA[i]; // divide by v_rstA[i] so this error means "how much off from v_rstA[i]"
+        double diff = (v_rstA[i].score - v_rstB[i].score) / v_rstA[i].score; // divide by v_rstA[i] so this error means "how much off from v_rstA[i]"
         squaredErrorSum += diff * diff;
     }
     double rmse = sqrt(squaredErrorSum / v_rstA.size());

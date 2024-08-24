@@ -47,6 +47,50 @@ __global__ void kernel_fp32_bf16(T_EMB *d_docEmb, T_EMB *d_reqEmb, Doc *d_doc, i
     }
 }
 
+template <typename T_ACC>
+__global__ void kernel_bf162(__nv_bfloat162 *d_docEmb, __nv_bfloat162 *d_reqEmb, Doc *d_doc, int numAllDocs, int numActiveDocs, int embDim2)
+{
+    int d = blockIdx.x * blockDim.x + threadIdx.x;
+    if (d < numActiveDocs)
+    {
+        Doc &doc = d_doc[d];
+        T_ACC acc = 0;
+        int i = doc.docIdx;
+        for (int j = 0; j < embDim2; j++)
+        {
+            __nv_bfloat162 docVal = d_docEmb[getMemAddr(i, j, numAllDocs, embDim2)];
+            __nv_bfloat162 reqVal = d_docEmb[getMemAddr(i, j, numAllDocs, embDim2)];
+            __nv_bfloat162 rst = docVal * reqVal;
+            acc += (T_ACC)(rst.x + rst.y);
+        }
+        doc.score = (float)acc;
+    }
+}
+
+template <typename T_ACC>
+__global__ void kernel_float4(float4 *d_docEmb, float4 *d_reqEmb, Doc *d_doc, int numAllDocs, int numActiveDocs, int embDim4)
+{
+    int d = blockIdx.x * blockDim.x + threadIdx.x;
+    if (d < numActiveDocs)
+    {
+        Doc &doc = d_doc[d];
+        T_ACC acc = 0;
+        int i = doc.docIdx;
+        for (int j = 0; j < embDim4; j++)
+        {
+            float4 docVal = d_docEmb[getMemAddr(i, j, numAllDocs, embDim4)];
+            float4 reqVal = d_docEmb[getMemAddr(i, j, numAllDocs, embDim4)];
+            float4 rst;
+            rst.x = docVal.x * reqVal.x;
+            rst.y = docVal.y * reqVal.y;
+            rst.z = docVal.z * reqVal.z;
+            rst.w = docVal.w * reqVal.w;
+            acc += (T_ACC)(rst.x + rst.y + rst.z + rst.w);
+        }
+        doc.score = (float)acc;
+    }
+}
+
 template <typename T_EMB, typename T_ACC>
 float score_fp32_bf16(T_EMB *d_docEmb, T_EMB *d_reqEmb, Doc *d_doc, int numAllDocs, int numActiveDocs, int embDim)
 {
@@ -54,6 +98,31 @@ float score_fp32_bf16(T_EMB *d_docEmb, T_EMB *d_reqEmb, Doc *d_doc, int numAllDo
     timer.tic();
     int gridSize = (int)ceil((double)numActiveDocs / kBlockSize);
     kernel_fp32_bf16<T_EMB, T_ACC><<<gridSize, kBlockSize>>>(d_docEmb, d_reqEmb, d_doc, numAllDocs, numActiveDocs, embDim);
+    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaGetLastError());
+    return timer.tocMs();
+}
+
+template <typename T_ACC>
+float score_bf162(__nv_bfloat162 *d_docEmb, __nv_bfloat162 *d_reqEmb, Doc *d_doc, int numAllDocs, int numActiveDocs, int embDim2)
+{
+    CudaTimer timer;
+    timer.tic();
+    int gridSize = (int)ceil((double)numActiveDocs / kBlockSize);
+    kernel_bf162<__nv_bfloat162, T_ACC><<<gridSize, kBlockSize>>>(d_docEmb, d_reqEmb, d_doc, numAllDocs, numActiveDocs, embDim2);
+    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaGetLastError());
+    return timer.tocMs();
+}
+
+
+template <typename T_ACC>
+float score_float4(float4 *d_docEmb, float4 *d_reqEmb, Doc *d_doc, int numAllDocs, int numActiveDocs, int embDim4)
+{
+    CudaTimer timer;
+    timer.tic();
+    int gridSize = (int)ceil((double)numActiveDocs / kBlockSize);
+    kernel_float4<T_ACC><<<gridSize, kBlockSize>>>(d_docEmb, d_reqEmb, d_doc, numAllDocs, numActiveDocs, embDim4);
     cudaDeviceSynchronize();
     CHECK_CUDA(cudaGetLastError());
     return timer.tocMs();
