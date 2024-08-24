@@ -109,7 +109,7 @@ float score_bf162(__nv_bfloat162 *d_docEmb, __nv_bfloat162 *d_reqEmb, Doc *d_doc
     CudaTimer timer;
     timer.tic();
     int gridSize = (int)ceil((double)numActiveDocs / kBlockSize);
-    kernel_bf162<__nv_bfloat162, T_ACC><<<gridSize, kBlockSize>>>(d_docEmb, d_reqEmb, d_doc, numAllDocs, numActiveDocs, embDim2);
+    kernel_bf162<T_ACC><<<gridSize, kBlockSize>>>(d_docEmb, d_reqEmb, d_doc, numAllDocs, numActiveDocs, embDim2);
     cudaDeviceSynchronize();
     CHECK_CUDA(cudaGetLastError());
     return timer.tocMs();
