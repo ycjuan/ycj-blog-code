@@ -64,6 +64,38 @@ void copyAsBF16(float *d_fp32, __nv_bfloat16 *d_bf16, int numDocs, int embDim)
             d_bf16[getMemAddr(i, j, numDocs, embDim)] = (__nv_bfloat16)d_fp32[getMemAddr(i, j, numDocs, embDim)];
 }
 
+void copyAsBF162(float *d_fp32, __nv_bfloat162 *d_bf162, int numDocs, int embDim)
+{
+    int embDim2 = embDim / 2;
+    assert(embDim2 * 2 == embDim);
+    for (int i = 0; i < numDocs; i++)
+    {
+        for (int j2 = 0; j2 < embDim2; j2++)
+        {
+            __nv_bfloat162 &v = d_bf162[getMemAddr(i, j2, numDocs, embDim2)];
+            v.x = (__nv_bfloat16)d_fp32[getMemAddr(i, j2, numDocs, embDim)];
+            v.y = (__nv_bfloat16)d_fp32[getMemAddr(i, j2+1, numDocs, embDim)];
+        }
+    }
+}
+
+void copyAsFloat4(float *d_fp32, float4 *d_float4, int numDocs, int embDim)
+{
+    int embDim4 = embDim / 4;
+    assert(embDim4 * 4 == embDim);
+    for (int i = 0; i < numDocs; i++)
+    {
+        for (int j4 = 0; j4 < embDim4; j4++)
+        {
+            float4 &v = d_float4[getMemAddr(i, j4, numDocs, embDim4)];
+            v.x = d_fp32[getMemAddr(i, j4, numDocs, embDim)];
+            v.y = d_fp32[getMemAddr(i, j4+1, numDocs, embDim)];
+            v.z = d_fp32[getMemAddr(i, j4+2, numDocs, embDim)];
+            v.w = d_fp32[getMemAddr(i, j4+3, numDocs, embDim)];
+        }
+    }
+}
+
 void genRandActiveDocs(Doc *d_doc, int numDocs, int numActiveDocs)
 {
     vector<Doc> v_doc(numDocs);
@@ -101,6 +133,24 @@ void runExp(int numDocs, int embDim, float density)
     CHECK_CUDA(cudaMallocManaged(&d_reqEmb_bf16, embDim * sizeof(__nv_bfloat16)));
     copyAsBF16(d_docEmb_fp32, d_docEmb_bf16, numDocs, embDim);
     copyAsBF16(d_reqEmb_fp32, d_reqEmb_bf16, 1, embDim);
+
+    int embDim2 = embDim / 2;
+    assert(embDim2 * 2 == embDim);
+    __nv_bfloat162 *d_docEmb_bf162 = nullptr;
+    __nv_bfloat162 *d_reqEmb_bf162 = nullptr;
+    CHECK_CUDA(cudaMallocManaged(&d_docEmb_bf162, numDocs * embDim2 * sizeof(__nv_bfloat162)));
+    CHECK_CUDA(cudaMallocManaged(&d_reqEmb_bf162, embDim2 * sizeof(__nv_bfloat162)));
+    copyAsBF16(d_docEmb_fp32, d_docEmb_bf16, numDocs, embDim);
+    copyAsBF16(d_reqEmb_fp32, d_reqEmb_bf16, 1, embDim);
+
+    int embDim4 = embDim / 4;
+    assert(embDim4 * 4 == embDim);
+    float4 *d_docEmb_float4 = nullptr;
+    float4 *d_reqEmb_float4 = nullptr;
+    CHECK_CUDA(cudaMallocManaged(&d_docEmb_float4, numDocs * embDim4 * sizeof(float4)));
+    CHECK_CUDA(cudaMallocManaged(&d_reqEmb_float4, embDim4 * sizeof(float4)));
+    copyAsFloat4(d_docEmb_fp32, d_docEmb_float4, numDocs, embDim);
+    copyAsFloat4(d_reqEmb_fp32, d_reqEmb_float4, 1, embDim);
 
     float timeMs, rmse;
 
