@@ -23,38 +23,38 @@ using namespace std;
         }                                                                                                                                    \
     }
 
-bool compareRst(const vector<float> &v_rstA, const vector<float> &v_rstB)
+float computeRMSE(const vector<Doc> &v_rstA, const vector<Doc> &v_rstB)
 {
     if (v_rstA.size() != v_rstB.size())
-        return false;
+        throw runtime_error("v_rstA.size() != v_rstB.size()");
+
+    double squaredErrorSum = 0;
     for (int i = 0; i < v_rstA.size(); i++)
     {
-        if (abs(v_rstA[i] - v_rstB[i]) > 1e-5)
-            return false;
+        double diff = (v_rstA[i].score - v_rstB[i].score) / v_rstA[i]; // divide by v_rstA[i] so this error means "how much off from v_rstA[i]"
+        squaredErrorSum += diff * diff;
     }
-    return true;
+    double rmse = sqrt(squaredErrorSum / v_rstA.size());
+    return rmse;
 }
 
 void genRandEmbFP32(float *d_emb, int numDocs, int embDim)
 {
     default_random_engine generator;
     uniform_real_distribution<float> distribution(-1.0, 1.0);
-    vector<float> v_emb(numDocs * embDim);
-    for (auto &v : v_emb)
-        v = distribution(generator);
     for (int i = 0; i < numDocs; i++)
     {
         double normSum = 0;
         for (int j = 0; j < embDim; j++)
         {
-            float v = v_emb[getMemAddr(i, j, numDocs, embDim)];
+            float &v = d_emb[getMemAddr(i, j, numDocs, embDim)];
+            v = distribution(generator);
             normSum += v * v;
         }
         double normalizer = 1.0 / sqrt(normSum);
         for (int j = 0; j < embDim; j++)
-            v_emb[getMemAddr(i, j, numDocs, embDim)] *= normalizer;
+            d_emb[getMemAddr(i, j, numDocs, embDim)] *= normalizer;
     }
-    CHECK_CUDA(cudaMemcpy(d_emb, v_emb.data(), numDocs * embDim * sizeof(float), cudaMemcpyHostToDevice));
 }
 
 void copyAsBF16(float *d_fp32, __nv_bfloat16 *d_bf16, int numDocs, int embDim)
@@ -102,17 +102,7 @@ void runExp(int numDocs, int embDim, float density)
     copyAsBF16(d_docEmb_fp32, d_docEmb_bf16, numDocs, embDim);
     copyAsBF16(d_reqEmb_fp32, d_reqEmb_bf16, 1, embDim);
 
-    float timeMs;
-    cout << "data type = fp32, accumulator type = fp32, ";
-    timeMs = 0;
-    for (int t = -3; t < kNumTrials; t++)
-    {
-        float timeMs1 = score_fp32_bf16<float, float>(d_docEmb_fp32, d_reqEmb_fp32, d_doc, numDocs, numActiveDocs, embDim);
-        if (t >= 0)
-            timeMs += timeMs1;
-    }
-    timeMs /= kNumTrials;
-    cout << "time = " << timeMs << " ms" << endl;
+    float timeMs, rmse;
 
     cout << "data type = fp32, accumulator type = fp64, ";
     timeMs = 0;
@@ -123,7 +113,24 @@ void runExp(int numDocs, int embDim, float density)
             timeMs += timeMs1;
     }
     timeMs /= kNumTrials;
+    vector<Doc> v_doc_fp32_fp64(numActiveDocs);
+    CHECK_CUDA(cudaMemcpy(v_doc_fp32_fp64.data(), d_doc, numActiveDocs * sizeof(Doc), cudaMemcpyDeviceToHost));
     cout << "time = " << timeMs << " ms" << endl;
+
+    cout << "data type = fp32, accumulator type = fp32, ";
+    timeMs = 0;
+    for (int t = -3; t < kNumTrials; t++)
+    {
+        float timeMs1 = score_fp32_bf16<float, float>(d_docEmb_fp32, d_reqEmb_fp32, d_doc, numDocs, numActiveDocs, embDim);
+        if (t >= 0)
+            timeMs += timeMs1;
+    }
+    timeMs /= kNumTrials;
+    vector<Doc> v_doc_fp32_fp32(numActiveDocs);
+    CHECK_CUDA(cudaMemcpy(v_doc_fp32_fp32.data(), d_doc, numActiveDocs * sizeof(Doc), cudaMemcpyDeviceToHost));
+    rmse = computeRMSE(v_doc_fp32_fp64, v_doc_fp32_fp32);
+    cout << "time = " << timeMs << " ms" << ", rmse = " << rmse << endl;
+
 
     cout << "data type = bf16, accumulator type = fp64, ";
     timeMs = 0;
@@ -134,7 +141,10 @@ void runExp(int numDocs, int embDim, float density)
             timeMs += timeMs1;
     }
     timeMs /= kNumTrials;
-    cout << "time = " << timeMs << " ms" << endl;
+    vector<Doc> v_doc_bf16_fp64(numActiveDocs);
+    CHECK_CUDA(cudaMemcpy(v_doc_bf16_fp64.data(), d_doc, numActiveDocs * sizeof(Doc), cudaMemcpyDeviceToHost));
+    rmse = computeRMSE(v_doc_fp32_fp64, v_doc_bf16_fp64);
+    cout << "time = " << timeMs << " ms" << ", rmse = " << rmse << endl;
 
     cout << "data type = bf16, accumulator type = fp32, ";
     timeMs = 0;
@@ -145,7 +155,10 @@ void runExp(int numDocs, int embDim, float density)
             timeMs += timeMs1;
     }
     timeMs /= kNumTrials;
-    cout << "time = " << timeMs << " ms" << endl;
+    vector<Doc> v_doc_bf16_fp32(numActiveDocs);
+    CHECK_CUDA(cudaMemcpy(v_doc_bf16_fp32.data(), d_doc, numActiveDocs * sizeof(Doc), cudaMemcpyDeviceToHost));
+    rmse = computeRMSE(v_doc_fp32_fp64, v_doc_bf16_fp32);
+    cout << "time = " << timeMs << " ms" << ", rmse = " << rmse << endl;
 
     cout << "data type = bf16, accumulator type = bf16, ";
     timeMs = 0;
@@ -156,7 +169,10 @@ void runExp(int numDocs, int embDim, float density)
             timeMs += timeMs1;
     }
     timeMs /= kNumTrials;
-    cout << "time = " << timeMs << " ms" << endl;
+    vector<Doc> v_doc_bf16_bf16(numActiveDocs);
+    CHECK_CUDA(cudaMemcpy(v_doc_bf16_bf16.data(), d_doc, numActiveDocs * sizeof(Doc), cudaMemcpyDeviceToHost));
+    rmse = computeRMSE(v_doc_fp32_fp64, v_doc_bf16_bf16);
+    cout << "time = " << timeMs << " ms" << ", rmse = " << rmse << endl;
 }
 
 int main()
