@@ -9,8 +9,6 @@
 #include "util.cuh"
 #include "core.cuh"
 
-const int kNumDocs = 1000000;
-const int kEmbDim = 128;
 const int kNumTrials = 10;
 
 using namespace std;
@@ -83,20 +81,87 @@ void genRandActiveDocs(Doc *d_doc, int numDocs, int numActiveDocs)
 
 void runExp(int numDocs, int embDim, float density)
 {
+    cout << "Running experiment with numDocs=" << numDocs << ", embDim=" << embDim << ", density=" << density << endl;
+
     int numActiveDocs = (int)(numDocs * density);
 
     float *d_docEmb_fp32 = nullptr;
     float *d_reqEmb_fp32 = nullptr;
     Doc *d_doc = nullptr;
-    CHECK_CUDA(cudaMalloc(&d_docEmb_fp32, numDocs * embDim * sizeof(float)));
-    CHECK_CUDA(cudaMalloc(&d_reqEmb_fp32, embDim * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&d_docEmb_fp32, numDocs * embDim * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&d_reqEmb_fp32, embDim * sizeof(float)));
     CHECK_CUDA(cudaMallocManaged(&d_doc, numActiveDocs * sizeof(Doc)));
     genRandEmbFP32(d_docEmb_fp32, numDocs, embDim);
     genRandEmbFP32(d_reqEmb_fp32, 1, embDim);
     genRandActiveDocs(d_doc, numDocs, numActiveDocs);
 
+    __nv_bfloat16 *d_docEmb_bf16 = nullptr;
+    __nv_bfloat16 *d_reqEmb_bf16 = nullptr;
+    CHECK_CUDA(cudaMallocManaged(&d_docEmb_bf16, numDocs * embDim * sizeof(__nv_bfloat16)));
+    CHECK_CUDA(cudaMallocManaged(&d_reqEmb_bf16, embDim * sizeof(__nv_bfloat16)));
+    copyAsBF16(d_docEmb_fp32, d_docEmb_bf16, numDocs, embDim);
+    copyAsBF16(d_reqEmb_fp32, d_reqEmb_bf16, 1, embDim);
+
+    float timeMs;
+    cout << "data type = fp32, accumulator type = fp32, ";
+    timeMs = 0;
+    for (int t = -3; t < kNumTrials; t++)
+    {
+        float timeMs1 = score_fp32_bf16<float, float>(d_docEmb_fp32, d_reqEmb_fp32, d_doc, numDocs, numActiveDocs, embDim);
+        if (t >= 0)
+            timeMs += timeMs1;
+    }
+    timeMs /= kNumTrials;
+    cout << "time = " << timeMs << " ms" << endl;
+
+    cout << "data type = fp32, accumulator type = fp64, ";
+    timeMs = 0;
+    for (int t = -3; t < kNumTrials; t++)
+    {
+        float timeMs1 = score_fp32_bf16<float, double>(d_docEmb_fp32, d_reqEmb_fp32, d_doc, numDocs, numActiveDocs, embDim);
+        if (t >= 0)
+            timeMs += timeMs1;
+    }
+    timeMs /= kNumTrials;
+    cout << "time = " << timeMs << " ms" << endl;
+
+    cout << "data type = bf16, accumulator type = fp64, ";
+    timeMs = 0;
+    for (int t = -3; t < kNumTrials; t++)
+    {
+        float timeMs1 = score_fp32_bf16<__nv_bfloat16, double>(d_docEmb_bf16, d_reqEmb_bf16, d_doc, numDocs, numActiveDocs, embDim);
+        if (t >= 0)
+            timeMs += timeMs1;
+    }
+    timeMs /= kNumTrials;
+    cout << "time = " << timeMs << " ms" << endl;
+
+    cout << "data type = bf16, accumulator type = fp32, ";
+    timeMs = 0;
+    for (int t = -3; t < kNumTrials; t++)
+    {
+        float timeMs1 = score_fp32_bf16<__nv_bfloat16, float>(d_docEmb_bf16, d_reqEmb_bf16, d_doc, numDocs, numActiveDocs, embDim);
+        if (t >= 0)
+            timeMs += timeMs1;
+    }
+    timeMs /= kNumTrials;
+    cout << "time = " << timeMs << " ms" << endl;
+
+    cout << "data type = bf16, accumulator type = bf16, ";
+    timeMs = 0;
+    for (int t = -3; t < kNumTrials; t++)
+    {
+        float timeMs1 = score_fp32_bf16<__nv_bfloat16, __nv_bfloat16>(d_docEmb_bf16, d_reqEmb_bf16, d_doc, numDocs, numActiveDocs, embDim);
+        if (t >= 0)
+            timeMs += timeMs1;
+    }
+    timeMs /= kNumTrials;
+    cout << "time = " << timeMs << " ms" << endl;
 }
 
 int main()
 {
+    runExp(100000, 128, 0.5);
+
+    return 0;
 }
