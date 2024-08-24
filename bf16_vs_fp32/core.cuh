@@ -7,8 +7,8 @@ using namespace std;
 
 inline __host__ __device__ int getMemAddr(int docIdx, int embIdx, int numDocs, int embDim)
 {
-    return embIdx * numDocs + docIdx; // column-major
-    //return docIdx * embDim + embIdx; // row-major
+    //return embIdx * numDocs + docIdx; // column-major
+    return docIdx * embDim + embIdx; // row-major
 }
 
 struct Doc
@@ -61,7 +61,7 @@ __global__ void kernel_bf162(__nv_bfloat162 *d_docEmb, __nv_bfloat162 *d_reqEmb,
         {
             __nv_bfloat162 docVal = d_docEmb[getMemAddr(i, j, numAllDocs, embDim2)];
             __nv_bfloat162 reqVal = d_reqEmb[getMemAddr(0, j, 1, embDim2)];
-            __nv_bfloat162 rst2 = docVal * reqVal;
+            __nv_bfloat162 rst2 = __hmul2(docVal, reqVal); // no difference compared with simply "docVal * reqVal"
             __nv_bfloat16 rst = rst2.x + rst2.y;
             float rst_f = __bfloat162float(rst);
             acc += (T_ACC)(rst_f);
