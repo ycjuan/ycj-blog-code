@@ -60,6 +60,7 @@ vector<vector<float>> genRandEmb(int numDocs, int embDim)
         for (int j = 0; j < embDim; j++)
             emb2D[i][j] *= normalizer;
     }
+    return emb2D;
 }
 
 void copyAsFP32(const vector<vector<float>> &emb2D, float *d_fp32, int numDocs, int embDim)
@@ -120,7 +121,7 @@ vector<Doc> referenceAlgo(const vector<vector<float>> &docEmb2D, const vector<ve
         doc.score = acc;
         v_rst[d] = doc;
     }
-    return v_doc;
+    return v_rst;
 }
 
 vector<Doc> genRandActiveDocs(int numDocs, int numActiveDocs)
@@ -221,6 +222,20 @@ void runExp(int numDocs, int embDim, float density)
     rmse = computeRMSE(v_doc_ref, v_doc_fp32_fp32);
     cout << "time = " << timeMs << " ms" << ", rmse = " << rmse << endl;
 
+    cout << "data type = float4, accumulator type = fp64, ";
+    timeMs = 0;
+    for (int t = -3; t < kNumTrials; t++)
+    {
+        float timeMs1 = score_float4<double>(d_docEmb_float4, d_reqEmb_float4, d_doc, numDocs, numActiveDocs, embDim4);
+        if (t >= 0)
+            timeMs += timeMs1;
+    }
+    timeMs /= kNumTrials;
+    vector<Doc> v_doc_float4_fp64(numActiveDocs);
+    CHECK_CUDA(cudaMemcpy(v_doc_float4_fp64.data(), d_doc, numActiveDocs * sizeof(Doc), cudaMemcpyDeviceToHost));
+    rmse = computeRMSE(v_doc_ref, v_doc_float4_fp64);
+    cout << "time = " << timeMs << " ms" << ", rmse = " << rmse << endl;
+
     cout << "data type = bf16, accumulator type = fp64, ";
     timeMs = 0;
     for (int t = -3; t < kNumTrials; t++)
@@ -263,20 +278,6 @@ void runExp(int numDocs, int embDim, float density)
     rmse = computeRMSE(v_doc_ref, v_doc_bf16_bf16);
     cout << "time = " << timeMs << " ms" << ", rmse = " << rmse << endl;
 
-    cout << "data type = float4, accumulator type = fp64, ";
-    timeMs = 0;
-    for (int t = -3; t < kNumTrials; t++)
-    {
-        float timeMs1 = score_float4<double>(d_docEmb_float4, d_reqEmb_float4, d_doc, numDocs, numActiveDocs, embDim4);
-        if (t >= 0)
-            timeMs += timeMs1;
-    }
-    timeMs /= kNumTrials;
-    vector<Doc> v_doc_float4_fp64(numActiveDocs);
-    CHECK_CUDA(cudaMemcpy(v_doc_float4_fp64.data(), d_doc, numActiveDocs * sizeof(Doc), cudaMemcpyDeviceToHost));
-    rmse = computeRMSE(v_doc_ref, v_doc_float4_fp64);
-    cout << "time = " << timeMs << " ms" << ", rmse = " << rmse << endl;
-
     cout << "data type = bf162, accumulator type = fp64, ";
     timeMs = 0;
     for (int t = -3; t < kNumTrials; t++)
@@ -289,6 +290,20 @@ void runExp(int numDocs, int embDim, float density)
     vector<Doc> v_doc_bf162_fp64(numActiveDocs);
     CHECK_CUDA(cudaMemcpy(v_doc_bf162_fp64.data(), d_doc, numActiveDocs * sizeof(Doc), cudaMemcpyDeviceToHost));
     rmse = computeRMSE(v_doc_ref, v_doc_bf162_fp64);
+    cout << "time = " << timeMs << " ms" << ", rmse = " << rmse << endl;
+
+    cout << "data type = bf162, accumulator type = fp32, ";
+    timeMs = 0;
+    for (int t = -3; t < kNumTrials; t++)
+    {
+        float timeMs1 = score_bf162<float>(d_docEmb_bf162, d_reqEmb_bf162, d_doc, numDocs, numActiveDocs, embDim2);
+        if (t >= 0)
+            timeMs += timeMs1;
+    }
+    timeMs /= kNumTrials;
+    vector<Doc> v_doc_bf162_fp32(numActiveDocs);
+    CHECK_CUDA(cudaMemcpy(v_doc_bf162_fp32.data(), d_doc, numActiveDocs * sizeof(Doc), cudaMemcpyDeviceToHost));
+    rmse = computeRMSE(v_doc_ref, v_doc_bf162_fp32);
     cout << "time = " << timeMs << " ms" << ", rmse = " << rmse << endl;
 
     cout << "data type = bf162, accumulator type = bf16, ";
@@ -308,7 +323,7 @@ void runExp(int numDocs, int embDim, float density)
 
 int main()
 {
-    runExp(200000, 128, 0.5);
+    runExp(1000000, 1024, 0.5);
 
     return 0;
 }

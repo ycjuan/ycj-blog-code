@@ -7,8 +7,8 @@ using namespace std;
 
 inline __host__ __device__ int getMemAddr(int docIdx, int embIdx, int numDocs, int embDim)
 {
-    //return embIdx * numDocs + docIdx;
-    return docIdx * embDim + embIdx;
+    return embIdx * numDocs + docIdx; // column-major
+    //return docIdx * embDim + embIdx; // row-major
 }
 
 struct Doc
