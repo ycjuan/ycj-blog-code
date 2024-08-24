@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cassert>
 #include <algorithm>
+#include <iomanip>
 #include <cuda_bf16.h>
 
 #include "util.cuh"
@@ -29,13 +30,16 @@ float computeRMSE(const vector<Doc> &v_rstA, const vector<Doc> &v_rstB)
         throw runtime_error("v_rstA.size() != v_rstB.size()");
 
     double squaredErrorSum = 0;
+    double squaredMeanSum = 0;
     for (int i = 0; i < v_rstA.size(); i++)
     {
-        double diff = (v_rstA[i].score - v_rstB[i].score) / v_rstA[i].score; // divide by v_rstA[i] so this error means "how much off from v_rstA[i]"
+        double diff = (v_rstA[i].score - v_rstB[i].score);
         squaredErrorSum += diff * diff;
+        squaredMeanSum += v_rstA[i].score * v_rstA[i].score;
     }
     double rmse = sqrt(squaredErrorSum / v_rstA.size());
-    return rmse;
+    double rms = sqrt(squaredMeanSum / v_rstA.size());
+    return rmse / rms;
 }
 
 void genRandEmbFP32(float *d_emb, int numDocs, int embDim)
@@ -72,9 +76,9 @@ void copyAsBF162(float *d_fp32, __nv_bfloat162 *d_bf162, int numDocs, int embDim
     {
         for (int j2 = 0; j2 < embDim2; j2++)
         {
-            __nv_bfloat162 &v = d_bf162[getMemAddr(i, j2, numDocs, embDim2)];
-            v.x = (__nv_bfloat16)d_fp32[getMemAddr(i, j2, numDocs, embDim)];
-            v.y = (__nv_bfloat16)d_fp32[getMemAddr(i, j2+1, numDocs, embDim)];
+            float float1 = d_fp32[getMemAddr(i, j2*2, numDocs, embDim)];
+            float float2 = d_fp32[getMemAddr(i, j2*2+1, numDocs, embDim)];
+            d_bf162[getMemAddr(i, j2, numDocs, embDim2)] = __floats2bfloat162_rn(float1, float2);
         }
     }
 }
@@ -87,11 +91,10 @@ void copyAsFloat4(float *d_fp32, float4 *d_float4, int numDocs, int embDim)
     {
         for (int j4 = 0; j4 < embDim4; j4++)
         {
-            float4 &v = d_float4[getMemAddr(i, j4, numDocs, embDim4)];
-            v.x = d_fp32[getMemAddr(i, j4, numDocs, embDim)];
-            v.y = d_fp32[getMemAddr(i, j4+1, numDocs, embDim)];
-            v.z = d_fp32[getMemAddr(i, j4+2, numDocs, embDim)];
-            v.w = d_fp32[getMemAddr(i, j4+3, numDocs, embDim)];
+            d_float4[getMemAddr(i, j4, numDocs, embDim4)].x = d_fp32[getMemAddr(i, j4*4, numDocs, embDim)];
+            d_float4[getMemAddr(i, j4, numDocs, embDim4)].y = d_fp32[getMemAddr(i, j4*4+1, numDocs, embDim)];
+            d_float4[getMemAddr(i, j4, numDocs, embDim4)].z = d_fp32[getMemAddr(i, j4*4+2, numDocs, embDim)];
+            d_float4[getMemAddr(i, j4, numDocs, embDim4)].w = d_fp32[getMemAddr(i, j4*4+3, numDocs, embDim)];
         }
     }
 }
@@ -140,8 +143,8 @@ void runExp(int numDocs, int embDim, float density)
     __nv_bfloat162 *d_reqEmb_bf162 = nullptr;
     CHECK_CUDA(cudaMallocManaged(&d_docEmb_bf162, numDocs * embDim2 * sizeof(__nv_bfloat162)));
     CHECK_CUDA(cudaMallocManaged(&d_reqEmb_bf162, embDim2 * sizeof(__nv_bfloat162)));
-    copyAsBF16(d_docEmb_fp32, d_docEmb_bf16, numDocs, embDim);
-    copyAsBF16(d_reqEmb_fp32, d_reqEmb_bf16, 1, embDim);
+    copyAsBF162(d_docEmb_fp32, d_docEmb_bf162, numDocs, embDim);
+    copyAsBF162(d_reqEmb_fp32, d_reqEmb_bf162, 1, embDim);
 
     int embDim4 = embDim / 4;
     assert(embDim4 * 4 == embDim);
@@ -151,9 +154,11 @@ void runExp(int numDocs, int embDim, float density)
     CHECK_CUDA(cudaMallocManaged(&d_reqEmb_float4, embDim4 * sizeof(float4)));
     copyAsFloat4(d_docEmb_fp32, d_docEmb_float4, numDocs, embDim);
     copyAsFloat4(d_reqEmb_fp32, d_reqEmb_float4, 1, embDim);
+    cudaDeviceSynchronize();
 
     float timeMs, rmse;
 
+    cout << fixed << setprecision(10);
     cout << "data type = fp32, accumulator type = fp64, ";
     timeMs = 0;
     for (int t = -3; t < kNumTrials; t++)
@@ -254,7 +259,7 @@ void runExp(int numDocs, int embDim, float density)
 
 int main()
 {
-    runExp(100000, 128, 0.5);
+    runExp(200000, 128, 0.5);
 
     return 0;
 }
