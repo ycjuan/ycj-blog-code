@@ -4,6 +4,8 @@
 #include <iostream>
 #include <cassert>
 #include <algorithm>
+#include <thrust/copy.h>
+#include <thrust/execution_policy.h>
 
 #include "util.cuh"
 
@@ -30,7 +32,52 @@ struct Doc
     bool isSelected;
 };
 
-__global__ void sampleKernelSimpleRandCopyIf(Doc *d_docSrc, Doc *d_docDst, int numDocs, int seed, int invSampleRate)
+namespace pseudoRandomCopyIf
+{
+    __global__ void sampleKernelPseudoRand(Doc *d_docSrc, Doc *d_docDst, int numDocs, int seed, int invSampleRate)
+    {
+        int i = blockIdx.x * blockDim.x + threadIdx.x;
+        if (i < numDocs)
+        {
+            Doc &doc = d_docSrc[i];
+            int randNum = doc.docIdx + seed;
+            doc.isSelected = (randNum % invSampleRate == 0);
+        }
+    }
+
+    struct Predicator
+    {
+        __host__ __device__ bool operator()(const Doc x)
+        {
+            return x.isSelected;
+        }
+    };
+
+    void sampleFuncPseudoRandCopyIf(Doc *d_docSrc, Doc *d_docDst, int numDocs, float sampleRate)
+    {
+        int gridSize = (int)ceil((double)(kNumDocs + 1) / kBlockSize);
+        int invSampleRate = 1.0 / sampleRate;
+        double timeMs = 0;
+        for (int t = -3; t < kNumTrials; t++)
+        {
+            CudaTimer timer;
+            timer.tic();
+            sampleKernelPseudoRand<<<gridSize, kBlockSize>>>(d_docSrc, d_docDst, numDocs, t, invSampleRate);
+            cudaDeviceSynchronize();
+            CHECK_CUDA(cudaGetLastError());
+            Doc *d_endPtr = thrust::copy_if(thrust::device, d_docSrc, d_docSrc + numDocs, d_docDst, Predicator());
+            int numCopied = d_endPtr - d_docDst;
+            cout << "[sampleFuncPseudoRandCopyIf] " << "t: " << t << "numCopied: " << numCopied << endl;
+            if (t >= 0)
+                timeMs += timer.tocMs();
+        }
+        timeMs /= kNumTrials;
+        cout << "[sampleFuncPseudoRandCopyIf] timeMs: " << timeMs << " ms" << endl;
+    }
+}
+__managed__ int currIdx = 0;
+
+__global__ void sampleKernelPseudoRandWithAtomicAdd(Doc *d_docSrc, Doc *d_docDst, int numDocs, int seed, int invSampleRate)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < numDocs)
@@ -38,10 +85,15 @@ __global__ void sampleKernelSimpleRandCopyIf(Doc *d_docSrc, Doc *d_docDst, int n
         Doc &doc = d_docSrc[i];
         int randNum = doc.docIdx + seed;
         doc.isSelected = (randNum % invSampleRate == 0);
+        if (doc.isSelected)
+        {
+            int idx = atomicAdd(&currIdx, 1);
+            d_docDst[idx] = doc;
+        }
     }
 }
 
-void sampleFuncSimpleRandCopyIf(Doc *d_docSrc, Doc *d_docDst, int numDocs, float sampleRate)
+void sampleFuncPseudoRandAtomicAdd(Doc *d_docSrc, Doc *d_docDst, int numDocs, float sampleRate)
 {
     int gridSize = (int)ceil((double)(kNumDocs + 1) / kBlockSize);
     int invSampleRate = 1.0 / sampleRate;
@@ -50,16 +102,16 @@ void sampleFuncSimpleRandCopyIf(Doc *d_docSrc, Doc *d_docDst, int numDocs, float
     {
         CudaTimer timer;
         timer.tic();
-        sampleKernelSimpleRandCopyIf<<<gridSize, kBlockSize>>>(d_docSrc, d_docDst, numDocs, invSampleRate, t);
+        currIdx = 0;
+        sampleKernelPseudoRandWithAtomicAdd<<<gridSize, kBlockSize>>>(d_docSrc, d_docDst, numDocs, t, invSampleRate);
         cudaDeviceSynchronize();
         CHECK_CUDA(cudaGetLastError());
         if (t >= 0)
             timeMs += timer.tocMs();
     }
     timeMs /= kNumTrials;
-    cout << "[sampleFuncSimpleRandCopyIf] timeMs: " << timeMs << " ms" << endl;
+    cout << "[sampleFuncPseudoRandCopyIf] timeMs: " << timeMs << " ms" << endl;
 }
-
 //chunkRandom
 
 int main()
@@ -74,7 +126,7 @@ int main()
     for (int i = 0; i < kNumDocs; i++)
         d_docSrc[i].docIdx = i;
 
-    sampleFuncSimpleRandCopyIf(d_docSrc, d_docDst, kNumDocs, kSampleRate);
+    pseudoRandomCopyIf::sampleFuncPseudoRandCopyIf(d_docSrc, d_docDst, kNumDocs, kSampleRate);
 
     cudaFree(d_docSrc);
     cudaFree(d_docDst);
