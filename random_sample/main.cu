@@ -9,10 +9,10 @@
 
 #include "util.cuh"
 
-const int kNumDocs = 1000000;
+const int kNumDocs = 10000000;
 const int kNumTrials = 10;
 const int kBlockSize = 512;
-const float kSampleRate = 0.1;
+const float kSampleRate = 0.5;
 
 using namespace std;
 
@@ -71,7 +71,8 @@ namespace pseudoRandomCopyIf
             int numSampled = d_endPtr - d_docDst;
             if (t >= 0)
                 timeMs += timer.tocMs();
-            cout << "[pseudoRandCopyIf] " << "t: " << t << "numSampled: " << numSampled << endl;
+            if (t == 0)
+                cout << "[pseudoRandCopyIf] " << "numSampled: " << numSampled << endl;
         }
         timeMs /= kNumTrials;
         cout << "[pseudoRandCopyIf] timeMs: " << timeMs << " ms" << endl;
@@ -113,10 +114,11 @@ namespace pseudoRandomAtomicAdd
             CHECK_CUDA(cudaGetLastError());
             if (t >= 0)
                 timeMs += timer.tocMs();
-            cout << "[pseudoRandAtomicAdd] " << "t: " << t << "numSampled: " << currIdx << endl;
+            if (t == 0)
+                cout << "[pseudoRandAtomicAdd] " << "numSampled: " << currIdx << endl;
         }
         timeMs /= kNumTrials;
-        cout << "[pseudoRandCopyIf] timeMs: " << timeMs << " ms" << endl;
+        cout << "[pseudoRandAtomicAdd] timeMs: " << timeMs << " ms" << endl;
     }
 }
 
@@ -137,15 +139,15 @@ namespace randomChunk
             cudaMemcpy(d_docDst + indexBegin, d_docSrc, sampleSize * sizeof(Doc), cudaMemcpyDeviceToDevice);
             cudaDeviceSynchronize();
             CHECK_CUDA(cudaGetLastError());
-            cout << "[randomChunk] " << "t: " << t << "numSampled: " << sampleSize << endl;
             if (t >= 0)
                 timeMs += timer.tocMs();
+            if (t == 0)
+                cout << "[randomChunk] " << "numSampled: " << sampleSize << endl;
         }
         timeMs /= kNumTrials;
         cout << "[randomChunk] timeMs: " << timeMs << " ms" << endl;
     }
 }
-
 
 int main()
 {
