@@ -9,17 +9,19 @@
 
 const int kNumDocs = 1000000;
 const int kNumTrials = 10;
+const int kBlockSize = 512;
+const float kSampleRate = 0.1;
 
 using namespace std;
 
-#define CHECK_CUDA(func)                                                                                                                     \
-    {                                                                                                                                        \
-        cudaError_t status = (func);                                                                                                         \
-        if (status != cudaSuccess)                                                                                                           \
-        {                                                                                                                                    \
-            string error = "[main.cu] CUDA API failed at line " + to_string(__LINE__) + " with error: " + cudaGetErrorString(status) + "\n"; \
-            throw runtime_error(error);                                                                                                      \
-        }                                                                                                                                    \
+#define CHECK_CUDA(func)                                                                                                           \
+    {                                                                                                                              \
+        cudaError_t status = (func);                                                                                               \
+        if (status != cudaSuccess)                                                                                                 \
+        {                                                                                                                          \
+            string error = "CUDA API failed at line " + to_string(__LINE__) + " with error: " + cudaGetErrorString(status) + "\n"; \
+            throw runtime_error(error);                                                                                            \
+        }                                                                                                                          \
     }
 
 struct Doc
@@ -28,7 +30,7 @@ struct Doc
     bool isSelected;
 };
 
-__global__ void sampleKernelA(Doc *d_docSrc, Doc *d_docDst, int numDocs, int seed, int invSampleRate)
+__global__ void sampleKernelSimpleRandCopyIf(Doc *d_docSrc, Doc *d_docDst, int numDocs, int seed, int invSampleRate)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < numDocs)
@@ -39,180 +41,43 @@ __global__ void sampleKernelA(Doc *d_docSrc, Doc *d_docDst, int numDocs, int see
     }
 }
 
-vector<float> runGpu(float *d_doc, float *d_req, float *d_rst, Meta *d_meta)
+void sampleFuncSimpleRandCopyIf(Doc *d_docSrc, Doc *d_docDst, int numDocs, float sampleRate)
 {
     int gridSize = (int)ceil((double)(kNumDocs + 1) / kBlockSize);
+    int invSampleRate = 1.0 / sampleRate;
     double timeMs = 0;
     for (int t = -3; t < kNumTrials; t++)
     {
         CudaTimer timer;
         timer.tic();
-        kernel<<<gridSize, kBlockSize>>>(d_doc, d_req, d_rst, d_meta, kNumDocs, kEmbDim, kMetaSize);
+        sampleKernelSimpleRandCopyIf<<<gridSize, kBlockSize>>>(d_docSrc, d_docDst, numDocs, invSampleRate, t);
         cudaDeviceSynchronize();
         CHECK_CUDA(cudaGetLastError());
         if (t >= 0)
             timeMs += timer.tocMs();
     }
     timeMs /= kNumTrials;
-    cout << "timeMs: " << timeMs << " ms" << endl;
-
-    vector<float> v_rst(kNumDocs);
-    CHECK_CUDA(cudaMemcpy(v_rst.data(), d_rst, kNumDocs * sizeof(float), cudaMemcpyDeviceToHost));
-    return v_rst;
+    cout << "[sampleFuncSimpleRandCopyIf] timeMs: " << timeMs << " ms" << endl;
 }
 
-vector<float> runCpu(const vector<float> &v_docEmb, const vector<float> &v_reqEmb, const vector<Meta> &v_meta)
-{
-    vector<float> v_rst(kNumDocs);
-    for (int i = 0; i < kNumDocs; i++)
-    {
-        double rst = 0;
-        for (int j = 0; j < kMetaSize; j++)
-        {
-            int idxBegin = v_meta[j].idxBegin;
-            int idxEnd = v_meta[j].idxEnd;
-            float weight = v_meta[j].weight;
-            for (int k = idxBegin; k < idxEnd; k++)
-                rst += v_docEmb[k * kNumDocs + i] * v_reqEmb[k] * weight;
-        }
-        v_rst[i] = rst;
-    }
-    return v_rst;
-}
-
-bool compareRst(const vector<float> &v_rstA, const vector<float> &v_rstB)
-{
-    if (v_rstA.size() != v_rstB.size())
-        return false;
-    for (int i = 0; i < v_rstA.size(); i++)
-    {
-        if (abs(v_rstA[i] - v_rstB[i]) > 1e-5)
-            return false;
-    }
-    return true;
-}
-
-void testGetSetValue(float *d_rst, bool doSet)
-{   
-    default_random_engine generator;
-    uniform_real_distribution<float> distribution(-1.0, 1.0);
-    
-    vector<int> v_idx(kNumDocs);
-    for (int i = 0; i < kNumDocs; i++)
-        v_idx[i] = i;
-    shuffle(v_idx.begin(), v_idx.end(), generator);
-    assert(v_idx[0] != 0);
-    assert(v_idx[kNumDocs] != kNumDocs - 1);
-    v_idx.resize(kGetSetCount);
-
-    vector<float> v_buffer(kNumDocs);
-    for (int i = 0; i < kNumDocs; i++)
-        v_buffer[i] = distribution(generator);
-
-    CudaTimer timer;
-    timer.tic();
-    for (auto idx : v_idx)
-    {
-        if (doSet)
-            d_rst[idx] = v_buffer[idx];
-        else
-            v_buffer[idx] = d_rst[idx];
-    }
-    float timeMs = (double)timer.tocMs() / kGetSetCount;
-    cout << "doSet = " << doSet << ", timeMs: " << fixed << timeMs << " ms" << endl;
-}
+//chunkRandom
 
 int main()
 {
-    cout << "kNumDocs: " << kNumDocs << ", kEmbDim: " << kEmbDim << ", kMetaSize: " << kMetaSize << ", kGetSetCount: " << kGetSetCount << endl;
-    // Some tools
-    default_random_engine generator;
-    uniform_real_distribution<float> distribution(-1.0, 1.0);
+    cout << "kNumDocs: " << kNumDocs << ", kSampleRate: " << kSampleRate << endl;
 
-    // Generate random data
-    vector<float> v_docEmb(kNumDocs * kEmbDim);
-    for (auto &v : v_docEmb)
-        v = distribution(generator);
+    Doc *d_docSrc = nullptr;
+    Doc *d_docDst = nullptr;
+    CHECK_CUDA(cudaMallocManaged(&d_docSrc, kNumDocs * sizeof(Doc)));
+    CHECK_CUDA(cudaMallocManaged(&d_docDst, kNumDocs * sizeof(Doc)));
 
-    vector<float> v_reqEmb(kEmbDim);
-    for (auto &v : v_reqEmb)
-        v = distribution(generator);
+    for (int i = 0; i < kNumDocs; i++)
+        d_docSrc[i].docIdx = i;
 
-    Meta meta1;
-    meta1.idxBegin = 0;
-    meta1.idxEnd = 64;
-    meta1.weight = 1.1;
+    sampleFuncSimpleRandCopyIf(d_docSrc, d_docDst, kNumDocs, kSampleRate);
 
-    Meta meta2;
-    meta2.idxBegin = 64;
-    meta2.idxEnd = 128;
-    meta2.weight = 2.2;
+    cudaFree(d_docSrc);
+    cudaFree(d_docDst);
 
-    vector<Meta> v_meta = {meta1, meta2};
-    
-    // Normal memory
-    float *d_docEmb = nullptr;
-    float *d_reqEmb = nullptr;
-    float *d_rst = nullptr;
-    Meta *d_meta = nullptr;
-    CHECK_CUDA(cudaMalloc(&d_docEmb, kNumDocs * kEmbDim * sizeof(float)));
-    CHECK_CUDA(cudaMalloc(&d_reqEmb, kEmbDim * sizeof(float)));
-    CHECK_CUDA(cudaMalloc(&d_rst, kNumDocs * sizeof(float)));
-    CHECK_CUDA(cudaMalloc(&d_meta, kMetaSize * sizeof(Meta)));
-    CHECK_CUDA(cudaMemcpy(d_docEmb, v_docEmb.data(), kNumDocs * kEmbDim * sizeof(float), cudaMemcpyHostToDevice));
-    CHECK_CUDA(cudaMemcpy(d_reqEmb, v_reqEmb.data(), kEmbDim * sizeof(float), cudaMemcpyHostToDevice));
-    CHECK_CUDA(cudaMemcpy(d_meta, v_meta.data(), kMetaSize * sizeof(Meta), cudaMemcpyHostToDevice));
-
-    // Managed memory
-    float *d_docEmb_managed = nullptr;
-    float *d_reqEmb_managed = nullptr;
-    float *d_rst_managed = nullptr;
-    Meta *d_meta_managed = nullptr;
-    CHECK_CUDA(cudaMallocManaged(&d_docEmb_managed, kNumDocs * kEmbDim * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&d_reqEmb_managed, kEmbDim * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&d_rst_managed, kNumDocs * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&d_meta_managed, kMetaSize * sizeof(Meta)));
-    CHECK_CUDA(cudaMemcpy(d_docEmb_managed, v_docEmb.data(), kNumDocs * kEmbDim * sizeof(float), cudaMemcpyHostToDevice));
-    CHECK_CUDA(cudaMemcpy(d_reqEmb_managed, v_reqEmb.data(), kEmbDim * sizeof(float), cudaMemcpyHostToDevice));
-    CHECK_CUDA(cudaMemcpy(d_meta_managed, v_meta.data(), kMetaSize * sizeof(Meta), cudaMemcpyHostToDevice));
-
-    vector<float> v_rst0 = runCpu(v_docEmb, v_reqEmb, v_meta);
-
-    cout << "d_docEmb, d_reqEmb, d_rst, d_meta" << endl;
-    vector<float> v_rst1 = runGpu(d_docEmb, d_reqEmb, d_rst, d_meta);
-    assert(compareRst(v_rst0, v_rst1));
-
-    cout << "d_docEmb_managed, d_reqEmb, d_rst, d_meta" << endl;
-    vector<float> v_rst2 = runGpu(d_docEmb_managed, d_reqEmb, d_rst, d_meta);
-    assert(compareRst(v_rst0, v_rst2));
-
-    cout << "d_docEmb_managed, d_reqEmb, d_rst_managed, d_meta" << endl;
-    vector<float> v_rst3 = runGpu(d_docEmb_managed, d_reqEmb, d_rst_managed, d_meta);
-    assert(compareRst(v_rst0, v_rst3));
-    assert(v_rst3[0] == d_rst_managed[0]); // This works. We can directly access GPU array
-    assert(v_rst3[99] == d_rst_managed[99]);
-    assert(v_rst3[kNumDocs-1] == d_rst_managed[kNumDocs-1]);
-
-    cout << "d_docEmb, d_reqEmb, d_rst, d_meta_managed" << endl;
-    vector<float> v_rst4 = runGpu(d_docEmb, d_reqEmb, d_rst, d_meta_managed);
-    assert(compareRst(v_rst0, v_rst4));
-    // assert(v_rst4[0] == d_rst[0]); // This leads to segmentation fault
-
-    // Alter the weight
-    v_meta[0].weight = 1.2;
-    v_meta[1].weight = 2.4;
-    //d_meta[0].weight = v_meta[0].weight; // This leads to segmentation fault
-    //d_meta[1].weight = v_meta[1].weight;
-    d_meta_managed[0].weight = v_meta[0].weight; // This is fine
-    d_meta_managed[1].weight = v_meta[1].weight;
-
-    vector<float> v_rst_b0 = runCpu(v_docEmb, v_reqEmb, v_meta);
-    vector<float> v_rst_b1 = runGpu(d_docEmb, d_reqEmb, d_rst, d_meta_managed);
-    assert(compareRst(v_rst_b0, v_rst_b1));
-
-    testGetSetValue(d_rst_managed, false);
-    testGetSetValue(d_rst_managed, true);
-
-    // Should free memory; please forgive my laziness...
     return 0;
 }
