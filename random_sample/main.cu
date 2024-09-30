@@ -4,14 +4,18 @@
 #include <iostream>
 #include <cassert>
 #include <algorithm>
+#include <unordered_set>
 #include <thrust/copy.h>
 #include <thrust/execution_policy.h>
 
 #include "util.cuh"
 
-const int kNumDocs = 10000000;
 const int kNumTrials = 10;
 const int kBlockSize = 512;
+const vector<int> kNumDocsPerPartition = {100, 1000, 10000, 100000, 1000000, 10000000};
+const int kNumPartitions = kNumDocsPerPartition.size();
+const int kMaxNumDocs = kNumDocsPerPartition[kNumPartitions - 1];
+const int kSampleSize = 250;
 const float kSampleRate = 0.5;
 
 using namespace std;
@@ -29,46 +33,82 @@ using namespace std;
 struct Doc
 {
     int docIdx;
-    bool isSelected;
+    int partitionIdx; // for example, a partition can be things like "country", "language", etc.
 };
 
-namespace pseudoRandomCopyIf
+namespace classicRandomSample
 {
-    __global__ void kernel(Doc *d_docSrc, Doc *d_docDst, int numDocs, int seed, int invSampleRate)
+    __global__ void kernel(Doc *d_docBuffer, int *d_sampleIdxBuffer, Doc *d_docDst, int kSampleSize)
     {
         int i = blockIdx.x * blockDim.x + threadIdx.x;
-        if (i < numDocs)
+        if (i < kSampleSize)
         {
-            Doc &doc = d_docSrc[i];
-            int randNum = doc.docIdx + seed;
-            doc.isSelected = (randNum % invSampleRate == 0);
+            d_docDst[i] = d_docBuffer[d_sampleIdxBuffer[i]];
         }
     }
 
     struct Predicator
     {
+        int partitionIdx;
+        Predicator(int partitionIdx) : partitionIdx(partitionIdx) {}
+
         __host__ __device__ bool operator()(const Doc x)
         {
-            return x.isSelected;
+            return x.partitionIdx == partitionIdx;
         }
     };
 
-    void sample(Doc *d_docSrc, Doc *d_docDst, int numDocs, float sampleRate)
+    void sample(Doc *d_docSrc, Doc *d_docDst, Doc *d_docBuffer, int *d_sampleIdxBuffer, int &finalSampleSize)
     {
-        int gridSize = (int)ceil((double)(kNumDocs + 1) / kBlockSize);
-        int invSampleRate = 1.0 / sampleRate;
+        int offsetDst = 0;
+        for (int partitionIdx = 0; partitionIdx < kNumPartitions; partitionIdx++)
+        {
+            // extract documents of this partition
+            int kNumDocs = kNumDocsPerPartition[partitionIdx];
+            Doc *d_docBufferEndPtr = thrust::copy_if(thrust::device, d_docSrc, d_docSrc + kNumDocs, d_docBuffer, Predicator(partitionIdx));
+            if (d_docBufferEndPtr - d_docBuffer != kNumDocs)
+                throw runtime_error("Error: d_docBufferEndPtr - d_docBuffer != kNumDocs");
+
+            // if num docs in this partition is less than kSampleSize, just copy all
+            if (kSampleSize >= kNumDocs)
+            {
+                CHECK_CUDA(cudaMemcpy(d_docDst + offsetDst, d_docBuffer, kNumDocs * sizeof(Doc), cudaMemcpyDeviceToDevice))
+                offsetDst += kNumDocs;
+                continue;
+            }
+
+            // generate random indexes
+            default_random_engine generator;
+            uniform_int_distribution<int> distribution(0, kNumDocs);
+            unordered_set<int> sampledIdxSet;
+            while (sampledIdxSet.size() < kSampleSize)
+            {
+                int idx = distribution(generator);
+                sampledIdxSet.insert(idx);
+            }
+
+            // do sampling
+            int gridSize = (int)ceil((double)(kSampleSize + 1) / kBlockSize);
+            kernel<<<gridSize, kBlockSize>>>(d_docBuffer, d_sampleIdxBuffer, d_docDst, kSampleSize);
+            cudaDeviceSynchronize();
+            CHECK_CUDA(cudaGetLastError());
+            offsetDst += kSampleSize;
+        }
+    }
+
+    void runExp(Doc *d_docSrc, Doc *d_docDst)
+    {
+        Doc *d_docBuffer = nullptr;
+        int *d_sampleIdxBuffer = nullptr;
+        CHECK_CUDA(cudaMalloc(&d_docBuffer, kMaxNumDocs * sizeof(Doc)));
+        CHECK_CUDA(cudaMalloc(&d_sampleIdxBuffer, kSampleSize * sizeof(int)));
+
         double timeMs = 0;
         for (int t = -3; t < kNumTrials; t++)
         {
             CudaTimer timer;
             timer.tic();
-            kernel<<<gridSize, kBlockSize>>>(d_docSrc, d_docDst, numDocs, t, invSampleRate);
-            cudaDeviceSynchronize();
-            CHECK_CUDA(cudaGetLastError());
-            Doc *d_endPtr = thrust::copy_if(thrust::device, d_docSrc, d_docSrc + numDocs, d_docDst, Predicator());
-            cudaDeviceSynchronize();
-            CHECK_CUDA(cudaGetLastError());
-            int numSampled = d_endPtr - d_docDst;
+            sample(d_docSrc, d_docDst, d_docBuffer, d_sampleIdxBuffer, kSampleSize);
             if (t >= 0)
                 timeMs += timer.tocMs();
             if (t == 0)
@@ -76,6 +116,9 @@ namespace pseudoRandomCopyIf
         }
         timeMs /= kNumTrials;
         cout << "[pseudoRandCopyIf] timeMs: " << timeMs << " ms" << endl;
+
+        cudaFree(d_docBuffer);
+        cudaFree(d_sampleIdxBuffer);
     }
 }
 
