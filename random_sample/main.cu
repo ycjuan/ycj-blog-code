@@ -14,7 +14,7 @@ using namespace std;
 
 const int kNumTrials = 10;
 const int kBlockSize = 512;
-const vector<int> kNumDocsPerPartition = {100, 1000, 10000, 100000, 1000000};
+const vector<int> kNumDocsPerPartition = {100, 1000, 10000, 100000, 1000000, 10000000};
 const int kNumPartitions = kNumDocsPerPartition.size();
 const int kMaxNumDocs = kNumDocsPerPartition[kNumPartitions - 1];
 const int kNumDocsTotal = accumulate(kNumDocsPerPartition.begin(), kNumDocsPerPartition.end(), 0);
@@ -140,7 +140,7 @@ namespace classicRandomSample
 
 namespace adhocRandomSampleGreedy
 {
-    const int kNumChunks = 1024;
+    const int kNumChunks = 1;
     __managed__ int docDstCurrIdx;
 
     struct KernelParam
@@ -150,7 +150,9 @@ namespace adhocRandomSampleGreedy
         int *d_partitionCounter;
         int offset;
         int numDocsPerChunk;
+        int numDocsTotal;
         int randomStartingPoint;
+        int sampleSize;
     };
 
     __global__ void kernel(KernelParam param)
@@ -158,18 +160,22 @@ namespace adhocRandomSampleGreedy
         int i = blockIdx.x * blockDim.x + threadIdx.x;
         if (i >= param.numDocsPerChunk)
             return;
-        if (param.offset + i >= param.randomStartingPoint)
+        if (param.offset < param.randomStartingPoint && param.offset + i >= param.randomStartingPoint)
             return;
         
-        int docIdx = param.offset + i;
+        int docIdx = (param.offset + i) % param.numDocsTotal;
         int partitionIdx = param.d_docSrc[docIdx].partitionIdx;
 
-        // below may have read-write race condition. however, it's fine as the consequence is there might be a little bit more than what we want to sample
-        if (param.d_partitionCounter[partitionIdx] >= kSampleSize)
+        if (param.d_partitionCounter[partitionIdx] >= param.sampleSize)
             return;
-        atomicAdd(param.d_partitionCounter + partitionIdx, 1);
-        atomicAdd(&docDstCurrIdx, 1);
-        param.d_docDst[docDstCurrIdx] = param.d_docSrc[docIdx];
+        int partitionCountOld = atomicAdd(param.d_partitionCounter + partitionIdx, 1);
+        if (partitionCountOld >= param.sampleSize)
+        {
+            atomicSub(param.d_partitionCounter + partitionIdx, 1);
+            return;
+        }
+        int currIdxOld = atomicAdd(&docDstCurrIdx, 1);
+        param.d_docDst[currIdxOld] = param.d_docSrc[docIdx];
     }
 
     int sample(Doc *d_docSrc, Doc *d_docDst, int *d_partitionCounter)
@@ -192,7 +198,11 @@ namespace adhocRandomSampleGreedy
             param.offset = offset;
             param.numDocsPerChunk = numDocsPerChunk;
             param.randomStartingPoint = randomStartingPoint;
+            param.numDocsTotal = kNumDocsTotal;
+            param.sampleSize = kSampleSize;
             kernel<<<gridSize, kBlockSize>>>(param);
+            cudaDeviceSynchronize();
+            CHECK_CUDA(cudaGetLastError());
 
             bool allPartitionSampled = true;
             for (int partitionIdx = 0; partitionIdx < kNumPartitions; partitionIdx++)
@@ -218,7 +228,7 @@ namespace adhocRandomSampleGreedy
     void runExp(Doc *d_docSrc, Doc *d_docDst)
     {
         int *d_partitionCounter = nullptr;
-        CHECK_CUDA(cudaMalloc(&d_partitionCounter, kSampleSize * sizeof(int)));
+        CHECK_CUDA(cudaMallocManaged(&d_partitionCounter, kSampleSize * sizeof(int)));
 
         double timeMs = 0;
         for (int t = -3; t < kNumTrials; t++)
@@ -232,7 +242,7 @@ namespace adhocRandomSampleGreedy
                 checkSample(d_docDst, sampleSizeAgg);
         }
         timeMs /= kNumTrials;
-        cout << "[classicRandomSample] timeMs: " << timeMs << " ms" << endl;
+        cout << "[adhocRandomSampleGreedy] timeMs: " << timeMs << " ms" << endl;
 
         cudaFree(d_partitionCounter);
     }
@@ -273,6 +283,7 @@ int main()
         throw runtime_error("Error: docIdx != kNumDocsTotal");
 
     classicRandomSample::runExp(d_docSrc, d_docDst);
+    adhocRandomSampleGreedy::runExp(d_docSrc, d_docDst);
 
     cudaFree(d_docSrc);
     cudaFree(d_docDst);
