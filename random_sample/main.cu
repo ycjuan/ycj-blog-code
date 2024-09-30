@@ -140,7 +140,6 @@ namespace classicRandomSample
 
 namespace adhocRandomSampleGreedy
 {
-    const int kNumChunks = 1;
     __managed__ int docDstCurrIdx;
 
     struct KernelParam
@@ -148,8 +147,6 @@ namespace adhocRandomSampleGreedy
         Doc *d_docSrc;
         Doc *d_docDst;
         int *d_partitionCounter;
-        int offset;
-        int numDocsPerChunk;
         int numDocsTotal;
         int randomStartingPoint;
         int sampleSize;
@@ -158,12 +155,10 @@ namespace adhocRandomSampleGreedy
     __global__ void kernel(KernelParam param)
     {
         int i = blockIdx.x * blockDim.x + threadIdx.x;
-        if (i >= param.numDocsPerChunk)
-            return;
-        if (param.offset < param.randomStartingPoint && param.offset + i >= param.randomStartingPoint)
+        if (i >= param.numDocsTotal)
             return;
         
-        int docIdx = (param.offset + i) % param.numDocsTotal;
+        int docIdx = (param.randomStartingPoint + i) % param.numDocsTotal;
         int partitionIdx = param.d_docSrc[docIdx].partitionIdx;
 
         if (param.d_partitionCounter[partitionIdx] >= param.sampleSize)
@@ -184,40 +179,19 @@ namespace adhocRandomSampleGreedy
         default_random_engine generator;
         uniform_int_distribution<int> distribution(0, kNumDocsTotal);
         int randomStartingPoint = distribution(generator);
-        int numDocsPerChunk = (int)ceil((double)kNumDocsTotal / kNumChunks);
 
-        int offset = randomStartingPoint;
         docDstCurrIdx = 0;
-        for (int chunkIdx = 0; chunkIdx < kNumChunks; chunkIdx++)
-        {
-            int gridSize = (int)ceil((double)(numDocsPerChunk + 1) / kBlockSize);
-            KernelParam param;
-            param.d_docSrc = d_docSrc;
-            param.d_docDst = d_docDst;
-            param.d_partitionCounter = d_partitionCounter;
-            param.offset = offset;
-            param.numDocsPerChunk = numDocsPerChunk;
-            param.randomStartingPoint = randomStartingPoint;
-            param.numDocsTotal = kNumDocsTotal;
-            param.sampleSize = kSampleSize;
-            kernel<<<gridSize, kBlockSize>>>(param);
-            cudaDeviceSynchronize();
-            CHECK_CUDA(cudaGetLastError());
-
-            bool allPartitionSampled = true;
-            for (int partitionIdx = 0; partitionIdx < kNumPartitions; partitionIdx++)
-            {
-                if (d_partitionCounter[partitionIdx] < kNumDocsPerPartition[partitionIdx])
-                {
-                    allPartitionSampled = false;
-                    break;
-                }
-            }
-            if (allPartitionSampled)
-                break;
-            
-            offset = (offset + numDocsPerChunk) % kNumDocsTotal;
-        }
+        int gridSize = (int)ceil((double)(kNumDocsTotal + 1) / kBlockSize);
+        KernelParam param;
+        param.d_docSrc = d_docSrc;
+        param.d_docDst = d_docDst;
+        param.d_partitionCounter = d_partitionCounter;
+        param.randomStartingPoint = randomStartingPoint;
+        param.numDocsTotal = kNumDocsTotal;
+        param.sampleSize = kSampleSize;
+        kernel<<<gridSize, kBlockSize>>>(param);
+        cudaDeviceSynchronize();
+        CHECK_CUDA(cudaGetLastError());
 
         int numSampled = 0;
         for (int partitionIdx = 0; partitionIdx < kNumPartitions; partitionIdx++)
