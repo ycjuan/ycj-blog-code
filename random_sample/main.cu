@@ -10,6 +10,8 @@
 
 #include "util.cuh"
 
+using namespace std;
+
 const int kNumTrials = 10;
 const int kBlockSize = 512;
 const vector<int> kNumDocsPerPartition = {100, 1000, 10000, 100000, 1000000, 10000000};
@@ -17,8 +19,6 @@ const int kNumPartitions = kNumDocsPerPartition.size();
 const int kMaxNumDocs = kNumDocsPerPartition[kNumPartitions - 1];
 const int kNumDocsTotal = accumulate(kNumDocsPerPartition.begin(), kNumDocsPerPartition.end(), 0);
 const int kSampleSize = 250;
-
-using namespace std;
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \
@@ -35,6 +35,21 @@ struct Doc
     int docIdx;
     int partitionIdx; // for example, a partition can be things like "country", "language", etc.
 };
+
+void checkSample(Doc *d_docDst, int numSampled)
+{
+    cout << "numSampled: " << numSampled << endl;
+    vector<vector<Doc>> sample(kNumPartitions);
+    for (int i = 0; i < numSampled; i++)
+    {
+        Doc doc = d_docDst[i];
+        sample[doc.partitionIdx].push_back(doc);
+    }
+    for (int partitionIdx = 0; partitionIdx < kNumPartitions; partitionIdx++)
+    {
+        cout << "partitionIdx: " << partitionIdx << ", numSampled: " << sample[partitionIdx].size() << endl;
+    }
+}
 
 namespace classicRandomSample
 {
@@ -113,7 +128,7 @@ namespace classicRandomSample
             if (t >= 0)
                 timeMs += timer.tocMs();
             if (t == 0)
-                cout << "[classicRandomSample] " << "numSampled: " << sampleSizeAgg << endl;
+                checkSample(d_docDst, sampleSizeAgg);
         }
         timeMs /= kNumTrials;
         cout << "[classicRandomSample] timeMs: " << timeMs << " ms" << endl;
@@ -157,7 +172,7 @@ namespace adhocRandomSampleGreedy
         param.d_docDst[docDstCurrIdx] = param.d_docSrc[docIdx];
     }
 
-    int sample(Doc *d_docSrc, Doc *d_docDst, Doc *d_docBuffer, int *d_partitionCounter)
+    int sample(Doc *d_docSrc, Doc *d_docDst, int *d_partitionCounter)
     {
         CHECK_CUDA(cudaMemset(d_partitionCounter, 0, kNumPartitions * sizeof(int)))
         default_random_engine generator;
@@ -199,7 +214,30 @@ namespace adhocRandomSampleGreedy
             numSampled += d_partitionCounter[partitionIdx];
         return numSampled;
     }
+
+    void runExp(Doc *d_docSrc, Doc *d_docDst)
+    {
+        int *d_partitionCounter = nullptr;
+        CHECK_CUDA(cudaMalloc(&d_partitionCounter, kSampleSize * sizeof(int)));
+
+        double timeMs = 0;
+        for (int t = -3; t < kNumTrials; t++)
+        {
+            CudaTimer timer;
+            timer.tic();
+            int sampleSizeAgg = sample(d_docSrc, d_docDst, d_partitionCounter);
+            if (t >= 0)
+                timeMs += timer.tocMs();
+            if (t == 0)
+                checkSample(d_docDst, sampleSizeAgg);
+        }
+        timeMs /= kNumTrials;
+        cout << "[classicRandomSample] timeMs: " << timeMs << " ms" << endl;
+
+        cudaFree(d_partitionCounter);
+    }
 }
+
 
 int main()
 {
@@ -218,14 +256,23 @@ int main()
     Doc *d_docSrc = nullptr;
     Doc *d_docDst = nullptr;
     CHECK_CUDA(cudaMallocManaged(&d_docSrc, kNumDocsTotal * sizeof(Doc)));
-    CHECK_CUDA(cudaMallocManaged(&d_docDst, kNumDocsTotal * sizeof(Doc)));
+    CHECK_CUDA(cudaMallocManaged(&d_docDst, kNumPartitions * kSampleSize * sizeof(Doc)));
 
-    for (int i = 0; i < kNumDocs; i++)
+    int docIdx = 0;
+    for (int partitionIdx = 0; partitionIdx < kNumPartitions; partitionIdx++)
+    {
+        int kNumDocs = kNumDocsPerPartition[partitionIdx];
+        for (int i = 0; i < kNumDocs; i++)
+        {
+            d_docSrc[docIdx].docIdx = docIdx;
+            d_docSrc[docIdx].partitionIdx = partitionIdx;
+        }
+    }
+    if (docIdx != kNumDocsTotal)
+        throw runtime_error("Error: docIdx != kNumDocsTotal");
+
+    for (int i = 0; i < kNumDocsTotal; i++)
         d_docSrc[i].docIdx = i;
-
-    pseudoRandomCopyIf::sample(d_docSrc, d_docDst, kNumDocs, kSampleRate);
-    pseudoRandomAtomicAdd::sample(d_docSrc, d_docDst, kNumDocs, kSampleRate);
-    randomChunk::sample(d_docSrc, d_docDst, kNumDocs, kSampleRate);
 
     cudaFree(d_docSrc);
     cudaFree(d_docDst);
