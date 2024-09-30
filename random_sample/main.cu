@@ -14,7 +14,7 @@ using namespace std;
 
 const int kNumTrials = 10;
 const int kBlockSize = 512;
-const vector<int> kNumDocsPerPartition = {100, 1000, 10000, 100000, 1000000, 10000000};
+const vector<int> kNumDocsPerPartition = {100, 1000, 10000, 100000, 1000000};
 const int kNumPartitions = kNumDocsPerPartition.size();
 const int kMaxNumDocs = kNumDocsPerPartition[kNumPartitions - 1];
 const int kNumDocsTotal = accumulate(kNumDocsPerPartition.begin(), kNumDocsPerPartition.end(), 0);
@@ -38,6 +38,7 @@ struct Doc
 
 void checkSample(Doc *d_docDst, int numSampled)
 {
+    cout << "============" << endl;
     cout << "numSampled: " << numSampled << endl;
     vector<vector<Doc>> sample(kNumPartitions);
     for (int i = 0; i < numSampled; i++)
@@ -46,9 +47,8 @@ void checkSample(Doc *d_docDst, int numSampled)
         sample[doc.partitionIdx].push_back(doc);
     }
     for (int partitionIdx = 0; partitionIdx < kNumPartitions; partitionIdx++)
-    {
         cout << "partitionIdx: " << partitionIdx << ", numSampled: " << sample[partitionIdx].size() << endl;
-    }
+    cout << "============" << endl;
 }
 
 namespace classicRandomSample
@@ -80,7 +80,7 @@ namespace classicRandomSample
         {
             // extract documents of this partition
             int kNumDocs = kNumDocsPerPartition[partitionIdx];
-            Doc *d_docBufferEndPtr = thrust::copy_if(thrust::device, d_docSrc, d_docSrc + kNumDocs, d_docBuffer, Predicator(partitionIdx));
+            Doc *d_docBufferEndPtr = thrust::copy_if(thrust::device, d_docSrc, d_docSrc + kNumDocsTotal, d_docBuffer, Predicator(partitionIdx));
             if (d_docBufferEndPtr - d_docBuffer != kNumDocs)
                 throw runtime_error("Error: d_docBufferEndPtr - d_docBuffer != kNumDocs");
 
@@ -104,7 +104,7 @@ namespace classicRandomSample
 
             // do sampling
             int gridSize = (int)ceil((double)(kSampleSize + 1) / kBlockSize);
-            kernel<<<gridSize, kBlockSize>>>(d_docBuffer, d_sampleIdxBuffer, d_docDst, kSampleSize);
+            kernel<<<gridSize, kBlockSize>>>(d_docBuffer, d_sampleIdxBuffer, d_docDst + sampleSizeAgg, kSampleSize);
             cudaDeviceSynchronize();
             CHECK_CUDA(cudaGetLastError());
             sampleSizeAgg += kSampleSize;
@@ -244,7 +244,7 @@ int main()
     cout << "kNumDocsPerPartition: ";
     for (auto kNumDocs : kNumDocsPerPartition)
     {
-        cout << kNumDocs;
+        cout << kNumDocs << " ";
     }
     cout << endl;
     cout << "kNumDocsTotal: " << kNumDocsTotal << endl;
@@ -266,13 +266,13 @@ int main()
         {
             d_docSrc[docIdx].docIdx = docIdx;
             d_docSrc[docIdx].partitionIdx = partitionIdx;
+            docIdx++;
         }
     }
     if (docIdx != kNumDocsTotal)
         throw runtime_error("Error: docIdx != kNumDocsTotal");
 
-    for (int i = 0; i < kNumDocsTotal; i++)
-        d_docSrc[i].docIdx = i;
+    classicRandomSample::runExp(d_docSrc, d_docDst);
 
     cudaFree(d_docSrc);
     cudaFree(d_docDst);
