@@ -1,0 +1,55 @@
+kNumDocsPerPartition: 100 1000 10000 100000 1000000 10000000 
+kNumDocsTotal: 11111100
+kSampleSize: 250
+kNumTrials: 10
+kMaxNumDocs: 10000000
+kNumPartitions: 6
+============
+numSampled: 1350
+partitionIdx: 0, numSampled: 100
+partitionIdx: 1, numSampled: 250
+partitionIdx: 2, numSampled: 250
+partitionIdx: 3, numSampled: 250
+partitionIdx: 4, numSampled: 250
+partitionIdx: 5, numSampled: 250
+============
+[classicRandomSample] timeMs: 2.71958 ms
+============
+numSampled: 1350
+partitionIdx: 0, numSampled: 100
+partitionIdx: 1, numSampled: 250
+partitionIdx: 2, numSampled: 250
+partitionIdx: 3, numSampled: 250
+partitionIdx: 4, numSampled: 250
+partitionIdx: 5, numSampled: 250
+============
+[adhocRandomSampleGreedy] timeMs: 0.695856 ms
+
+
+
+kNumDocsPerPartition: 10000000 10000000 10000000 10000000 10000000 10000000 
+kNumDocsTotal: 60000000
+kSampleSize: 250
+kNumTrials: 10
+kMaxNumDocs: 10000000
+kNumPartitions: 6
+============
+numSampled: 1500
+partitionIdx: 0, numSampled: 250
+partitionIdx: 1, numSampled: 250
+partitionIdx: 2, numSampled: 250
+partitionIdx: 3, numSampled: 250
+partitionIdx: 4, numSampled: 250
+partitionIdx: 5, numSampled: 250
+============
+[classicRandomSample] timeMs: 13.752 ms
+============
+numSampled: 1500
+partitionIdx: 0, numSampled: 250
+partitionIdx: 1, numSampled: 250
+partitionIdx: 2, numSampled: 250
+partitionIdx: 3, numSampled: 250
+partitionIdx: 4, numSampled: 250
+partitionIdx: 5, numSampled: 250
+============
+[adhocRandomSampleGreedy] timeMs: 1.87337 ms
