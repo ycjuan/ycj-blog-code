@@ -53,10 +53,10 @@ void checkSample(Doc *d_docDst, int numSampled)
 
 namespace classicRandomSample
 {
-    __global__ void kernel(Doc *d_docBuffer, int *d_sampleIdxBuffer, Doc *d_docDst, int kSampleSize)
+    __global__ void kernel(Doc *d_docBuffer, int *d_sampleIdxBuffer, Doc *d_docDst, int sampleSize)
     {
         int i = blockIdx.x * blockDim.x + threadIdx.x;
-        if (i < kSampleSize)
+        if (i < sampleSize)
         {
             d_docDst[i] = d_docBuffer[d_sampleIdxBuffer[i]];
         }
@@ -79,8 +79,8 @@ namespace classicRandomSample
         for (int partitionIdx = 0; partitionIdx < kNumPartitions; partitionIdx++)
         {
             // extract documents of this partition
-            int kNumDocs = kNumDocsPerPartition[partitionIdx];
             Doc *d_docBufferEndPtr = thrust::copy_if(thrust::device, d_docSrc, d_docSrc + kNumDocsTotal, d_docBuffer, Predicator(partitionIdx));
+            int kNumDocs = kNumDocsPerPartition[partitionIdx];
             if (d_docBufferEndPtr - d_docBuffer != kNumDocs)
                 throw runtime_error("Error: d_docBufferEndPtr - d_docBuffer != kNumDocs");
 
@@ -94,13 +94,15 @@ namespace classicRandomSample
 
             // generate random indexes
             default_random_engine generator;
-            uniform_int_distribution<int> distribution(0, kNumDocs);
+            uniform_int_distribution<int> distribution(0, kNumDocs-1);
             unordered_set<int> sampledIdxSet;
             while (sampledIdxSet.size() < kSampleSize)
             {
                 int idx = distribution(generator);
                 sampledIdxSet.insert(idx);
             }
+            vector<int> sampledIdxVec(sampledIdxSet.begin(), sampledIdxSet.end());
+            CHECK_CUDA(cudaMemcpy(d_sampleIdxBuffer, sampledIdxVec.data(), kSampleSize * sizeof(int), cudaMemcpyHostToDevice))
 
             // do sampling
             int gridSize = (int)ceil((double)(kSampleSize + 1) / kBlockSize);
@@ -253,6 +255,7 @@ int main()
             docIdx++;
         }
     }
+    shuffle(d_docSrc, d_docSrc + kNumDocsTotal, default_random_engine(0));
     if (docIdx != kNumDocsTotal)
         throw runtime_error("Error: docIdx != kNumDocsTotal");
 
