@@ -17,7 +17,6 @@ const int kNumPartitions = kNumDocsPerPartition.size();
 const int kMaxNumDocs = kNumDocsPerPartition[kNumPartitions - 1];
 const int kNumDocsTotal = accumulate(kNumDocsPerPartition.begin(), kNumDocsPerPartition.end(), 0);
 const int kSampleSize = 250;
-const float kSampleRate = 0.5;
 
 using namespace std;
 
@@ -127,6 +126,7 @@ namespace classicRandomSample
 namespace adhocRandomSampleGreedy
 {
     const int kNumChunks = 1024;
+    __managed__ int docDstCurrIdx;
 
     struct KernelParam
     {
@@ -153,6 +153,8 @@ namespace adhocRandomSampleGreedy
         if (param.d_partitionCounter[partitionIdx] >= kSampleSize)
             return;
         atomicAdd(param.d_partitionCounter + partitionIdx, 1);
+        atomicAdd(&docDstCurrIdx, 1);
+        param.d_docDst[docDstCurrIdx] = param.d_docSrc[docIdx];
     }
 
     int sample(Doc *d_docSrc, Doc *d_docDst, Doc *d_docBuffer, int *d_partitionCounter)
@@ -164,6 +166,7 @@ namespace adhocRandomSampleGreedy
         int numDocsPerChunk = (int)ceil((double)kNumDocsTotal / kNumChunks);
 
         int offset = randomStartingPoint;
+        docDstCurrIdx = 0;
         for (int chunkIdx = 0; chunkIdx < kNumChunks; chunkIdx++)
         {
             int gridSize = (int)ceil((double)(numDocsPerChunk + 1) / kBlockSize);
@@ -179,8 +182,6 @@ namespace adhocRandomSampleGreedy
             bool allPartitionSampled = true;
             for (int partitionIdx = 0; partitionIdx < kNumPartitions; partitionIdx++)
             {
-                for (int slotIdx = 1; slotIdx < kNumCounterSlots; slotIdx++)
-                    d_partitionCounter[partitionIdx] += d_partitionCounter[slotIdx * kNumPartitions + partitionIdx];
                 if (d_partitionCounter[partitionIdx] < kNumDocsPerPartition[partitionIdx])
                 {
                     allPartitionSampled = false;
@@ -202,12 +203,22 @@ namespace adhocRandomSampleGreedy
 
 int main()
 {
-    cout << "kNumDocs: " << kNumDocs << ", kSampleRate: " << kSampleRate << endl;
+    cout << "kNumDocsPerPartition: ";
+    for (auto kNumDocs : kNumDocsPerPartition)
+    {
+        cout << kNumDocs;
+    }
+    cout << endl;
+    cout << "kNumDocsTotal: " << kNumDocsTotal << endl;
+    cout << "kSampleSize: " << kSampleSize << endl;
+    cout << "kNumTrials: " << kNumTrials << endl;
+    cout << "kMaxNumDocs: " << kMaxNumDocs << endl;
+    cout << "kNumPartitions: " << kNumPartitions << endl;
 
     Doc *d_docSrc = nullptr;
     Doc *d_docDst = nullptr;
-    CHECK_CUDA(cudaMallocManaged(&d_docSrc, kNumDocs * sizeof(Doc)));
-    CHECK_CUDA(cudaMallocManaged(&d_docDst, kNumDocs * sizeof(Doc)));
+    CHECK_CUDA(cudaMallocManaged(&d_docSrc, kNumDocsTotal * sizeof(Doc)));
+    CHECK_CUDA(cudaMallocManaged(&d_docDst, kNumDocsTotal * sizeof(Doc)));
 
     for (int i = 0; i < kNumDocs; i++)
         d_docSrc[i].docIdx = i;
