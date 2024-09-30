@@ -15,6 +15,7 @@ const int kBlockSize = 512;
 const vector<int> kNumDocsPerPartition = {100, 1000, 10000, 100000, 1000000, 10000000};
 const int kNumPartitions = kNumDocsPerPartition.size();
 const int kMaxNumDocs = kNumDocsPerPartition[kNumPartitions - 1];
+const int kNumDocsTotal = accumulate(kNumDocsPerPartition.begin(), kNumDocsPerPartition.end(), 0);
 const int kSampleSize = 250;
 const float kSampleRate = 0.5;
 
@@ -58,9 +59,9 @@ namespace classicRandomSample
         }
     };
 
-    void sample(Doc *d_docSrc, Doc *d_docDst, Doc *d_docBuffer, int *d_sampleIdxBuffer, int &finalSampleSize)
+    int sample(Doc *d_docSrc, Doc *d_docDst, Doc *d_docBuffer, int *d_sampleIdxBuffer)
     {
-        int offsetDst = 0;
+        int sampleSizeAgg = 0;
         for (int partitionIdx = 0; partitionIdx < kNumPartitions; partitionIdx++)
         {
             // extract documents of this partition
@@ -72,8 +73,8 @@ namespace classicRandomSample
             // if num docs in this partition is less than kSampleSize, just copy all
             if (kSampleSize >= kNumDocs)
             {
-                CHECK_CUDA(cudaMemcpy(d_docDst + offsetDst, d_docBuffer, kNumDocs * sizeof(Doc), cudaMemcpyDeviceToDevice))
-                offsetDst += kNumDocs;
+                CHECK_CUDA(cudaMemcpy(d_docDst + sampleSizeAgg, d_docBuffer, kNumDocs * sizeof(Doc), cudaMemcpyDeviceToDevice))
+                sampleSizeAgg += kNumDocs;
                 continue;
             }
 
@@ -92,8 +93,9 @@ namespace classicRandomSample
             kernel<<<gridSize, kBlockSize>>>(d_docBuffer, d_sampleIdxBuffer, d_docDst, kSampleSize);
             cudaDeviceSynchronize();
             CHECK_CUDA(cudaGetLastError());
-            offsetDst += kSampleSize;
+            sampleSizeAgg += kSampleSize;
         }
+        return sampleSizeAgg;
     }
 
     void runExp(Doc *d_docSrc, Doc *d_docDst)
@@ -108,87 +110,93 @@ namespace classicRandomSample
         {
             CudaTimer timer;
             timer.tic();
-            sample(d_docSrc, d_docDst, d_docBuffer, d_sampleIdxBuffer, kSampleSize);
+            int sampleSizeAgg = sample(d_docSrc, d_docDst, d_docBuffer, d_sampleIdxBuffer);
             if (t >= 0)
                 timeMs += timer.tocMs();
             if (t == 0)
-                cout << "[pseudoRandCopyIf] " << "numSampled: " << numSampled << endl;
+                cout << "[classicRandomSample] " << "numSampled: " << sampleSizeAgg << endl;
         }
         timeMs /= kNumTrials;
-        cout << "[pseudoRandCopyIf] timeMs: " << timeMs << " ms" << endl;
+        cout << "[classicRandomSample] timeMs: " << timeMs << " ms" << endl;
 
         cudaFree(d_docBuffer);
         cudaFree(d_sampleIdxBuffer);
     }
 }
 
-namespace pseudoRandomAtomicAdd
+namespace adhocRandomSampleGreedy
 {
-    __managed__ int currIdx = 0;
+    const int kNumChunks = 1024;
 
-    __global__ void kernel(Doc *d_docSrc, Doc *d_docDst, int numDocs, int seed, int invSampleRate)
+    struct KernelParam
+    {
+        Doc *d_docSrc;
+        Doc *d_docDst;
+        int *d_partitionCounter;
+        int offset;
+        int numDocsPerChunk;
+        int randomStartingPoint;
+    };
+
+    __global__ void kernel(KernelParam param)
     {
         int i = blockIdx.x * blockDim.x + threadIdx.x;
-        if (i < numDocs)
-        {
-            Doc &doc = d_docSrc[i];
-            int randNum = doc.docIdx + seed;
-            doc.isSelected = (randNum % invSampleRate == 0);
-            if (doc.isSelected)
-            {
-                int idx = atomicAdd(&currIdx, 1);
-                d_docDst[idx] = doc;
-            }
-        }
+        if (i >= param.numDocsPerChunk)
+            return;
+        if (param.offset + i >= param.randomStartingPoint)
+            return;
+        
+        int docIdx = param.offset + i;
+        int partitionIdx = param.d_docSrc[docIdx].partitionIdx;
+
+        // below may have read-write race condition. however, it's fine as the consequence is there might be a little bit more than what we want to sample
+        if (param.d_partitionCounter[partitionIdx] >= kSampleSize)
+            return;
+        atomicAdd(param.d_partitionCounter + partitionIdx, 1);
     }
 
-    void sample(Doc *d_docSrc, Doc *d_docDst, int numDocs, float sampleRate)
+    int sample(Doc *d_docSrc, Doc *d_docDst, Doc *d_docBuffer, int *d_partitionCounter)
     {
-        int gridSize = (int)ceil((double)(kNumDocs + 1) / kBlockSize);
-        int invSampleRate = 1.0 / sampleRate;
-        double timeMs = 0;
-        for (int t = -3; t < kNumTrials; t++)
-        {
-            CudaTimer timer;
-            timer.tic();
-            currIdx = 0;
-            kernel<<<gridSize, kBlockSize>>>(d_docSrc, d_docDst, numDocs, t, invSampleRate);
-            cudaDeviceSynchronize();
-            CHECK_CUDA(cudaGetLastError());
-            if (t >= 0)
-                timeMs += timer.tocMs();
-            if (t == 0)
-                cout << "[pseudoRandAtomicAdd] " << "numSampled: " << currIdx << endl;
-        }
-        timeMs /= kNumTrials;
-        cout << "[pseudoRandAtomicAdd] timeMs: " << timeMs << " ms" << endl;
-    }
-}
-
-namespace randomChunk
-{
-    void sample(Doc *d_docSrc, Doc *d_docDst, int numDocs, float sampleRate)
-    {
-        int sampleSize = numDocs * sampleRate;
-
+        CHECK_CUDA(cudaMemset(d_partitionCounter, 0, kNumPartitions * sizeof(int)))
         default_random_engine generator;
-        uniform_int_distribution<int> distribution(0, numDocs - sampleSize);
-        double timeMs = 0;
-        for (int t = -3; t < kNumTrials; t++)
+        uniform_int_distribution<int> distribution(0, kNumDocsTotal);
+        int randomStartingPoint = distribution(generator);
+        int numDocsPerChunk = (int)ceil((double)kNumDocsTotal / kNumChunks);
+
+        int offset = randomStartingPoint;
+        for (int chunkIdx = 0; chunkIdx < kNumChunks; chunkIdx++)
         {
-            CudaTimer timer;
-            timer.tic();
-            int indexBegin = distribution(generator);
-            cudaMemcpy(d_docDst + indexBegin, d_docSrc, sampleSize * sizeof(Doc), cudaMemcpyDeviceToDevice);
-            cudaDeviceSynchronize();
-            CHECK_CUDA(cudaGetLastError());
-            if (t >= 0)
-                timeMs += timer.tocMs();
-            if (t == 0)
-                cout << "[randomChunk] " << "numSampled: " << sampleSize << endl;
+            int gridSize = (int)ceil((double)(numDocsPerChunk + 1) / kBlockSize);
+            KernelParam param;
+            param.d_docSrc = d_docSrc;
+            param.d_docDst = d_docDst;
+            param.d_partitionCounter = d_partitionCounter;
+            param.offset = offset;
+            param.numDocsPerChunk = numDocsPerChunk;
+            param.randomStartingPoint = randomStartingPoint;
+            kernel<<<gridSize, kBlockSize>>>(param);
+
+            bool allPartitionSampled = true;
+            for (int partitionIdx = 0; partitionIdx < kNumPartitions; partitionIdx++)
+            {
+                for (int slotIdx = 1; slotIdx < kNumCounterSlots; slotIdx++)
+                    d_partitionCounter[partitionIdx] += d_partitionCounter[slotIdx * kNumPartitions + partitionIdx];
+                if (d_partitionCounter[partitionIdx] < kNumDocsPerPartition[partitionIdx])
+                {
+                    allPartitionSampled = false;
+                    break;
+                }
+            }
+            if (allPartitionSampled)
+                break;
+            
+            offset = (offset + numDocsPerChunk) % kNumDocsTotal;
         }
-        timeMs /= kNumTrials;
-        cout << "[randomChunk] timeMs: " << timeMs << " ms" << endl;
+
+        int numSampled = 0;
+        for (int partitionIdx = 0; partitionIdx < kNumPartitions; partitionIdx++)
+            numSampled += d_partitionCounter[partitionIdx];
+        return numSampled;
     }
 }
 
