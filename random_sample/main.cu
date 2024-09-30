@@ -14,7 +14,7 @@ using namespace std;
 
 const int kNumTrials = 10;
 const int kBlockSize = 512;
-const vector<int> kNumDocsPerPartition = {100, 1000, 10000, 100000, 1000000, 10000000};
+const vector<int> kNumDocsPerPartition = {10000000, 10000000, 10000000, 10000000, 10000000, 10000000};
 const int kNumPartitions = kNumDocsPerPartition.size();
 const int kMaxNumDocs = kNumDocsPerPartition[kNumPartitions - 1];
 const int kNumDocsTotal = accumulate(kNumDocsPerPartition.begin(), kNumDocsPerPartition.end(), 0);
