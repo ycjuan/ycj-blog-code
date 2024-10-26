@@ -6,17 +6,6 @@
 
 using namespace std;
 
-struct GpuAlgoParam
-{
-    ItemDataGpu reqData;
-    ItemDataGpu docData;
-    ReqDocPairDataGpu rqData;
-    ReqDocPairDataGpu reqBufferData;
-    Topk topk;
-    int numToRetrieve;
-    float topkTimeMs;
-};
-
 inline __device__ __host__ bool scoreComparator(const ReqDocPair &a, const ReqDocPair &b)
 {
     return a.score > b.score;

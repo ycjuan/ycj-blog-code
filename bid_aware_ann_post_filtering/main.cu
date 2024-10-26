@@ -12,17 +12,18 @@ using namespace std;
 
 int main()
 {
-    const int kNumCentroids = 10;
+    const int kNumCentroids = 100;
     const int kDim = 4;
     const float kCentroidStdDev = 0.1;
     const float kDocStdDev = 0.05;
     const float kPassRate = 0.25;
     const int kBidStdDev = 1;
-    const int kNumDocsPerCentroid = 1000;
+    const int kNumDocsPerCentroid = 10000;
     const int kNumReqsPerCentroid = 1;
-    const int kNumToRetrieve = 100;
+    const int kNumToRetrieve = 1000;
 
     // prepare CPU data
+    cout << "Generating data..." << endl;
     vector<CentroidCpu> centroids = genRandCentroids(kNumCentroids, kDim, kCentroidStdDev);
     vector<ItemCpu> docs = genRandReqDocsFromCentroids(centroids, kDocStdDev, kNumDocsPerCentroid, kBidStdDev);
     vector<ItemCpu> reqs = genRandReqDocsFromCentroids(centroids, kDocStdDev, kNumReqsPerCentroid, kBidStdDev);
@@ -31,16 +32,26 @@ int main()
         req.randAttr = kPassRate;
     }
 
+    cout << "Running pre CPU algo..." << endl;
     vector<vector<ReqDocPair>> rstPreCpu = preCpuAlgoBatch(reqs, docs, kNumToRetrieve);
+
+    cout << "Running pre GPU algo..." << endl;
     vector<vector<ReqDocPair>> rstPreGpu = preGpuAlgoBatch(reqs, docs, kNumToRetrieve);
 
-    for (int i = 0; i < reqs.size(); i++)
+    cout << "Comparing results..." << endl;
+    double sameClusterRatioSum = 0;
+    for (int reqIdx = 0; reqIdx < reqs.size(); reqIdx++)
     {
-        float sameClusterRatio = checkSameClusterRatio(rstPreCpu[i]);
-        cout << "Same cluster ratio: " << sameClusterRatio << endl;
-        float sameClusterRatioPreGpu = checkSameClusterRatio(rstPreGpu[i]);
-        cout << "Same cluster ratio: " << sameClusterRatioPreGpu << endl;
+        int numErrors = compareResults(rstPreCpu[reqIdx], rstPreGpu[reqIdx]);
+        if (numErrors > 4)
+        {
+            cout << "Error in comparing results: " << numErrors << endl;
+        }
+        float sameClusterRatio = checkSameClusterRatio(rstPreCpu[reqIdx]);
+        sameClusterRatioSum += sameClusterRatio;
     }
+    double avgSameClusterRatio = sameClusterRatioSum / reqs.size();
+    cout << "Average same cluster ratio: " << avgSameClusterRatio << endl;
 
     return 0;
 }

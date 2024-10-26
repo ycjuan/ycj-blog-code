@@ -15,7 +15,6 @@ struct ItemCpu
     vector<float> emb;
     float randAttr;
     float bid;
-    float score = 0.0f;
 };
 
 struct CentroidCpu
@@ -30,7 +29,6 @@ struct ItemGpu
     int centroidId;
     float randAttr;
     float bid;
-    float score = 0.0f;
 };
 
 struct ItemDataGpu
@@ -75,7 +73,6 @@ struct ItemDataGpu
             d_item[i].centroidId = itemCpu1D[i].centroidId;
             d_item[i].randAttr = itemCpu1D[i].randAttr;
             d_item[i].bid = itemCpu1D[i].bid;
-            d_item[i].score = itemCpu1D[i].score;
             for (int j = 0; j < embDim; j++)
             {
                 d_emb[getEmbMemAddr(i, j)] = itemCpu1D[i].emb[j];
@@ -122,13 +119,11 @@ struct ReqDocPairDataGpu
     ReqDocPair *d_data;
     size_t size_d_data;
     size_t size_byte_d_data;
-    size_t numActivePairs = 0;
 
     void malloc(size_t size_d_data)
     {
         this->size_d_data = size_d_data;
         this->size_byte_d_data = size_d_data * sizeof(ReqDocPair);
-        numActivePairs = 0;
         cudaError_t cudaError = cudaMallocManaged(&d_data, size_byte_d_data);
         if (cudaError != cudaSuccess)
         {
@@ -148,7 +143,6 @@ struct ReqDocPairDataGpu
             pair.docCentroidId = docs[docIdx].centroidId;
             pair.score = 0.0f;
         }
-        numActivePairs = docs.size();
     }
 
     void reset()
@@ -159,7 +153,6 @@ struct ReqDocPairDataGpu
         }
         size_d_data = 0;
         size_byte_d_data = 0;
-        numActivePairs = 0;
     }
 };
 

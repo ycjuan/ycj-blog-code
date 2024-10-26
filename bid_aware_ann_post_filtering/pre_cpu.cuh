@@ -3,6 +3,7 @@
 
 #include "data_synthesizer.cuh"
 #include "common.cuh"
+#include "util.cuh"
 
 #include <random>
 #include <iostream>
@@ -13,7 +14,7 @@ using namespace std;
 
 vector<ReqDocPair> preCpuAlgoSingle(const ItemCpu &req, const vector<ItemCpu> &docs, int k)
 {
-    vector<ReqDocPair> eligibleDocs;
+    vector<ReqDocPair> rst;
     for (auto doc : docs)
     {
         if (doc.randAttr <= req.randAttr)
@@ -27,30 +28,33 @@ vector<ReqDocPair> preCpuAlgoSingle(const ItemCpu &req, const vector<ItemCpu> &d
             pair.reqCentroidId = req.centroidId;
             pair.docCentroidId = doc.centroidId;
 
-            eligibleDocs.push_back(pair);
+            rst.push_back(pair);
         }
     }
 
-    sort(eligibleDocs.begin(), eligibleDocs.end(), scoreComparator);
+    sort(rst.begin(), rst.end(), scoreComparator);
 
-    if (eligibleDocs.size() > k)
+    if (rst.size() > k)
     {
-        eligibleDocs.resize(k);
+        rst.resize(k);
     }
 
-    return eligibleDocs;
+    return rst;
 }
 
 vector<vector<ReqDocPair>> preCpuAlgoBatch(const vector<ItemCpu> &reqs, const vector<ItemCpu> &docs, int k)
 {
-    vector<vector<ReqDocPair>> eligibleDocsBatch;
-    for (auto req : reqs)
+    vector<vector<ReqDocPair>> rst2D(reqs.size());
+    CudaTimer timer;
+    timer.tic();
+    for (int reqIdx = 0; reqIdx < reqs.size(); reqIdx++)
     {
-        auto eligibleDocs = preCpuAlgoSingle(req, docs, k);
-        eligibleDocsBatch.push_back(eligibleDocs);
+        rst2D[reqIdx] = preCpuAlgoSingle(reqs[reqIdx], docs, k);
     }
+    float timeMs = timer.tocMs() / reqs.size();
+    cout << "Latency per request (CPU): " << timeMs << " ms" << endl;
 
-    return eligibleDocsBatch;
+    return rst2D;
 }
 
 #endif // PRE_CPU_CUH

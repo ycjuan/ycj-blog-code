@@ -77,45 +77,59 @@ void Topk::findLowestBucket(vector<int> &v_counter, int numToRetrieve, int &lowe
     }
 }
 
-vector<ReqDocPair> Topk::retrieveTopk(ReqDocPair *d_doc, ReqDocPair *d_buffer, int numReqDocPairs, int numToRetrieve, float &timeMs)
+vector<ReqDocPair> Topk::retrieveTopk(TopkRetrievalParam &param)
 {
     CudaTimer timer;
+    CudaTimer timerLocal;
     timer.tic();
 
     int kBlockSize = 256;
-    int gridSize = (int)ceil((double)(numReqDocPairs + 1) / kBlockSize);
+    int gridSize = (int)ceil((double)(param.numReqDocPairs + 1) / kBlockSize);
 
     // Step1 - Run kernel to update the counter
+    timerLocal.tic();
     CHECK_CUDA(cudaMemset(d_counter_, 0, kSize_byte_d_counter_))
-    updateCounterKernel<<<gridSize, kBlockSize>>>(d_doc, numReqDocPairs, *this);
+    updateCounterKernel<<<gridSize, kBlockSize>>>(param.d_pair, param.numReqDocPairs, *this);
     cudaDeviceSynchronize();
     CHECK_CUDA(cudaGetLastError())
+    param.timeMsUpdateCounter = timerLocal.tocMs();
 
     // Step2 - Copy counter from GPU to CPU
+    timerLocal.tic();
     vector<int> v_counter(kSize_d_counter_, 0);
     CHECK_CUDA(cudaMemcpy(v_counter.data(), d_counter_, kSize_byte_d_counter_, cudaMemcpyDeviceToHost))
+    param.timeMsCopyCounterToCpu = timerLocal.tocMs();
 
     // Step3 - Find the lowest bucket
+    timerLocal.tic();
     int numReqDocPairsGreaterThanLowestBucket;
-    findLowestBucket(v_counter, numToRetrieve, lowestBucket_, numReqDocPairsGreaterThanLowestBucket);
+    findLowestBucket(v_counter, param.numToRetrieve, lowestBucket_, numReqDocPairsGreaterThanLowestBucket);
+    param.timeMsFindLowestBucket = timerLocal.tocMs();
 
     // Step4 - Filter items that is larger than the lowest bucket
-    ReqDocPair *d_endPtr = thrust::copy_if(thrust::device, d_doc, d_doc + numReqDocPairs, d_buffer, *this); // copy_if will call Topk::operator()
+    timerLocal.tic();
+    ReqDocPair *d_endPtr = thrust::copy_if(thrust::device, param.d_pair, param.d_pair + param.numReqDocPairs, param.d_buffer, *this); // copy_if will call Topk::operator()
     cudaDeviceSynchronize();
     CHECK_CUDA(cudaGetLastError())
-    int numCopied = (d_endPtr - d_buffer);
+    int numCopied = (d_endPtr - param.d_buffer);
     assert(numCopied == numReqDocPairsGreaterThanLowestBucket);
+    param.timeMsPrefilter = timerLocal.tocMs();
 
     // Step5 - Only sort the docs that are larger than the lowest bucket
-    thrust::stable_sort(thrust::device, d_buffer, d_buffer + numCopied, ScorePredicator());
+    timerLocal.tic();
+    thrust::stable_sort(thrust::device, param.d_buffer, param.d_buffer + numCopied, ScorePredicator());
     cudaDeviceSynchronize();
     CHECK_CUDA(cudaGetLastError())
+    param.timeMsSort = timerLocal.tocMs();
 
     // Step6 - copy back to CPU
+    timerLocal.tic();
+    int numToRetrieve = min(param.numToRetrieve, numCopied);
     vector<ReqDocPair> v_doc(numToRetrieve);
-    CHECK_CUDA(cudaMemcpy(v_doc.data(), d_buffer, sizeof(ReqDocPair) * numToRetrieve, cudaMemcpyDeviceToHost))
+    CHECK_CUDA(cudaMemcpy(v_doc.data(), param.d_buffer, sizeof(ReqDocPair) * numToRetrieve, cudaMemcpyDeviceToHost))
+    param.timeMsCopyBackToCpu = timerLocal.tocMs();
 
-    timeMs = timer.tocMs();
+    param.timeMsTotal = timer.tocMs();
 
     return v_doc;
 }

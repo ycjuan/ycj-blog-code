@@ -28,8 +28,8 @@ std::vector<CentroidCpu> genRandCentroids(int numCentroids, int dim, float stdDe
     return centroids;
 }
 
-std::vector<ItemCpu> genRandReqDocsFromOneCentroid(
-    const CentroidCpu &centroid, float stdDev, int numDocs, float bidStdDev, int &uid)
+std::vector<ItemCpu> genRandItemsFromOneCentroid(
+    const CentroidCpu &centroid, float stdDev, int numItems, float bidStdDev, int &uid)
 {
     using namespace std;
 
@@ -38,39 +38,39 @@ std::vector<ItemCpu> genRandReqDocsFromOneCentroid(
     normal_distribution<float> bidDist(1.0, bidStdDev);
     uniform_real_distribution<float> attrDist(0.0, 1.0);
 
-    vector<ItemCpu> docs(numDocs);
-    for (int i = 0; i < numDocs; i++)
+    vector<ItemCpu> items(numItems);
+    for (int i = 0; i < numItems; i++)
     {
-        docs[i].uid = uid++;
-        docs[i].centroidId = centroid.centroidId;
-        docs[i].emb.resize(centroid.emb.size());
-        docs[i].randAttr = attrDist(generator);
-        docs[i].bid = max(0.1, bidDist(generator));
+        items[i].uid = uid++;
+        items[i].centroidId = centroid.centroidId;
+        items[i].emb.resize(centroid.emb.size());
+        items[i].randAttr = attrDist(generator);
+        items[i].bid = max(0.1, bidDist(generator));
 
-        auto &docEmb = docs[i].emb;
+        auto &docEmb = items[i].emb;
         for (int j = 0; j < centroid.emb.size(); j++)
         {
             docEmb[j] = centroid.emb[j] + embDist(generator);
         }
     }
 
-    return docs;
+    return items;
 }
 
 std::vector<ItemCpu> genRandReqDocsFromCentroids(
-    const std::vector<CentroidCpu>& centroids, float stdDev, int numDocsPerCentroid, float bidStdDev)
+    const std::vector<CentroidCpu>& centroids, float stdDev, int numItemsPerCentroid, float bidStdDev)
 {
     using namespace std;
 
-    vector<ItemCpu> docs;
+    vector<ItemCpu> items;
     int uid = 0;
     for (const auto& centroid : centroids)
     {
-        auto docsFromOneCentroid = genRandReqDocsFromOneCentroid(centroid, stdDev, numDocsPerCentroid, bidStdDev, uid);
-        docs.insert(docs.end(), docsFromOneCentroid.begin(), docsFromOneCentroid.end());
+        auto itemsFromOneCentroid = genRandItemsFromOneCentroid(centroid, stdDev, numItemsPerCentroid, bidStdDev, uid);
+        items.insert(items.end(), itemsFromOneCentroid.begin(), itemsFromOneCentroid.end());
     }
 
-    return docs;
+    return items;
 }
 
 #endif // DATA_SYNTHESIZER_CUH

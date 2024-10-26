@@ -5,6 +5,21 @@
 
 #include "data_struct.cuh"
 
+struct TopkRetrievalParam
+{
+    ReqDocPair *d_pair;
+    ReqDocPair *d_buffer;
+    int numReqDocPairs;
+    int numToRetrieve;
+    float timeMsUpdateCounter = 0;
+    float timeMsCopyCounterToCpu = 0;
+    float timeMsFindLowestBucket = 0;
+    float timeMsPrefilter = 0;
+    float timeMsSort = 0;
+    float timeMsCopyBackToCpu = 0;
+    float timeMsTotal = 0;
+};
+
 class Topk
 {
 public:
@@ -12,7 +27,7 @@ public:
 
     void reset();
 
-    std::vector<ReqDocPair> retrieveTopk(ReqDocPair *d_rd, ReqDocPair *d_buffer, int numReqDocPairs, int numToRetrieve, float &timeMs);
+    std::vector<ReqDocPair> retrieveTopk(TopkRetrievalParam &param);
 
     __device__ __host__ int getCounterIdx(int slot, int bucket)
     {
