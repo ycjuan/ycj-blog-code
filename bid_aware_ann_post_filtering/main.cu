@@ -1,6 +1,7 @@
 #include "data_synthesizer.cuh"
 #include "pre_cpu.cuh"
 #include "pre_gpu.cuh"
+#include "post_gpu.cuh"
 #include "eval.cuh"
 #include "common.cuh"
 #include "topk.cuh"
@@ -24,14 +25,18 @@ int main()
         req.randAttr = kPassRate;
     }
 
-    cout << "Running pre CPU algo..." << endl;
+    cout << endl << "Running pre CPU algo..." << endl;
     vector<vector<ReqDocPair>> rstPreCpu = preCpuAlgoBatch(reqs, docs, kNumToRetrieve);
 
-    cout << "Running pre GPU algo..." << endl;
+    cout << endl << "Running pre GPU algo..." << endl;
     vector<vector<ReqDocPair>> rstPreGpu = preGpuAlgoBatch(reqs, docs, kNumToRetrieve);
 
-    cout << "Comparing results..." << endl;
+    cout << endl << "Running post GPU algo..." << endl;
+    vector<vector<ReqDocPair>> rstPostGpu = postGpuAlgoBatch(centroids, reqs, docs, kNumToRetrieve);
+
+    cout << endl << "Comparing results..." << endl;
     double sameClusterRatioSum = 0;
+    double recallSum = 0;
     for (int reqIdx = 0; reqIdx < reqs.size(); reqIdx++)
     {
         int numErrors = compareResults(rstPreCpu[reqIdx], rstPreGpu[reqIdx]);
@@ -41,9 +46,14 @@ int main()
         }
         float sameClusterRatio = checkSameClusterRatio(rstPreCpu[reqIdx]);
         sameClusterRatioSum += sameClusterRatio;
+
+        float recall = checkRecall(rstPostGpu[reqIdx], rstPreCpu[reqIdx]);
+        recallSum += recall;
     }
     double avgSameClusterRatio = sameClusterRatioSum / reqs.size();
+    double avgRecall = recallSum / reqs.size();
     cout << "Average same cluster ratio: " << avgSameClusterRatio << endl;
+    cout << "Average recall: " << avgRecall << endl;
 
     return 0;
 }

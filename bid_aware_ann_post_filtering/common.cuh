@@ -44,4 +44,18 @@ inline __device__ float getScoreDevice(
     return 1.0 / (dist + 1e-8);
 };
 
+inline __device__ float getScoreDevice(
+    const ItemDataGpu &reqData, const CentroidDataGpu &centroidData, int reqIdx, int centroidIdx)
+{
+    double dist = 0.0f;
+    for (int j = 0; j < reqData.embDim; j++)
+    {
+        float a = reqData.getEmb(reqIdx, j);
+        float b = centroidData.getEmb(centroidIdx, j);
+        dist += (a - b) * (a - b);
+    }
+    dist = sqrt(dist);
+    return 1.0 / (dist + 1e-8);
+};
+
 #endif // COMMON_CUH

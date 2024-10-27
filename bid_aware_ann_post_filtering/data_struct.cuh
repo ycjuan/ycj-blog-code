@@ -105,6 +105,77 @@ struct ItemDataGpu
     }
 };
 
+struct CentroidDataGpu
+{
+    int *d_centroidId;
+    size_t numCentroids;
+    size_t size_d_centroidId;
+    size_t size_byte_d_centroidId;
+
+    float *d_emb;
+    size_t embDim;
+    size_t size_d_emb;
+    size_t size_byte_d_emb;
+
+    void malloc(size_t numCentroids, size_t embDim)
+    {
+        this->numCentroids = numCentroids;
+        size_d_centroidId = numCentroids;
+        size_byte_d_centroidId = numCentroids * sizeof(int);
+        cudaError_t cudaError = cudaMallocManaged(&d_centroidId, size_byte_d_centroidId);
+        if (cudaError != cudaSuccess)
+        {
+            throw runtime_error("cudaMallocManaged failed: " + string(cudaGetErrorString(cudaError)));
+        }
+
+        this->embDim = embDim;
+        size_d_emb = numCentroids * embDim;
+        size_byte_d_emb = size_d_emb * sizeof(float);
+        cudaError = cudaMallocManaged(&d_emb, size_byte_d_emb);
+        if (cudaError != cudaSuccess)
+        {
+            throw runtime_error("cudaMallocManaged failed: " + string(cudaGetErrorString(cudaError)));
+        }
+    }
+
+    void init(const vector<CentroidCpu> &centroidCpu1D)
+    {
+        malloc(centroidCpu1D.size(), centroidCpu1D[0].emb.size());
+        for (int i = 0; i < numCentroids; i++)
+        {
+            d_centroidId[i] = centroidCpu1D[i].centroidId;
+            for (int j = 0; j < embDim; j++)
+            {
+                d_emb[getEmbMemAddr(i, j)] = centroidCpu1D[i].emb[j];
+            }
+        }
+    }
+
+    void reset()
+    {
+        if (d_centroidId != nullptr)
+        {
+            cudaFree(d_centroidId);
+        }
+        if (d_emb != nullptr)
+        {
+            cudaFree(d_emb);
+        }
+        size_d_centroidId = 0;
+        size_byte_d_centroidId = 0;
+    }
+
+    __device__ __host__ size_t getEmbMemAddr(int i, int j) const
+    {
+        return (size_t)j * numCentroids + i;
+    }
+
+    __device__ __host__ float getEmb(int i, int j) const
+    {
+        return d_emb[getEmbMemAddr(i, j)];
+    }
+};
+
 struct ReqDocPair
 {
     int reqIdx;

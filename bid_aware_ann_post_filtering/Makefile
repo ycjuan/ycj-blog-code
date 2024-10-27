@@ -7,7 +7,7 @@ all: test_data_synthesizer main
 test_data_synthesizer: test_data_synthesizer.cu
 	nvcc $(INC) -o $@ $^ $(CFLAGS)
 
-main: main.cu topk_with_bucket_sort.cu
+main: main.cu topk_with_bucket_sort.cu post_gpu.cu
 	nvcc $(INC) -o $@ $^ $(CFLAGS)
 
 clean:

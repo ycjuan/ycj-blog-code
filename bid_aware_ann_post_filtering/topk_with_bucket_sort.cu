@@ -127,9 +127,55 @@ vector<ReqDocPair> Topk::retrieveTopk(TopkRetrievalParam &param)
     int numToRetrieve = min(param.numToRetrieve, numCopied);
     vector<ReqDocPair> v_doc(numToRetrieve);
     CHECK_CUDA(cudaMemcpy(v_doc.data(), param.d_buffer, sizeof(ReqDocPair) * numToRetrieve, cudaMemcpyDeviceToHost))
+    param.numRetrieved = numToRetrieve;
     param.timeMsCopyBackToCpu = timerLocal.tocMs();
 
     param.timeMsTotal = timer.tocMs();
 
     return v_doc;
+}
+
+// TODO: merge code with retrieveTopk
+void Topk::retrieveTopkApprox(TopkRetrievalParam &param)
+{
+    CudaTimer timer;
+    CudaTimer timerLocal;
+    timer.tic();
+
+    int kBlockSize = 256;
+    int gridSize = (int)ceil((double)(param.numReqDocPairs + 1) / kBlockSize);
+
+    // Step1 - Run kernel to update the counter
+    timerLocal.tic();
+    CHECK_CUDA(cudaMemset(d_counter_, 0, kSize_byte_d_counter_))
+    updateCounterKernel<<<gridSize, kBlockSize>>>(param.d_pair, param.numReqDocPairs, *this);
+    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaGetLastError())
+    param.timeMsUpdateCounter = timerLocal.tocMs();
+
+    // Step2 - Copy counter from GPU to CPU
+    timerLocal.tic();
+    vector<int> v_counter(kSize_d_counter_, 0);
+    CHECK_CUDA(cudaMemcpy(v_counter.data(), d_counter_, kSize_byte_d_counter_, cudaMemcpyDeviceToHost))
+    param.timeMsCopyCounterToCpu = timerLocal.tocMs();
+
+    // Step3 - Find the lowest bucket
+    timerLocal.tic();
+    int numReqDocPairsGreaterThanLowestBucket;
+    findLowestBucket(v_counter, param.numToRetrieve, lowestBucket_, numReqDocPairsGreaterThanLowestBucket);
+    param.timeMsFindLowestBucket = timerLocal.tocMs();
+
+    // Step4 - Filter items that is larger than the lowest bucket
+    timerLocal.tic();
+    ReqDocPair *d_endPtr = thrust::copy_if(thrust::device, param.d_pair, param.d_pair + param.numReqDocPairs, param.d_buffer, *this); // copy_if will call Topk::operator()
+    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaGetLastError())
+    int numCopied = (d_endPtr - param.d_buffer);
+    assert(numCopied == numReqDocPairsGreaterThanLowestBucket);
+    param.numRetrieved = numCopied;
+    param.timeMsPrefilter = timerLocal.tocMs();
+
+    param.timeMsSort = 0;
+    param.timeMsCopyBackToCpu = 0;
+    param.timeMsTotal = timer.tocMs();
 }

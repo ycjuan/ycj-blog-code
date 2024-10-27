@@ -4,6 +4,7 @@
 #include "data_struct.cuh"
 
 #include <vector>
+#include <set>
 
 using namespace std;
 
@@ -42,5 +43,60 @@ int compareResults(const vector<ReqDocPair> &pair1D, const vector<ReqDocPair> &p
     return errorCount;
 }
 
+float checkRecall(const vector<ReqDocPair> &pair1D, const vector<ReqDocPair> &pair1DRef)
+{
+    if (pair1D.size() != pair1DRef.size())
+    {
+        throw runtime_error("pair1D.size() != pair1DRef.size()");
+    }
+
+    set<int> docIdxSet;
+    for (const auto &rd : pair1DRef)
+    {
+        docIdxSet.insert(rd.docIdx);
+    }
+
+    int recallCount = 0;
+    for (const auto &rd : pair1D)
+    {
+        if (docIdxSet.find(rd.docIdx) != docIdxSet.end())
+        {
+            recallCount++;
+        }
+    }
+    float recall = (float)recallCount / docIdxSet.size();
+
+    return recall;
+}
+
+/*
+float checkSizeToCover(const vector<ReqDocPair> &pair1D, const vector<ReqDocPair> &pair1DRef)
+{
+    if (pair1D.size() != pair1DRef.size())
+    {
+        throw runtime_error("pair1D.size() != pair1DRef.size()");
+    }
+
+    set<int> docIdxSet;
+    for (const auto &rd : pair1DRef)
+    {
+        docIdxSet.insert(rd.docIdx);
+    }
+
+    int sizeToCover = 0;
+    set<int> coveredDocIdxSet;
+    for (const auto &rd : pair1D)
+    {
+        if (docIdxSet.find(rd.docIdx) != docIdxSet.end() &&
+            coveredDocIdxSet.find(rd.docIdx) == coveredDocIdxSet.end())
+        {
+            coveredDocIdxSet.insert(rd.docIdx);
+            sizeToCover++;
+        }
+    }
+
+    return (float)sizeToCover / docIdxSet.size();
+}
+*/
 
 #endif // EVAL_CUH

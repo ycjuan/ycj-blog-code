@@ -11,6 +11,7 @@ struct TopkRetrievalParam
     ReqDocPair *d_buffer;
     int numReqDocPairs;
     int numToRetrieve;
+    int numRetrieved;
     float timeMsUpdateCounter = 0;
     float timeMsCopyCounterToCpu = 0;
     float timeMsFindLowestBucket = 0;
@@ -28,6 +29,8 @@ public:
     void reset();
 
     std::vector<ReqDocPair> retrieveTopk(TopkRetrievalParam &param);
+
+    void retrieveTopkApprox(TopkRetrievalParam &param);
 
     __device__ __host__ int getCounterIdx(int slot, int bucket)
     {
