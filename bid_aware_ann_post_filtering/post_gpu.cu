@@ -230,11 +230,10 @@ namespace
 
 }
 
-//TODO: rename k to numToRetrieve
 vector<vector<ReqDocPair>> postGpuAlgoBatch(const vector<CentroidCpu> &centroids,
                                             const vector<ItemCpu> &reqs,
                                             const vector<ItemCpu> &docs,
-                                            int k,
+                                            int numToRetrieve,
                                             bool enableBidAware)
 {
     // prepare topk
@@ -246,7 +245,7 @@ vector<vector<ReqDocPair>> postGpuAlgoBatch(const vector<CentroidCpu> &centroids
     // prepare PostGpuAlgoParam
     PostGpuAlgoParam param;
     param.docData.init(docs);
-    param.numToRetrieve = k;
+    param.numToRetrieve = numToRetrieve;
     param.topk.init(minScore, maxScore);
     param.reqData.init(reqs);
     param.centroidData.init(centroids);

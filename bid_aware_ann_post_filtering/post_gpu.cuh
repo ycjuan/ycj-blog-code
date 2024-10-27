@@ -16,11 +16,10 @@
 
 using namespace std;
 
-//TODO: rename k to numToRetrieve
 vector<vector<ReqDocPair>> postGpuAlgoBatch(const vector<CentroidCpu> &centroids,
                                             const vector<ItemCpu> &reqs,
                                             const vector<ItemCpu> &docs,
-                                            int k,
+                                            int numToRetrieve,
                                             bool enableBidAware);
 
 #endif // POST_GPU_CUH
