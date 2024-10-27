@@ -29,6 +29,7 @@ namespace
         int activePairSize;
         float *d_centroidScore = nullptr;
         float minPassRate;
+        bool enableBidAware;
 
         float timeMsStep1ScoreCentroid;
         float timeMsStep2PreScore;
@@ -78,7 +79,9 @@ namespace
             pair.docIdx = docIdx;
             pair.reqCentroidId = req.centroidId;
             pair.docCentroidId = doc.centroidId;
-            pair.score = param.d_centroidScore[doc.centroidId] * param.docData.d_item[docIdx].bid;
+            pair.score = param.d_centroidScore[doc.centroidId];
+            if (param.enableBidAware)
+                pair.score *= param.docData.d_item[docIdx].bid;
 
             param.rstData.d_data[docIdx] = pair;
         }
@@ -231,7 +234,8 @@ namespace
 vector<vector<ReqDocPair>> postGpuAlgoBatch(const vector<CentroidCpu> &centroids,
                                             const vector<ItemCpu> &reqs,
                                             const vector<ItemCpu> &docs,
-                                            int k)
+                                            int k,
+                                            bool enableBidAware)
 {
     // prepare topk
     float maxScore;
@@ -249,6 +253,7 @@ vector<vector<ReqDocPair>> postGpuAlgoBatch(const vector<CentroidCpu> &centroids
     param.rstData.malloc(docs.size());
     param.bufData.malloc(docs.size());
     param.minPassRate = kMinPassRate;
+    param.enableBidAware = enableBidAware;
     cudaError_t cudaError = cudaMallocManaged(&param.d_centroidScore, param.centroidData.size_d_centroidId * sizeof(float));
     if (cudaError != cudaSuccess)
     {

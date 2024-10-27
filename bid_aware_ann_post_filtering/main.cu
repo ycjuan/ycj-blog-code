@@ -31,12 +31,18 @@ int main()
     cout << endl << "Running pre GPU algo..." << endl;
     vector<vector<ReqDocPair>> rstPreGpu = preGpuAlgoBatch(reqs, docs, kNumToRetrieve);
 
-    cout << endl << "Running post GPU algo..." << endl;
-    vector<vector<ReqDocPair>> rstPostGpu = postGpuAlgoBatch(centroids, reqs, docs, kNumToRetrieve);
+    cout << endl << "Running post GPU algo (bid aware)..." << endl;
+    bool enableBidAware = true;
+    vector<vector<ReqDocPair>> rstPostGpuBidAware = postGpuAlgoBatch(centroids, reqs, docs, kNumToRetrieve, enableBidAware);
+
+    cout << endl << "Running post GPU algo (no bid aware)..." << endl;
+    enableBidAware = false;
+    vector<vector<ReqDocPair>> rstPostGpuNoBidAware = postGpuAlgoBatch(centroids, reqs, docs, kNumToRetrieve, enableBidAware);
 
     cout << endl << "Comparing results..." << endl;
     double sameClusterRatioSum = 0;
-    double recallSum = 0;
+    double recallBidAwareSum = 0;
+    double recallNoBidAwareSum = 0;
     for (int reqIdx = 0; reqIdx < reqs.size(); reqIdx++)
     {
         int numErrors = compareResults(rstPreCpu[reqIdx], rstPreGpu[reqIdx]);
@@ -47,13 +53,18 @@ int main()
         float sameClusterRatio = checkSameClusterRatio(rstPreCpu[reqIdx]);
         sameClusterRatioSum += sameClusterRatio;
 
-        float recall = checkRecall(rstPostGpu[reqIdx], rstPreCpu[reqIdx]);
-        recallSum += recall;
+        float recall = checkRecall(rstPostGpuBidAware[reqIdx], rstPreCpu[reqIdx]);
+        recallBidAwareSum += recall;
+
+        recall = checkRecall(rstPostGpuNoBidAware[reqIdx], rstPreCpu[reqIdx]);
+        recallNoBidAwareSum += recall;
     }
     double avgSameClusterRatio = sameClusterRatioSum / reqs.size();
-    double avgRecall = recallSum / reqs.size();
+    double avgRecallBidAware = recallBidAwareSum / reqs.size();
+    double avgRecallNoBidAware = recallNoBidAwareSum / reqs.size();
     cout << "Average same cluster ratio: " << avgSameClusterRatio << endl;
-    cout << "Average recall: " << avgRecall << endl;
+    cout << "Average recall (bid aware): " << avgRecallBidAware << endl;
+    cout << "Average recall (no bid aware): " << avgRecallNoBidAware << endl;
 
     return 0;
 }

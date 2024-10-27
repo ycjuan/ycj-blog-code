@@ -20,6 +20,7 @@ using namespace std;
 vector<vector<ReqDocPair>> postGpuAlgoBatch(const vector<CentroidCpu> &centroids,
                                             const vector<ItemCpu> &reqs,
                                             const vector<ItemCpu> &docs,
-                                            int k);
+                                            int k,
+                                            bool enableBidAware);
 
 #endif // POST_GPU_CUH
