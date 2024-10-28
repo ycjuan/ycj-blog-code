@@ -28,7 +28,6 @@ namespace
         int reqIdx;
         int activePairSize;
         float *d_centroidScore = nullptr;
-        float minPassRate;
         bool enableBidAware;
 
         float timeMsStep1ScoreCentroid;
@@ -180,18 +179,14 @@ namespace
         topkParam.d_pair = param.rstData.d_data;
         topkParam.d_buffer = param.bufData.d_data;
         topkParam.numReqDocPairs = param.activePairSize;
-        topkParam.numToRetrieve = (int)(param.numToRetrieve / param.minPassRate);
+        topkParam.numToRetrieve = param.numToRetrieve * kAnnNumtoRetrieveMultiplier;
         param.topk.retrieveTopkApprox(topkParam); // the result is stored in d_buffer
-        param.activePairSize = topkParam.numRetrieved;
-        /*
-        CudaTimer timerStep3s5TopkApproxCopyback;
-        timerStep3s5TopkApproxCopyback.tic();
-        cudaError = cudaMemcpy(param.rstData.d_data, param.bufData.d_data, param.activePairSize * sizeof(ReqDocPair), cudaMemcpyDeviceToDevice);
-        if (cudaError != cudaSuccess)
+        if (topkParam.numRetrieved > topkParam.numToRetrieve * 1.2)
         {
-            throw runtime_error("cudaMemcpy failed (param.bufData.d_data => param.rstData.d_data): " + string(cudaGetErrorString(cudaError)));
+            double ratio = (double)topkParam.numRetrieved / topkParam.numToRetrieve;
+            cout << "[Warning] numRetrieved / numToRetrieve = " << ratio << endl;
         }
-        */
+        param.activePairSize = topkParam.numRetrieved;
         param.timeMsStep3s5TopkApproxCopyback = 0;
         param.timeMsStep3s1TopkApproxUpdateCounter = topkParam.timeMsUpdateCounter;
         param.timeMsStep3s2TopkApproxCopyCounterToCpu = topkParam.timeMsCopyCounterToCpu;
@@ -271,7 +266,6 @@ vector<vector<ReqDocPair>> postGpuAlgoBatch(const vector<CentroidCpu> &centroids
     param.centroidData.init(centroids);
     param.rstData.malloc(docs.size());
     param.bufData.malloc(docs.size());
-    param.minPassRate = kMinPassRate;
     param.enableBidAware = enableBidAware;
     cudaError_t cudaError = cudaMallocManaged(&param.d_centroidScore, param.centroidData.size_d_centroidId * sizeof(float));
     if (cudaError != cudaSuccess)
