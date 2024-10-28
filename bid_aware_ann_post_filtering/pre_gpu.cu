@@ -4,6 +4,7 @@
 #include "misc.cuh"
 #include "util.cuh"
 #include "pre_gpu.cuh"
+#include "config.cuh"
 
 #include <random>
 #include <iostream>
@@ -53,6 +54,13 @@ __global__ void filterKernel(PreGpuAlgoParam param)
         pair.score = (doc.randAttr <= req.randAttr) ? 1.0f : 0.0f;
 
         param.bufData.d_data[docIdx] = pair;
+
+        clock_t start_clock = clock();
+        clock_t clock_offset = 0;
+        while (clock_offset < kFilterSlowdownCycle)
+        {
+            clock_offset = clock() - start_clock;
+        }
     }
 }
 
@@ -65,6 +73,13 @@ __global__ void scoringKernel(PreGpuAlgoParam param)
         ReqDocPair &pair = param.rstData.d_data[pairIdx];
         pair.score = getScoreDevice(param.reqData, param.docData, pair.reqIdx, pair.docIdx);
         pair.score *= param.docData.d_item[pair.docIdx].bid;
+        
+        clock_t start_clock = clock();
+        clock_t clock_offset = 0;
+        while (clock_offset < kScoreSlowdownCycle)
+        {
+            clock_offset = clock() - start_clock;
+        }
     }
 }
 
