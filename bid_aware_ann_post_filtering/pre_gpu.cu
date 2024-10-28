@@ -163,14 +163,14 @@ vector<ReqDocPair> preGpuAlgoSingle(PreGpuAlgoParam &param)
     return rst;
 }
 
-vector<vector<ReqDocPair>> preGpuAlgoBatch(const vector<ItemCpu> &reqs, const vector<ItemCpu> &docs, int numToRetrieve)
+vector<vector<ReqDocPair>> preGpuAlgoBatch(const vector<ItemCpu> &reqs,
+                                           const vector<ItemCpu> &docs,
+                                           int numToRetrieve,
+                                           int minScore,
+                                           int maxScore)
 {
-    // prepare topk
-    float maxScore;
-    float minScore;
-    getUpperAndLowerBound(reqs, docs, minScore, maxScore);
     assert(minScore < maxScore);
-
+    
     // prepare PreGpuAlgoParam
     PreGpuAlgoParam param;
     param.docData.init(docs);

@@ -256,12 +256,10 @@ vector<vector<ReqDocPair>> postGpuAlgoBatch(const vector<CentroidCpu> &centroids
                                             const vector<ItemCpu> &reqs,
                                             const vector<ItemCpu> &docs,
                                             int numToRetrieve,
-                                            bool enableBidAware)
+                                            bool enableBidAware,
+                                            int minScore,
+                                            int maxScore)
 {
-    // prepare topk
-    float maxScore;
-    float minScore;
-    getUpperAndLowerBound(reqs, docs, minScore, maxScore);
     assert(minScore < maxScore);
 
     // prepare PostGpuAlgoParam

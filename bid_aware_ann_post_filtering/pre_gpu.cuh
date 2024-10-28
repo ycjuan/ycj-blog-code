@@ -15,6 +15,10 @@
 
 using namespace std;
 
-vector<vector<ReqDocPair>> preGpuAlgoBatch(const vector<ItemCpu> &reqs, const vector<ItemCpu> &docs, int numToRetrieve);
+vector<vector<ReqDocPair>> preGpuAlgoBatch(const vector<ItemCpu> &reqs,
+                                           const vector<ItemCpu> &docs,
+                                           int numToRetrieve,
+                                           int minScore,
+                                           int maxScore);
 
 #endif // PRE_GPU_CUH

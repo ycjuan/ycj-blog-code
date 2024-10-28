@@ -24,20 +24,23 @@ int main()
     {
         req.randAttr = kPassRate;
     }
+    float minScore;
+    float maxScore;
+    getUpperAndLowerBound(reqs, docs, minScore, maxScore);
 
     cout << endl << "Running pre CPU algo..." << endl;
     vector<vector<ReqDocPair>> rstPreCpu = preCpuAlgoBatch(reqs, docs, kNumToRetrieve);
 
     cout << endl << "Running pre GPU algo..." << endl;
-    vector<vector<ReqDocPair>> rstPreGpu = preGpuAlgoBatch(reqs, docs, kNumToRetrieve);
+    vector<vector<ReqDocPair>> rstPreGpu = preGpuAlgoBatch(reqs, docs, kNumToRetrieve, minScore, maxScore);
 
     cout << endl << "Running post GPU algo (bid aware)..." << endl;
     bool enableBidAware = true;
-    vector<vector<ReqDocPair>> rstPostGpuBidAware = postGpuAlgoBatch(centroids, reqs, docs, kNumToRetrieve, enableBidAware);
+    vector<vector<ReqDocPair>> rstPostGpuBidAware = postGpuAlgoBatch(centroids, reqs, docs, kNumToRetrieve, enableBidAware, minScore, maxScore);
 
     cout << endl << "Running post GPU algo (no bid aware)..." << endl;
     enableBidAware = false;
-    vector<vector<ReqDocPair>> rstPostGpuNoBidAware = postGpuAlgoBatch(centroids, reqs, docs, kNumToRetrieve, enableBidAware);
+    vector<vector<ReqDocPair>> rstPostGpuNoBidAware = postGpuAlgoBatch(centroids, reqs, docs, kNumToRetrieve, enableBidAware, minScore, maxScore);
 
     cout << endl << "Comparing results..." << endl;
     double sameClusterRatioSum = 0;
