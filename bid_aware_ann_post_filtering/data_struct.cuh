@@ -67,6 +67,7 @@ struct ItemDataGpu
     void init(const vector<ItemCpu> &itemCpu1D)
     {
         malloc(itemCpu1D.size(), itemCpu1D[0].emb.size());
+        #pragma omp parallel for
         for (int i = 0; i < numItems; i++)
         {
             d_item[i].uid = itemCpu1D[i].uid;
@@ -141,6 +142,7 @@ struct CentroidDataGpu
     void init(const vector<CentroidCpu> &centroidCpu1D)
     {
         malloc(centroidCpu1D.size(), centroidCpu1D[0].emb.size());
+        #pragma omp parallel for
         for (int i = 0; i < numCentroids; i++)
         {
             d_centroidId[i] = centroidCpu1D[i].centroidId;
@@ -205,6 +207,7 @@ struct ReqDocPairDataGpu
     void init(const ItemCpu &req, const vector<ItemCpu> &docs)
     {
         malloc(docs.size());
+        #pragma omp parallel for
         for (int docIdx = 0; docIdx < docs.size(); docIdx++)
         {
             ReqDocPair &pair = d_data[docIdx];

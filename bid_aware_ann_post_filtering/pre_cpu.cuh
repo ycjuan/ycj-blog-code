@@ -47,6 +47,7 @@ vector<vector<ReqDocPair>> preCpuAlgoBatch(const vector<ItemCpu> &reqs, const ve
     vector<vector<ReqDocPair>> rst2D(reqs.size());
     CudaTimer timer;
     timer.tic();
+    #pragma omp parallel for
     for (int reqIdx = 0; reqIdx < reqs.size(); reqIdx++)
     {
         rst2D[reqIdx] = preCpuAlgoSingle(reqs[reqIdx], docs, k);

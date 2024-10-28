@@ -10,7 +10,8 @@ std::vector<CentroidCpu> genRandCentroids(int numCentroids, int dim, float stdDe
 {
     using namespace std;
 
-    default_random_engine generator(random_device{}());
+    default_random_engine generator;
+    generator.seed(0);
     normal_distribution<float> distribution(0.0, stdDev);
 
     vector<CentroidCpu> centroids(numCentroids);
@@ -33,7 +34,8 @@ std::vector<ItemCpu> genRandItemsFromOneCentroid(
 {
     using namespace std;
 
-    default_random_engine generator(random_device{}());
+    default_random_engine generator;
+    generator.seed(uid);
     normal_distribution<float> embDist(0.0, stdDev);
     normal_distribution<float> bidDist(1.0, bidStdDev);
     uniform_real_distribution<float> attrDist(0.0, 1.0);
