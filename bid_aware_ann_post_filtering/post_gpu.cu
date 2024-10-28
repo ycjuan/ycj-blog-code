@@ -304,6 +304,11 @@ vector<vector<ReqDocPair>> postGpuAlgoBatch(const vector<CentroidCpu> &centroids
 
     for (int reqIdx = 0; reqIdx < reqs.size(); reqIdx++)
     {
+        if ((reqIdx+1) % 500 == 0)
+        {
+            cout << "Processing request " << reqIdx+1 << "..." << endl;
+        }
+
         param.reqIdx = reqIdx;
         rst2D.push_back(postGpuAlgoSingle(param));
 

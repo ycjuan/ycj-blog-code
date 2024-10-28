@@ -196,6 +196,10 @@ vector<vector<ReqDocPair>> preGpuAlgoBatch(const vector<ItemCpu> &reqs,
     param.bufData.malloc(docs.size());
     for (int reqIdx = 0; reqIdx < reqs.size(); reqIdx++)
     {
+        if ((reqIdx+1) % 500 == 0)
+        {
+            cout << "Processing request " << reqIdx+1 << "..." << endl;
+        }
         param.reqIdx = reqIdx;
         rst2D.push_back(preGpuAlgoSingle(param));
 

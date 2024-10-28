@@ -11,8 +11,8 @@ const int kBidStdDev = 1;
 const int kNumDocsPerCentroid = 4000;
 const int kNumReqsPerCentroid = 1;
 const int kNumToRetrieve = 1000;
-const clock_t kFilterSlowdownCycle = 2 << 20;
-const clock_t kScoreSlowdownCycle = 2 << 20;
+const clock_t kFilterSlowdownCycle = 2 << 15;
+const clock_t kScoreSlowdownCycle = 2 << 15;
 const bool kRunCpu = false;
 
 #endif // CONFIG_CUH
