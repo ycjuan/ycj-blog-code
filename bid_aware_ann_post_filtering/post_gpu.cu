@@ -179,7 +179,7 @@ namespace
         topkParam.d_pair = param.rstData.d_data;
         topkParam.d_buffer = param.bufData.d_data;
         topkParam.numReqDocPairs = param.activePairSize;
-        topkParam.numToRetrieve = param.numToRetrieve * kAnnNumtoRetrieveMultiplier;
+        topkParam.numToRetrieve = param.activePairSize * kAnnNumtoRetrieveRatio;
         param.topk.retrieveTopkApprox(topkParam); // the result is stored in d_buffer
         if (topkParam.numRetrieved > topkParam.numToRetrieve * 1.2)
         {
