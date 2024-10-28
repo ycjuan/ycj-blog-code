@@ -55,7 +55,7 @@ inline void getUpperAndLowerBound(const std::vector<ItemCpu> &req1D,
         {
             int reqIdx = reqIdx1D[i];
             int docIdx = docIdx1D[j];
-            scores[i * docIdx1D.size() + j] = getScore(req1D[reqIdx], doc1D[docIdx]);
+            scores[i * docIdx1D.size() + j] = getScore(req1D[reqIdx], doc1D[docIdx]) * doc1D[docIdx].bid;
         }
     }
 
