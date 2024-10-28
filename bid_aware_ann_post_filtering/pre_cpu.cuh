@@ -4,6 +4,7 @@
 #include "data_synthesizer.cuh"
 #include "common.cuh"
 #include "util.cuh"
+#include "config.cuh"
 
 #include <random>
 #include <iostream>
@@ -15,6 +16,11 @@ using namespace std;
 vector<ReqDocPair> preCpuAlgoSingle(const ItemCpu &req, const vector<ItemCpu> &docs, int k)
 {
     vector<ReqDocPair> rst;
+    if (!kRunCpu)
+    {
+        return rst;
+    }
+    
     for (auto doc : docs)
     {
         if (doc.randAttr <= req.randAttr)

@@ -48,18 +48,21 @@ int main()
     double recallNoBidAwareSum = 0;
     for (int reqIdx = 0; reqIdx < reqs.size(); reqIdx++)
     {
-        int numErrors = compareResults(rstPreCpu[reqIdx], rstPreGpu[reqIdx]);
-        if (numErrors > 4)
+        if (kRunCpu)
         {
-            cout << "Error in comparing results: " << numErrors << endl;
+            int numErrors = compareResults(rstPreGpu[reqIdx], rstPreCpu[reqIdx]);
+            if (numErrors > 4)
+            {
+                cout << "Error in comparing results: " << numErrors << endl;
+            }
         }
-        float sameClusterRatio = checkSameClusterRatio(rstPreCpu[reqIdx]);
+        float sameClusterRatio = checkSameClusterRatio(rstPreGpu[reqIdx]);
         sameClusterRatioSum += sameClusterRatio;
 
-        float recall = checkRecall(rstPostGpuBidAware[reqIdx], rstPreCpu[reqIdx]);
+        float recall = checkRecall(rstPostGpuBidAware[reqIdx], rstPreGpu[reqIdx]);
         recallBidAwareSum += recall;
 
-        recall = checkRecall(rstPostGpuNoBidAware[reqIdx], rstPreCpu[reqIdx]);
+        recall = checkRecall(rstPostGpuNoBidAware[reqIdx], rstPreGpu[reqIdx]);
         recallNoBidAwareSum += recall;
     }
     double avgSameClusterRatio = sameClusterRatioSum / reqs.size();
