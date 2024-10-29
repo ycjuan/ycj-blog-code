@@ -166,8 +166,8 @@ vector<ReqDocPair> preGpuAlgoSingle(PreGpuAlgoParam &param)
 vector<vector<ReqDocPair>> preGpuAlgoBatch(const vector<ItemCpu> &reqs,
                                            const vector<ItemCpu> &docs,
                                            int numToRetrieve,
-                                           int minScore,
-                                           int maxScore)
+                                           float minScore,
+                                           float maxScore)
 {
     assert(minScore < maxScore);
     

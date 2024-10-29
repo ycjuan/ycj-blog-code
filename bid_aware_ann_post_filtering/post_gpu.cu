@@ -252,8 +252,8 @@ vector<vector<ReqDocPair>> postGpuAlgoBatch(const vector<CentroidCpu> &centroids
                                             const vector<ItemCpu> &docs,
                                             int numToRetrieve,
                                             bool enableBidAware,
-                                            int minScore,
-                                            int maxScore)
+                                            float minScore,
+                                            float maxScore)
 {
     assert(minScore < maxScore);
 
