@@ -181,7 +181,7 @@ namespace
         topkParam.numReqDocPairs = param.activePairSize;
         topkParam.numToRetrieve = param.activePairSize * kAnnNumtoRetrieveRatio;
         param.topk.retrieveTopkApprox(topkParam); // the result is stored in d_buffer
-        if (topkParam.numRetrieved > topkParam.numToRetrieve * 1.5)
+        if (topkParam.numRetrieved > topkParam.numToRetrieve * 1.5 || topkParam.numRetrieved < topkParam.numToRetrieve)
         {
             double ratio = (double)topkParam.numRetrieved / topkParam.numToRetrieve;
             cout << "[Warning] numRetrieved / numToRetrieve = " << ratio << endl;
