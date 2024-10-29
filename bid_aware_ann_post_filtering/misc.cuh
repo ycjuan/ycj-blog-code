@@ -16,8 +16,8 @@ inline void getUpperAndLowerBound(const std::vector<ItemCpu> &req1D,
                                   float &minScore,
                                   float &maxScore)
 {
-    int kMaxNumReqs = 100;
-    int kMaxNumDocs = 100000;
+    int kMaxNumReqs = 2000;
+    int kMaxNumDocs = 50000;
 
     vector<int> reqIdx1D(req1D.size());
     for (int i = 0; i < req1D.size(); i++)
