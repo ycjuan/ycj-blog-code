@@ -23,10 +23,6 @@ int main()
 {
     int kNumElements = 1000000;
     float *d_data;
-    std::default_random_engine gen;
-    std::uniform_real_distribution<float> floatDist(-1.0, 1.0);
-    for (int i = 0; i < kNumElements; i++)
-        d_data[i] = floatDist(gen);
 
     for (int i = 0; ; i++)
     {

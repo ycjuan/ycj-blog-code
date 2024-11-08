@@ -21,7 +21,7 @@ using namespace std;
     }
 
 // Modified from https://github.com/NVIDIA/thrust/blob/main/examples/cuda/custom_temporary_allocation.cu
-struct ThrustAllocator
+struct StaticThrustAllocator
 {
     typedef char value_type;
 
@@ -31,7 +31,7 @@ struct ThrustAllocator
         if (cudaError != cudaSuccess)
         {
             ostringstream errorMsg;
-            errorMsg << "[ThrustAllocator::malloc] cudaMalloc error: " << cudaGetErrorString(cudaError)
+            errorMsg << "[StaticThrustAllocator::malloc] cudaMalloc error: " << cudaGetErrorString(cudaError)
                      << ", numBytes = " << numBytes;
             throw std::runtime_error(errorMsg.str());
         }
@@ -51,12 +51,12 @@ struct ThrustAllocator
     char *allocate(std::ptrdiff_t numBytesAsked)
     {
         if (verbose)
-            cout << "[ThrustAllocator::allocate]: numBytesAsked = " << numBytesAsked << ", numBytesAllocated = " << numBytesAllocated;
+            cout << "[StaticThrustAllocator::allocate]: numBytesAsked = " << numBytesAsked << ", numBytesAllocated = " << numBytesAllocated << endl;
 
         if (numBytesAsked > numBytesAllocated)
         {
             std::ostringstream errorMsg;
-            errorMsg << "[ThrustAllocator::allocate] numBytesAsked > numBytesAllocated: "
+            errorMsg << "[StaticThrustAllocator::allocate] numBytesAsked > numBytesAllocated: "
                      << "numBytesAsked = " << numBytesAsked
                      << ", numBytesAllocated = " << numBytesAllocated;
             throw std::runtime_error(errorMsg.str());
@@ -87,8 +87,8 @@ int main()
     for (int i = 0; i < kNumElements; i++)
         d_data[i] = floatDist(gen);
 
-    ThrustAllocator allocator;
-    allocator.malloc(kNumElements * sizeof(float) + 1000000);
+    StaticThrustAllocator allocator;
+    allocator.malloc(kNumElements * sizeof(float) + 1000000); // Add additional 1MB for the overhead that thrust::sort needs 
 
     for (int i = 0;; i++)
     {
