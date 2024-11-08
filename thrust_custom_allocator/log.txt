@@ -1,0 +1,46 @@
+➜  thrust_custom_allocator git:(thrust_custom_allocator) ./run_default_thrust_sort
+i = 0, timeMs = 7.83664ms
+i = 100, timeMs = 0.38592ms
+i = 200, timeMs = 0.41984ms
+i = 300, timeMs = 0.417792ms
+i = 400, timeMs = 0.439296ms
+i = 469, timeMs = 141.487ms
+i = 500, timeMs = 0.432128ms
+i = 600, timeMs = 0.404448ms
+i = 700, timeMs = 0.415744ms
+i = 800, timeMs = 0.414848ms
+i = 828, timeMs = 145.842ms
+i = 900, timeMs = 0.279552ms
+
+➜  thrust_custom_allocator git:(thrust_custom_allocator) ✗ ./run_malloc
+i = 0, timeMs = 0.148576ms
+i = 100, timeMs = 0.304896ms
+i = 200, timeMs = 0.263168ms
+i = 290, timeMs = 141.15ms
+i = 300, timeMs = 0.308096ms
+i = 400, timeMs = 0.262336ms
+i = 417, timeMs = 141.024ms
+i = 500, timeMs = 0.265216ms
+i = 600, timeMs = 0.27136ms
+
+➜  thrust_custom_allocator git:(thrust_custom_allocator) ✗ ./run_thrust_sort_with_custom_allocator
+[ThrustAllocator::allocate]: numBytesAsked = 4132607, numBytesAllocated = 5000000
+i = 0, timeMs = 1.71315ms
+[ThrustAllocator::allocate]: numBytesAsked = 4132607, numBytesAllocated = 5000000
+i = 100, timeMs = 0.154624ms
+[ThrustAllocator::allocate]: numBytesAsked = 4132607, numBytesAllocated = 5000000
+i = 200, timeMs = 0.1536ms
+[ThrustAllocator::allocate]: numBytesAsked = 4132607, numBytesAllocated = 5000000
+i = 300, timeMs = 0.152576ms
+[ThrustAllocator::allocate]: numBytesAsked = 4132607, numBytesAllocated = 5000000
+i = 400, timeMs = 0.155648ms
+[ThrustAllocator::allocate]: numBytesAsked = 4132607, numBytesAllocated = 5000000
+i = 500, timeMs = 0.152576ms
+[ThrustAllocator::allocate]: numBytesAsked = 4132607, numBytesAllocated = 5000000
+i = 600, timeMs = 0.153568ms
+[ThrustAllocator::allocate]: numBytesAsked = 4132607, numBytesAllocated = 5000000
+i = 700, timeMs = 0.156672ms
+[ThrustAllocator::allocate]: numBytesAsked = 4132607, numBytesAllocated = 5000000
+i = 800, timeMs = 0.154592ms
+[ThrustAllocator::allocate]: numBytesAsked = 4132607, numBytesAllocated = 5000000
+i = 900, timeMs = 0.155616ms
