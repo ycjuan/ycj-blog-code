@@ -97,7 +97,7 @@ int main()
         CudaTimer timer;
 
         timer.tic();
-        thrust::stable_sort(thrust::cuda::par(allocator), d_data, d_data + kNumElements);
+        thrust::sort(thrust::cuda::par(allocator), d_data, d_data + kNumElements);
         float timeMs = timer.tocMs();
 
         if (timeMs > 50 || i % 100 == 0)
