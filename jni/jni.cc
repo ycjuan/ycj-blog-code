@@ -181,16 +181,16 @@ public:
 
         // process outputField1D
         output.outputField1D = input.inputField1D;
-        for (int i = 0; i < min(10UL, input.inputField1D.size()); i++)
+        for (int i = 0; i < min(3UL, input.inputField1D.size()); i++)
         {
             cout << "inputField1D[" << i << "]: " << input.inputField1D[i] << endl;
         }
         
         // process outputField2D
         output.outputField2D = input.inputField2D;
-        for (int i = 0; i < min(10UL, input.inputField2D.size()); i++)
+        for (int i = 0; i < min(3UL, input.inputField2D.size()); i++)
         {
-            for (int j = 0; j < min(10UL, input.inputField2D[i].size()); j++)
+            for (int j = 0; j < min(3UL, input.inputField2D[i].size()); j++)
             {
                 cout << "inputField2D[" << i << "][" << j << "]: " << input.inputField2D[i][j] << endl;
             }
