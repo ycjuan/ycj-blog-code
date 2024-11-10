@@ -79,15 +79,15 @@ void parseInputInner(JNIEnv *env, jobject jobj_input, Input &input)
 }
 
 
-// write output functions
-void writeOutput0D(JNIEnv *jenv, jobject jobj_output, Output &output)
+// update output functions
+void updateOutput0D(JNIEnv *jenv, jobject jobj_output, Output &output)
 {
     jclass jcls_output = jenv->GetObjectClass(jobj_output);
     jfieldID jfid_outputField0D = jenv->GetFieldID(jcls_output, "outputField0D", "I");
     jenv->SetIntField(jobj_output, jfid_outputField0D, output.outputField0D);
 }
 
-void writeOutput1D(JNIEnv *jenv, jobject jobj_output, Output &output)
+void updateOutput1D(JNIEnv *jenv, jobject jobj_output, Output &output)
 {
     jclass jcls_output = jenv->GetObjectClass(jobj_output);
     jfieldID jfid_outputField1D = jenv->GetFieldID(jcls_output, "outputField1D", "[I");
@@ -97,7 +97,7 @@ void writeOutput1D(JNIEnv *jenv, jobject jobj_output, Output &output)
     jenv->DeleteLocalRef(jarr_outputField1D);
 }
 
-void writeOutput2D(JNIEnv *jenv, jobject jobj_output, Output &output)
+void updateOutput2D(JNIEnv *jenv, jobject jobj_output, Output &output)
 {
     jclass jcls_output = jenv->GetObjectClass(jobj_output);
     jfieldID jfid_outputField2D = jenv->GetFieldID(jcls_output, "outputField2D", "[[I");
@@ -113,19 +113,19 @@ void writeOutput2D(JNIEnv *jenv, jobject jobj_output, Output &output)
     jenv->DeleteLocalRef(jarr_outputField2D);
 }
 
-void writeOutputInner(JNIEnv *env, jobject jobj_output, Output &output)
+void updateOutputInner(JNIEnv *env, jobject jobj_output, Output &output)
 {   
-    jclass jcls_innerFieldInner = env->FindClass("com/jni/OutputClassInner");
-    jobject jobj_innerFieldInner = env->AllocObject(jcls_innerFieldInner);
+    jclass jcls_outputClassInner = env->FindClass("com/jni/OutputClassInner");
+    jobject jobj_outputClassInner = env->AllocObject(jcls_outputClassInner);
 
-    jfieldID jfieldID_outputFieldInner0D = env->GetFieldID(jcls_innerFieldInner, "outputFieldInner0D", "I");
-    env->SetIntField(jobj_innerFieldInner, jfieldID_outputFieldInner0D, output.outputFieldInner0D);
+    jfieldID jfieldID_outputFieldInner0D = env->GetFieldID(jcls_outputClassInner, "outputFieldInner0D", "I");
+    env->SetIntField(jobj_outputClassInner, jfieldID_outputFieldInner0D, output.outputFieldInner0D);
 
     jclass jcls_output = env->GetObjectClass(jobj_output);
-    jfieldID jfieldID_innerFieldInner = env->GetFieldID(jcls_output, "outputFieldInner", "Lcom/jni/OutputClassInner;");
-    env->SetObjectField(jobj_output, jfieldID_innerFieldInner, jobj_innerFieldInner);
+    jfieldID jfieldID_outputClassInner = env->GetFieldID(jcls_output, "outputFieldInner", "Lcom/jni/OutputClassInner;");
+    env->SetObjectField(jobj_output, jfieldID_outputClassInner, jobj_outputClassInner);
 
-    env->DeleteLocalRef(jobj_innerFieldInner);
+    env->DeleteLocalRef(jobj_outputClassInner);
 }
 
 // Core class
@@ -187,10 +187,10 @@ JNIEXPORT jobject JNICALL Java_com_jni_JniMain_c_1process
 
     jclass jcls_output = jenv->FindClass("com/jni/OutputClass");
     jobject jobj_output = jenv->AllocObject(jcls_output);
-    writeOutput0D(jenv, jobj_output, output);
-    writeOutput1D(jenv, jobj_output, output);
-    writeOutput2D(jenv, jobj_output, output);
-    writeOutputInner(jenv, jobj_output, output);
+    updateOutput0D(jenv, jobj_output, output);
+    updateOutput1D(jenv, jobj_output, output);
+    updateOutput2D(jenv, jobj_output, output);
+    updateOutputInner(jenv, jobj_output, output);
 
     return jobj_output;
 }
