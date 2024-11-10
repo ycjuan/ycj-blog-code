@@ -9,7 +9,7 @@ public class TestJni {
 
     private static InputClass constructInput() {
         InputClass input = new InputClass();
-        int uniqueInt = 0;
+        int uniqueInt = 1;
         input.inputField0D = uniqueInt++;
         input.inputField1D = new int[SHAPE_1];
         for (int i = 0; i < SHAPE_1; i++) {
