@@ -113,6 +113,21 @@ void writeOutput2D(JNIEnv *jenv, jobject jobj_output, Output &output)
     jenv->DeleteLocalRef(jarr_outputField2D);
 }
 
+void writeOutputInner(JNIEnv *env, jobject jobj_output, Output &output)
+{   
+    jclass jcls_innerFieldInner = env->FindClass("com/jni/OutputClassInner");
+    jobject jobj_innerFieldInner = env->AllocObject(jcls_innerFieldInner);
+
+    jfieldID jfieldID_outputFieldInner0D = env->GetFieldID(jcls_innerFieldInner, "outputFieldInner0D", "I");
+    env->SetIntField(jobj_innerFieldInner, jfieldID_outputFieldInner0D, output.outputFieldInner0D);
+
+    jclass jcls_output = env->GetObjectClass(jobj_output);
+    jfieldID jfieldID_innerFieldInner = env->GetFieldID(jcls_output, "outputFieldInner", "Lcom/jni/OutputClassInner;");
+    env->SetObjectField(jobj_output, jfieldID_innerFieldInner, jobj_innerFieldInner);
+
+    env->DeleteLocalRef(jobj_innerFieldInner);
+}
+
 // Core class
 class Core
 {
@@ -175,6 +190,7 @@ JNIEXPORT jobject JNICALL Java_com_jni_JniMain_c_1process
     writeOutput0D(jenv, jobj_output, output);
     writeOutput1D(jenv, jobj_output, output);
     writeOutput2D(jenv, jobj_output, output);
+    writeOutputInner(jenv, jobj_output, output);
 
     return jobj_output;
 }
