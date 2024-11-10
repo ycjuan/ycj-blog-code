@@ -7,6 +7,8 @@ public class TestJni {
         input.inputField0D = 1;
         input.inputField1D = new int[] {11, 12, 13};
         input.inputField2D = new int[][] {{21, 22, 23}, {24, 25, 26}};
+        input.inputFieldInner = new InputClassInner();
+        input.inputFieldInner.inputFieldInner0D = 111;
         return input;
     }
 

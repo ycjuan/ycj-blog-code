@@ -11,6 +11,7 @@ struct Input
     int inputField0D;
     vector<int> inputField1D;
     vector<vector<int>> inputField2D;
+    int inputFieldInner0D;
 };
 
 struct Output
@@ -18,6 +19,7 @@ struct Output
     int outputField0D;
     vector<int> outputField1D;
     vector<vector<int>> outputField2D;
+    int outputFieldInner0D;
 };
 
 // parse input functions
@@ -56,6 +58,26 @@ void parseInput2D(JNIEnv *jenv, jobject jobj_input, Input &input)
     }
     jenv->DeleteLocalRef(jarr_inputField2D);
 }
+
+// reference: https://stackoverflow.com/questions/32513413/jni-getfieldid-returning-null-for-inner-class
+void parseInputInner(JNIEnv *env, jobject jobj_input, Input &input)
+{
+    jclass jcls_input = env->GetObjectClass(jobj_input);
+    jfieldID jfieldID_innerFieldInner = env->GetFieldID(jcls_input, "inputFieldInner", "Lcom/jni/InputClassInner;");
+    jobject jobj_innerFieldInner = env->GetObjectField(jobj_input, jfieldID_innerFieldInner);
+
+    if (jobj_innerFieldInner == nullptr)
+    {
+        return;
+    }
+
+    jclass jcls_innerFieldInner = env->GetObjectClass(jobj_innerFieldInner);
+    jfieldID jfieldID_inputFieldInner0D = env->GetFieldID(jcls_innerFieldInner, "inputFieldInner0D", "I");
+    input.inputFieldInner0D = env->GetIntField(jobj_innerFieldInner, jfieldID_inputFieldInner0D);
+
+    env->DeleteLocalRef(jobj_innerFieldInner);
+}
+
 
 // write output functions
 void writeOutput0D(JNIEnv *jenv, jobject jobj_output, Output &output)
@@ -98,13 +120,19 @@ public:
     Output process(Input input)
     {
         Output output;
+
+        // process outputField0D
         output.outputField0D = input.inputField0D;
         cout << "inputField0D: " << input.inputField0D << endl;
+
+        // process outputField1D
         output.outputField1D = input.inputField1D;
         for (int i = 0; i < input.inputField1D.size(); i++)
         {
             cout << "inputField1D[" << i << "]: " << input.inputField1D[i] << endl;
         }
+        
+        // process outputField2D
         output.outputField2D = input.inputField2D;
         for (int i = 0; i < input.inputField2D.size(); i++)
         {
@@ -113,6 +141,11 @@ public:
                 cout << "inputField2D[" << i << "][" << j << "]: " << input.inputField2D[i][j] << endl;
             }
         }
+
+        // process outputFieldInner0D
+        output.outputFieldInner0D = input.inputFieldInner0D;
+        cout << "inputFieldInner0D: " << input.inputFieldInner0D << endl;
+
         return output;
     }
 };
@@ -133,6 +166,7 @@ JNIEXPORT jobject JNICALL Java_com_jni_JniMain_c_1process
     parseInput0D(jenv, jobj_input, input);
     parseInput1D(jenv, jobj_input, input);
     parseInput2D(jenv, jobj_input, input);
+    parseInputInner(jenv, jobj_input, input);
 
     Output output = core.process(input);
 
