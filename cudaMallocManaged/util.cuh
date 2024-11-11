@@ -14,4 +14,8 @@ private:
     cudaEvent_t stop_;
 };
 
+size_t getCpuRamUsageByte();
+
+float getCpuRamUsageMiB();
+
 #endif // UTIL_CUH

@@ -180,7 +180,15 @@ int main()
     float *d_reqEmb_managed = nullptr;
     float *d_rst_managed = nullptr;
     Meta *d_meta_managed = nullptr;
+
+    // The code below demostrates that cudaMallocManaged may use CPU memory
+    cout << "memroy usage (before cudaMallocManaged): " << getCpuRamUsageMiB() << " MiB" << endl;
     CHECK_CUDA(cudaMallocManaged(&d_docEmb_managed, kNumDocs * kEmbDim * sizeof(float)));
+    cout << "memroy usage (after cudaMallocManaged): " << getCpuRamUsageMiB() << " MiB" << endl;
+    for (int i = 0; i < kNumDocs * kEmbDim; i++)
+        d_docEmb_managed[i] = 0;
+    cout << "memroy usage (after writing to d_docEmb_managed using for loop): " << getCpuRamUsageMiB() << " MiB" << endl;
+    
     CHECK_CUDA(cudaMallocManaged(&d_reqEmb_managed, kEmbDim * sizeof(float)));
     CHECK_CUDA(cudaMallocManaged(&d_rst_managed, kNumDocs * sizeof(float)));
     CHECK_CUDA(cudaMallocManaged(&d_meta_managed, kMetaSize * sizeof(Meta)));
