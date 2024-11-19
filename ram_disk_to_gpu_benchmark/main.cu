@@ -120,7 +120,8 @@ void runExp(ExpSetting expSetting, ExpData &expData)
             {
                 long threadId = omp_get_thread_num();
                 auto &f_bin = f_bins[threadId];
-                f_bin.seekg(offsetSrc * sizeof(float), ios::beg);
+                long offsetSrc1 = (j % expSetting.numBinaryFileDuplicates) * expSetting.numDocsAll * expSetting.numDims + offsetSrc;
+                f_bin.seekg(offsetSrc1 * sizeof(float), ios::beg);
                 f_bin.read((char *)(expData.hp_embSelected + offsetDst), expSetting.numDims * sizeof(float));
             }
             else
@@ -164,8 +165,8 @@ int main()
     expSetting.copyMode = DISK;
     expSetting.binaryPath = "/tmp2/bin";
     expSetting.hasGpu = false;
-    expSetting.numThreads = 1;
-    expSetting.numBinaryFileDuplicates = 1;
+    expSetting.numThreads = 8;
+    expSetting.numBinaryFileDuplicates = 20;
 
     cout << "numDocsAll: " << expSetting.numDocsAll << endl;
     cout << "numDims: " << expSetting.numDims << endl;
