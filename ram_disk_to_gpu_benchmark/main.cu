@@ -29,11 +29,11 @@ ExpData prepareExpData(ExpSetting expSetting)
     uniform_real_distribution<float> distribution(0.0, 1.0);
 
     expData.hv_embAll.resize(expSetting.numDocsAll * expSetting.numDims);
-    for (int i = 0; i < expSetting.numDocsAll * expSetting.numDims; i++)
+    for (long i = 0; i < expSetting.numDocsAll * expSetting.numDims; i++)
         expData.hv_embAll[i] = distribution(generator);
 
     expData.hv_docIds.resize(expSetting.numDocsAll);
-    for (int i = 0; i < expSetting.numDocsAll; i++)
+    for (long i = 0; i < expSetting.numDocsAll; i++)
         expData.hv_docIds[i] = i;
     
     ofstream f_bin(expSetting.binaryPath , ios::out | ios::binary);
@@ -61,7 +61,7 @@ void runExp(ExpSetting expSetting, ExpData &expData)
     double timeMsRandomAcessSum = 0;
     double timeMsH2DSum = 0;
     vector<ifstream> f_bins(expSetting.numThreads);
-    for (int i = 0; i < expSetting.numThreads; i++)
+    for (long i = 0; i < expSetting.numThreads; i++)
     {
         f_bins[i].open(expSetting.binaryPath, ios::in | ios::binary);
         if (!f_bins[i].is_open())
@@ -69,20 +69,20 @@ void runExp(ExpSetting expSetting, ExpData &expData)
             throw runtime_error("Cannot open file " + expSetting.binaryPath);
         }
     }
-    for (int i = 0; i < expSetting.numTrials; i++)
+    for (long i = 0; i < expSetting.numTrials; i++)
     {
         Timer timer;
 
         std::shuffle(expData.hv_docIds.begin(), expData.hv_docIds.end(), std::default_random_engine(i));
         cout << "Trial " << i << ": ";
-        for (int j = 0; j < 10; j++)
+        for (long j = 0; j < 10; j++)
             cout << expData.hv_docIds[j] << " ";
         cout << endl;
 
         timer.tic();
         omp_set_num_threads(expSetting.numThreads);
         #pragma omp parallel for
-        for (int j = 0; j < expSetting.numDocsSelected; j++)
+        for (long j = 0; j < expSetting.numDocsSelected; j++)
         {
             long offsetSrc = expData.hv_docIds[j] * expSetting.numDims;
             long offsetDst = j * expSetting.numDims;
@@ -92,14 +92,14 @@ void runExp(ExpSetting expSetting, ExpData &expData)
             }
             else if (expSetting.copyMode == FOR_LOOP)
             {
-                for (int k = 0; k < expSetting.numDims; k++)
+                for (long k = 0; k < expSetting.numDims; k++)
                 {
                     expData.hp_embSelected[offsetDst + k] = expData.hv_embAll[offsetSrc + k];
                 }
             }
             else if (expSetting.copyMode == DISK)
             {
-                int threadId = omp_get_thread_num();
+                long threadId = omp_get_thread_num();
                 auto &f_bin = f_bins[threadId];
                 f_bin.seekg(offsetSrc * sizeof(float), ios::beg);
                 f_bin.read((char *)(expData.hp_embSelected + offsetDst), expSetting.numDims * sizeof(float));
@@ -111,9 +111,9 @@ void runExp(ExpSetting expSetting, ExpData &expData)
         }
         timeMsRandomAcessSum += timer.tocMs();
 
-        for (int j = 0; j < expSetting.numDocsSelected; j++)
+        for (long j = 0; j < expSetting.numDocsSelected; j++)
         {
-            for (int k = 0; k < expSetting.numDims; k++)
+            for (long k = 0; k < expSetting.numDims; k++)
             {
                 float a = expData.hp_embSelected[j * expSetting.numDims + k];
                 float b = expData.hv_embAll[expData.hv_docIds[j] * expSetting.numDims + k];
@@ -139,13 +139,13 @@ int main()
 {
     ExpSetting expSetting;
     expSetting.numTrials = 20;
-    expSetting.numDocsAll = 1000000;
+    expSetting.numDocsAll = 4000000;
     expSetting.numDims = 1024;
     expSetting.numDocsSelected = 100000;
     expSetting.copyMode = DISK;
-    expSetting.binaryPath = "bin";
+    expSetting.binaryPath = "/tmp2/bin";
     expSetting.hasGpu = false;
-    expSetting.numThreads = 1;
+    expSetting.numThreads = 8;
 
     ExpData expData = prepareExpData(expSetting);
 

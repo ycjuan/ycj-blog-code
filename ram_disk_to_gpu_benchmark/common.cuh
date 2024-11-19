@@ -13,20 +13,20 @@ enum CopyMode
 
 struct ExpSetting
 {
-    int numTrials;
-    int numDocsAll;
-    int numDocsSelected;
-    int numDims;
+    long numTrials;
+    long numDocsAll;
+    long numDocsSelected;
+    long numDims;
     CopyMode copyMode;
     std::string binaryPath;
     bool hasGpu;
-    int numThreads;
+    long numThreads;
 };
 
 struct ExpData
 {
     std::vector<float> hv_embAll;
-    std::vector<int> hv_docIds;
+    std::vector<long> hv_docIds;
     float *d_embSelected = nullptr; 
     float *hp_embSelected = nullptr;
 
