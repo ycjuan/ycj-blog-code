@@ -28,15 +28,17 @@ ExpData prepareExpData(ExpSetting expSetting)
     default_random_engine generator;
     uniform_real_distribution<float> distribution(0.0, 1.0);
 
-    cout << "numFP32: " << (expSetting.numDocsAll * expSetting.numDims * sizeof(float)) << endl;
-    cout << "dataSize (GB): "
-         << (expSetting.numDocsAll * expSetting.numDims * sizeof(float)) / 1024.0 / 1024.0 / 1024.0 << endl;
-    cout << "dataSizeDuplicate (GB): "
-         << (expSetting.numDocsAll * expSetting.numDims * expSetting.numBinaryFileDuplicates * sizeof(float)) / 1024.0 / 1024.0 / 1024.0 << endl;
+    long numFP32 = expSetting.numDocsAll * expSetting.numDims;
+    long dataSize = numFP32 * sizeof(float);
+    long dataSizeDuplicate = dataSize * expSetting.numBinaryFileDuplicates;
+
+    cout << "numFP32: " << numFP32 << endl;
+    cout << "dataSize (GiB): " << dataSize / 1024.0 / 1024.0 / 1024.0 << endl;
+    cout << "dataSizeDuplicate (GiB): " << dataSizeDuplicate / 1024.0 / 1024.0 / 1024.0 << endl;
 
     cout << "Generating random data" << endl;
-    expData.hv_embAll.resize(expSetting.numDocsAll * expSetting.numDims);
-    for (long i = 0; i < expSetting.numDocsAll * expSetting.numDims; i++)
+    expData.hv_embAll.resize(numFP32);
+    for (long i = 0; i < numFP32; i++)
         expData.hv_embAll[i] = distribution(generator);
 
     expData.hv_docIds.resize(expSetting.numDocsAll);
@@ -51,18 +53,23 @@ ExpData prepareExpData(ExpSetting expSetting)
         throw runtime_error("Cannot open file " + expSetting.binaryPath);
     }
     for (long i = 0; i < expSetting.numBinaryFileDuplicates; i++)
-        f_bin.write((char *)expData.hv_embAll.data(), expData.hv_embAll.size() * sizeof(float));
+        f_bin.write((char *)expData.hv_embAll.data(), dataSize);
     f_bin.close();
     cout << "Done writing to binary file" << endl;
 
+    long numFP32Selected = expSetting.numDocsSelected * expSetting.numDims;
+    long dataSizeSelected = numFP32Selected * sizeof(float);
+    cout << "numFP32Selected: " << numFP32Selected << endl;
+    cout << "dataSizeSelected (GiB): " << dataSizeSelected / 1024.0 / 1024.0 / 1024.0 << endl;
+
     if (expSetting.hasGpu)
     {
-        CHECK_CUDA(cudaMalloc(&expData.d_embSelected, expSetting.numDocsSelected * expSetting.numDims * sizeof(float)))
-        CHECK_CUDA(cudaMallocHost(&expData.hp_embSelected, expSetting.numDocsSelected * expSetting.numDims * sizeof(float)))
+        CHECK_CUDA(cudaMalloc(&expData.d_embSelected, dataSizeSelected))
+        CHECK_CUDA(cudaMallocHost(&expData.hp_embSelected, dataSizeSelected))
     }
     else
     {
-        expData.hp_embSelected = (float *)malloc(expSetting.numDocsSelected * expSetting.numDims * sizeof(float));
+        expData.hp_embSelected = (float *)malloc(dataSizeSelected);
     }
 
     return expData;
