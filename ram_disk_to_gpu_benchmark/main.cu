@@ -28,6 +28,13 @@ ExpData prepareExpData(ExpSetting expSetting)
     default_random_engine generator;
     uniform_real_distribution<float> distribution(0.0, 1.0);
 
+    cout << "numFP32: " << (expSetting.numDocsAll * expSetting.numDims * sizeof(float)) << endl;
+    cout << "dataSize (GB): "
+         << (expSetting.numDocsAll * expSetting.numDims * sizeof(float)) / 1024.0 / 1024.0 / 1024.0 << endl;
+    cout << "dataSizeDuplicate (GB): "
+         << (expSetting.numDocsAll * expSetting.numDims * expSetting.numBinaryFileDuplicates * sizeof(float)) / 1024.0 / 1024.0 / 1024.0 << endl;
+
+    cout << "Generating random data" << endl;
     expData.hv_embAll.resize(expSetting.numDocsAll * expSetting.numDims);
     for (long i = 0; i < expSetting.numDocsAll * expSetting.numDims; i++)
         expData.hv_embAll[i] = distribution(generator);
@@ -35,13 +42,18 @@ ExpData prepareExpData(ExpSetting expSetting)
     expData.hv_docIds.resize(expSetting.numDocsAll);
     for (long i = 0; i < expSetting.numDocsAll; i++)
         expData.hv_docIds[i] = i;
+    cout << "Done generating random data" << endl;
     
+    cout << "Writing to binary file " << expSetting.binaryPath << endl;
     ofstream f_bin(expSetting.binaryPath , ios::out | ios::binary);
     if (!f_bin.is_open())
     {
         throw runtime_error("Cannot open file " + expSetting.binaryPath);
     }
-    f_bin.write((char *)expData.hv_embAll.data(), expData.hv_embAll.size() * sizeof(float));
+    for (long i = 0; i < expSetting.numBinaryFileDuplicates; i++)
+        f_bin.write((char *)expData.hv_embAll.data(), expData.hv_embAll.size() * sizeof(float));
+    f_bin.close();
+    cout << "Done writing to binary file" << endl;
 
     if (expSetting.hasGpu)
     {
@@ -139,13 +151,23 @@ int main()
 {
     ExpSetting expSetting;
     expSetting.numTrials = 20;
-    expSetting.numDocsAll = 4000000;
+    expSetting.numDocsAll = 1000000;
     expSetting.numDims = 1024;
     expSetting.numDocsSelected = 100000;
     expSetting.copyMode = DISK;
     expSetting.binaryPath = "/tmp2/bin";
     expSetting.hasGpu = false;
-    expSetting.numThreads = 8;
+    expSetting.numThreads = 1;
+    expSetting.numBinaryFileDuplicates = 1;
+
+    cout << "numDocsAll: " << expSetting.numDocsAll << endl;
+    cout << "numDims: " << expSetting.numDims << endl;
+    cout << "numDocsSelected: " << expSetting.numDocsSelected << endl;
+    cout << "copyMode: " << expSetting.copyMode << endl;
+    cout << "binaryPath: " << expSetting.binaryPath << endl;
+    cout << "hasGpu: " << expSetting.hasGpu << endl;
+    cout << "numThreads: " << expSetting.numThreads << endl;
+    cout << "numBinaryFileDuplicates: " << expSetting.numBinaryFileDuplicates << endl;
 
     ExpData expData = prepareExpData(expSetting);
 

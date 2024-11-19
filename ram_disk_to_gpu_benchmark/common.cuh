@@ -21,6 +21,7 @@ struct ExpSetting
     std::string binaryPath;
     bool hasGpu;
     long numThreads;
+    long numBinaryFileDuplicates;
 };
 
 struct ExpData
