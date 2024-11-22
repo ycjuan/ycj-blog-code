@@ -50,7 +50,7 @@ __global__ void matMul(Data data)
 void matMulKernel(Data data, Setting setting)
 {
     int blockSize = 512;
-    int gridSize = size_t(data.numDocs) * data.numReqs / blockSize;
+    int gridSize = (size_t(data.numDocs) * data.numReqs + blockSize - 1) / blockSize;
     CudaTimer timer;
     for (int t = -3; t < setting.kNumTrials; t++)
     {

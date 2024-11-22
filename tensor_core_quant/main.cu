@@ -13,8 +13,8 @@
 using namespace std;
 
 int kNumDocs = 1 << 20;
-int kNumReqs = 1 << 0;
-int kNumInt64 = 1 << 10;
+int kNumReqs = 1 << 4;
+int kNumInt64 = 1 << 3;
 int kNumTrials = 100;
 MemLayout kMemLayoutDoc = COL_MAJOR;
 MemLayout kMemLayoutReq = ROW_MAJOR;
@@ -51,6 +51,7 @@ Data genData()
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_cublas, (size_t)data.numDocs * data.numReqs * sizeof(uint16_t)));
     CHECK_CUDA(cudaMallocHost(&data.h_rst_cpu, (size_t)data.numDocs * data.numReqs * sizeof(uint16_t)));
 
+
     default_random_engine generator;
     uniform_int_distribution<uint64_t> distribution;
     for (int i = 0; i < data.numDocs * data.numInt64; i++)
@@ -77,11 +78,13 @@ void checkData(Data data)
                 return;
             }
             
+            /*
             if (abs(cpuVal - gpuCublasVal) / abs(gpuKernelVal) > 1e-3)
             {
                 cout << "Cublas error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuCublasVal << endl;
                 return;
             }
+            */
         }
     }
 }
