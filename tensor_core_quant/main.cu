@@ -52,9 +52,9 @@ struct Data
     int numInt64;
     uint64_t *d_doc; // M=numDocs x N=numInt64
     uint64_t *d_req; // M=numReqs x N=numInt64
-    float *d_rst_kernel; // M=numDocs x N=numReqs
-    float *d_rst_cublas; // M=numDocs x N=numReqs
-    float *h_rst_cpu;
+    uint16_t *d_rst_kernel; // M=numDocs x N=numReqs
+    uint16_t *d_rst_cublas; // M=numDocs x N=numReqs
+    uint16_t *h_rst_cpu;
     MemLayout docMemLayout;
     MemLayout reqMemLayout;
     MemLayout rstLayoutCpu;
@@ -98,9 +98,9 @@ Data genData()
     
     CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.numInt64 * sizeof(uint64_t)));
     CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.numInt64 * sizeof(uint64_t)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rst_kernel, (size_t)data.numDocs * data.numReqs * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rst_cublas, (size_t)data.numDocs * data.numReqs * sizeof(float)));
-    CHECK_CUDA(cudaMallocHost(&data.h_rst_cpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rst_kernel, (size_t)data.numDocs * data.numReqs * sizeof(uint16_t)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rst_cublas, (size_t)data.numDocs * data.numReqs * sizeof(uint16_t)));
+    CHECK_CUDA(cudaMallocHost(&data.h_rst_cpu, (size_t)data.numDocs * data.numReqs * sizeof(uint16_t)));
 
     default_random_engine generator;
     uniform_int_distribution<uint64_t> distribution;
@@ -118,9 +118,9 @@ void checkData(Data data)
     {
         for (int j = 0; j < data.numReqs; j++)
         {
-            float cpuVal = data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)];
-            float gpuKernelVal = data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)];
-            float gpuCublasVal = data.d_rst_cublas[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
+            uint16_t cpuVal = data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)];
+            uint16_t gpuKernelVal = data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)];
+            uint16_t gpuCublasVal = data.d_rst_cublas[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
 
             if (abs(cpuVal - gpuKernelVal) / abs(gpuKernelVal) > 1e-3)
             {
@@ -146,7 +146,7 @@ void matMulCpu(Data data)
     {
         for (int j = 0; j < data.numReqs; j++)
         {
-            int totalCount = 0;
+            uint16_t totalCount = 0;
             for (int k = 0; k < data.numInt64; k++)
             {
                 uint64_t reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.numInt64, data.reqMemLayout)];
@@ -169,7 +169,7 @@ __global__ void matMul(Data data)
 
     if (i < data.numDocs && j < data.numReqs)
     {
-        int totalCount = 0;
+        uint16_t totalCount = 0;
         for (int k = 0; k < data.numInt64; k++)
         {
             uint64_t reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.numInt64, data.reqMemLayout)];
