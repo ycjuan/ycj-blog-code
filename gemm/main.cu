@@ -26,7 +26,7 @@ int kNumTrials = 100;
 MemLayout kMemLayoutDoc = COL_MAJOR;
 MemLayout kMemLayoutReq = ROW_MAJOR;
 MemLayout kMemLayoutRstCpu = COL_MAJOR;
-MemLayout kMemLayoutRstGpuKernel = COL_MAJOR;
+MemLayout kMemLayoutRstGpuCuda = COL_MAJOR;
 MemLayout kMemLayoutRstGpuCublas = COL_MAJOR;
 //typedef __nv_bfloat16 T;
 typedef half T; 
@@ -106,7 +106,7 @@ Data<T> genData()
     data.docMemLayout = kMemLayoutDoc;
     data.reqMemLayout = kMemLayoutReq;
     data.rstLayoutCpu = kMemLayoutRstCpu;
-    data.rstLayoutGpuKernel = kMemLayoutRstGpuKernel;
+    data.rstLayoutGpuKernel = kMemLayoutRstGpuCuda;
     data.rstLayoutGpuCublas = kMemLayoutRstGpuCublas;
     data.print();
     
