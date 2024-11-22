@@ -26,7 +26,6 @@ MemLayout kMemLayoutReq = ROW_MAJOR;
 MemLayout kMemLayoutRstCpu = COL_MAJOR;
 MemLayout kMemLayoutRstGpuKernel = COL_MAJOR;
 MemLayout kMemLayoutRstGpuTensor = COL_MAJOR;
-typedef uint64_t T; // [IMPORTANT] Only uint64_t is tested. No guarantee the code will work for other types.
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \
@@ -46,14 +45,13 @@ __device__ __host__ size_t getMemAddr(int i, int j, int M, int N, MemLayout layo
         return (size_t)j * M + i;
 }
 
-template <typename T>
 struct Data
 {
     int numDocs;
     int numReqs;
     int numInt64;
-    T *d_doc; // M=numDocs x N=numInt64
-    T *d_req; // M=numReqs x N=numInt64
+    uint64_t *d_doc; // M=numDocs x N=numInt64
+    uint64_t *d_req; // M=numReqs x N=numInt64
     float *d_rst_kernel; // M=numDocs x N=numReqs
     float *d_rst_cublas; // M=numDocs x N=numReqs
     float *h_rst_cpu;
@@ -85,10 +83,9 @@ struct Data
     }
 };
 
-template <typename T>
-Data<T> genData()
+Data genData()
 {
-    Data<T> data;
+    Data data;
     data.numDocs = kNumDocs;
     data.numReqs = kNumReqs;
     data.numInt64 = kNumInt64;
@@ -99,8 +96,8 @@ Data<T> genData()
     data.rstLayoutGpuCublas = kMemLayoutRstGpuTensor;
     data.print();
     
-    CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.numInt64 * sizeof(T)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.numInt64 * sizeof(T)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.numInt64 * sizeof(uint64_t)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.numInt64 * sizeof(uint64_t)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_kernel, (size_t)data.numDocs * data.numReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_cublas, (size_t)data.numDocs * data.numReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocHost(&data.h_rst_cpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
@@ -115,8 +112,7 @@ Data<T> genData()
     return data;
 }
 
-template <typename T>
-void checkData(Data<T> data)
+void checkData(Data data)
 {
     for (int i = 0; i < data.numDocs; i++)
     {
@@ -141,8 +137,7 @@ void checkData(Data<T> data)
     }
 }
 
-template<typename T>
-void matMulCpu(Data<T> data)
+void matMulCpu(Data data)
 {
     Timer timer;
     timer.tic();
@@ -154,8 +149,8 @@ void matMulCpu(Data<T> data)
             int totalCount = 0;
             for (int k = 0; k < data.numInt64; k++)
             {
-                T reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.numInt64, data.reqMemLayout)];
-                T docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.numInt64, data.docMemLayout)];
+                uint64_t reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.numInt64, data.reqMemLayout)];
+                uint64_t docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.numInt64, data.docMemLayout)];
                 uint64_t bitwiseRst = ~ (reqVal ^ docVal);
                 bitset<64> bits(bitwiseRst);
                 totalCount += bits.count();
@@ -166,8 +161,7 @@ void matMulCpu(Data<T> data)
     cout << "CPU time: " << timer.tocMs() << " ms" << endl;
 }
 
-template <typename T>
-__global__ void matMul(Data<T> data)
+__global__ void matMul(Data data)
 {
     int threadId = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
     int i = threadId / data.numReqs;
@@ -178,8 +172,8 @@ __global__ void matMul(Data<T> data)
         int totalCount = 0;
         for (int k = 0; k < data.numInt64; k++)
         {
-            T reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.numInt64, data.reqMemLayout)];
-            T docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.numInt64, data.docMemLayout)];            
+            uint64_t reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.numInt64, data.reqMemLayout)];
+            uint64_t docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.numInt64, data.docMemLayout)];            
             uint64_t bitwiseRst = ~ (reqVal ^ docVal);
             totalCount += __popcll(bitwiseRst); // This counts the number of "1" in the 64bit bitwiseAnd
         }
@@ -187,8 +181,7 @@ __global__ void matMul(Data<T> data)
     }
 }
 
-template <typename T>
-void matMulKernel(Data<T> data)
+void matMulKernel(Data data)
 {
     int blockSize = 512;
     int gridSize = size_t(data.numDocs) * data.numReqs / blockSize;
@@ -212,7 +205,7 @@ void matMulKernel(Data<T> data)
 
 int main()
 {
-    Data<T> data = genData<T>();
+    Data data = genData();
 
     matMulKernel(data);
     matMulCpu(data);
