@@ -2,10 +2,10 @@ CUDA_TOOLKIT := $(shell dirname $$(command -v nvcc))/..
 INC          := -I$(CUDA_TOOLKIT)/include
 CFLAGS       := -Xcompiler -fopenmp --gpu-architecture=sm_89 -O3 -lcublas
 
-all: gemm
+all: tensor_quant
 
-gemm: main.cu
+tensor_quant: main.cu
 	nvcc $(INC) -o $@ $^ $(CFLAGS)
 
 clean:
-	rm -f gemm
+	rm -f tensor_quant

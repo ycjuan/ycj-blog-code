@@ -5,11 +5,9 @@
 #include <sstream>
 #include <cublas_v2.h>
 #include <type_traits>
+#include <bitset>
 
 #include "util.cuh"
-
-// Ref: Some code snippets are borrowed from
-// https://github.com/NVIDIA-developer-blog/code-samples/blob/708ce9137eb5ac7682f788e5d5b8279c7e2578ed/posts/tensor-cores/simpleTensorCoreGEMM.cu
 
 using namespace std;
 
@@ -21,16 +19,14 @@ enum MemLayout
 
 int kNumDocs = 1 << 20;
 int kNumReqs = 1 << 0;
-int kEmbDim = 1 << 10;
+int kNumInt64 = 1 << 10;
 int kNumTrials = 100;
 MemLayout kMemLayoutDoc = COL_MAJOR;
 MemLayout kMemLayoutReq = ROW_MAJOR;
 MemLayout kMemLayoutRstCpu = COL_MAJOR;
 MemLayout kMemLayoutRstGpuKernel = COL_MAJOR;
-MemLayout kMemLayoutRstGpuCublas = COL_MAJOR;
-//typedef __nv_bfloat16 T;
-typedef half T; 
-// IMPORTANT!!! only __nv_bfloat16 and half are supported for now
+MemLayout kMemLayoutRstGpuTensor = COL_MAJOR;
+typedef uint64_t T; // [IMPORTANT] Only uint64_t is tested. No guarantee the code will work for other types.
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \
@@ -41,13 +37,6 @@ typedef half T;
             throw runtime_error(error);                                                                                            \
         }                                                                                                                          \
     }
-
-#define cublasErrCheck(stat) { cublasErrCheck_((stat), __FILE__, __LINE__); }
-void cublasErrCheck_(cublasStatus_t stat, const char *file, int line) {
-   if (stat != CUBLAS_STATUS_SUCCESS) {
-      fprintf(stderr, "cuBLAS Error: %d %s %d\n", stat, file, line);
-   }
-}
 
 __device__ __host__ size_t getMemAddr(int i, int j, int M, int N, MemLayout layout)
 {
@@ -62,9 +51,9 @@ struct Data
 {
     int numDocs;
     int numReqs;
-    int embDim;
-    T *d_doc; // M=numDocs x N=embDim
-    T *d_req; // M=numReqs x N=embDim
+    int numInt64;
+    T *d_doc; // M=numDocs x N=numInt64
+    T *d_req; // M=numReqs x N=numInt64
     float *d_rst_kernel; // M=numDocs x N=numReqs
     float *d_rst_cublas; // M=numDocs x N=numReqs
     float *h_rst_cpu;
@@ -86,7 +75,7 @@ struct Data
     void print()
     {
         ostringstream oss;
-        oss << "numDocs: " << numDocs << ", numReqs: " << numReqs << ", embDim: " << embDim << endl;
+        oss << "numDocs: " << numDocs << ", numReqs: " << numReqs << ", numInt64: " << numInt64 << endl;
         oss << "docMemLayout: " << (docMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "reqMemLayout: " << (reqMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "rstLayoutCpu: " << (rstLayoutCpu == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
@@ -102,26 +91,26 @@ Data<T> genData()
     Data<T> data;
     data.numDocs = kNumDocs;
     data.numReqs = kNumReqs;
-    data.embDim = kEmbDim;
+    data.numInt64 = kNumInt64;
     data.docMemLayout = kMemLayoutDoc;
     data.reqMemLayout = kMemLayoutReq;
     data.rstLayoutCpu = kMemLayoutRstCpu;
     data.rstLayoutGpuKernel = kMemLayoutRstGpuKernel;
-    data.rstLayoutGpuCublas = kMemLayoutRstGpuCublas;
+    data.rstLayoutGpuCublas = kMemLayoutRstGpuTensor;
     data.print();
     
-    CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.embDim * sizeof(T)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.embDim * sizeof(T)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.numInt64 * sizeof(T)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.numInt64 * sizeof(T)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_kernel, (size_t)data.numDocs * data.numReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_cublas, (size_t)data.numDocs * data.numReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocHost(&data.h_rst_cpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
 
     default_random_engine generator;
-    uniform_real_distribution<float> distribution(0.0, 1.0);
-    for (int i = 0; i < data.numDocs * data.embDim; i++)
-        data.d_doc[i] = (T)distribution(generator);
-    for (int i = 0; i < data.numReqs * data.embDim; i++)
-        data.d_req[i] = (T)distribution(generator);
+    uniform_int_distribution<uint64_t> distribution;
+    for (int i = 0; i < data.numDocs * data.numInt64; i++)
+        data.d_doc[i] = distribution(generator);
+    for (int i = 0; i < data.numReqs * data.numInt64; i++)
+        data.d_req[i] = distribution(generator);
 
     return data;
 }
@@ -152,48 +141,6 @@ void checkData(Data<T> data)
     }
 }
 
-template <typename T>
-void matMulCublas(Data<T> data)
-{
-    cublasHandle_t cublasHandle;
-    cublasCreate(&cublasHandle);
-
-    float alpha = 1.0;
-    float beta = 0.0;
-
-    int MATRIX_M = data.numDocs;
-    int MATRIX_N = data.numReqs;
-    int MATRIX_K = data.embDim;
-    T *a_fp16 = data.d_doc;
-    T *b_fp16 = data.d_req;
-    float *c_cublas = data.d_rst_cublas;
-
-    cublasOperation_t trana = (data.docMemLayout == COL_MAJOR) ? CUBLAS_OP_N : CUBLAS_OP_T;
-    cublasOperation_t tranb = (data.reqMemLayout == COL_MAJOR) ? CUBLAS_OP_T : CUBLAS_OP_N;
-    int lda = (data.docMemLayout == COL_MAJOR) ? MATRIX_M : MATRIX_K;
-    int ldb = (data.reqMemLayout == COL_MAJOR) ? MATRIX_N : MATRIX_K;
-    cudaDataType aType = (is_same<T, half>::value) ? CUDA_R_16F : CUDA_R_16BF;
-    cudaDataType bType = (is_same<T, half>::value) ? CUDA_R_16F : CUDA_R_16BF;
-
-    CudaTimer timer;
-    for (int t = -3; t < kNumTrials; t++)
-    {
-        if (t == 0)
-            timer.tic();
-        cublasErrCheck(cublasGemmEx(cublasHandle, trana, tranb,
-                                    MATRIX_M, MATRIX_N, MATRIX_K,
-                                    &alpha,
-                                    a_fp16, aType, lda,
-                                    b_fp16, bType, ldb,
-                                    &beta,
-                                    c_cublas, CUDA_R_32F, MATRIX_M,
-                                    CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-    }
-    cout << "Cublas time: " << timer.tocMs() / kNumTrials << " ms" << endl;
-
-    cublasDestroy(cublasHandle);
-}
-
 template<typename T>
 void matMulCpu(Data<T> data)
 {
@@ -204,14 +151,16 @@ void matMulCpu(Data<T> data)
     {
         for (int j = 0; j < data.numReqs; j++)
         {
-            float sum = 0;
-            for (int k = 0; k < data.embDim; k++)
+            int totalCount = 0;
+            for (int k = 0; k < data.numInt64; k++)
             {
-                T reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.embDim, data.reqMemLayout)];
-                T docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.embDim, data.docMemLayout)];
-                sum += (float)reqVal * (float)docVal;
+                T reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.numInt64, data.reqMemLayout)];
+                T docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.numInt64, data.docMemLayout)];
+                uint64_t bitwiseRst = ~ (reqVal ^ docVal);
+                bitset<64> bits(bitwiseRst);
+                totalCount += bits.count();
             }
-            data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)] = (half)sum;
+            data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)] = totalCount;
         }
     }
     cout << "CPU time: " << timer.tocMs() << " ms" << endl;
@@ -226,14 +175,15 @@ __global__ void matMul(Data<T> data)
 
     if (i < data.numDocs && j < data.numReqs)
     {
-        float sum = 0;
-        for (int k = 0; k < data.embDim; k++)
+        int totalCount = 0;
+        for (int k = 0; k < data.numInt64; k++)
         {
-            T reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.embDim, data.reqMemLayout)];
-            T docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.embDim, data.docMemLayout)];            
-            sum += float(reqVal * docVal);
+            T reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.numInt64, data.reqMemLayout)];
+            T docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.numInt64, data.docMemLayout)];            
+            uint64_t bitwiseRst = ~ (reqVal ^ docVal);
+            totalCount += __popcll(bitwiseRst); // This counts the number of "1" in the 64bit bitwiseAnd
         }
-        data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)] = sum;
+        data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)] = totalCount;
     }
 }
 
@@ -264,7 +214,6 @@ int main()
 {
     Data<T> data = genData<T>();
 
-    matMulCublas(data);
     matMulKernel(data);
     matMulCpu(data);
 
