@@ -8,14 +8,9 @@
 #include <bitset>
 
 #include "util.cuh"
+#include "common.cuh"
 
 using namespace std;
-
-enum MemLayout
-{
-    ROW_MAJOR,
-    COL_MAJOR
-};
 
 int kNumDocs = 1 << 20;
 int kNumReqs = 1 << 0;
@@ -44,44 +39,6 @@ __device__ __host__ size_t getMemAddr(int i, int j, int M, int N, MemLayout layo
     else
         return (size_t)j * M + i;
 }
-
-struct Data
-{
-    int numDocs;
-    int numReqs;
-    int numInt64;
-    uint64_t *d_doc; // M=numDocs x N=numInt64
-    uint64_t *d_req; // M=numReqs x N=numInt64
-    uint16_t *d_rst_kernel; // M=numDocs x N=numReqs
-    uint16_t *d_rst_cublas; // M=numDocs x N=numReqs
-    uint16_t *h_rst_cpu;
-    MemLayout docMemLayout;
-    MemLayout reqMemLayout;
-    MemLayout rstLayoutCpu;
-    MemLayout rstLayoutGpuKernel;
-    MemLayout rstLayoutGpuCublas;
-
-    void free()
-    {
-        cudaFree(d_doc);
-        cudaFree(d_req);
-        cudaFree(d_rst_kernel);
-        cudaFree(d_rst_cublas);
-        cudaFreeHost(h_rst_cpu);
-    }
-
-    void print()
-    {
-        ostringstream oss;
-        oss << "numDocs: " << numDocs << ", numReqs: " << numReqs << ", numInt64: " << numInt64 << endl;
-        oss << "docMemLayout: " << (docMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
-        oss << "reqMemLayout: " << (reqMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
-        oss << "rstLayoutCpu: " << (rstLayoutCpu == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
-        oss << "rstLayoutGpuKernel: " << (rstLayoutGpuKernel == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
-        oss << "rstLayoutGpuCublas: " << (rstLayoutGpuCublas == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
-        cout << oss.str();
-    }
-};
 
 Data genData()
 {
