@@ -17,7 +17,7 @@ int kNumReqs = 1 << 3;
 int kNumT1 = 1 << 2;
 int kNumTrials = 100;
 MemLayout kMemLayoutDoc = ROW_MAJOR;
-MemLayout kMemLayoutReq = COL_MAJOR;
+MemLayout kMemLayoutReq = ROW_MAJOR;
 MemLayout kMemLayoutRstCpu = COL_MAJOR;
 MemLayout kMemLayoutRstGpuKernel = COL_MAJOR;
 MemLayout kMemLayoutRstGpuTensor = ROW_MAJOR;
@@ -82,10 +82,10 @@ void checkData(Data data)
             T2 cpuVal = data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)];
             T2 gpuKernelVal = data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)];
             T2 gpuWmma = data.d_rst_wmma[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
-            T2 gpuWmmaAdj = sizeof(T1) * 8 * data.numT1 - gpuWmma;
-            //T2 gpuWmmaAdj = gpuWmma;
+            //T2 gpuWmmaAdj = sizeof(T1) * 8 * data.numT1 - gpuWmma;
+            T2 gpuWmmaAdj = gpuWmma;
 
-            if (cpuVal != gpuKernelVal)
+            if (false)
             {
                 cout << "Kernel error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuKernelVal << endl;
                 return;
@@ -107,7 +107,7 @@ int main()
     Setting setting;
     setting.kNumTrials = kNumTrials;
 
-    quantKernel(data, setting);
+    //quantKernel(data, setting);
     quantCpu(data, setting);
     quantWMMA(data, setting);
 

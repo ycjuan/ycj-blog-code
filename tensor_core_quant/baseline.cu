@@ -17,7 +17,7 @@ void quantCpu(Data data, Setting setting)
             {
                 T1 reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.numT1, data.reqMemLayout)];
                 T1 docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.numT1, data.docMemLayout)];
-                T1 bitwiseRst = ~ (reqVal ^ docVal);
+                T1 bitwiseRst = reqVal ^ docVal;
                 bitset<32> bits(bitwiseRst);
                 int count = bits.count();
                 totalCount += count;

@@ -82,7 +82,7 @@ __global__ void wmma_example(const unsigned *A, const unsigned *B, int *C, const
    using namespace nvcuda::wmma::experimental;
    int bx = blockIdx.x * blockDim.y + threadIdx.y;
    int by = blockIdx.y;
-   printf("bx: %d, by: %d, blockIdx.x: %d, blockDim.y: %d, threadIdx.y: %d\n", bx, by, blockIdx.x, blockDim.y, threadIdx.y);
+   //printf("bx: %d, by: %d, blockIdx.x: %d, blockDim.y: %d, threadIdx.y: %d\n", bx, by, blockIdx.x, blockDim.y, threadIdx.y);
 
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag;
    wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag;
@@ -114,15 +114,15 @@ __global__ void wmma_example(const unsigned *A, const unsigned *B, int *C, const
          c_frag.x[i] += acc_frag.x[i];
       }
 
-   store_matrix_sync(C + (bx * 8 * n + by * 8), c_frag, n, wmma::mem_row_major);
-      if (bx == 0 && by == 0 && threadIdx.x == 31)
+   store_matrix_sync(C + (bx * 8 * n + by * 8), acc_frag, n, wmma::mem_row_major);
+      //if (bx == 0 && by == 0 && threadIdx.x == 31)
       {
          printf("A[0] = %u\n", A[threadIdx.x]);
          printf("B[0] = %u\n", B[threadIdx.x]);
          printf("a_frag.x[0]: %u, a_frag.x[1]: %u, a_frag.x[2]: %u, a_frag.x[3]: %u\n", a_frag.x[0], a_frag.x[1], a_frag.x[2], a_frag.x[3]);
          printf("b_frag.x[0]: %u, b_frag.x[1]: %u, b_frag.x[2]: %u, b_frag.x[3]: %u\n", b_frag.x[0], b_frag.x[1], b_frag.x[2], b_frag.x[3]);
          printf("c_frag.x[0]: %d, c_frag.x[1]: %d\n", acc_frag.x[0], acc_frag.x[1]);
-         printf("C[0]: %d\n", C[threadIdx.x]);
+         printf("C[0]: %d\n", C[0]);
       }
 }
 
@@ -147,6 +147,10 @@ void quantWMMA(Data data, Setting setting) {
    cout << "gridDim: " << gridDim.x << " " << gridDim.y << endl;
 
    cout << "A[0]: " << a_fp16[0] << endl;
+   cout << "B[0]: " << b_fp16[0] << endl;
+   cout << "B[1]: " << b_fp16[1] << endl;
+   cout << "B[2]: " << b_fp16[2] << endl;
+   cout << "B[3]: " << b_fp16[3] << endl;
  
    printf("Running with wmma...\n");
    CudaTimer timer;
