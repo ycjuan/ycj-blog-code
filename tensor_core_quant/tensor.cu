@@ -30,6 +30,7 @@ This file is modified from:
 
 https://github.com/NVIDIA-developer-blog/code-samples/blob/708ce9137eb5ac7682f788e5d5b8279c7e2578ed/posts/tensor-cores/simpleTensorCoreGEMM.cu
 
+https://github.com/pnnl/TCBNN/blob/de4713445fd1cd772ad176080a0ff61a5f862e3b/bmm/tensorcore_kernel.cu#L336
 */
 
 #include <stdio.h>
@@ -47,57 +48,19 @@ void cudaErrCheck_(cudaError_t stat, const char *file, int line) {
    }
 }
 
-#define cublasErrCheck(stat) { cublasErrCheck_((stat), __FILE__, __LINE__); }
-void cublasErrCheck_(cublasStatus_t stat, const char *file, int line) {
-   if (stat != CUBLAS_STATUS_SUCCESS) {
-      fprintf(stderr, "cuBLAS Error: %d %s %d\n", stat, file, line);
-   }
-}
-
-#define curandErrCheck(stat) { curandErrCheck_((stat), __FILE__, __LINE__); }
-void curandErrCheck_(curandStatus_t stat, const char *file, int line) {
-   if (stat != CURAND_STATUS_SUCCESS) {
-      fprintf(stderr, "cuRand Error: %d %s %d\n", stat, file, line);
-   }
-}
-
-
 #include <mma.h>
 using namespace nvcuda;
 
-// The only dimensions currently supported by WMMA
-const int WMMA_M = 8;
-const int WMMA_N = 8;
-const int WMMA_K = 128;
-
-
-// Performs an MxNxK GEMM (C=alpha*A*B + beta*C) assuming:
-//  1) Matrices are packed in memory.
-//  2) M, N and K are multiples of 16. 
-//  3) Neither A nor B are transposed.
-// Note: This is NOT a high performance example but is for demonstration purposes only
-//       For a high performance code please use the GEMM provided in cuBLAS.
 __global__ void wmma_example(const unsigned *A, const unsigned *B, int *C, const unsigned m, const unsigned n, const unsigned k)
 {
    using namespace nvcuda::wmma::experimental;
    int bx = blockIdx.x * blockDim.y + threadIdx.y;
    int by = blockIdx.y;
-   //printf("bx: %d, by: %d, blockIdx.x: %d, blockDim.y: %d, threadIdx.y: %d\n", bx, by, blockIdx.x, blockDim.y, threadIdx.y);
 
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag;
    wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag;
    wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag;
    wmma::fill_fragment(c_frag, 0);
-
-   /*
-   printf(" \
-      a_frag.num_storage_elements: %d, a_frag.num_elements: %d, \
-      b_frag.num_storage_elements: %d, b_frag.num_elements: %d, \
-      c_frag.num_storage_elements: %d, c_frag.num_elements: %d\n",
-      a_frag.num_storage_elements, a_frag.num_elements,
-      b_frag.num_storage_elements, b_frag.num_elements,
-      c_frag.num_storage_elements, c_frag.num_elements);
-   */
 
    for (int j = 0; j < (k / 128); j++)
    {
@@ -108,17 +71,6 @@ __global__ void wmma_example(const unsigned *A, const unsigned *B, int *C, const
    }
 
    store_matrix_sync(C + (bx * 8 * n + by * 8), c_frag, n, wmma::mem_row_major);
-   /*
-      //if (bx == 0 && by == 0 && threadIdx.x == 31)
-      {
-         printf("A[0] = %u\n", A[threadIdx.x]);
-         printf("B[0] = %u\n", B[threadIdx.x]);
-         printf("a_frag.x[0]: %u, a_frag.x[1]: %u, a_frag.x[2]: %u, a_frag.x[3]: %u\n", a_frag.x[0], a_frag.x[1], a_frag.x[2], a_frag.x[3]);
-         printf("b_frag.x[0]: %u, b_frag.x[1]: %u, b_frag.x[2]: %u, b_frag.x[3]: %u\n", b_frag.x[0], b_frag.x[1], b_frag.x[2], b_frag.x[3]);
-         printf("c_frag.x[0]: %d, c_frag.x[1]: %d\n", acc_frag.x[0], acc_frag.x[1]);
-         printf("C[0]: %d\n", C[0]);
-      }
-   */
 }
 
 void quantWMMA(Data data, Setting setting) {
