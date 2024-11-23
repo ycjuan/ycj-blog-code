@@ -45,15 +45,15 @@ Data genData()
     data.rstLayoutGpuCublas = kMemLayoutRstGpuTensor;
     data.print();
     
-    CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.numInt64 * sizeof(uint64_t)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.numInt64 * sizeof(uint64_t)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rst_kernel, (size_t)data.numDocs * data.numReqs * sizeof(uint16_t)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rst_cublas, (size_t)data.numDocs * data.numReqs * sizeof(uint16_t)));
-    CHECK_CUDA(cudaMallocHost(&data.h_rst_cpu, (size_t)data.numDocs * data.numReqs * sizeof(uint16_t)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.numInt64 * sizeof(T1)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.numInt64 * sizeof(T1)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rst_kernel, (size_t)data.numDocs * data.numReqs * sizeof(T2)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rst_cublas, (size_t)data.numDocs * data.numReqs * sizeof(T2)));
+    CHECK_CUDA(cudaMallocHost(&data.h_rst_cpu, (size_t)data.numDocs * data.numReqs * sizeof(T2)));
 
 
     default_random_engine generator;
-    uniform_int_distribution<uint64_t> distribution;
+    uniform_int_distribution<T1> distribution;
     for (int i = 0; i < data.numDocs * data.numInt64; i++)
         data.d_doc[i] = distribution(generator);
     for (int i = 0; i < data.numReqs * data.numInt64; i++)
@@ -68,9 +68,9 @@ void checkData(Data data)
     {
         for (int j = 0; j < data.numReqs; j++)
         {
-            uint16_t cpuVal = data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)];
-            uint16_t gpuKernelVal = data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)];
-            uint16_t gpuCublasVal = data.d_rst_cublas[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
+            T2 cpuVal = data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)];
+            T2 gpuKernelVal = data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)];
+            T2 gpuCublasVal = data.d_rst_cublas[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
 
             if (abs(cpuVal - gpuKernelVal) / abs(gpuKernelVal) > 1e-3)
             {

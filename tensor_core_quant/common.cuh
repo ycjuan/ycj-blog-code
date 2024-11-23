@@ -6,6 +6,9 @@
 
 using namespace std;
 
+typedef uint64_t T1;
+typedef uint16_t T2;
+
 enum MemLayout
 {
     ROW_MAJOR,
@@ -22,11 +25,11 @@ struct Data
     int numDocs;
     int numReqs;
     int numInt64;
-    uint64_t *d_doc; // M=numDocs x N=numInt64
-    uint64_t *d_req; // M=numReqs x N=numInt64
-    uint16_t *d_rst_kernel; // M=numDocs x N=numReqs
-    uint16_t *d_rst_cublas; // M=numDocs x N=numReqs
-    uint16_t *h_rst_cpu;
+    T1 *d_doc; // M=numDocs x N=numInt64
+    T1 *d_req; // M=numReqs x N=numInt64
+    T2 *d_rst_kernel; // M=numDocs x N=numReqs
+    T2 *d_rst_cublas; // M=numDocs x N=numReqs
+    T2 *h_rst_cpu;
     MemLayout docMemLayout;
     MemLayout reqMemLayout;
     MemLayout rstLayoutCpu;
