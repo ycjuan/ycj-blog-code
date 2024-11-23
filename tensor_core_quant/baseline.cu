@@ -53,6 +53,7 @@ void quantKernel(Data data, Setting setting)
 {
     int blockSize = 512;
     int gridSize = (size_t(data.numDocs) * data.numReqs + blockSize - 1) / blockSize;
+    cout << "gridSize (kernel): " << gridSize << endl;
     CudaTimer timer;
     for (int t = -3; t < setting.kNumTrials; t++)
     {
