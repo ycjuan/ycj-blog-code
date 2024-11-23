@@ -70,7 +70,7 @@ const int WMMA_M = 8;
 const int WMMA_N = 8;
 const int WMMA_K = 128;
 const int WMMA_K32 = (WMMA_K/32);
-const int WMMA_Nx2 = (WMMA_N*2);
+const int WMMA_Nx2 = (WMMA_N);
 
 
 // Performs an MxNxK GEMM (C=alpha*A*B + beta*C) assuming:
@@ -86,8 +86,6 @@ __global__ void wmma_example(T1 *A, T1 *B, T2 *C, int M, int N, int K) {
    int ldc = N;
    // total 57%
    int index = blockIdx.x * blockDim.x + threadIdx.x;
-
-   __shared__ int C_s[WMMA_N * WMMA_M * 32 * 2]; // 2 * 8 KB - Temprorary result of GEMM WMMA for 32 warps
 
    const int lane_id = threadIdx.x % 32;
    const int warp_id = threadIdx.x / 32;
@@ -123,8 +121,8 @@ __global__ void wmma_example(T1 *A, T1 *B, T2 *C, int M, int N, int K) {
          // 8 x 8 x 4 (uint32_t, 4 * 32 = 128 bit)
          for (; k < K; k += 128) // l.size*l.size*l.c - one filter size [27 - 144 - 9216]
          {
-            int64_t A_cur_index = (i * lda + k) / 8;        // index in bits
-            int64_t B1_cur_index = (j * ldb + k) / 8;       // index in bits
+            int64_t A_cur_index = (i * lda + k) / 32;        // index in bits
+            int64_t B1_cur_index = (j * ldb + k) / 32;       // index in bits
 
             // try to use A that is cached in shared memory - poor performance
             // if (i == start_i) wmma::load_matrix_sync(a_frag, &A_s[k / 32], (512 * 32));   // lda = (128*32) bits
@@ -160,19 +158,20 @@ void quantWMMA(Data data, Setting setting) {
    cudaErrCheck(cudaEventCreate(&startWMMA));
    cudaErrCheck(cudaEventCreate(&stopWMMA));
 
-   printf("\nM = %d, N = %d, K = %d.\n\n", MATRIX_M, MATRIX_N, MATRIX_K);
+   int MATRIX_K_BITS = MATRIX_K * sizeof(T1) * 8;
+   printf("\nM = %d, N = %d, K = %d, K_BITS = %d.\n\n", MATRIX_M, MATRIX_N, MATRIX_K, MATRIX_K_BITS);
    
    // First: using WMMA
 
    int WARP_SIZE = 32;
-   int size = (MATRIX_M / 8) * (MATRIX_N / 8) * WARP_SIZE;
    int blockSize = 256;
+   int size = (MATRIX_M / 8) * (MATRIX_N / 8);
    int gridSize = (size + blockSize - 1) / blockSize;
    cout << "gridSize (WMMA): " << gridSize << endl;
 
    printf("Running with wmma...\n");
    cudaErrCheck(cudaEventRecord(startWMMA));
-   wmma_example <<< gridSize, blockSize >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
+   wmma_example <<< gridSize, blockSize >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K_BITS);
    cudaErrCheck(cudaEventRecord(stopWMMA));
    cudaErrCheck(cudaEventSynchronize(stopWMMA));
 
