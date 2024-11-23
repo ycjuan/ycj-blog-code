@@ -64,6 +64,10 @@ void curandErrCheck_(curandStatus_t stat, const char *file, int line) {
 #include <mma.h>
 using namespace nvcuda;
 
+// The only dimensions currently supported by WMMA
+const int WMMA_M = 8;
+const int WMMA_N = 8;
+const int WMMA_K = 128;
 
 // Performs an MxNxK GEMM (C=alpha*A*B + beta*C) assuming:
 //  1) Matrices are packed in memory.
@@ -71,11 +75,15 @@ using namespace nvcuda;
 //  3) Neither A nor B are transposed.
 // Note: This is NOT a high performance example but is for demonstration purposes only
 //       For a high performance code please use the GEMM provided in cuBLAS.
-__global__ void wmma_example(T1 *A, T1 *B, T2 *C, int M, int n, int k) {
+__global__ void wmma_example(T1 *A, T1 *B, T2 *C, int M, const int n, int k) {
 
    using namespace nvcuda::wmma::experimental;
-   int bx = blockIdx.x * blockDim.y + threadIdx.y;
-   int by = blockIdx.y;
+   size_t wid = ((size_t)blockIdx.x * blockDim.x + threadIdx.x);
+   //printf("wid: %ld, M = %d, n = %d\n", wid, M, n);
+   int n1 = n / 8;
+   int bx = (wid / n1) * 8;
+   int by = (wid % n1) * 8;
+   //printf("wid: %ld, bx: %d, by: %d, n = %d, m = %d, k = %d\n", wid, bx, by, n, M, k);
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag;
    wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag;
    wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag;
@@ -87,8 +95,9 @@ __global__ void wmma_example(T1 *A, T1 *B, T2 *C, int M, int n, int k) {
       load_matrix_sync(b_frag, B + by * 8 * k / 32 + j * 128 * 8 / 32, 128);
       bmma_sync(c_frag, a_frag, b_frag, c_frag, bmmaBitOpXOR, bmmaAccumulateOpPOPC);
    }
-   
+
    store_matrix_sync(C + (bx * 8 * n + by * 8), c_frag, n, wmma::mem_row_major);
+
 
 }
 
@@ -112,12 +121,14 @@ void quantWMMA(Data data, Setting setting) {
    printf("\nM = %d, N = %d, K = %d.\n\n", MATRIX_M, MATRIX_N, MATRIX_K);
    
    // First: using WMMA
-   dim3 tensorcoreSNBlk(512, 1);
-   dim3 tensorcoreSNDim(MATRIX_M / 512 / 8, MATRIX_N / 8);
+
+   int blockSize = 256;
+   int gridSize = (MATRIX_M * MATRIX_N + blockSize - 1) / blockSize / 8 / 8;
+   cout << "gridSize: " << gridSize << endl;
 
    printf("Running with wmma...\n");
    cudaErrCheck(cudaEventRecord(startWMMA));
-   wmma_example <<< tensorcoreSNDim, tensorcoreSNBlk >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
+   wmma_example <<< gridSize, blockSize >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
    cudaErrCheck(cudaEventRecord(stopWMMA));
    cudaErrCheck(cudaEventSynchronize(stopWMMA));
 

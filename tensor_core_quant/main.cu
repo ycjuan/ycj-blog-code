@@ -12,7 +12,7 @@
 
 using namespace std;
 
-int kNumDocs = 1 << 20;
+int kNumDocs = 1 << 10;
 int kNumReqs = 1 << 4;
 int kNumT1 = 1 << 2;
 int kNumTrials = 100;
