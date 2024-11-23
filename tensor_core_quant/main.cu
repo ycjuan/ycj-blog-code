@@ -12,7 +12,7 @@
 
 using namespace std;
 
-int kNumDocs = 1 << 20;
+int kNumDocs = 1 << 10;
 int kNumReqs = 1 << 8;
 int kNumT1 = 1 << 5;
 int kNumTrials = 100;
@@ -20,7 +20,7 @@ MemLayout kMemLayoutDoc = ROW_MAJOR;
 MemLayout kMemLayoutReq = ROW_MAJOR;
 MemLayout kMemLayoutRstCpu = COL_MAJOR;
 MemLayout kMemLayoutRstGpuKernel = COL_MAJOR;
-MemLayout kMemLayoutRstGpuTensor = ROW_MAJOR;
+MemLayout kMemLayoutRstGpuTensor = COL_MAJOR;
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \

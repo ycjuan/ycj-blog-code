@@ -51,30 +51,56 @@ void cudaErrCheck_(cudaError_t stat, const char *file, int line) {
 #include <mma.h>
 using namespace nvcuda;
 
-__global__ void wmma_example(const unsigned *A, const unsigned *B, int *C, const unsigned m, const unsigned n, const unsigned k)
+// The only dimensions currently supported by WMMA
+const int WMMA_M = 8;
+const int WMMA_N = 8;
+const int WMMA_K = 128;
+
+__global__ void wmma_example(const unsigned *a, const unsigned *b, int *c, const unsigned M, const unsigned N, const unsigned K)
 {
    using namespace nvcuda::wmma::experimental;
-   int bx = blockIdx.x * blockDim.y + threadIdx.y;
-   int by = blockIdx.y;
+   int lda = K;
+   int ldb = K;
+   int ldc = M;
+
+   // Tile using a 2D grid
+   int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
+   int warpN = (blockIdx.y * blockDim.y + threadIdx.y);
 
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag;
    wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag;
    wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag;
    wmma::fill_fragment(c_frag, 0);
 
-   for (int j = 0; j < (k / 128); j++)
-   {
-      load_matrix_sync(a_frag, A + bx * 8 * k / 32 + j * 128 * 8 / 32, 128);
-      load_matrix_sync(b_frag, B + by * 8 * k / 32 + j * 128 * 8 / 32, 128);
+   for (int i = 0; i < K; i += WMMA_K) {
+      int aRow = warpM * WMMA_M;
+      int aCol = i;
 
-      bmma_sync(c_frag, a_frag, b_frag, c_frag, bmmaBitOpXOR, bmmaAccumulateOpPOPC);
+      int bRow = i;
+      int bCol = warpN * WMMA_N;
+
+      // Bounds checking
+      if (aRow < M && aCol < K && bRow < K && bCol < N) {
+         // Load the inputs
+         wmma::load_matrix_sync(a_frag, a + aRow * lda / 32 + aCol, lda);
+         wmma::load_matrix_sync(b_frag, b + bCol * ldb / 32 + bRow, ldb);
+
+         // Perform the matrix multiplication
+         wmma::bmma_sync(c_frag, a_frag, b_frag, c_frag);
+
+      }
    }
+
+   int cRow = warpM * WMMA_M;
+   int cCol = warpN * WMMA_N;
 
 #pragma unroll
    for (int i = 0; i < c_frag.num_elements; i++)
-      c_frag.x[i] = k - c_frag.x[i];
+      c_frag.x[i] = K - c_frag.x[i];
 
-   store_matrix_sync(C + (bx * 8 * n + by * 8), c_frag, n, wmma::mem_row_major);
+   if (cRow < M && cCol < N) {
+      wmma::store_matrix_sync(c + cRow + cCol * ldc, c_frag, ldc, wmma::mem_col_major);
+   }
 }
 
 void quantWMMA(Data data, Setting setting) {
@@ -91,8 +117,16 @@ void quantWMMA(Data data, Setting setting) {
    printf("\nM = %d, N = %d, K = %d.\n\n", MATRIX_M, MATRIX_N, MATRIX_K);
    
    // First: using WMMA
-   dim3 blockDim(32, 2);
-   dim3 gridDim(MATRIX_M/16, MATRIX_N/8);
+   dim3 gridDim;
+   dim3 blockDim;
+ 
+   // blockDim.x must be a multple of warpSize
+   // 128x4 means we have 16 warps and a block computes a 64x64 output tile
+   blockDim.x = 128;
+   blockDim.y = 4;
+
+   gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / 32 - 1)) / (WMMA_M * blockDim.x / 32);
+   gridDim.y = (MATRIX_N + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y);
 
    cout << "blockDim: " << blockDim.x << " " << blockDim.y << endl;
    cout << "gridDim: " << gridDim.x << " " << gridDim.y << endl;
