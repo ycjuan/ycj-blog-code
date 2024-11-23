@@ -64,11 +64,6 @@ void curandErrCheck_(curandStatus_t stat, const char *file, int line) {
 #include <mma.h>
 using namespace nvcuda;
 
-// The only dimensions currently supported by WMMA
-const int WMMA_M = 8;
-const int WMMA_N = 8;
-const int WMMA_K = 128;
-
 
 // Performs an MxNxK GEMM (C=alpha*A*B + beta*C) assuming:
 //  1) Matrices are packed in memory.
@@ -119,8 +114,8 @@ void quantWMMA(Data data, Setting setting) {
    printf("\nM = %d, N = %d, K = %d.\n\n", MATRIX_M, MATRIX_N, MATRIX_K);
    
    // First: using WMMA
-   dim3 tensorcoreSNBlk(32, 2);
-   dim3 tensorcoreSNDim(MATRIX_M / 16, MATRIX_N / 8);
+   dim3 tensorcoreSNBlk(512, 1);
+   dim3 tensorcoreSNDim(MATRIX_M / 512 / 8, MATRIX_N / 8);
 
    printf("Running with wmma...\n");
    cudaErrCheck(cudaEventRecord(startWMMA));
