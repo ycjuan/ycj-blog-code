@@ -25,6 +25,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+This file is copied from: 
+
+https://github.com/NVIDIA-developer-blog/code-samples/blob/708ce9137eb5ac7682f788e5d5b8279c7e2578ed/posts/tensor-cores/simpleTensorCoreGEMM.cu
+
+For my reference
+*/
+
 #include <stdio.h>
 #include <curand.h>
 #include <cublas_v2.h>
