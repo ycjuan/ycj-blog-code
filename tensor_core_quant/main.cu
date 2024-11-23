@@ -13,7 +13,7 @@
 using namespace std;
 
 int kNumDocs = 1 << 10;
-int kNumReqs = 1 << 4;
+int kNumReqs = 1 << 6;
 int kNumT1 = 1 << 2;
 int kNumTrials = 100;
 MemLayout kMemLayoutDoc = ROW_MAJOR;
