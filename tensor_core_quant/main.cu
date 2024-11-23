@@ -14,7 +14,7 @@ using namespace std;
 
 int kNumDocs = 1 << 20;
 int kNumReqs = 1 << 4;
-int kNumInt64 = 1 << 3;
+int kNumInt64 = 1 << 4;
 int kNumTrials = 100;
 MemLayout kMemLayoutDoc = ROW_MAJOR;
 MemLayout kMemLayoutReq = COL_MAJOR;

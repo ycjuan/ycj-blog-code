@@ -67,7 +67,7 @@ using namespace nvcuda;
 // Must be multiples of 16 for wmma code to work
 #define MATRIX_M 1048576
 #define MATRIX_N 16 
-#define MATRIX_K 1024
+#define MATRIX_K 16
 
 // The only dimensions currently supported by WMMA
 const int WMMA_M = 8;
@@ -170,6 +170,10 @@ void quantWMMA(Data data, Setting setting) {
    wmma_example <<< gridDim, blockDim >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K);
    cudaErrCheck(cudaEventRecord(stopWMMA));
    cudaErrCheck(cudaEventSynchronize(stopWMMA));
+
+   float wmmaTime;
+   cudaErrCheck(cudaEventElapsedTime(&wmmaTime, startWMMA, stopWMMA));
+   printf("wmma took %fms\n", wmmaTime);
 
    cudaErrCheck(cudaEventDestroy(startWMMA));
    cudaErrCheck(cudaEventDestroy(stopWMMA));
