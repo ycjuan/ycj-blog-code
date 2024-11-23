@@ -28,7 +28,7 @@ struct Data
     T1 *d_doc; // M=numDocs x N=numInt64
     T1 *d_req; // M=numReqs x N=numInt64
     T2 *d_rst_kernel; // M=numDocs x N=numReqs
-    T2 *d_rst_cublas; // M=numDocs x N=numReqs
+    T2 *d_rst_wmma; // M=numDocs x N=numReqs
     T2 *h_rst_cpu;
     MemLayout docMemLayout;
     MemLayout reqMemLayout;
@@ -41,7 +41,7 @@ struct Data
         cudaFree(d_doc);
         cudaFree(d_req);
         cudaFree(d_rst_kernel);
-        cudaFree(d_rst_cublas);
+        cudaFree(d_rst_wmma);
         cudaFreeHost(h_rst_cpu);
     }
 

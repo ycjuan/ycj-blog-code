@@ -143,7 +143,7 @@ void quantTensor(Data data, Setting setting) {
    T1 *a_fp16 = data.d_doc;
    T1 *b_fp16 = data.d_req;
 
-   T2 *c_wmma = data.d_rst_cublas;
+   T2 *c_wmma = data.d_rst_wmma;
 
    cudaEvent_t startWMMA;
    cudaEvent_t stopWMMA;
