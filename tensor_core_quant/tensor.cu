@@ -30,6 +30,7 @@ This file is modified from:
 
 https://github.com/NVIDIA-developer-blog/code-samples/blob/708ce9137eb5ac7682f788e5d5b8279c7e2578ed/posts/tensor-cores/simpleTensorCoreGEMM.cu
 
+https://github.com/rgb000000/yolo2_light/blob/6bb99873873f0fde08e8ecde754d5cb0e0ff97b8/src/gpu.cu#L1892
 */
 
 #include <stdio.h>
@@ -68,6 +69,9 @@ using namespace nvcuda;
 const int WMMA_M = 8;
 const int WMMA_N = 8;
 const int WMMA_K = 128;
+const int WMMA_K32 = (WMMA_K/32);
+const int WMMA_Nx2 = (WMMA_N*2);
+
 
 // Performs an MxNxK GEMM (C=alpha*A*B + beta*C) assuming:
 //  1) Matrices are packed in memory.
@@ -75,30 +79,68 @@ const int WMMA_K = 128;
 //  3) Neither A nor B are transposed.
 // Note: This is NOT a high performance example but is for demonstration purposes only
 //       For a high performance code please use the GEMM provided in cuBLAS.
-__global__ void wmma_example(T1 *A, T1 *B, T2 *C, int M, const int n, int k) {
+__global__ void wmma_example(T1 *A, T1 *B, T2 *C, int M, int N, int K) {
 
-   using namespace nvcuda::wmma::experimental;
-   size_t wid = ((size_t)blockIdx.x * blockDim.x + threadIdx.x);
-   //printf("wid: %ld, M = %d, n = %d\n", wid, M, n);
-   int n1 = n / 8;
-   int bx = (wid / n1);
-   int by = (wid % n1);
-   //printf("wid: %ld, bx: %d, by: %d, n = %d, m = %d, k = %d\n", wid, bx, by, n, M, k);
-   wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag;
-   wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag;
-   wmma::fill_fragment(c_frag, 0);
+   int lda = K;
+   int ldb = K;
+   int ldc = N;
+   // total 57%
+   int index = blockIdx.x * blockDim.x + threadIdx.x;
 
-   for (int j = 0; j < (k / 128); j++)
-   {
-      load_matrix_sync(a_frag, A + bx * 8 * k / 32 + j * 128 * 8 / 32, 128);
-      load_matrix_sync(b_frag, B + by * 8 * k / 32 + j * 128 * 8 / 32, 128);
-      bmma_sync(c_frag, a_frag, b_frag, c_frag, bmmaBitOpXOR, bmmaAccumulateOpPOPC);
+   __shared__ int C_s[WMMA_N * WMMA_M * 32 * 2]; // 2 * 8 KB - Temprorary result of GEMM WMMA for 32 warps
+
+   const int lane_id = threadIdx.x % 32;
+   const int warp_id = threadIdx.x / 32;
+   const int global_warp_id = index / 32;
+
+   const int N_aligned = N + WMMA_Nx2 - (N % WMMA_Nx2);
+
+   int i, j, k, h;
+   // 47% = 29 + 10 + 8
+   j = global_warp_id % (N_aligned / WMMA_Nx2);
+   j = j * WMMA_Nx2;
+   { // out_h*out_w - one channel output size [169 - 173056]
+      i = global_warp_id / (N_aligned / WMMA_Nx2);
+      i = i * WMMA_M;
+
+      int count = 0;
+      k = 0;
+
+      if (i < M) // if (i < M)  // l.n - filters [16 - 55 - 1024]
+      {
+         if (j + WMMA_Nx2 > N)
+            j = N - WMMA_Nx2; // must be: j+7 < N
+         if (i + WMMA_M > M)
+            i = M - WMMA_M; // must be: i+7 < M
+                            // Tensor Cores
+         using namespace nvcuda;
+
+         wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, wmma::experimental::precision::b1, wmma::row_major> a_frag;
+         wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, wmma::experimental::precision::b1, wmma::col_major> b_frag;
+         wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, int> c1_frag;
+         wmma::fill_fragment(c1_frag, 0); // !!!! XOR isn't XNOR !!!!!!!!!!
+
+         // 8 x 8 x 4 (uint32_t, 4 * 32 = 128 bit)
+         for (; k < K; k += 128) // l.size*l.size*l.c - one filter size [27 - 144 - 9216]
+         {
+            int64_t A_cur_index = (i * lda + k) / 8;        // index in bits
+            int64_t B1_cur_index = (j * ldb + k) / 8;       // index in bits
+
+            // try to use A that is cached in shared memory - poor performance
+            // if (i == start_i) wmma::load_matrix_sync(a_frag, &A_s[k / 32], (512 * 32));   // lda = (128*32) bits
+            // else wmma::load_matrix_sync(a_frag, (uint32_t *)(A + A_cur_index), lda);   // lda = M
+
+            // lda, ldb - are in bits
+            wmma::load_matrix_sync(a_frag, (uint32_t *)(A + A_cur_index), lda); // lda = M
+
+            wmma::load_matrix_sync(b_frag, (uint32_t *)(B + B1_cur_index), ldb); // ldb = K
+            wmma::bmma_sync(c1_frag, a_frag, b_frag, c1_frag);                   // XOR-GEMM
+         }
+         // C[i*ldc + j]
+         wmma::store_matrix_sync(&C[i*ldc+j], c1_frag, WMMA_N, wmma::mem_row_major);
+
+      }
    }
-
-   store_matrix_sync(C + (bx * 8 * n + by * 8), c_frag, n, wmma::mem_row_major);
-
-
 }
 
 void quantWMMA(Data data, Setting setting) {
@@ -122,9 +164,11 @@ void quantWMMA(Data data, Setting setting) {
    
    // First: using WMMA
 
+   int WARP_SIZE = 32;
+   int size = (MATRIX_M / 8) * (MATRIX_N / 8) * WARP_SIZE;
    int blockSize = 256;
-   int gridSize = (MATRIX_M * MATRIX_N + blockSize - 1) / blockSize / 8 / 8;
-   cout << "gridSize: " << gridSize << endl;
+   int gridSize = (size + blockSize - 1) / blockSize;
+   cout << "gridSize (WMMA): " << gridSize << endl;
 
    printf("Running with wmma...\n");
    cudaErrCheck(cudaEventRecord(startWMMA));
