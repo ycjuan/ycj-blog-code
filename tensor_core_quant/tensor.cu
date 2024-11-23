@@ -90,11 +90,11 @@ __global__ void wmma_example(T1 *A, T1 *B, T2 *C, int M, int n, int k) {
    {
       load_matrix_sync(a_frag, A + bx * 8 * k / 32 + j * 128 * 8 / 32, 128);
       load_matrix_sync(b_frag, B + by * 8 * k / 32 + j * 128 * 8 / 32, 128);
-      bmma_sync(c_frag, a_frag, b_frag, c_frag);
+      bmma_sync(c_frag, a_frag, b_frag, c_frag, );
    }
 #pragma unroll
    for (int i = 0; i < c_frag.num_elements; i++)
-      c_frag.x[i] = k - 2 * c_frag.x[i];
+      c_frag.x[i] = k - c_frag.x[i];
    store_matrix_sync(C + (bx * 8 * n + by * 8), c_frag, n, wmma::mem_row_major);
 
 }
@@ -124,7 +124,7 @@ void quantWMMA(Data data, Setting setting) {
 
    printf("Running with wmma...\n");
    cudaErrCheck(cudaEventRecord(startWMMA));
-   wmma_example <<< tensorcoreSNDim, tensorcoreSNBlk >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K);
+   wmma_example <<< tensorcoreSNDim, tensorcoreSNBlk >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
    cudaErrCheck(cudaEventRecord(stopWMMA));
    cudaErrCheck(cudaEventSynchronize(stopWMMA));
 

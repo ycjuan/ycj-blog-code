@@ -20,7 +20,7 @@ MemLayout kMemLayoutDoc = ROW_MAJOR;
 MemLayout kMemLayoutReq = COL_MAJOR;
 MemLayout kMemLayoutRstCpu = COL_MAJOR;
 MemLayout kMemLayoutRstGpuKernel = COL_MAJOR;
-MemLayout kMemLayoutRstGpuTensor = COL_MAJOR;
+MemLayout kMemLayoutRstGpuTensor = ROW_MAJOR;
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \
@@ -81,8 +81,8 @@ void checkData(Data data)
             
             if (cpuVal != gpuWmmaAdj)
             {
-                cout << "Cublas error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuWmmaAdj << endl;
-                return;
+                cout << "Wmma error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuWmmaAdj << endl;
+                //return;
             }
         }
     }
