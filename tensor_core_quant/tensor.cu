@@ -70,6 +70,10 @@ __global__ void wmma_example(const unsigned *A, const unsigned *B, int *C, const
       bmma_sync(c_frag, a_frag, b_frag, c_frag, bmmaBitOpXOR, bmmaAccumulateOpPOPC);
    }
 
+#pragma unroll
+   for (int i = 0; i < c_frag.num_elements; i++)
+      c_frag.x[i] = k - c_frag.x[i];
+
    store_matrix_sync(C + (bx * 8 * n + by * 8), c_frag, n, wmma::mem_row_major);
 }
 
@@ -95,7 +99,7 @@ void quantWMMA(Data data, Setting setting) {
 
    printf("Running with wmma...\n");
    CudaTimer timer;
-   for (int t = -3; t < -2; t++)
+   for (int t = -3; t < setting.kNumTrials; t++)
    {
       if (t == 0)
          timer.tic();

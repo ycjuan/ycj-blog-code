@@ -82,8 +82,6 @@ void checkData(Data data)
             T2 cpuVal = data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)];
             T2 gpuKernelVal = data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)];
             T2 gpuWmma = data.d_rst_wmma[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
-            //T2 gpuWmmaAdj = sizeof(T1) * 8 * data.numT1 - gpuWmma;
-            T2 gpuWmmaAdj = gpuWmma;
 
             if (false)
             {
@@ -91,10 +89,10 @@ void checkData(Data data)
                 return;
             }
             
-            if (cpuVal != gpuWmmaAdj)
+            if (cpuVal != gpuWmma)
             {
                 if (numPrinted++ < 256)
-                    cout << "Wmma error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuWmmaAdj << endl;
+                    cout << "Wmma error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuWmma << endl;
                 //return;
             }
         }
