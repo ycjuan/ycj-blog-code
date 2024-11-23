@@ -30,7 +30,6 @@ This file is modified from:
 
 https://github.com/NVIDIA-developer-blog/code-samples/blob/708ce9137eb5ac7682f788e5d5b8279c7e2578ed/posts/tensor-cores/simpleTensorCoreGEMM.cu
 
-https://github.com/rgb000000/yolo2_light/blob/6bb99873873f0fde08e8ecde754d5cb0e0ff97b8/src/gpu.cu#L1892
 */
 
 #include <stdio.h>
@@ -38,6 +37,7 @@ https://github.com/rgb000000/yolo2_light/blob/6bb99873873f0fde08e8ecde754d5cb0e0
 #include <cublas_v2.h>
 
 #include "common.cuh"
+#include "util.cuh"
 
 // Define some error checking macros.
 #define cudaErrCheck(stat) { cudaErrCheck_((stat), __FILE__, __LINE__); }
@@ -69,8 +69,6 @@ using namespace nvcuda;
 const int WMMA_M = 8;
 const int WMMA_N = 8;
 const int WMMA_K = 128;
-const int WMMA_K32 = (WMMA_K/32);
-const int WMMA_Nx2 = (WMMA_N);
 
 
 // Performs an MxNxK GEMM (C=alpha*A*B + beta*C) assuming:
@@ -79,66 +77,51 @@ const int WMMA_Nx2 = (WMMA_N);
 //  3) Neither A nor B are transposed.
 // Note: This is NOT a high performance example but is for demonstration purposes only
 //       For a high performance code please use the GEMM provided in cuBLAS.
-__global__ void wmma_example(T1 *A, T1 *B, T2 *C, int M, int N, int K) {
+__global__ void wmma_example(T1 *a, T1 *b, T2 *c, int M, int N, int K) {
 
+   using namespace nvcuda::wmma::experimental;
+   // Leading dimensions. Packed with no transpositions.
    int lda = K;
    int ldb = K;
-   int ldc = N;
-   // total 57%
-   int index = blockIdx.x * blockDim.x + threadIdx.x;
+   int ldc = M;
 
-   const int lane_id = threadIdx.x % 32;
-   const int warp_id = threadIdx.x / 32;
-   const int global_warp_id = index / 32;
+   // Tile using a 2D grid
+   int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
+   int warpN = (blockIdx.y * blockDim.y + threadIdx.y);
+ 
+   // Declare the fragments
+   wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, precision::b1, wmma::row_major> a_frag;
+   wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, precision::b1, wmma::col_major> b_frag;
+   wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, T2> c_frag;
 
-   const int N_aligned = N + WMMA_Nx2 - (N % WMMA_Nx2);
+   wmma::fill_fragment(c_frag, 0);
 
-   int i, j, k, h;
-   // 47% = 29 + 10 + 8
-   j = global_warp_id % (N_aligned / WMMA_Nx2);
-   j = j * WMMA_Nx2;
-   { // out_h*out_w - one channel output size [169 - 173056]
-      i = global_warp_id / (N_aligned / WMMA_Nx2);
-      i = i * WMMA_M;
+   // Loop over k
+   for (int i = 0; i < K; i += WMMA_K) {
+      int aRow = warpM * WMMA_M;
+      int aCol = i;
 
-      int count = 0;
-      k = 0;
+      int bRow = i;
+      int bCol = warpN * WMMA_N;
 
-      if (i < M) // if (i < M)  // l.n - filters [16 - 55 - 1024]
-      {
-         if (j + WMMA_Nx2 > N)
-            j = N - WMMA_Nx2; // must be: j+7 < N
-         if (i + WMMA_M > M)
-            i = M - WMMA_M; // must be: i+7 < M
-                            // Tensor Cores
-         using namespace nvcuda;
+      // Bounds checking
+      if (aRow < M && aCol < K && bRow < K && bCol < N) {
+         // Load the inputs
+         wmma::load_matrix_sync(a_frag, a + aRow * lda + aCol, lda);
+         wmma::load_matrix_sync(b_frag, b + bRow + bCol * ldb, ldb);
 
-         wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, wmma::experimental::precision::b1, wmma::row_major> a_frag;
-         wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, wmma::experimental::precision::b1, wmma::col_major> b_frag;
-         wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, int> c1_frag;
-         wmma::fill_fragment(c1_frag, 0); // !!!! XOR isn't XNOR !!!!!!!!!!
-
-         // 8 x 8 x 4 (uint32_t, 4 * 32 = 128 bit)
-         for (; k < K; k += 128) // l.size*l.size*l.c - one filter size [27 - 144 - 9216]
-         {
-            int64_t A_cur_index = (i * lda + k) / 32;        // index in bits
-            int64_t B1_cur_index = (j * ldb + k) / 32;       // index in bits
-
-            // try to use A that is cached in shared memory - poor performance
-            // if (i == start_i) wmma::load_matrix_sync(a_frag, &A_s[k / 32], (512 * 32));   // lda = (128*32) bits
-            // else wmma::load_matrix_sync(a_frag, (uint32_t *)(A + A_cur_index), lda);   // lda = M
-
-            // lda, ldb - are in bits
-            wmma::load_matrix_sync(a_frag, (uint32_t *)(A + A_cur_index), lda); // lda = M
-
-            wmma::load_matrix_sync(b_frag, (uint32_t *)(B + B1_cur_index), ldb); // ldb = K
-            wmma::bmma_sync(c1_frag, a_frag, b_frag, c1_frag);                   // XOR-GEMM
-         }
-         // C[i*ldc + j]
-         wmma::store_matrix_sync(&C[i*ldc+j], c1_frag, WMMA_N, wmma::mem_row_major);
+         // Perform the matrix multiplication
+         wmma::bmma_sync(c_frag, a_frag, b_frag, c_frag, bmmaBitOpXOR, bmmaAccumulateOpPOPC);
 
       }
    }
+
+   // Load in the current value of c, scale it by beta, and add this our result scaled by alpha
+   int cRow = warpM * WMMA_M;
+   int cCol = warpN * WMMA_N;
+
+   // Store the output
+   wmma::store_matrix_sync(c + cRow + cCol * ldc, c_frag, ldc, wmma::mem_col_major);
 }
 
 void quantWMMA(Data data, Setting setting) {
@@ -152,35 +135,31 @@ void quantWMMA(Data data, Setting setting) {
 
    T2 *c_wmma = data.d_rst_wmma;
 
-   cudaEvent_t startWMMA;
-   cudaEvent_t stopWMMA;
-   
-   cudaErrCheck(cudaEventCreate(&startWMMA));
-   cudaErrCheck(cudaEventCreate(&stopWMMA));
-
-   int MATRIX_K_BITS = MATRIX_K * sizeof(T1) * 8;
-   printf("\nM = %d, N = %d, K = %d, K_BITS = %d.\n\n", MATRIX_M, MATRIX_N, MATRIX_K, MATRIX_K_BITS);
+   printf("\nM = %d, N = %d, K = %d.\n\n", MATRIX_M, MATRIX_N, MATRIX_K);
    
    // First: using WMMA
+   dim3 gridDim;
+   dim3 blockDim;
+ 
+   // blockDim.x must be a multple of warpSize
+   // 128x4 means we have 16 warps and a block computes a 64x64 output tile
+   blockDim.x = 128;
+   blockDim.y = 4;
 
-   int WARP_SIZE = 32;
-   int blockSize = 256;
-   int size = (MATRIX_M / 8) * (MATRIX_N / 8);
-   int gridSize = (size + blockSize - 1) / blockSize;
-   cout << "gridSize (WMMA): " << gridSize << endl;
-
+   gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / 32 - 1)) / (WMMA_M * blockDim.x / 32);
+   gridDim.y = (MATRIX_N + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y);
+   
    printf("Running with wmma...\n");
-   cudaErrCheck(cudaEventRecord(startWMMA));
-   wmma_example <<< gridSize, blockSize >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K_BITS);
-   cudaErrCheck(cudaEventRecord(stopWMMA));
-   cudaErrCheck(cudaEventSynchronize(stopWMMA));
-
-   float wmmaTime;
-   cudaErrCheck(cudaEventElapsedTime(&wmmaTime, startWMMA, stopWMMA));
-   printf("wmma took %fms\n", wmmaTime);
-
-   cudaErrCheck(cudaEventDestroy(startWMMA));
-   cudaErrCheck(cudaEventDestroy(stopWMMA));
+   CudaTimer timer;
+   for (int t = -3; t < setting.kNumTrials; t++)
+   {
+      if (t == 0)
+         timer.tic();
+      wmma_example <<< gridDim, blockDim >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K);
+      cudaErrCheck(cudaDeviceSynchronize());
+      cudaErrCheck(cudaGetLastError());
+   }
+   cout << "wmma took " << timer.tocMs() / setting.kNumTrials << "ms" << endl;
 }
 
 
