@@ -12,7 +12,7 @@
 
 using namespace std;
 
-int kNumDocs = 1 << 20;
+int kNumDocs = 1 << 10;
 int kNumReqs = 1 << 4;
 int kNumT1 = 1 << 4;
 int kNumTrials = 100;
@@ -70,7 +70,8 @@ void checkData(Data data)
         {
             T2 cpuVal = data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)];
             T2 gpuKernelVal = data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)];
-            T2 gpuCublasVal = data.d_rst_wmma[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
+            T2 gpuWmma = data.d_rst_wmma[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
+            T2 gpuWmmaAdj = sizeof(T1) * 8 * data.numT1 - gpuWmma;
 
             if (cpuVal != gpuKernelVal)
             {
@@ -78,9 +79,9 @@ void checkData(Data data)
                 return;
             }
             
-            if (cpuVal != gpuKernelVal)
+            if (cpuVal != gpuWmmaAdj)
             {
-                cout << "Cublas error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuCublasVal << endl;
+                cout << "Cublas error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuWmmaAdj << endl;
                 return;
             }
         }

@@ -64,11 +64,6 @@ void curandErrCheck_(curandStatus_t stat, const char *file, int line) {
 #include <mma.h>
 using namespace nvcuda;
 
-// Must be multiples of 16 for wmma code to work
-#define MATRIX_M 1048576
-#define MATRIX_N 16 
-#define MATRIX_K 16
-
 // The only dimensions currently supported by WMMA
 const int WMMA_M = 8;
 const int WMMA_N = 8;
@@ -139,6 +134,10 @@ __global__ void wmma_example(T1 *a, T1 *b, T2 *c, int M, int N, int K) {
 }
 
 void quantWMMA(Data data, Setting setting) {
+
+   int MATRIX_M = data.numDocs;
+   int MATRIX_N = data.numReqs;
+   int MATRIX_K = data.numT1;
 
    T1 *a_fp16 = data.d_doc;
    T1 *b_fp16 = data.d_req;
