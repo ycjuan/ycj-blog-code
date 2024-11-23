@@ -55,11 +55,11 @@ Data genData()
     default_random_engine generator;
     uniform_int_distribution<T1> distribution;
 
-    T1 uid = 1;
+    T1 uid = 0;
     for (int i = 0; i < data.numDocs; i++)
         for (int k = 0; k < data.numT1; k++)
             data.d_doc[getMemAddr(i, k, data.numDocs, data.numT1, data.docMemLayout)] = uid++;
-    uid = 1;
+    uid = 0;
 
     for (int j = 0; j < data.numReqs; j++)
     {
@@ -93,8 +93,8 @@ void checkData(Data data)
             
             if (cpuVal != gpuWmmaAdj)
             {
-                if (numPrinted++ < 256);
-                    //cout << "Wmma error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuWmmaAdj << endl;
+                if (numPrinted++ < 256)
+                    cout << "Wmma error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuWmmaAdj << endl;
                 //return;
             }
         }

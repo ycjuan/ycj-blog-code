@@ -83,10 +83,12 @@ __global__ void wmma_example(const unsigned *A, const unsigned *B, int *C, const
    int bx = blockIdx.x * blockDim.y + threadIdx.y;
    int by = blockIdx.y;
    printf("bx: %d, by: %d, blockIdx.x: %d, blockDim.y: %d, threadIdx.y: %d\n", bx, by, blockIdx.x, blockDim.y, threadIdx.y);
+
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag;
    wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag;
+   wmma::fragment<wmma::accumulator, 8, 8, 128, int> acc_frag;
    wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag;
-   wmma::fill_fragment(c_frag, 0);
+   wmma::fill_fragment(acc_frag, 0);
 
    /*
    printf(" \
@@ -103,17 +105,24 @@ __global__ void wmma_example(const unsigned *A, const unsigned *B, int *C, const
       load_matrix_sync(a_frag, A + bx * 8 * k / 32 + j * 128 * 8 / 32, 128);
       load_matrix_sync(b_frag, B + by * 8 * k / 32 + j * 128 * 8 / 32, 128);
 
-      bmma_sync(c_frag, a_frag, b_frag, c_frag);
+      bmma_sync(acc_frag, a_frag, b_frag, acc_frag, bmmaBitOpXOR, bmmaAccumulateOpPOPC);
    }
+   load_matrix_sync(c_frag, C + (bx * 8 * n + by * 8), n, wmma::mem_row_major);
+
+   #pragma unroll
+      for(int i=0; i < c_frag.num_elements; i++) {
+         c_frag.x[i] += acc_frag.x[i];
+      }
+
    store_matrix_sync(C + (bx * 8 * n + by * 8), c_frag, n, wmma::mem_row_major);
-      if (bx == 0 && by == 0 && threadIdx.x == 0)
+      if (bx == 0 && by == 0 && threadIdx.x == 31)
       {
-         printf("A[0] = %u\n", A[0]);
-         printf("B[0] = %u\n", B[0]);
+         printf("A[0] = %u\n", A[threadIdx.x]);
+         printf("B[0] = %u\n", B[threadIdx.x]);
          printf("a_frag.x[0]: %u, a_frag.x[1]: %u, a_frag.x[2]: %u, a_frag.x[3]: %u\n", a_frag.x[0], a_frag.x[1], a_frag.x[2], a_frag.x[3]);
          printf("b_frag.x[0]: %u, b_frag.x[1]: %u, b_frag.x[2]: %u, b_frag.x[3]: %u\n", b_frag.x[0], b_frag.x[1], b_frag.x[2], b_frag.x[3]);
-         printf("c_frag.x[0]: %d, c_frag.x[1]: %d, c_frag.x[2]: %d, c_frag.x[3]: %d\n", c_frag.x[0], c_frag.x[1], c_frag.x[2], c_frag.x[3]);
-         printf("C[0]: %d\n", C[0]);
+         printf("c_frag.x[0]: %d, c_frag.x[1]: %d\n", acc_frag.x[0], acc_frag.x[1]);
+         printf("C[0]: %d\n", C[threadIdx.x]);
       }
 }
 
@@ -150,6 +159,7 @@ void quantWMMA(Data data, Setting setting) {
       cudaErrCheck(cudaGetLastError());
    }
    cout << "wmma took " << timer.tocMs() / setting.kNumTrials << "ms" << endl;
+   cout << "C[0]: " << data.d_rst_wmma[0] << endl;
 }
 
 
