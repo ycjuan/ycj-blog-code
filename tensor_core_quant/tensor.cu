@@ -80,8 +80,9 @@ __global__ void wmma_example(T1 *A, T1 *B, T2 *C, int M, const int n, int k) {
    using namespace nvcuda::wmma::experimental;
    size_t wid = ((size_t)blockIdx.x * blockDim.x + threadIdx.x);
    //printf("wid: %ld, M = %d, n = %d\n", wid, M, n);
-    int bx = blockIdx.x * blockDim.y + threadIdx.y; 
-    int by = blockIdx.y;
+   int n1 = n / 8;
+   int bx = (wid / n1) * 8;
+   int by = (wid % n1) * 8;
    //printf("wid: %ld, bx: %d, by: %d, n = %d, m = %d, k = %d\n", wid, bx, by, n, M, k);
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag;
    wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag;
@@ -121,12 +122,13 @@ void quantWMMA(Data data, Setting setting) {
    
    // First: using WMMA
 
-   dim3 tensorcoreSNBlk(32, 2);
-   dim3 tensorcoreSNDim(MATRIX_M/16, MATRIX_N/8);
+   int blockSize = 256;
+   int gridSize = (MATRIX_M * MATRIX_N + blockSize - 1) / blockSize / 8 / 8;
+   cout << "gridSize: " << gridSize << endl;
 
    printf("Running with wmma...\n");
    cudaErrCheck(cudaEventRecord(startWMMA));
-   wmma_example <<< tensorcoreSNDim, tensorcoreSNBlk >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
+   wmma_example <<< gridSize, blockSize >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
    cudaErrCheck(cudaEventRecord(stopWMMA));
    cudaErrCheck(cudaEventSynchronize(stopWMMA));
 
