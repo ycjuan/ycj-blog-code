@@ -81,8 +81,8 @@ __global__ void wmma_example(T1 *A, T1 *B, T2 *C, int M, const int n, int k) {
    size_t wid = ((size_t)blockIdx.x * blockDim.x + threadIdx.x);
    //printf("wid: %ld, M = %d, n = %d\n", wid, M, n);
    int n1 = n / 8;
-   int bx = (wid / n1) * 8;
-   int by = (wid % n1) * 8;
+   int bx = (wid / n1);
+   int by = (wid % n1);
    //printf("wid: %ld, bx: %d, by: %d, n = %d, m = %d, k = %d\n", wid, bx, by, n, M, k);
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag;
    wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag;
