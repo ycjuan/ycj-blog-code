@@ -14,7 +14,7 @@ using namespace std;
 
 int kNumDocs = 1 << 20;
 int kNumReqs = 1 << 4;
-int kNumInt64 = 1 << 4;
+int kNumT1 = 1 << 4;
 int kNumTrials = 100;
 MemLayout kMemLayoutDoc = ROW_MAJOR;
 MemLayout kMemLayoutReq = COL_MAJOR;
@@ -37,7 +37,7 @@ Data genData()
     Data data;
     data.numDocs = kNumDocs;
     data.numReqs = kNumReqs;
-    data.numInt64 = kNumInt64;
+    data.numT1 = kNumT1;
     data.docMemLayout = kMemLayoutDoc;
     data.reqMemLayout = kMemLayoutReq;
     data.rstLayoutCpu = kMemLayoutRstCpu;
@@ -45,8 +45,8 @@ Data genData()
     data.rstLayoutGpuCublas = kMemLayoutRstGpuTensor;
     data.print();
     
-    CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.numInt64 * sizeof(T1)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.numInt64 * sizeof(T1)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.numT1 * sizeof(T1)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.numT1 * sizeof(T1)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_kernel, (size_t)data.numDocs * data.numReqs * sizeof(T2)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_wmma, (size_t)data.numDocs * data.numReqs * sizeof(T2)));
     CHECK_CUDA(cudaMallocHost(&data.h_rst_cpu, (size_t)data.numDocs * data.numReqs * sizeof(T2)));
@@ -54,9 +54,9 @@ Data genData()
 
     default_random_engine generator;
     uniform_int_distribution<T1> distribution;
-    for (int i = 0; i < data.numDocs * data.numInt64; i++)
+    for (int i = 0; i < data.numDocs * data.numT1; i++)
         data.d_doc[i] = distribution(generator);
-    for (int i = 0; i < data.numReqs * data.numInt64; i++)
+    for (int i = 0; i < data.numReqs * data.numT1; i++)
         data.d_req[i] = distribution(generator);
 
     return data;

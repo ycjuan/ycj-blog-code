@@ -24,7 +24,7 @@ struct Data
 {
     int numDocs;
     int numReqs;
-    int numInt64;
+    int numT1;
     T1 *d_doc; // M=numDocs x N=numInt64
     T1 *d_req; // M=numReqs x N=numInt64
     T2 *d_rst_kernel; // M=numDocs x N=numReqs
@@ -48,7 +48,7 @@ struct Data
     void print()
     {
         ostringstream oss;
-        oss << "numDocs: " << numDocs << ", numReqs: " << numReqs << ", numInt64: " << numInt64 << endl;
+        oss << "numDocs: " << numDocs << ", numReqs: " << numReqs << ", numInt64: " << numT1 << endl;
         oss << "docMemLayout: " << (docMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "reqMemLayout: " << (reqMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "rstLayoutCpu: " << (rstLayoutCpu == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
