@@ -16,8 +16,8 @@ int kNumDocs = 1 << 20;
 int kNumReqs = 1 << 4;
 int kNumInt64 = 1 << 3;
 int kNumTrials = 100;
-MemLayout kMemLayoutDoc = COL_MAJOR;
-MemLayout kMemLayoutReq = ROW_MAJOR;
+MemLayout kMemLayoutDoc = ROW_MAJOR;
+MemLayout kMemLayoutReq = COL_MAJOR;
 MemLayout kMemLayoutRstCpu = COL_MAJOR;
 MemLayout kMemLayoutRstGpuKernel = COL_MAJOR;
 MemLayout kMemLayoutRstGpuTensor = COL_MAJOR;
@@ -78,13 +78,11 @@ void checkData(Data data)
                 return;
             }
             
-            /*
-            if (abs(cpuVal - gpuCublasVal) / abs(gpuKernelVal) > 1e-3)
+            if (cpuVal != gpuKernelVal)
             {
                 cout << "Cublas error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuCublasVal << endl;
                 return;
             }
-            */
         }
     }
 }
@@ -97,6 +95,7 @@ int main()
 
     quantKernel(data, setting);
     quantCpu(data, setting);
+    quantWMMA(data, setting);
 
     checkData(data);
 
