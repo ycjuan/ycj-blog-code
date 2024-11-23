@@ -18,9 +18,11 @@ void quantCpu(Data data, Setting setting)
                 T1 reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.numT1, data.reqMemLayout)];
                 T1 docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.numT1, data.docMemLayout)];
                 T1 bitwiseRst = ~ (reqVal ^ docVal);
-                uint64_t bitwiseRst64 = uint64_t(bitwiseRst);
-                bitset<64> bits(bitwiseRst64);
-                totalCount += bits.count();
+                bitset<32> bits(bitwiseRst);
+                int count = bits.count();
+                totalCount += count;
+                if (i == 0 && j == 0)
+                    cout << "docVal: " << docVal << ", reqVal: " << reqVal << ", bitwiseRst: " << bitwiseRst << ", count: " << count << ", totalCount: " << totalCount << endl;
             }
             data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)] = totalCount;
         }

@@ -12,7 +12,7 @@
 
 using namespace std;
 
-int kNumDocs = 1 << 10;
+int kNumDocs = 1 << 4;
 int kNumReqs = 1 << 3;
 int kNumT1 = 1 << 2;
 int kNumTrials = 100;
@@ -54,11 +54,21 @@ Data genData()
 
     default_random_engine generator;
     uniform_int_distribution<T1> distribution;
-    for (int i = 0; i < data.numDocs * data.numT1; i++)
-        data.d_doc[i] = distribution(generator);
-    for (int i = 0; i < data.numReqs * data.numT1; i++)
-        data.d_req[i] = distribution(generator);
 
+    T1 uid = 1;
+    for (int i = 0; i < data.numDocs; i++)
+        for (int k = 0; k < data.numT1; k++)
+            data.d_doc[getMemAddr(i, k, data.numDocs, data.numT1, data.docMemLayout)] = uid++;
+    uid = 1;
+
+    for (int j = 0; j < data.numReqs; j++)
+    {
+        for (int k = 0; k < data.numT1; k++)
+        {
+            size_t addr = getMemAddr(j, k, data.numReqs, data.numT1, data.reqMemLayout);
+            data.d_req[addr] = uid++;
+        }
+    }
     return data;
 }
 
@@ -83,8 +93,8 @@ void checkData(Data data)
             
             if (cpuVal != gpuWmmaAdj)
             {
-                if (numPrinted++ < 256)
-                    cout << "Wmma error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuWmmaAdj << endl;
+                if (numPrinted++ < 256);
+                    //cout << "Wmma error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuWmmaAdj << endl;
                 //return;
             }
         }

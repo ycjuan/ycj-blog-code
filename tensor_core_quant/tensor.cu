@@ -82,18 +82,39 @@ __global__ void wmma_example(const unsigned *A, const unsigned *B, int *C, const
    using namespace nvcuda::wmma::experimental;
    int bx = blockIdx.x * blockDim.y + threadIdx.y;
    int by = blockIdx.y;
+   printf("bx: %d, by: %d, blockIdx.x: %d, blockDim.y: %d, threadIdx.y: %d\n", bx, by, blockIdx.x, blockDim.y, threadIdx.y);
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag;
    wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag;
    wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag;
    wmma::fill_fragment(c_frag, 0);
 
+   /*
+   printf(" \
+      a_frag.num_storage_elements: %d, a_frag.num_elements: %d, \
+      b_frag.num_storage_elements: %d, b_frag.num_elements: %d, \
+      c_frag.num_storage_elements: %d, c_frag.num_elements: %d\n",
+      a_frag.num_storage_elements, a_frag.num_elements,
+      b_frag.num_storage_elements, b_frag.num_elements,
+      c_frag.num_storage_elements, c_frag.num_elements);
+   */
+
    for (int j = 0; j < (k / 128); j++)
    {
       load_matrix_sync(a_frag, A + bx * 8 * k / 32 + j * 128 * 8 / 32, 128);
       load_matrix_sync(b_frag, B + by * 8 * k / 32 + j * 128 * 8 / 32, 128);
+
       bmma_sync(c_frag, a_frag, b_frag, c_frag);
    }
    store_matrix_sync(C + (bx * 8 * n + by * 8), c_frag, n, wmma::mem_row_major);
+      if (bx == 0 && by == 0 && threadIdx.x == 0)
+      {
+         printf("A[0] = %u\n", A[0]);
+         printf("B[0] = %u\n", B[0]);
+         printf("a_frag.x[0]: %u, a_frag.x[1]: %u, a_frag.x[2]: %u, a_frag.x[3]: %u\n", a_frag.x[0], a_frag.x[1], a_frag.x[2], a_frag.x[3]);
+         printf("b_frag.x[0]: %u, b_frag.x[1]: %u, b_frag.x[2]: %u, b_frag.x[3]: %u\n", b_frag.x[0], b_frag.x[1], b_frag.x[2], b_frag.x[3]);
+         printf("c_frag.x[0]: %d, c_frag.x[1]: %d, c_frag.x[2]: %d, c_frag.x[3]: %d\n", c_frag.x[0], c_frag.x[1], c_frag.x[2], c_frag.x[3]);
+         printf("C[0]: %d\n", C[0]);
+      }
 }
 
 void quantWMMA(Data data, Setting setting) {
@@ -115,6 +136,8 @@ void quantWMMA(Data data, Setting setting) {
 
    cout << "blockDim: " << blockDim.x << " " << blockDim.y << endl;
    cout << "gridDim: " << gridDim.x << " " << gridDim.y << endl;
+
+   cout << "A[0]: " << a_fp16[0] << endl;
  
    printf("Running with wmma...\n");
    CudaTimer timer;
