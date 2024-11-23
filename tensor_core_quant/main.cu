@@ -12,7 +12,7 @@
 
 using namespace std;
 
-int kNumDocs = 1 << 3;
+int kNumDocs = 1 << 10;
 int kNumReqs = 1 << 3;
 int kNumT1 = 1 << 2;
 int kNumTrials = 100;
@@ -20,7 +20,7 @@ MemLayout kMemLayoutDoc = ROW_MAJOR;
 MemLayout kMemLayoutReq = COL_MAJOR;
 MemLayout kMemLayoutRstCpu = COL_MAJOR;
 MemLayout kMemLayoutRstGpuKernel = COL_MAJOR;
-MemLayout kMemLayoutRstGpuTensor = COL_MAJOR;
+MemLayout kMemLayoutRstGpuTensor = ROW_MAJOR;
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \
@@ -83,7 +83,7 @@ void checkData(Data data)
             
             if (cpuVal != gpuWmmaAdj)
             {
-                if (numPrinted++ < 20)
+                if (numPrinted++ < 256)
                     cout << "Wmma error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuWmmaAdj << endl;
                 //return;
             }

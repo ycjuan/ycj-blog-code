@@ -77,23 +77,36 @@ const int WMMA_K = 128;
 //  3) Neither A nor B are transposed.
 // Note: This is NOT a high performance example but is for demonstration purposes only
 //       For a high performance code please use the GEMM provided in cuBLAS.
-__global__ void wmma_example(const unsigned *A, const unsigned *B, int *C, const unsigned m, const unsigned n, const unsigned k)
-{
+__global__ void wmma_example(T1 *A, T1 *B, T2 *C, int M, int n, int k) {
+
    using namespace nvcuda::wmma::experimental;
+
+   // Tile using a 2D grid
    int bx = blockIdx.x * blockDim.y + threadIdx.y;
    int by = blockIdx.y;
-   wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag;
-   wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag;
+
+   // Declare the fragments
+   wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, precision::b1, wmma::row_major> a_frag;
+   wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, precision::b1, wmma::col_major> b_frag;
+   wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, T2> c_frag;
+
    wmma::fill_fragment(c_frag, 0);
 
    for (int j = 0; j < (k / 128); j++)
    {
       load_matrix_sync(a_frag, A + bx * 8 * k / 32 + j * 128 * 8 / 32, 128);
       load_matrix_sync(b_frag, B + by * 8 * k / 32 + j * 128 * 8 / 32, 128);
-      bmma_sync(c_frag, a_frag, b_frag, c_frag);
+      bmma_sync(c_frag, a_frag, b_frag, c_frag, bmmaBitOpXOR, bmmaAccumulateOpPOPC);
    }
+
    store_matrix_sync(C + (bx * 8 * n + by * 8), c_frag, n, wmma::mem_row_major);
+   /*
+   if (bx == 0 && by == 0)
+   {
+      printf("a_frag.x = %u, b_frag.x = %u, c_frag.x = %u\n", a_frag.x, b_frag.x, c_frag.x);
+      printf("A[0] = %u, B[0] = %u, C[0] = %d\n", A[0], B[0], C[0]);
+   }
+   */
 }
 
 void quantWMMA(Data data, Setting setting) {
@@ -118,11 +131,11 @@ void quantWMMA(Data data, Setting setting) {
  
    printf("Running with wmma...\n");
    CudaTimer timer;
-   for (int t = -3; t < -2; t++)
+   for (int t = -3; t < setting.kNumTrials; t++)
    {
       if (t == 0)
          timer.tic();
-      wmma_example <<< gridDim, blockDim >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
+      wmma_example <<< gridDim, blockDim >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K);
       cudaErrCheck(cudaDeviceSynchronize());
       cudaErrCheck(cudaGetLastError());
    }
