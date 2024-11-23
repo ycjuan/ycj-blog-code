@@ -86,9 +86,8 @@ __global__ void wmma_example(const unsigned *A, const unsigned *B, int *C, const
 
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag;
    wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> acc_frag;
    wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag;
-   wmma::fill_fragment(acc_frag, 0);
+   wmma::fill_fragment(c_frag, 0);
 
    /*
    printf(" \
@@ -105,16 +104,11 @@ __global__ void wmma_example(const unsigned *A, const unsigned *B, int *C, const
       load_matrix_sync(a_frag, A + bx * 8 * k / 32 + j * 128 * 8 / 32, 128);
       load_matrix_sync(b_frag, B + by * 8 * k / 32 + j * 128 * 8 / 32, 128);
 
-      bmma_sync(acc_frag, a_frag, b_frag, acc_frag, bmmaBitOpXOR, bmmaAccumulateOpPOPC);
+      bmma_sync(c_frag, a_frag, b_frag, c_frag, bmmaBitOpXOR, bmmaAccumulateOpPOPC);
    }
-   load_matrix_sync(c_frag, C + (bx * 8 * n + by * 8), n, wmma::mem_row_major);
 
-   #pragma unroll
-      for(int i=0; i < c_frag.num_elements; i++) {
-         c_frag.x[i] += acc_frag.x[i];
-      }
-
-   store_matrix_sync(C + (bx * 8 * n + by * 8), acc_frag, n, wmma::mem_row_major);
+   store_matrix_sync(C + (bx * 8 * n + by * 8), c_frag, n, wmma::mem_row_major);
+   /*
       //if (bx == 0 && by == 0 && threadIdx.x == 31)
       {
          printf("A[0] = %u\n", A[threadIdx.x]);
@@ -124,6 +118,7 @@ __global__ void wmma_example(const unsigned *A, const unsigned *B, int *C, const
          printf("c_frag.x[0]: %d, c_frag.x[1]: %d\n", acc_frag.x[0], acc_frag.x[1]);
          printf("C[0]: %d\n", C[0]);
       }
+   */
 }
 
 void quantWMMA(Data data, Setting setting) {
@@ -146,12 +141,6 @@ void quantWMMA(Data data, Setting setting) {
    cout << "blockDim: " << blockDim.x << " " << blockDim.y << endl;
    cout << "gridDim: " << gridDim.x << " " << gridDim.y << endl;
 
-   cout << "A[0]: " << a_fp16[0] << endl;
-   cout << "B[0]: " << b_fp16[0] << endl;
-   cout << "B[1]: " << b_fp16[1] << endl;
-   cout << "B[2]: " << b_fp16[2] << endl;
-   cout << "B[3]: " << b_fp16[3] << endl;
- 
    printf("Running with wmma...\n");
    CudaTimer timer;
    for (int t = -3; t < -2; t++)
@@ -163,7 +152,6 @@ void quantWMMA(Data data, Setting setting) {
       cudaErrCheck(cudaGetLastError());
    }
    cout << "wmma took " << timer.tocMs() / setting.kNumTrials << "ms" << endl;
-   cout << "C[0]: " << data.d_rst_wmma[0] << endl;
 }
 
 
