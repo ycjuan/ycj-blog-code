@@ -76,27 +76,61 @@ const int WMMA_K = 128;
 //  3) Neither A nor B are transposed.
 // Note: This is NOT a high performance example but is for demonstration purposes only
 //       For a high performance code please use the GEMM provided in cuBLAS.
-__global__ void wmma_example(T1 *A, T1 *B, T2 *C, int M, int n, int k) {
+__global__ void wmma_example(T1 *a, T1 *b, T2 *c, int M, int N, int K) {
 
    using namespace nvcuda::wmma::experimental;
-   int bx = blockIdx.x * blockDim.y + threadIdx.y;
-   int by = blockIdx.y;
-   wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag;
-   wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag;
-   wmma::fill_fragment(c_frag, 0);
+   // Leading dimensions. Packed with no transpositions.
+   int lda = K;
+   int ldb = K;
+   int ldc = M;
 
-   for (int j = 0; j < (k / 128); j++)
-   {
-      load_matrix_sync(a_frag, A + bx * 8 * k / 32 + j * 128 * 8 / 32, 128);
-      load_matrix_sync(b_frag, B + by * 8 * k / 32 + j * 128 * 8 / 32, 128);
-      bmma_sync(c_frag, a_frag, b_frag, c_frag);
+   // Tile using a 2D grid
+   int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
+   int warpN = (blockIdx.y * blockDim.y + threadIdx.y);
+ 
+   // Declare the fragments
+   wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, precision::b1, wmma::row_major> a_frag;
+   wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, precision::b1, wmma::col_major> b_frag;
+   wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, T2> acc_frag;
+   wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, T2> c_frag;
+
+   wmma::fill_fragment(acc_frag, 0);
+
+   // Loop over k
+   for (int i = 0; i < K; i += WMMA_K) {
+      int aRow = warpM * WMMA_M;
+      int aCol = i;
+
+      int bRow = i;
+      int bCol = warpN * WMMA_N;
+
+      // Bounds checking
+      if (aRow < M && aCol < K && bRow < K && bCol < N) {
+         // Load the inputs
+         wmma::load_matrix_sync(a_frag, a + aRow * lda + aCol, lda);
+         wmma::load_matrix_sync(b_frag, b + bRow + bCol * ldb, ldb);
+
+         // Perform the matrix multiplication
+         wmma::bmma_sync(acc_frag, a_frag, b_frag, acc_frag, bmmaBitOpXOR, bmmaAccumulateOpPOPC);
+
+      }
    }
-#pragma unroll
-   for (int i = 0; i < c_frag.num_elements; i++)
-      c_frag.x[i] = k - 2 * c_frag.x[i];
-   store_matrix_sync(C + (bx * 8 * n + by * 8), c_frag, n, wmma::mem_row_major);
 
+   // Load in the current value of c, scale it by beta, and add this our result scaled by alpha
+   int cRow = warpM * WMMA_M;
+   int cCol = warpN * WMMA_N;
+
+   if (cRow < M && cCol < N) {
+      wmma::load_matrix_sync(c_frag, c + cRow + cCol * ldc, ldc, wmma::mem_col_major);
+
+#pragma unroll
+      for(int i=0; i < c_frag.num_elements; i++) {
+         c_frag.x[i] = acc_frag.x[i];
+      }
+
+      // Store the output
+      wmma::store_matrix_sync(c + cRow + cCol * ldc, c_frag, ldc, wmma::mem_col_major);
+   }
 }
 
 void quantWMMA(Data data, Setting setting) {
@@ -119,12 +153,20 @@ void quantWMMA(Data data, Setting setting) {
    printf("\nM = %d, N = %d, K = %d.\n\n", MATRIX_M, MATRIX_N, MATRIX_K);
    
    // First: using WMMA
-   dim3 tensorcoreSNBlk(32, 2);
-   dim3 tensorcoreSNDim(MATRIX_M / 16, MATRIX_N / 8);
+   dim3 gridDim;
+   dim3 blockDim;
+ 
+   // blockDim.x must be a multple of warpSize
+   // 128x4 means we have 16 warps and a block computes a 64x64 output tile
+   blockDim.x = 128;
+   blockDim.y = 4;
 
+   gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / 32 - 1)) / (WMMA_M * blockDim.x / 32);
+   gridDim.y = (MATRIX_N + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y);
+   
    printf("Running with wmma...\n");
    cudaErrCheck(cudaEventRecord(startWMMA));
-   wmma_example <<< tensorcoreSNDim, tensorcoreSNBlk >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K);
+   wmma_example <<< gridDim, blockDim >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K);
    cudaErrCheck(cudaEventRecord(stopWMMA));
    cudaErrCheck(cudaEventSynchronize(stopWMMA));
 
