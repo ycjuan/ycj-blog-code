@@ -13,8 +13,8 @@
 using namespace std;
 
 int kNumDocs = 1 << 20;
-int kNumReqs = 1 << 3;
-int kNumT1 = 1 << 4;
+int kNumReqs = 1 << 4;
+int kNumT1 = 1 << 2;
 int kNumTrials = 100;
 MemLayout kMemLayoutDoc = ROW_MAJOR;
 MemLayout kMemLayoutReq = COL_MAJOR;
@@ -71,8 +71,8 @@ void checkData(Data data)
             T2 cpuVal = data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)];
             T2 gpuKernelVal = data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)];
             T2 gpuWmma = data.d_rst_wmma[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
-            //T2 gpuWmmaAdj = sizeof(T1) * 8 * data.numT1 - gpuWmma;
-            T2 gpuWmmaAdj = gpuWmma;
+            T2 gpuWmmaAdj = sizeof(T1) * 8 * data.numT1 - gpuWmma;
+            //T2 gpuWmmaAdj = gpuWmma;
 
             if (cpuVal != gpuKernelVal)
             {
@@ -91,9 +91,6 @@ void checkData(Data data)
 
 int main()
 {
-    cout << "db1: " << sizeof(unsigned) << endl;
-    cout << "db1: " << sizeof(T1) << endl;
-    cout << "db1: " << sizeof(T2) << endl;
     Data data = genData();
     Setting setting;
     setting.kNumTrials = kNumTrials;
