@@ -72,7 +72,7 @@ void checkData(Data data)
             T2 gpuKernelVal = data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)];
             T2 gpuCublasVal = data.d_rst_cublas[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
 
-            if (abs(cpuVal - gpuKernelVal) / abs(gpuKernelVal) > 1e-3)
+            if (cpuVal != gpuKernelVal)
             {
                 cout << "Kernel error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuKernelVal << endl;
                 return;

@@ -18,7 +18,8 @@ void matMulCpu(Data data, Setting setting)
                 T1 reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.numInt64, data.reqMemLayout)];
                 T1 docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.numInt64, data.docMemLayout)];
                 T1 bitwiseRst = ~ (reqVal ^ docVal);
-                bitset<64> bits(bitwiseRst);
+                uint64_t bitwiseRst64 = uint64_t(bitwiseRst);
+                bitset<64> bits(bitwiseRst64);
                 totalCount += bits.count();
             }
             data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)] = totalCount;
@@ -39,9 +40,10 @@ __global__ void matMul(Data data)
         for (int k = 0; k < data.numInt64; k++)
         {
             T1 reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.numInt64, data.reqMemLayout)];
-            T1 docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.numInt64, data.docMemLayout)];            
-            uint64_t bitwiseRst = uint64_t(~ (reqVal ^ docVal));
-            totalCount += __popcll(bitwiseRst); // This counts the number of "1" in the 64bit bitwiseAnd
+            T1 docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.numInt64, data.docMemLayout)];    
+            T1 bitwiseRst = ~ (reqVal ^ docVal);
+            uint64_t bitwiseRst64 = uint64_t(bitwiseRst);
+            totalCount += __popcll(bitwiseRst64); // This counts the number of "1" in the 64bit bitwiseAnd
         }
         data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)] = totalCount;
     }

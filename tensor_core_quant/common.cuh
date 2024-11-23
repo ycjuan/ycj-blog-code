@@ -6,8 +6,8 @@
 
 using namespace std;
 
-typedef uint64_t T1;
-typedef uint16_t T2;
+typedef uint16_t T1;
+typedef uint32_t T2;
 
 enum MemLayout
 {
