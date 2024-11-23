@@ -3,7 +3,7 @@
 #include "common.cuh"
 #include "util.cuh"
 
-void matMulCpu(Data data, Setting setting)
+void quantCpu(Data data, Setting setting)
 {
     Timer timer;
     timer.tic();
@@ -49,7 +49,7 @@ __global__ void matMul(Data data)
     }
 }
 
-void matMulKernel(Data data, Setting setting)
+void quantKernel(Data data, Setting setting)
 {
     int blockSize = 512;
     int gridSize = (size_t(data.numDocs) * data.numReqs + blockSize - 1) / blockSize;

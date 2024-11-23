@@ -138,7 +138,7 @@ __global__ void wmma_example(T1 *a, T1 *b, T2 *c, int M, int N, int K) {
    }
 }
 
-void quantTensor(Data data, Setting setting) {
+void quantWMMA(Data data, Setting setting) {
 
    T1 *a_fp16 = data.d_doc;
    T1 *b_fp16 = data.d_req;

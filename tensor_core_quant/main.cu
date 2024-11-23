@@ -8,7 +8,7 @@
 
 #include "util.cuh"
 #include "common.cuh"
-#include "baseline.cuh"
+#include "methods.cuh"
 
 using namespace std;
 
@@ -95,8 +95,8 @@ int main()
     Setting setting;
     setting.kNumTrials = kNumTrials;
 
-    matMulKernel(data, setting);
-    matMulCpu(data, setting);
+    quantKernel(data, setting);
+    quantCpu(data, setting);
 
     checkData(data);
 
