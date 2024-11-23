@@ -64,6 +64,7 @@ Data genData()
 
 void checkData(Data data)
 {
+    int numPrinted = 0;
     for (int i = 0; i < data.numDocs; i++)
     {
         for (int j = 0; j < data.numReqs; j++)
@@ -82,8 +83,9 @@ void checkData(Data data)
             
             if (cpuVal != gpuWmmaAdj)
             {
-                cout << "Wmma error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuWmmaAdj << endl;
-                return;
+                if (numPrinted++ < 20)
+                    cout << "Wmma error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuWmmaAdj << endl;
+                //return;
             }
         }
     }
