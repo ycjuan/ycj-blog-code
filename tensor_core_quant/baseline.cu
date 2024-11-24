@@ -28,7 +28,7 @@ void quantCpu(Data data, Setting setting)
     cout << "CPU time: " << timer.tocMs() << " ms" << endl;
 }
 
-__global__ void matMul(Data data)
+__global__ void quantKernel(Data data)
 {
     int threadId = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
     int i = threadId / data.numReqs;
@@ -49,7 +49,7 @@ __global__ void matMul(Data data)
     }
 }
 
-void quantKernel(Data data, Setting setting)
+void quantGpuCuda(Data data, Setting setting)
 {
     int blockSize = 512;
     int gridSize = (size_t(data.numDocs) * data.numReqs + blockSize - 1) / blockSize;
@@ -59,7 +59,7 @@ void quantKernel(Data data, Setting setting)
     {
         if (t == 0)
             timer.tic();
-        matMul<<<gridSize, blockSize>>>(data);
+        quantKernel<<<gridSize, blockSize>>>(data);
         cudaDeviceSynchronize();
         cudaError_t status = cudaGetLastError();
         if (status != cudaSuccess)

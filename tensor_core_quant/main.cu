@@ -107,7 +107,7 @@ int main()
     Setting setting;
     setting.kNumTrials = kNumTrials;
 
-    quantKernel(data, setting);
+    quantGpuCuda(data, setting);
     quantCpu(data, setting);
     quantWMMA(data, setting);
 
