@@ -15,7 +15,8 @@ struct Pair
 struct TopkParam
 {
     float *dm_score;
-    Pair *dm_rst;    
+    Pair *hp_rstCpu;
+    Pair *dm_rstGpu;
     int numReqs;
     int numDocs;
     int numToRetrieve;

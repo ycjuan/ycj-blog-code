@@ -19,7 +19,7 @@ using namespace std;
     }
 
 size_t kNumToRetrieve = 1000;
-size_t kNumTrials = 10;
+size_t kNumTrials = 1;
 
 void runExp(size_t numReqs, size_t numDocs)
 {
@@ -27,52 +27,59 @@ void runExp(size_t numReqs, size_t numDocs)
     default_random_engine generator;
     uniform_real_distribution<float> distribution(-1.0, 1.0);
 
-    float *dm_score = nullptr;
-    CHECK_CUDA(cudaMallocManaged(&dm_score, numDocs * numReqs * sizeof(float)));
+
+    TopkParam param;
+    param.numReqs = numReqs;
+    param.numDocs = numDocs;
+    param.numToRetrieve = kNumToRetrieve;
+
+    CHECK_CUDA(cudaMallocManaged(&param.dm_score, numDocs * numReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocHost(&param.hp_rstCpu, numReqs * kNumToRetrieve * sizeof(Pair)));
+    CHECK_CUDA(cudaMallocManaged(&param.dm_rstGpu, numReqs * kNumToRetrieve * sizeof(Pair)));
+
     for (size_t i = 0; i < numDocs * numReqs; i++)
     {
-        dm_score[i] = distribution(generator);
+        param.dm_score[i] = distribution(generator);
     }
 
-    double timeMsCpuFullSort = 0;
-    double timeMsGpuFullSort = 0;
-    double timeMsGpuSampling = 0;
+    TopkSampling topkSampling;
+    topkSampling.malloc();
+
     for (int t = -3; t < kNumTrials; t++)
     {
-        float timeMsCpuFullSort1 = 0;
-        float timeMsGpuFullSort1 = 0;
-        float timeMsGpuSampling1 = 0;
-        
-        vector<Pair> v_topkCpuFullSort = retrieveTopkCpuFullSort(dm_score, numReqs, numDocs, kNumToRetrieve, timeMsGpuFullSort1);
-        vector<Pair> v_topkGpuFullSort = retrieveTopkGpuFullSort(dm_score, numReqs, numDocs, kNumToRetrieve, timeMsGpuFullSort1);
-        vector<Pair> v_topkGpuSampling;
+        retrieveTopkCpu(param);
+        topkSampling.retrieveTopk(param);
 
-        if (v_topkGpuFullSort != v_topkCpuFullSort)
+        for (int reqIdx = 0; reqIdx < numReqs; reqIdx++)
         {
-            throw runtime_error("Topk results from GPU full sort and CPU full sort do not match");
+            for (int docIdx = 0; docIdx < kNumToRetrieve; docIdx++)
+            {
+                size_t memAddr = getMemAddr(reqIdx, docIdx, kNumToRetrieve);
+                Pair cpuPair = param.hp_rstCpu[memAddr];
+                Pair gpuPair = param.dm_rstGpu[memAddr];
+                if (cpuPair.docId != gpuPair.docId || cpuPair.score != gpuPair.score)
+                {
+                    cout << "Error: CPU and GPU results do not match" << endl;
+                    break;
+                }
+            }
         }
 
-        if (v_topkGpuSampling != v_topkCpuFullSort)
+        for (int i = 0; i < numReqs * kNumToRetrieve; i++)
         {
-            throw runtime_error("Topk results from GPU sampling and CPU full sort do not match");
-        }
-
-        if (t >= 0)
-        {
-            timeMsCpuFullSort += timeMsCpuFullSort1;
-            timeMsGpuFullSort += timeMsGpuFullSort1;
-            timeMsGpuSampling += timeMsGpuSampling1;
+            Pair cpuPair = param.hp_rstCpu[i];
+            Pair gpuPair = param.dm_rstGpu[i];
+            if (param.hp_rstCpu[i].docId != param.dm_rstGpu[i].docId)
+            {
+                cout << "Error: CPU and GPU results do not match" << endl;
+                break;
+            }
         }
     }
 
-    timeMsCpuFullSort /= kNumTrials;
-    timeMsGpuFullSort /= kNumTrials;
-    timeMsGpuSampling /= kNumTrials;
-
-    cout << "timeMsCpuFullSort: " << timeMsCpuFullSort << " ms" << endl;
-    cout << "timeMsGpuFullSort: " << timeMsGpuFullSort << " ms" << endl;
-    cout << "timeMsGpuSampling: " << timeMsGpuSampling << " ms" << endl;
-
+    CHECK_CUDA(cudaFree(param.dm_score));
+    CHECK_CUDA(cudaFree(param.hp_rstCpu));
+    CHECK_CUDA(cudaFree(param.dm_rstGpu));
 }
 
 int main()
