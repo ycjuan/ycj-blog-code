@@ -16,20 +16,21 @@ public:
 
 private:
 
+    // constants
     const size_t kNumSamplesPerReq = 10000;
-
     const size_t kMaxNumReqs = 1 << 10;
+    const size_t kMaxEligiblePairsPerDoc = 1 << 20;
 
+    // device memory
     float *dm_scoreSample = nullptr;
-
     float *dm_scoreThreshold = nullptr;
+    Pair *dm_eligiblePairs = nullptr;
+    int *dm_copyCount = nullptr;
 
+    // functions
     void sample(TopkParam &param);
-
     void findThreshold(TopkParam &param);
-
     void copyEligible(TopkParam &param, size_t &numCopied);
-
     void retrieveExact(TopkParam &param);
 };
 

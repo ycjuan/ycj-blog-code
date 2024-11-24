@@ -106,3 +106,52 @@ void TopkSampling::findThreshold(TopkParam &param)
     int gridSize = (param.numReqs + blockSize - 1) / blockSize;
     updateThreshold<<<gridSize, blockSize>>>(dm_scoreSample, dm_scoreThreshold, param.numReqs, thIdx, kNumSamplesPerReq);
 }
+
+__global__ void copyEligibleKernel(float *dm_score,
+                                   float *dm_scoreThreshold,
+                                   Pair *dm_eligiblePairs,
+                                   int *dm_copyCount,
+                                   int numReqs,
+                                   int numDocs,
+                                   size_t kMaxEligiblePairsPerDoc)
+{
+    size_t wid = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
+    if (wid < numReqs * numDocs)
+    {
+        int reqIdx = wid % numReqs;
+        int docIdx = wid / numReqs;
+        size_t memAddr = getMemAddr(reqIdx, docIdx, numDocs);
+        float score = dm_score[memAddr];
+        float threshold = dm_scoreThreshold[reqIdx];
+        if (score >= threshold)
+        {
+            int count = atomicAdd(dm_copyCount + reqIdx, 1);
+            if (count < kMaxEligiblePairsPerDoc)
+            {
+                Pair pair;
+                pair.reqId = reqIdx;
+                pair.docId = docIdx;
+                pair.score = score;
+                dm_eligiblePairs[reqIdx * kMaxEligiblePairsPerDoc + count] = pair;
+            }
+        }
+    }
+}
+
+void TopkSampling::copyEligible(TopkParam &param, size_t &numCopied)
+{
+    /*
+    for (size_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
+    {
+        thrust::copy_if(thrust::device,
+                        param.dm_score + reqIdx * param.numDocs,
+                        param.dm_score + (reqIdx + 1) * param.numDocs,
+                        param.dm_rst + reqIdx * param.numToRetrieve,
+                        [thIdx = dm_scoreThreshold[reqIdx]] __device__(float score) mutable {
+                            return score >= thIdx;
+                        });
+    }
+    */
+
+   CHECK_CUDA(cudaMemset(dm_copyCount, 0, param.numReqs * sizeof(int)));
+}
