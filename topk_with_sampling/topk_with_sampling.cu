@@ -48,13 +48,12 @@ void TopkSampling::retrieveTopk(TopkParam &param)
     // Step1 - Sample
     sample(param);
 
-    // Step2 - Sort
-    float threshold = 0;
-    findThreshold(param, threshold);
+    // Step2 - Find threshold
+    findThreshold(param);
 
     // Step3 - Copy eligible 
     size_t numCopied = 0;
-    copyEligible(param, threshold, numCopied);
+    copyEligible(param, numCopied);
     param.gpuApproxTimeMs = timerApprox.tocMs();
 
     // Step4 - retreiveExact
@@ -81,4 +80,29 @@ void TopkSampling::sample(TopkParam &param)
     int gridSize = (param.numReqs * kNumSamplesPerReq + blockSize - 1) / blockSize;
     sampleKernelNonRandom<<<gridSize, blockSize>>>(param, dm_scoreSample, kNumSamplesPerReq);
     CHECK_CUDA(cudaDeviceSynchronize());
+}
+
+__global__ void updateThreshold(float *dm_scoreSample, float *dm_scoreThreshold, int numReqs, int thIdx, size_t kNumSamplesPerReq)
+{
+    int reqIdx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (reqIdx < numReqs)
+    {
+        dm_scoreThreshold[reqIdx] = dm_scoreSample[reqIdx * kNumSamplesPerReq + thIdx];
+    }
+}
+
+void TopkSampling::findThreshold(TopkParam &param)
+{
+    int thIdx = int((double)param.numToRetrieve / param.numDocs * kNumSamplesPerReq);
+    for (size_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
+    {
+        thrust::sort(thrust::device,
+                     dm_scoreSample + reqIdx       * kNumSamplesPerReq,
+                     dm_scoreSample + (reqIdx + 1) * kNumSamplesPerReq,
+                     greater<float>());
+    }
+
+    int blockSize = 256;
+    int gridSize = (param.numReqs + blockSize - 1) / blockSize;
+    updateThreshold<<<gridSize, blockSize>>>(dm_scoreSample, dm_scoreThreshold, param.numReqs, thIdx, kNumSamplesPerReq);
 }

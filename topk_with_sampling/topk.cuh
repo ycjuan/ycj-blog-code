@@ -22,11 +22,13 @@ private:
 
     float *dm_scoreSample = nullptr;
 
+    float *dm_scoreThreshold = nullptr;
+
     void sample(TopkParam &param);
 
-    void findThreshold(TopkParam &param, float &threshold);
+    void findThreshold(TopkParam &param);
 
-    void copyEligible(TopkParam &param, float threshold, size_t numCopied);
+    void copyEligible(TopkParam &param, size_t &numCopied);
 
     void retrieveExact(TopkParam &param);
 };
