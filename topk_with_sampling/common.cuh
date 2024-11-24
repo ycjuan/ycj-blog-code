@@ -12,6 +12,20 @@ struct Pair
     }
 };
 
+struct TopkParam
+{
+    float *dm_score;
+    Pair *dm_rst;    
+    int numReqs;
+    int numDocs;
+    int numToRetrieve;
+    bool useRandomSampling = false;
+    float cpuTimeMs = 0;
+    float gpuTotalTimeMs = 0;
+    float gpuSamplingTimeMs = 0;
+};
+
+
 inline __device__ __host__ bool scoreComparator(const Pair &a, const Pair &b)
 {
     return a.score > b.score;

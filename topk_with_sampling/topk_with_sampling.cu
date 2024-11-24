@@ -1,10 +1,19 @@
+#include <vector>
+#include <cmath>
+#include <functional>
+#include <iostream>
+#include <random>
+#include <stdexcept>
+#include <string>
+#include <cassert>
+#include <numeric>
 #include <thrust/copy.h>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
-#include <algorithm>
+#include <string>
 
-#include "common.cuh"
 #include "topk.cuh"
+#include "common.cuh"
 #include "util.cuh"
 
 using namespace std;
@@ -14,34 +23,34 @@ using namespace std;
         cudaError_t status = (func);                                                                                               \
         if (status != cudaSuccess)                                                                                                 \
         {                                                                                                                          \
-            string error = "[topk_baseline.cu] CUDA API failed at line " + to_string(__LINE__) + " with error: " + cudaGetErrorString(status) + "\n"; \
+            string error = "[topk_with_bucket_sort.cu] CUDA API failed at line " + to_string(__LINE__) + " with error: " + cudaGetErrorString(status) + "\n"; \
             throw runtime_error(error);                                                                                            \
         }                                                                                                                          \
     }
 
-void retrieveTopkCpu(TopkParam &param)
+void TopkSampling::init()
+{
+
+}
+
+void TopkSampling::reset()
+{
+
+}
+
+void TopkSampling::retrieveTopk(TopkParam &param)
 {
     CudaTimer timer;
     timer.tic();
 
-    for (int j = 0; j < param.numReqs; j++)
-    {
-        vector<Pair> v_doc;
-        for (int i = 0; i < param.numDocs; i++)
-        {
-            Pair doc;
-            doc.reqId = j;
-            doc.docId = i;
-            doc.score = param.dm_score[j * param.numDocs + i];
-            v_doc.push_back(doc);
-        }
+    // Step1 - Sample
+    sample(param);
 
-        sort(v_doc.begin(), v_doc.end(), scoreComparator);
-        for (int i = 0; i < param.numToRetrieve; i++)
-        {
-            param.dm_rst[j * param.numToRetrieve + i] = v_doc[i];
-        }
-    }
+    // Step2 - Sort
+    float threshold = 0;
+    findThreshold(param, threshold);
 
-    param.cpuTimeMs = timer.tocMs();
+    //
+
+    timeMs = timer.tocMs();
 }
