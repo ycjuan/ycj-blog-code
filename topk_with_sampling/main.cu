@@ -72,7 +72,7 @@ void runExp(int numReqs, int numDocs)
 
 int main()
 {
-    runExp(1, 100);
+    runExp(1, 1000000);
 
     return 0;
 }

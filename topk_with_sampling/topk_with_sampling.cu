@@ -178,10 +178,10 @@ void TopkSampling::retrieveExact(TopkParam &param)
     {
         Pair *dm_eligiblePairsStart = dm_eligiblePairs + reqIdx * kMaxEligiblePairsPerReq;
         Pair *dm_eligiblePairsEnd = dm_eligiblePairsStart + dm_copyCount[reqIdx];
-        thrust::sort(thrust::device,
-                     dm_eligiblePairsStart,
-                     dm_eligiblePairsEnd,
-                     ScorePredicator());
+        thrust::stable_sort(thrust::device,
+                            dm_eligiblePairsStart,
+                            dm_eligiblePairsEnd,
+                            ScorePredicator());
         thrust::copy(thrust::device,
                      dm_eligiblePairsStart,
                      dm_eligiblePairsStart + param.numToRetrieve,
