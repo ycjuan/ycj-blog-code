@@ -19,34 +19,29 @@ using namespace std;
         }                                                                                                                          \
     }
 
-
-vector<Doc> retrieveTopkGpuFullSort(Doc *d_doc, int numDocs, int numToRetrieve, float &timeMs)
-{
-    CudaTimer timer;
-    timer.tic();
-    thrust::stable_sort(thrust::device, d_doc, d_doc + numDocs, ScorePredicator());
-    cudaDeviceSynchronize();
-    CHECK_CUDA(cudaGetLastError());
-
-    vector<Doc> v_topkDocs(numToRetrieve);
-    CHECK_CUDA(cudaMemcpy(v_topkDocs.data(), d_doc, numToRetrieve * sizeof(Doc), cudaMemcpyDeviceToHost));
-
-    timeMs = timer.tocMs();
-
-    return v_topkDocs;
-}
-
-vector<Doc> retrieveTopkCpuFullSort(vector<Doc> &v_doc, int numToRetrieve, float &timeMs)
+void retrieveTopkCpuFullSort(float *dm_score, size_t numReqs, size_t numDocs, size_t numToRetrieve, Pair *dm_rst, float &timeMs)
 {
     CudaTimer timer;
     timer.tic();
 
-    stable_sort(v_doc.begin(), v_doc.end(), scoreComparator);
-    int numToCopy = min(numToRetrieve, (int)v_doc.size());
+    for (int j = 0; j < numReqs; j++)
+    {
+        vector<Pair> v_doc;
+        for (int i = 0; i < numDocs; i++)
+        {
+            Pair doc;
+            doc.reqId = j;
+            doc.docId = i;
+            doc.score = dm_score[j * numDocs + i];
+            v_doc.push_back(doc);
+        }
 
-    vector<Doc> v_topkDocs(v_doc.begin(), v_doc.begin() + numToCopy);
+        sort(v_doc.begin(), v_doc.end(), scoreComparator);
+        for (int i = 0; i < numToRetrieve; i++)
+        {
+            dm_rst[j * numToRetrieve + i] = v_doc[i];
+        }
+    }
 
     timeMs = timer.tocMs();
-
-    return v_topkDocs;
 }

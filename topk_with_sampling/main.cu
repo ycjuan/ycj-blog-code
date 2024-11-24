@@ -43,8 +43,8 @@ void runExp(size_t numReqs, size_t numDocs)
         float timeMsGpuFullSort1 = 0;
         float timeMsGpuSampling1 = 0;
         
-        vector<Pair> v_topkCpuFullSort = retrieveTopkCpuFullSort(dm_score, numDocs, numReqs, kNumToRetrieve, timeMsGpuFullSort1);
-        vector<Pair> v_topkGpuFullSort = retrieveTopkGpuFullSort(dm_score, numDocs, numReqs, kNumToRetrieve, timeMsGpuFullSort1);
+        vector<Pair> v_topkCpuFullSort = retrieveTopkCpuFullSort(dm_score, numReqs, numDocs, kNumToRetrieve, timeMsGpuFullSort1);
+        vector<Pair> v_topkGpuFullSort = retrieveTopkGpuFullSort(dm_score, numReqs, numDocs, kNumToRetrieve, timeMsGpuFullSort1);
         vector<Pair> v_topkGpuSampling;
 
         if (v_topkGpuFullSort != v_topkCpuFullSort)

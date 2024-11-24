@@ -25,4 +25,9 @@ struct ScorePredicator
     }
 };
 
+inline __device__ __host__ size_t getMemAddr(int reqId, int docId, size_t numDocs)
+{
+    return reqId * numDocs + docId;
+}
+
 #endif // COMMON_CUH
