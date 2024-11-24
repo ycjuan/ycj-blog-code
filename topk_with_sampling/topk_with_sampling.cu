@@ -59,8 +59,7 @@ void TopkSampling::retrieveTopk(TopkParam &param)
     // Step2 - Find threshold
     findThreshold(param);
 
-    // Step3 - Copy eligible 
-    size_t numCopied = 0;
+    // Step3 - Copy eligible
     copyEligible(param);
     param.gpuApproxTimeMs = timerApprox.tocMs();
 
@@ -107,7 +106,7 @@ void TopkSampling::findThreshold(TopkParam &param)
         thrust::sort(thrust::device,
                      dm_scoreSample + reqIdx       * kNumSamplesPerReq,
                      dm_scoreSample + (reqIdx + 1) * kNumSamplesPerReq,
-                     greater<float>());
+                     thrust::greater<float>());
     }
 
     int blockSize = 256;
@@ -186,6 +185,6 @@ void TopkSampling::retrieveExact(TopkParam &param)
         thrust::copy(thrust::device,
                      dm_eligiblePairsStart,
                      dm_eligiblePairsStart + param.numToRetrieve,
-                     param.dm_rst + reqIdx * param.numToRetrieve);
+                     param.dm_rstGpu + reqIdx * param.numToRetrieve);
     }
 }

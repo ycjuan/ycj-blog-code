@@ -4,7 +4,7 @@ CFLAGS       := -Xcompiler -fopenmp --gpu-architecture=sm_89 -O3
 
 all: topk
 
-topk: main.cu topk_baseline.cu topk_with_bucket_sort.cu util.cu
+topk: main.cu topk_baseline.cu topk_with_sampling.cu util.cu
 	nvcc $(INC) -o $@ $^ $(CFLAGS)
 
 clean:

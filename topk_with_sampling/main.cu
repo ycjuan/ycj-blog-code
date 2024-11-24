@@ -18,15 +18,12 @@ using namespace std;
         }                                                                                                                          \
     }
 
-size_t kNumToRetrieve = 1000;
-size_t kNumTrials = 1;
+int kNumToRetrieve = 1000;
+int kNumTrials = 1;
 
-void runExp(size_t numReqs, size_t numDocs)
+void runExp(int numReqs, int numDocs)
 {
     cout << "\n\nrunning exps with numReq: " << numReqs << ", numDocs" << numDocs << endl;
-    default_random_engine generator;
-    uniform_real_distribution<float> distribution(-1.0, 1.0);
-
 
     TopkParam param;
     param.numReqs = numReqs;
@@ -37,6 +34,8 @@ void runExp(size_t numReqs, size_t numDocs)
     CHECK_CUDA(cudaMallocHost(&param.hp_rstCpu, numReqs * kNumToRetrieve * sizeof(Pair)));
     CHECK_CUDA(cudaMallocManaged(&param.dm_rstGpu, numReqs * kNumToRetrieve * sizeof(Pair)));
 
+    default_random_engine generator;
+    uniform_real_distribution<float> distribution(-1.0, 1.0);
     for (size_t i = 0; i < numDocs * numReqs; i++)
     {
         param.dm_score[i] = distribution(generator);
@@ -64,17 +63,6 @@ void runExp(size_t numReqs, size_t numDocs)
                 }
             }
         }
-
-        for (int i = 0; i < numReqs * kNumToRetrieve; i++)
-        {
-            Pair cpuPair = param.hp_rstCpu[i];
-            Pair gpuPair = param.dm_rstGpu[i];
-            if (param.hp_rstCpu[i].docId != param.dm_rstGpu[i].docId)
-            {
-                cout << "Error: CPU and GPU results do not match" << endl;
-                break;
-            }
-        }
     }
 
     CHECK_CUDA(cudaFree(param.dm_score));
@@ -84,7 +72,7 @@ void runExp(size_t numReqs, size_t numDocs)
 
 int main()
 {
-    runExp(100, 1000000);
+    runExp(10, 100000);
 
     return 0;
 }

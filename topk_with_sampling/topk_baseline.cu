@@ -39,7 +39,7 @@ void retrieveTopkCpu(TopkParam &param)
         sort(v_doc.begin(), v_doc.end(), scoreComparator);
         for (int i = 0; i < param.numToRetrieve; i++)
         {
-            param.dm_rst[j * param.numToRetrieve + i] = v_doc[i];
+            param.hp_rstCpu[j * param.numToRetrieve + i] = v_doc[i];
         }
     }
 
