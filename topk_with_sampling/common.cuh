@@ -21,8 +21,12 @@ struct TopkParam
     int numToRetrieve;
     bool useRandomSampling = false;
     float cpuTimeMs = 0;
+    float gpuSampleTimeMs = 0;
+    float gpuFindThresholdTimeMs = 0;
+    float gpuCopyEligibleTimeMs = 0;
+    float gpuRetreiveExactTimeMs = 0;
     float gpuTotalTimeMs = 0;
-    float gpuSamplingTimeMs = 0;
+    float gpuApproxTimeMs = 0;
 };
 
 

@@ -40,8 +40,10 @@ void TopkSampling::reset()
 
 void TopkSampling::retrieveTopk(TopkParam &param)
 {
-    CudaTimer timer;
-    timer.tic();
+    CudaTimer timerTotal;
+    CudaTimer timerApprox;
+    timerTotal.tic();
+    timerApprox.tic();
 
     // Step1 - Sample
     sample(param);
@@ -50,7 +52,13 @@ void TopkSampling::retrieveTopk(TopkParam &param)
     float threshold = 0;
     findThreshold(param, threshold);
 
-    //
+    // Step3 - Copy eligible 
+    size_t numCopied = 0;
+    copyEligible(param, threshold, numCopied);
+    param.gpuApproxTimeMs = timerApprox.tocMs();
 
-    timeMs = timer.tocMs();
+    // Step4 - retreiveExact
+    retrieveExact(param);
+
+    param.gpuTotalTimeMs = timerTotal.tocMs();
 }

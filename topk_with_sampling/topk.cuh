@@ -20,6 +20,10 @@ private:
     void sample(TopkParam &param);
 
     void findThreshold(TopkParam &param, float &threshold);
+
+    void copyEligible(TopkParam &param, float threshold, size_t numCopied);
+
+    void retrieveExact(TopkParam &param);
 };
 
 void retrieveTopkCpu(TopkParam &param);
