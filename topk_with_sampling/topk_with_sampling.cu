@@ -25,7 +25,7 @@ using namespace std;
         cudaError_t status = (func);                                                                                               \
         if (status != cudaSuccess)                                                                                                 \
         {                                                                                                                          \
-            string error = "[topk_with_bucket_sort.cu] CUDA API failed at line " + to_string(__LINE__) + " with error: " + cudaGetErrorString(status) + "\n"; \
+            string error = "CUDA API failed at line " + to_string(__LINE__) + " with error: " + cudaGetErrorString(status) + "\n"; \
             throw runtime_error(error);                                                                                            \
         }                                                                                                                          \
     }
@@ -34,7 +34,7 @@ void TopkSampling::malloc()
 {
     CHECK_CUDA(cudaMallocManaged(&dm_scoreSample, kNumSamplesPerReq * kMaxNumReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocManaged(&dm_scoreThreshold, kMaxNumReqs * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&dm_eligiblePairs, kMaxNumReqs * kMaxEligiblePairsPerDoc * sizeof(Pair)));
+    CHECK_CUDA(cudaMallocManaged(&dm_eligiblePairs, kMaxNumReqs * kMaxEligiblePairsPerReq * sizeof(Pair)));
     CHECK_CUDA(cudaMallocManaged(&dm_copyCount, kMaxNumReqs * sizeof(int)));
 }
 
@@ -69,7 +69,7 @@ void TopkSampling::retrieveTopk(TopkParam &param)
     param.gpuTotalTimeMs = timerTotal.tocMs();
 }
 
-__global__ void sampleKernelNonRandom(TopkParam &topkParam, float *dm_scoreSample, size_t sampleSizePerReq)
+__global__ void sampleKernelNonRandom(TopkParam topkParam, float *dm_scoreSample, size_t sampleSizePerReq)
 {
     int wid = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -120,7 +120,7 @@ __global__ void copyEligibleKernel(float *dm_score,
                                    int *dm_copyCount,
                                    int numReqs,
                                    int numDocs,
-                                   size_t kMaxEligiblePairsPerDoc)
+                                   size_t kMaxEligiblePairsPerReq)
 {
     size_t wid = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (wid < numReqs * numDocs)
@@ -133,13 +133,13 @@ __global__ void copyEligibleKernel(float *dm_score,
         if (score >= threshold)
         {
             int count = atomicAdd(dm_copyCount + reqIdx, 1);
-            if (count < kMaxEligiblePairsPerDoc)
+            if (count < kMaxEligiblePairsPerReq)
             {
                 Pair pair;
                 pair.reqId = reqIdx;
                 pair.docId = docIdx;
                 pair.score = score;
-                dm_eligiblePairs[reqIdx * kMaxEligiblePairsPerDoc + count] = pair;
+                dm_eligiblePairs[reqIdx * kMaxEligiblePairsPerReq + count] = pair;
             }
         }
     }
@@ -169,19 +169,19 @@ void TopkSampling::copyEligible(TopkParam &param)
                                                 dm_copyCount,
                                                 param.numReqs,
                                                 param.numDocs,
-                                                kMaxEligiblePairsPerDoc);
+                                                kMaxEligiblePairsPerReq);
 }
 
 void TopkSampling::retrieveExact(TopkParam &param)
 {
     for (size_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
     {
-        Pair *dm_eligiblePairsStart = dm_eligiblePairs + reqIdx * kMaxEligiblePairsPerDoc;
+        Pair *dm_eligiblePairsStart = dm_eligiblePairs + reqIdx * kMaxEligiblePairsPerReq;
         Pair *dm_eligiblePairsEnd = dm_eligiblePairsStart + dm_copyCount[reqIdx];
         thrust::sort(thrust::device,
                      dm_eligiblePairsStart,
                      dm_eligiblePairsEnd,
-                     scoreComparator);
+                     ScorePredicator());
         thrust::copy(thrust::device,
                      dm_eligiblePairsStart,
                      dm_eligiblePairsStart + param.numToRetrieve,

@@ -18,12 +18,12 @@ using namespace std;
         }                                                                                                                          \
     }
 
-int kNumToRetrieve = 1000;
+int kNumToRetrieve = 10;
 int kNumTrials = 1;
 
 void runExp(int numReqs, int numDocs)
 {
-    cout << "\n\nrunning exps with numReq: " << numReqs << ", numDocs" << numDocs << endl;
+    cout << "\n\nrunning exps with numReq: " << numReqs << ", numDocs: " << numDocs << endl;
 
     TopkParam param;
     param.numReqs = numReqs;
@@ -72,7 +72,7 @@ void runExp(int numReqs, int numDocs)
 
 int main()
 {
-    runExp(10, 100000);
+    runExp(1, 100);
 
     return 0;
 }
