@@ -73,11 +73,11 @@ __global__ void wmma_example(const unsigned *a, const unsigned *b, int *c, const
    wmma::fill_fragment(c_frag, 0);
 
    for (int i = 0; i < K; i += WMMA_K) {
-      int aRow = warpM * WMMA_M;
-      int aCol = i / 32;
+      size_t aRow = warpM * WMMA_M;
+      size_t aCol = i / 32;
 
-      int bRow = i / 32;
-      int bCol = warpN * WMMA_N;
+      size_t bRow = i / 32;
+      size_t bCol = warpN * WMMA_N;
 
       // Bounds checking
       if (aRow < M && aCol < K && bRow < K && bCol < N) {
