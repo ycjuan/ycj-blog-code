@@ -43,10 +43,6 @@ __global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, co
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag1;
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag2;
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag3;
-   wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag4;
-   wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag5;
-   wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag6;
-   wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag7;
    wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag0;
    wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag1;
    wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag2;
@@ -67,22 +63,6 @@ __global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, co
    wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag31;
    wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag32;
    wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag33;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag40;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag41;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag42;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag43;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag50;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag51;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag52;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag53;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag60;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag61;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag62;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag63;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag70;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag71;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag72;
-   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag73;
    wmma::fill_fragment(c_frag00, 0);
    wmma::fill_fragment(c_frag01, 0);
    wmma::fill_fragment(c_frag02, 0);
@@ -99,31 +79,15 @@ __global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, co
    wmma::fill_fragment(c_frag31, 0);
    wmma::fill_fragment(c_frag32, 0);
    wmma::fill_fragment(c_frag33, 0);
-   wmma::fill_fragment(c_frag40, 0);
-   wmma::fill_fragment(c_frag41, 0);
-   wmma::fill_fragment(c_frag42, 0);
-   wmma::fill_fragment(c_frag43, 0);
-   wmma::fill_fragment(c_frag50, 0);
-   wmma::fill_fragment(c_frag51, 0);
-   wmma::fill_fragment(c_frag52, 0);
-   wmma::fill_fragment(c_frag53, 0);
-   wmma::fill_fragment(c_frag60, 0);
-   wmma::fill_fragment(c_frag61, 0);
-   wmma::fill_fragment(c_frag62, 0);
-   wmma::fill_fragment(c_frag63, 0);
-   wmma::fill_fragment(c_frag70, 0);
-   wmma::fill_fragment(c_frag71, 0);
-   wmma::fill_fragment(c_frag72, 0);
-   wmma::fill_fragment(c_frag73, 0);
 
    int lda32 = lda / 32;
    int ldb32 = ldb / 32;
    for (int i = 0; i < K; i += WMMA_K) {
       int i32 = i / 32;
-      size_t aRow0 = warpM * WMMA_M * 8;
+      size_t aRow0 = warpM * WMMA_M * 4;
       size_t aCol0 = i32;
 
-      size_t aRow1 = aRow0 + WMMA_M * 1;
+      size_t aRow1 = aRow0 + WMMA_M;
       size_t aCol1 = i32;
 
       size_t aRow2 = aRow0 + WMMA_M * 2;
@@ -132,23 +96,11 @@ __global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, co
       size_t aRow3 = aRow0 + WMMA_M * 3;
       size_t aCol3 = i32;
 
-      size_t aRow4 = aRow0 + WMMA_M * 4;
-      size_t aCol4 = i32;
-
-      size_t aRow5 = aRow0 + WMMA_M * 5;
-      size_t aCol5 = i32;
-
-      size_t aRow6 = aRow0 + WMMA_M * 6;
-      size_t aCol6 = i32;
-
-      size_t aRow7 = aRow0 + WMMA_M * 7;
-      size_t aCol7 = i32;
-
       size_t bRow0 = i32;
       size_t bCol0 = warpN * WMMA_N * 4;
 
       size_t bRow1 = i32;
-      size_t bCol1 = bCol0 + WMMA_N * 1;
+      size_t bCol1 = bCol0 + WMMA_N;
 
       size_t bRow2 = i32;
       size_t bCol2 = bCol0 + WMMA_N * 2;
@@ -160,10 +112,6 @@ __global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, co
       wmma::load_matrix_sync(a_frag1, a + aRow1 * lda32 + aCol1, lda);
       wmma::load_matrix_sync(a_frag2, a + aRow2 * lda32 + aCol2, lda);
       wmma::load_matrix_sync(a_frag3, a + aRow3 * lda32 + aCol3, lda);
-      wmma::load_matrix_sync(a_frag4, a + aRow4 * lda32 + aCol4, lda);
-      wmma::load_matrix_sync(a_frag5, a + aRow5 * lda32 + aCol5, lda);
-      wmma::load_matrix_sync(a_frag6, a + aRow6 * lda32 + aCol6, lda);
-      wmma::load_matrix_sync(a_frag7, a + aRow7 * lda32 + aCol7, lda);
       wmma::load_matrix_sync(b_frag0, b + bCol0 * ldb32 + bRow0, ldb);
       wmma::load_matrix_sync(b_frag1, b + bCol1 * ldb32 + bRow1, ldb);
       wmma::load_matrix_sync(b_frag2, b + bCol2 * ldb32 + bRow2, ldb);
@@ -186,36 +134,16 @@ __global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, co
       wmma::bmma_sync(c_frag31, a_frag3, b_frag1, c_frag31);
       wmma::bmma_sync(c_frag32, a_frag3, b_frag2, c_frag32);
       wmma::bmma_sync(c_frag33, a_frag3, b_frag3, c_frag33);
-      wmma::bmma_sync(c_frag40, a_frag4, b_frag0, c_frag40);
-      wmma::bmma_sync(c_frag41, a_frag4, b_frag1, c_frag41);
-      wmma::bmma_sync(c_frag42, a_frag4, b_frag2, c_frag42);
-      wmma::bmma_sync(c_frag43, a_frag4, b_frag3, c_frag43);
-      wmma::bmma_sync(c_frag50, a_frag5, b_frag0, c_frag50);
-      wmma::bmma_sync(c_frag51, a_frag5, b_frag1, c_frag51);
-      wmma::bmma_sync(c_frag52, a_frag5, b_frag2, c_frag52);
-      wmma::bmma_sync(c_frag53, a_frag5, b_frag3, c_frag53);
-      wmma::bmma_sync(c_frag60, a_frag6, b_frag0, c_frag60);
-      wmma::bmma_sync(c_frag61, a_frag6, b_frag1, c_frag61);
-      wmma::bmma_sync(c_frag62, a_frag6, b_frag2, c_frag62);
-      wmma::bmma_sync(c_frag63, a_frag6, b_frag3, c_frag63);
-      wmma::bmma_sync(c_frag70, a_frag7, b_frag0, c_frag70);
-      wmma::bmma_sync(c_frag71, a_frag7, b_frag1, c_frag71);
-      wmma::bmma_sync(c_frag72, a_frag7, b_frag2, c_frag72);
-      wmma::bmma_sync(c_frag73, a_frag7, b_frag3, c_frag73);
 
    }
 
-   int cRow0 = warpM * WMMA_M * 8;
-   int cRow1 = cRow0 + WMMA_M * 1;
+   int cRow0 = warpM * WMMA_M * 4;
+   int cRow1 = cRow0 + WMMA_M;
    int cRow2 = cRow0 + WMMA_M * 2;
    int cRow3 = cRow0 + WMMA_M * 3;
-   int cRow4 = cRow0 + WMMA_M * 4;
-   int cRow5 = cRow0 + WMMA_M * 5;
-   int cRow6 = cRow0 + WMMA_M * 6;
-   int cRow7 = cRow0 + WMMA_M * 7;
 
    int cCol0 = warpN * WMMA_N * 4;
-   int cCol1 = cCol0 + WMMA_N * 1;
+   int cCol1 = cCol0 + WMMA_N;
    int cCol2 = cCol0 + WMMA_N * 2;
    int cCol3 = cCol0 + WMMA_N * 3;
 
@@ -238,22 +166,6 @@ __global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, co
       c_frag31.x[i] = K - c_frag31.x[i];
       c_frag32.x[i] = K - c_frag32.x[i];
       c_frag33.x[i] = K - c_frag33.x[i];
-      c_frag40.x[i] = K - c_frag40.x[i];
-      c_frag41.x[i] = K - c_frag41.x[i];
-      c_frag42.x[i] = K - c_frag42.x[i];
-      c_frag43.x[i] = K - c_frag43.x[i];
-      c_frag50.x[i] = K - c_frag50.x[i];
-      c_frag51.x[i] = K - c_frag51.x[i];
-      c_frag52.x[i] = K - c_frag52.x[i];
-      c_frag53.x[i] = K - c_frag53.x[i];
-      c_frag60.x[i] = K - c_frag60.x[i];
-      c_frag61.x[i] = K - c_frag61.x[i];
-      c_frag62.x[i] = K - c_frag62.x[i];
-      c_frag63.x[i] = K - c_frag63.x[i];
-      c_frag70.x[i] = K - c_frag70.x[i];
-      c_frag71.x[i] = K - c_frag71.x[i];
-      c_frag72.x[i] = K - c_frag72.x[i];
-      c_frag73.x[i] = K - c_frag73.x[i];
    }
 
    wmma::store_matrix_sync(c + cRow0 * ldc + cCol0, c_frag00, ldc, wmma::mem_row_major);
@@ -272,22 +184,6 @@ __global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, co
    wmma::store_matrix_sync(c + cRow3 * ldc + cCol1, c_frag31, ldc, wmma::mem_row_major);
    wmma::store_matrix_sync(c + cRow3 * ldc + cCol2, c_frag32, ldc, wmma::mem_row_major);
    wmma::store_matrix_sync(c + cRow3 * ldc + cCol3, c_frag33, ldc, wmma::mem_row_major);
-   wmma::store_matrix_sync(c + cRow4 * ldc + cCol0, c_frag40, ldc, wmma::mem_row_major);
-   wmma::store_matrix_sync(c + cRow4 * ldc + cCol1, c_frag41, ldc, wmma::mem_row_major);
-   wmma::store_matrix_sync(c + cRow4 * ldc + cCol2, c_frag42, ldc, wmma::mem_row_major);
-   wmma::store_matrix_sync(c + cRow4 * ldc + cCol3, c_frag43, ldc, wmma::mem_row_major);
-   wmma::store_matrix_sync(c + cRow5 * ldc + cCol0, c_frag50, ldc, wmma::mem_row_major);
-   wmma::store_matrix_sync(c + cRow5 * ldc + cCol1, c_frag51, ldc, wmma::mem_row_major);
-   wmma::store_matrix_sync(c + cRow5 * ldc + cCol2, c_frag52, ldc, wmma::mem_row_major);
-   wmma::store_matrix_sync(c + cRow5 * ldc + cCol3, c_frag53, ldc, wmma::mem_row_major);
-   wmma::store_matrix_sync(c + cRow6 * ldc + cCol0, c_frag60, ldc, wmma::mem_row_major);
-   wmma::store_matrix_sync(c + cRow6 * ldc + cCol1, c_frag61, ldc, wmma::mem_row_major);
-   wmma::store_matrix_sync(c + cRow6 * ldc + cCol2, c_frag62, ldc, wmma::mem_row_major);
-   wmma::store_matrix_sync(c + cRow6 * ldc + cCol3, c_frag63, ldc, wmma::mem_row_major);
-   wmma::store_matrix_sync(c + cRow7 * ldc + cCol0, c_frag70, ldc, wmma::mem_row_major);
-   wmma::store_matrix_sync(c + cRow7 * ldc + cCol1, c_frag71, ldc, wmma::mem_row_major);
-   wmma::store_matrix_sync(c + cRow7 * ldc + cCol2, c_frag72, ldc, wmma::mem_row_major);
-   wmma::store_matrix_sync(c + cRow7 * ldc + cCol3, c_frag73, ldc, wmma::mem_row_major);   
    
 }
 
@@ -313,7 +209,7 @@ void quantWMMA(Data data, Setting setting) {
    blockDim.x = 128;
    blockDim.y = 4;
 
-   gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / 32 - 1)) / (WMMA_M * blockDim.x / 32) / 8;
+   gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / 32 - 1)) / (WMMA_M * blockDim.x / 32) / 4;
    gridDim.y = (MATRIX_N + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y) / 4;
 
    cout << "blockDim: " << blockDim.x << " " << blockDim.y << endl;
