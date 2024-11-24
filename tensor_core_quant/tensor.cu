@@ -191,12 +191,12 @@ void quantWMMA(Data data, Setting setting) {
 
    int MATRIX_M = data.numDocs;
    int MATRIX_N = data.numReqs;
-   int MATRIX_K = data.numT1;
+   int MATRIX_K = data.numInt;
 
-   T1 *a_fp16 = data.d_doc;
-   T1 *b_fp16 = data.d_req;
+   T_QUANT *a_fp16 = data.d_doc;
+   T_QUANT *b_fp16 = data.d_req;
 
-   T2 *c_wmma = data.d_rst_wmma;
+   T_RST *c_wmma = data.d_rst_wmma;
 
    printf("\nM = %d, N = %d, K = %d.\n\n", MATRIX_M, MATRIX_N, MATRIX_K);
    

@@ -12,12 +12,12 @@ void quantCpu(Data data, Setting setting)
     {
         for (int j = 0; j < data.numReqs; j++)
         {
-            T2 totalCount = 0;
-            for (int k = 0; k < data.numT1; k++)
+            T_RST totalCount = 0;
+            for (int k = 0; k < data.numInt; k++)
             {
-                T1 reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.numT1, data.reqMemLayout)];
-                T1 docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.numT1, data.docMemLayout)];
-                T1 bitwiseRst = ~(reqVal ^ docVal);
+                T_QUANT reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.numInt, data.reqMemLayout)];
+                T_QUANT docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.numInt, data.docMemLayout)];
+                T_QUANT bitwiseRst = ~(reqVal ^ docVal);
                 bitset<32> bits(bitwiseRst);
                 int count = bits.count();
                 totalCount += count;
@@ -36,12 +36,12 @@ __global__ void matMul(Data data)
 
     if (i < data.numDocs && j < data.numReqs)
     {
-        T2 totalCount = 0;
-        for (int k = 0; k < data.numT1; k++)
+        T_RST totalCount = 0;
+        for (int k = 0; k < data.numInt; k++)
         {
-            T1 reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.numT1, data.reqMemLayout)];
-            T1 docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.numT1, data.docMemLayout)];    
-            T1 bitwiseRst = ~ (reqVal ^ docVal);
+            T_QUANT reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.numInt, data.reqMemLayout)];
+            T_QUANT docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.numInt, data.docMemLayout)];    
+            T_QUANT bitwiseRst = ~ (reqVal ^ docVal);
             uint64_t bitwiseRst64 = uint64_t(bitwiseRst);
             totalCount += __popcll(bitwiseRst64); // This counts the number of "1" in the 64bit bitwiseAnd
         }

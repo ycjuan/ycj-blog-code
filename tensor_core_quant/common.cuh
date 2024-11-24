@@ -6,8 +6,9 @@
 
 using namespace std;
 
-typedef uint32_t T1;
-typedef int32_t T2;
+// IMPORTANT: Do not change the following typedefs. These are only ones that works for WMMA.
+typedef uint32_t T_QUANT;
+typedef int32_t T_RST;
 
 enum MemLayout
 {
@@ -24,12 +25,12 @@ struct Data
 {
     int numDocs;
     int numReqs;
-    int numT1;
-    T1 *d_doc; // M=numDocs x N=numInt64
-    T1 *d_req; // M=numReqs x N=numInt64
-    T2 *d_rst_kernel; // M=numDocs x N=numReqs
-    T2 *d_rst_wmma; // M=numDocs x N=numReqs
-    T2 *h_rst_cpu;
+    int numInt;
+    T_QUANT *d_doc; // M=numDocs x N=numInt64
+    T_QUANT *d_req; // M=numReqs x N=numInt64
+    T_RST *d_rst_kernel; // M=numDocs x N=numReqs
+    T_RST *d_rst_wmma; // M=numDocs x N=numReqs
+    T_RST *h_rst_cpu;
     MemLayout docMemLayout;
     MemLayout reqMemLayout;
     MemLayout rstLayoutCpu;
@@ -48,7 +49,7 @@ struct Data
     void print()
     {
         ostringstream oss;
-        oss << "numDocs: " << numDocs << ", numReqs: " << numReqs << ", numInt64: " << numT1 << endl;
+        oss << "numDocs: " << numDocs << ", numReqs: " << numReqs << ", numInt: " << numInt << ", numBits: " << sizeof(T_QUANT) * 8 << endl;
         oss << "docMemLayout: " << (docMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "reqMemLayout: " << (reqMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "rstLayoutCpu: " << (rstLayoutCpu == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
