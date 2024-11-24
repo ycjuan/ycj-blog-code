@@ -23,8 +23,8 @@ MemLayout kMemLayoutReq = ROW_MAJOR;
 // However, since the matrix here has a shape of (numReqs, numInt), setting ROW_MAJOR here is equivalent to COL_MAJOR of a (numInt, numReqs) matrix
 MemLayout kMemLayoutRstCpu = ROW_MAJOR;
 MemLayout kMemLayoutRstGpuCuda = ROW_MAJOR;
-MemLayout kMemLayoutRstGpuTensorSimple = ROW_MAJOR;
-MemLayout kMemLayoutRstGpuTensorUnroll = ROW_MAJOR;
+MemLayout kMemLayoutRstGpuWmmaSimple = ROW_MAJOR;
+MemLayout kMemLayoutRstGpuWmmaUnroll = ROW_MAJOR;
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \
@@ -46,15 +46,15 @@ Data genData()
     data.reqMemLayout = kMemLayoutReq;
     data.rstLayoutCpu = kMemLayoutRstCpu;
     data.rstLayoutGpuCuda = kMemLayoutRstGpuCuda;
-    data.rstLayoutGpuTensorSimple = kMemLayoutRstGpuTensorSimple;
-    data.rstLayoutGpuTensorUnroll = kMemLayoutRstGpuTensorUnroll;
+    data.rstLayoutGpuWmmaSimple = kMemLayoutRstGpuWmmaSimple;
+    data.rstLayoutGpuWmmaUnroll = kMemLayoutRstGpuWmmaUnroll;
     data.print();
     
     CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.numInt * sizeof(T_QUANT)));
     CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.numInt * sizeof(T_QUANT)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_kernel, (size_t)data.numDocs * data.numReqs * sizeof(T_RST)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rstTensorSimple, (size_t)data.numDocs * data.numReqs * sizeof(T_RST)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rstTensorUnroll, (size_t)data.numDocs * data.numReqs * sizeof(T_RST)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rstWmmaSimple, (size_t)data.numDocs * data.numReqs * sizeof(T_RST)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rstWmmaUnroll, (size_t)data.numDocs * data.numReqs * sizeof(T_RST)));
     CHECK_CUDA(cudaMallocHost(&data.h_rst_cpu, (size_t)data.numDocs * data.numReqs * sizeof(T_RST)));
 
 
@@ -86,8 +86,8 @@ void checkRst(Data data)
         {
             T_RST cpuVal = data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)];
             T_RST gpuCudaVal = data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCuda)];
-            T_RST gpuTensorSimpleVal = data.d_rstTensorSimple[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuTensorSimple)];
-            T_RST gpuTensorUnrollVal = data.d_rstTensorUnroll[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuTensorUnroll)];
+            T_RST gpuTensorSimpleVal = data.d_rstWmmaSimple[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuWmmaSimple)];
+            T_RST gpuTensorUnrollVal = data.d_rstWmmaUnroll[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuWmmaUnroll)];
 
             if (cpuVal != gpuCudaVal)
             {

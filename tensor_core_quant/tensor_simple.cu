@@ -88,7 +88,7 @@ void quantWmmaSimple(Data data, Setting setting) {
    T_QUANT *a = data.d_doc;
    T_QUANT *b = data.d_req;
 
-   T_RST *c_wmma = data.d_rstTensorSimple;
+   T_RST *c_wmma = data.d_rstWmmaSimple;
 
    
    // First: using WMMA

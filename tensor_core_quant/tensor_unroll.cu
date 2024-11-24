@@ -200,7 +200,7 @@ void quantWmmaUnroll(Data data, Setting setting) {
    T_QUANT *a = data.d_doc;
    T_QUANT *b = data.d_req;
 
-   T_RST *c_wmma = data.d_rstTensorUnroll;
+   T_RST *c_wmma = data.d_rstWmmaUnroll;
 
    
    dim3 gridDim;

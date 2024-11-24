@@ -29,23 +29,23 @@ struct Data
     T_QUANT *d_doc; // M=numDocs x N=numInt64
     T_QUANT *d_req; // M=numReqs x N=numInt64
     T_RST *d_rst_kernel; // M=numDocs x N=numReqs
-    T_RST *d_rstTensorSimple; // M=numDocs x N=numReqs
-    T_RST *d_rstTensorUnroll; // M=numDocs x N=numReqs
+    T_RST *d_rstWmmaSimple; // M=numDocs x N=numReqs
+    T_RST *d_rstWmmaUnroll; // M=numDocs x N=numReqs
     T_RST *h_rst_cpu;
     MemLayout docMemLayout;
     MemLayout reqMemLayout;
     MemLayout rstLayoutCpu;
     MemLayout rstLayoutGpuCuda;
-    MemLayout rstLayoutGpuTensorSimple;
-    MemLayout rstLayoutGpuTensorUnroll;
+    MemLayout rstLayoutGpuWmmaSimple;
+    MemLayout rstLayoutGpuWmmaUnroll;
 
     void free()
     {
         cudaFree(d_doc);
         cudaFree(d_req);
         cudaFree(d_rst_kernel);
-        cudaFree(d_rstTensorSimple);
-        cudaFree(d_rstTensorUnroll);
+        cudaFree(d_rstWmmaSimple);
+        cudaFree(d_rstWmmaUnroll);
         cudaFreeHost(h_rst_cpu);
     }
 
@@ -57,8 +57,8 @@ struct Data
         oss << "reqMemLayout: " << (reqMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "rstLayoutCpu: " << (rstLayoutCpu == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "rstLayoutGpuCuda: " << (rstLayoutGpuCuda == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
-        oss << "rstLayoutGpuTensorSimple: " << (rstLayoutGpuTensorSimple == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
-        oss << "rstLayoutGpuTensorUnroll: " << (rstLayoutGpuTensorUnroll == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
+        oss << "rstLayoutGpuWmmaSimple: " << (rstLayoutGpuWmmaSimple == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
+        oss << "rstLayoutGpuWmmaUnroll: " << (rstLayoutGpuWmmaUnroll == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         cout << oss.str();
     }
 };
