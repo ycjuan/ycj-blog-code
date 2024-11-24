@@ -41,37 +41,54 @@ __global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, co
 
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag;
    wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag;
+   wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag1;
    wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag;
+   wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag1;
    wmma::fill_fragment(c_frag, 0);
+   wmma::fill_fragment(c_frag1, 0);
 
    for (int i = 0; i < K; i += WMMA_K) {
       size_t aRow = warpM * WMMA_M;
       size_t aCol = i / 32;
 
       size_t bRow = i / 32;
-      size_t bCol = warpN * WMMA_N;
+      size_t bCol = warpN * WMMA_N * 2;
+
+      size_t bRow1 = bRow;
+      size_t bCol1 = bCol + WMMA_N;
 
       // Bounds checking
       if (aRow < M && aCol < K && bRow < K && bCol < N) {
          // Load the inputs
          wmma::load_matrix_sync(a_frag, a + aRow * lda / 32 + aCol, lda);
          wmma::load_matrix_sync(b_frag, b + bCol * ldb / 32 + bRow, ldb);
+         wmma::load_matrix_sync(b_frag1, b + bCol1 * ldb / 32 + bRow1, ldb);
 
          // Perform the matrix multiplication
          wmma::bmma_sync(c_frag, a_frag, b_frag, c_frag);
+         wmma::bmma_sync(c_frag1, a_frag, b_frag1, c_frag1);
 
       }
    }
 
    int cRow = warpM * WMMA_M;
-   int cCol = warpN * WMMA_N;
+   int cCol = warpN * WMMA_N * 2;
+   int cCol1 = cCol + WMMA_N;
 
 #pragma unroll
    for (int i = 0; i < c_frag.num_elements; i++)
       c_frag.x[i] = K - c_frag.x[i];
 
+#pragma unroll
+   for (int i = 0; i < c_frag1.num_elements; i++)
+      c_frag1.x[i] = K - c_frag1.x[i];
+
    if (cRow < M && cCol < N) {
       wmma::store_matrix_sync(c + cRow * ldc + cCol, c_frag, ldc, wmma::mem_row_major);
+   }
+
+   if (cRow < M && cCol1 < N) {
+      wmma::store_matrix_sync(c + cRow * ldc + cCol1, c_frag1, ldc, wmma::mem_row_major);
    }
 }
 
@@ -98,7 +115,7 @@ void quantWMMA(Data data, Setting setting) {
    blockDim.y = 4;
 
    gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / 32 - 1)) / (WMMA_M * blockDim.x / 32);
-   gridDim.y = (MATRIX_N + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y);
+   gridDim.y = (MATRIX_N + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y) / 2;
 
    cout << "blockDim: " << blockDim.x << " " << blockDim.y << endl;
    cout << "gridDim: " << gridDim.x << " " << gridDim.y << endl;
