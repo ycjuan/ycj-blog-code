@@ -14,7 +14,7 @@ using namespace std;
 
 int kNumDocs = 1 << 10;
 int kNumReqs = 1 << 8;
-int kNumT1 = 1 << 5;
+int kNumT1 = 1 << 3;
 int kNumTrials = 100;
 MemLayout kMemLayoutDoc = ROW_MAJOR;
 MemLayout kMemLayoutReq = ROW_MAJOR;
@@ -93,7 +93,6 @@ void checkData(Data data)
             {
                 if (numPrinted++ < 256)
                     cout << "Wmma error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuWmma << endl;
-                return;
             }
         }
     }

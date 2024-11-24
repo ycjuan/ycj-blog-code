@@ -74,9 +74,9 @@ __global__ void wmma_example(const unsigned *a, const unsigned *b, int *c, const
 
    for (int i = 0; i < K; i += WMMA_K) {
       int aRow = warpM * WMMA_M;
-      int aCol = i;
+      int aCol = i / 32;
 
-      int bRow = i;
+      int bRow = i / 32;
       int bCol = warpN * WMMA_N;
 
       // Bounds checking
