@@ -202,24 +202,20 @@ void quantWmmaUnroll(Data data, Setting setting) {
 
    T_RST *c_wmma = data.d_rstTensorUnroll;
 
-   printf("\nM = %d, N = %d, K = %d.\n\n", MATRIX_M, MATRIX_N, MATRIX_K);
    
-   // First: using WMMA
    dim3 gridDim;
    dim3 blockDim;
  
-   // blockDim.x must be a multple of warpSize
-   // 128x4 means we have 16 warps and a block computes a 64x64 output tile
    blockDim.x = 128;
    blockDim.y = 4;
 
    gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / 32 - 1)) / (WMMA_M * blockDim.x / 32) / 4;
    gridDim.y = (MATRIX_N + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y) / 4;
 
+   printf("\nRunning with wmma (unroll)...\n");
+   printf("M = %d, N = %d, K = %d.\n", MATRIX_M, MATRIX_N, MATRIX_K);
    cout << "blockDim: " << blockDim.x << " " << blockDim.y << endl;
    cout << "gridDim: " << gridDim.x << " " << gridDim.y << endl;
-
-   printf("Running with wmma...\n");
    CudaTimer timer;
    for (int t = -3; t < setting.kNumTrials; t++)
    {
@@ -229,7 +225,7 @@ void quantWmmaUnroll(Data data, Setting setting) {
       CHECK_CUDA(cudaDeviceSynchronize());
       CHECK_CUDA(cudaGetLastError());
    }
-   cout << "wmma took " << timer.tocMs() / setting.kNumTrials << "ms" << endl;
+   cout << "wmma (unroll) took " << timer.tocMs() / setting.kNumTrials << "ms" << endl;
 }
 
 

@@ -85,12 +85,11 @@ void quantWmmaSimple(Data data, Setting setting) {
    int MATRIX_N = data.numReqs;
    int MATRIX_K = data.numInt;
 
-   T_QUANT *a_fp16 = data.d_doc;
-   T_QUANT *b_fp16 = data.d_req;
+   T_QUANT *a = data.d_doc;
+   T_QUANT *b = data.d_req;
 
    T_RST *c_wmma = data.d_rstTensorSimple;
 
-   printf("\nM = %d, N = %d, K = %d.\n\n", MATRIX_M, MATRIX_N, MATRIX_K);
    
    // First: using WMMA
    dim3 gridDim;
@@ -104,20 +103,20 @@ void quantWmmaSimple(Data data, Setting setting) {
    gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / 32 - 1)) / (WMMA_M * blockDim.x / 32);
    gridDim.y = (MATRIX_N + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y);
 
+   printf("\nRunning with wmma (simple)...\n");
+   printf("M = %d, N = %d, K = %d.\n", MATRIX_M, MATRIX_N, MATRIX_K);
    cout << "blockDim: " << blockDim.x << " " << blockDim.y << endl;
    cout << "gridDim: " << gridDim.x << " " << gridDim.y << endl;
-
-   printf("Running with wmma...\n");
    CudaTimer timer;
    for (int t = -3; t < setting.kNumTrials; t++)
    {
       if (t == 0)
          timer.tic();
-      quantWmmaKernel <<< gridDim, blockDim >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
+      quantWmmaKernel <<< gridDim, blockDim >>> (a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
       CHECK_CUDA(cudaDeviceSynchronize());
       CHECK_CUDA(cudaGetLastError());
    }
-   cout << "wmma took " << timer.tocMs() / setting.kNumTrials << "ms" << endl;
+   cout << "wmma (simple) took " << timer.tocMs() / setting.kNumTrials << "ms" << endl;
 }
 
 

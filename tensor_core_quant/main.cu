@@ -78,9 +78,8 @@ Data genData()
     return data;
 }
 
-void checkData(Data data)
+void checkRst(Data data)
 {
-    int numPrinted = 0;
     for (int i = 0; i < data.numDocs; i++)
     {
         for (int j = 0; j < data.numReqs; j++)
@@ -98,15 +97,13 @@ void checkData(Data data)
             
             if (cpuVal != gpuTensorSimpleVal)
             {
-                if (numPrinted++ < 256)
-                    cout << "Wmma error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuTensorSimpleVal << endl;
+                cout << "Wmma error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuTensorSimpleVal << endl;
                 return;
             }
 
             if (cpuVal != gpuTensorUnrollVal)
             {
-                if (numPrinted++ < 256)
-                    cout << "Wmma unroll error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuTensorUnrollVal << endl;
+                cout << "Wmma unroll error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuTensorUnrollVal << endl;
                 return;
             }
         }
@@ -124,7 +121,7 @@ int main()
     quantWmmaSimple(data, setting);
     quantWmmaUnroll(data, setting);
 
-    checkData(data);
+    checkRst(data);
 
     data.free();
 
