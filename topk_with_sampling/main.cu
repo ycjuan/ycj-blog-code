@@ -18,82 +18,66 @@ using namespace std;
         }                                                                                                                          \
     }
 
-int kNumToRetrieve = 1000;
-int kNumTrials = 10;
+size_t kNumToRetrieve = 1000;
+size_t kNumTrials = 10;
 
-void runExp(int numDocs)
+void runExp(size_t numReqs, size_t numDocs)
 {
-    cout << "\n\nrunning exps with numDocs: " << numDocs << endl;
+    cout << "\n\nrunning exps with numReq: " << numReqs << ", numDocs" << numDocs << endl;
     default_random_engine generator;
     uniform_real_distribution<float> distribution(-1.0, 1.0);
 
-    vector<Pair> v_doc(numDocs);
-    for (int i = 0; i < numDocs; i++)
+    float *dm_score = nullptr;
+    CHECK_CUDA(cudaMallocManaged(&dm_score, numDocs * numReqs * sizeof(float)));
+    for (size_t i = 0; i < numDocs * numReqs; i++)
     {
-        v_doc[i].docId = i;
-        v_doc[i].score = distribution(generator);
+        dm_score[i] = distribution(generator);
     }
 
-    TopkBucketSort retriever;
-    retriever.init();
-    Pair *d_doc = nullptr;
-    Pair *d_buffer = nullptr;
-    CHECK_CUDA(cudaMalloc(&d_doc, numDocs * sizeof(Pair)));
-    CHECK_CUDA(cudaMalloc(&d_buffer, numDocs * sizeof(Pair)));
-
-    double timeMsGpuBucketSort = 0;
-    double timeMsGpuFullSort = 0;
     double timeMsCpuFullSort = 0;
+    double timeMsGpuFullSort = 0;
+    double timeMsGpuSampling = 0;
     for (int t = -3; t < kNumTrials; t++)
     {
-        float timeMsGpuBucketSort1 = 0;
-        float timeMsGpuFullSort1 = 0;
         float timeMsCpuFullSort1 = 0;
-        CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Pair), cudaMemcpyHostToDevice));
-        vector<Pair> v_topk_gpuBucketSort = retriever.retrieveTopk(d_doc, d_buffer, numDocs, kNumToRetrieve, timeMsGpuBucketSort1);
-        CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Pair), cudaMemcpyHostToDevice));
-        vector<Pair> v_topk_gpuFullSort = retrieveTopkGpuFullSort(d_doc, numDocs, kNumToRetrieve, timeMsGpuFullSort1);
-        vector<Pair> v_doc_copy = v_doc;
-        vector<Pair> v_topk_cpuFullSort = retrieveTopkCpuFullSort(v_doc_copy, kNumToRetrieve, timeMsCpuFullSort1);
+        float timeMsGpuFullSort1 = 0;
+        float timeMsGpuSampling1 = 0;
+        
+        vector<Pair> v_topkCpuFullSort = retrieveTopkCpuFullSort(dm_score, numDocs, numReqs, kNumToRetrieve, timeMsGpuFullSort1);
+        vector<Pair> v_topkGpuFullSort = retrieveTopkGpuFullSort(dm_score, numDocs, numReqs, kNumToRetrieve, timeMsGpuFullSort1);
+        vector<Pair> v_topkGpuSampling;
 
-        if (v_topk_gpuBucketSort != v_topk_gpuFullSort)
+        if (v_topkGpuFullSort != v_topkCpuFullSort)
         {
-            throw runtime_error("Topk results from GPU bucket sort and GPU full sort do not match");
+            throw runtime_error("Topk results from GPU full sort and CPU full sort do not match");
         }
-        if (v_topk_gpuBucketSort != v_topk_cpuFullSort)
+
+        if (v_topkGpuSampling != v_topkCpuFullSort)
         {
-            throw runtime_error("Topk results from GPU bucket sort and CPU full sort do not match");
+            throw runtime_error("Topk results from GPU sampling and CPU full sort do not match");
         }
 
         if (t >= 0)
         {
-            timeMsGpuBucketSort += timeMsGpuBucketSort1;
-            timeMsGpuFullSort += timeMsGpuFullSort1;
             timeMsCpuFullSort += timeMsCpuFullSort1;
+            timeMsGpuFullSort += timeMsGpuFullSort1;
+            timeMsGpuSampling += timeMsGpuSampling1;
         }
     }
 
-    timeMsGpuBucketSort /= kNumTrials;
-    timeMsGpuFullSort /= kNumTrials;
     timeMsCpuFullSort /= kNumTrials;
+    timeMsGpuFullSort /= kNumTrials;
+    timeMsGpuSampling /= kNumTrials;
 
-    cout << "timeMsGpuBucketSort: " << timeMsGpuBucketSort << " ms" << endl;
-    cout << "timeMsGpuFullSort: " << timeMsGpuFullSort << " ms" << endl;
     cout << "timeMsCpuFullSort: " << timeMsCpuFullSort << " ms" << endl;
+    cout << "timeMsGpuFullSort: " << timeMsGpuFullSort << " ms" << endl;
+    cout << "timeMsGpuSampling: " << timeMsGpuSampling << " ms" << endl;
 
-    CHECK_CUDA(cudaFree(d_doc));
-    CHECK_CUDA(cudaFree(d_buffer));
-    retriever.reset();
 }
 
 int main()
 {
-    runExp(1000000);
-    runExp(2000000);
-    runExp(4000000);
-    runExp(8000000);
-    runExp(16000000);
-    runExp(32000000);
+    runExp(100, 1000000);
 
     return 0;
 }
