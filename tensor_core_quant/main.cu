@@ -21,8 +21,8 @@ MemLayout kMemLayoutDoc = ROW_MAJOR;
 MemLayout kMemLayoutReq = ROW_MAJOR; 
 // IMPORTANT: Don't change this. b_frag in WMMA requires COL_MAJOR. 
 // However, since the matrix here has a shape of (numReqs, numInt), setting ROW_MAJOR here is equivalent to COL_MAJOR of a (numInt, numReqs) matrix
-MemLayout kMemLayoutRstCpu = COL_MAJOR;
-MemLayout kMemLayoutRstGpuKernel = COL_MAJOR;
+MemLayout kMemLayoutRstCpu = ROW_MAJOR;
+MemLayout kMemLayoutRstGpuKernel = ROW_MAJOR;
 MemLayout kMemLayoutRstGpuTensor = ROW_MAJOR;
 
 #define CHECK_CUDA(func)                                                                                                           \
