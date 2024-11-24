@@ -1,30 +1,3 @@
-/* Copyright (c) 1993-2017, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
 /*
 This file is modified from: 
 
@@ -51,17 +24,16 @@ void cudaErrCheck_(cudaError_t stat, const char *file, int line) {
 #include <mma.h>
 using namespace nvcuda;
 
-// The only dimensions currently supported by WMMA
 const int WMMA_M = 8;
 const int WMMA_N = 8;
 const int WMMA_K = 128;
 
-__global__ void wmma_example(const unsigned *a, const unsigned *b, int *c, const unsigned M, const unsigned N, const unsigned K)
+__global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, const unsigned M, const unsigned N, const unsigned K)
 {
    using namespace nvcuda::wmma::experimental;
    int lda = K;
    int ldb = K;
-   int ldc = M;
+   int ldc = N;
 
    // Tile using a 2D grid
    int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
@@ -99,7 +71,7 @@ __global__ void wmma_example(const unsigned *a, const unsigned *b, int *c, const
       c_frag.x[i] = K - c_frag.x[i];
 
    if (cRow < M && cCol < N) {
-      wmma::store_matrix_sync(c + cRow + cCol * ldc, c_frag, ldc, wmma::mem_col_major);
+      wmma::store_matrix_sync(c + cRow * ldc + cCol, c_frag, ldc, wmma::mem_row_major);
    }
 }
 
@@ -137,7 +109,7 @@ void quantWMMA(Data data, Setting setting) {
    {
       if (t == 0)
          timer.tic();
-      wmma_example <<< gridDim, blockDim >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
+      quantWmmaKernel <<< gridDim, blockDim >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
       cudaErrCheck(cudaDeviceSynchronize());
       cudaErrCheck(cudaGetLastError());
    }
