@@ -66,7 +66,7 @@ void runExp(int numReqs, int numDocs)
     }
 
     CHECK_CUDA(cudaFree(param.dm_score));
-    CHECK_CUDA(cudaFree(param.hp_rstCpu));
+    CHECK_CUDA(cudaFreeHost(param.hp_rstCpu));
     CHECK_CUDA(cudaFree(param.dm_rstGpu));
 }
 
