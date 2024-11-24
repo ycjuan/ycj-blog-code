@@ -27,7 +27,7 @@ void runExp(int numDocs)
     default_random_engine generator;
     uniform_real_distribution<float> distribution(-1.0, 1.0);
 
-    vector<Doc> v_doc(numDocs);
+    vector<Pair> v_doc(numDocs);
     for (int i = 0; i < numDocs; i++)
     {
         v_doc[i].docId = i;
@@ -36,10 +36,10 @@ void runExp(int numDocs)
 
     TopkBucketSort retriever;
     retriever.init();
-    Doc *d_doc = nullptr;
-    Doc *d_buffer = nullptr;
-    CHECK_CUDA(cudaMalloc(&d_doc, numDocs * sizeof(Doc)));
-    CHECK_CUDA(cudaMalloc(&d_buffer, numDocs * sizeof(Doc)));
+    Pair *d_doc = nullptr;
+    Pair *d_buffer = nullptr;
+    CHECK_CUDA(cudaMalloc(&d_doc, numDocs * sizeof(Pair)));
+    CHECK_CUDA(cudaMalloc(&d_buffer, numDocs * sizeof(Pair)));
 
     double timeMsGpuBucketSort = 0;
     double timeMsGpuFullSort = 0;
@@ -49,12 +49,12 @@ void runExp(int numDocs)
         float timeMsGpuBucketSort1 = 0;
         float timeMsGpuFullSort1 = 0;
         float timeMsCpuFullSort1 = 0;
-        CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Doc), cudaMemcpyHostToDevice));
-        vector<Doc> v_topk_gpuBucketSort = retriever.retrieveTopk(d_doc, d_buffer, numDocs, kNumToRetrieve, timeMsGpuBucketSort1);
-        CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Doc), cudaMemcpyHostToDevice));
-        vector<Doc> v_topk_gpuFullSort = retrieveTopkGpuFullSort(d_doc, numDocs, kNumToRetrieve, timeMsGpuFullSort1);
-        vector<Doc> v_doc_copy = v_doc;
-        vector<Doc> v_topk_cpuFullSort = retrieveTopkCpuFullSort(v_doc_copy, kNumToRetrieve, timeMsCpuFullSort1);
+        CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Pair), cudaMemcpyHostToDevice));
+        vector<Pair> v_topk_gpuBucketSort = retriever.retrieveTopk(d_doc, d_buffer, numDocs, kNumToRetrieve, timeMsGpuBucketSort1);
+        CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Pair), cudaMemcpyHostToDevice));
+        vector<Pair> v_topk_gpuFullSort = retrieveTopkGpuFullSort(d_doc, numDocs, kNumToRetrieve, timeMsGpuFullSort1);
+        vector<Pair> v_doc_copy = v_doc;
+        vector<Pair> v_topk_cpuFullSort = retrieveTopkCpuFullSort(v_doc_copy, kNumToRetrieve, timeMsCpuFullSort1);
 
         if (v_topk_gpuBucketSort != v_topk_gpuFullSort)
         {

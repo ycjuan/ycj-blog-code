@@ -12,7 +12,7 @@ public:
 
     void reset();
 
-    std::vector<Doc> retrieveTopk(Doc *d_doc, Doc *d_buffer, int numDocs, int numToRetrieve, float &timeMs);
+    std::vector<Pair> retrieveTopk(Pair *d_doc, Pair *d_buffer, int numDocs, int numToRetrieve, float &timeMs);
 
     __device__ __host__ int getCounterIdx(int slot, int bucket)
     {
@@ -26,7 +26,7 @@ public:
         return (int)(score * kGranularity_);
     }
 
-    __device__ void updateCounter(Doc doc)
+    __device__ void updateCounter(Pair doc)
     {
         int slot = doc.docId % kNumSlots_;
         int bucket = bucketize(doc.score);
@@ -35,7 +35,7 @@ public:
         atomicAdd(&d_counter_[counterIdx], 1);
     }
 
-    __device__ bool operator()(const Doc &doc)
+    __device__ bool operator()(const Pair &doc)
     {
         int bucket = bucketize(doc.score);
         return bucket >= lowestBucket_;
@@ -62,7 +62,7 @@ private:
     void findLowestBucket(std::vector<int> &v_counter, int numToRetrieve, int &lowestBucket, int &numDocsGreaterThanLowestBucket);
 };
 
-std::vector<Doc> retrieveTopkGpuFullSort(Doc *d_doc, int numDocs, int numToRetrieve, float &timeMs);
-std::vector<Doc> retrieveTopkCpuFullSort(std::vector<Doc> &v_doc, int numToRetrieve, float &timeMs);
+std::vector<Pair> retrieveTopkGpuFullSort(Pair *d_doc, int numDocs, int numToRetrieve, float &timeMs);
+std::vector<Pair> retrieveTopkCpuFullSort(std::vector<Pair> &v_doc, int numToRetrieve, float &timeMs);
 
 #endif // TOPK_CUH
