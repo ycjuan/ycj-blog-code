@@ -13,13 +13,15 @@ https://github.com/pnnl/TCBNN/blob/de4713445fd1cd772ad176080a0ff61a5f862e3b/bmm/
 #include "common.cuh"
 #include "util.cuh"
 
-// Define some error checking macros.
-#define cudaErrCheck(stat) { cudaErrCheck_((stat), __FILE__, __LINE__); }
-void cudaErrCheck_(cudaError_t stat, const char *file, int line) {
-   if (stat != cudaSuccess) {
-      fprintf(stderr, "CUDA Error: %s %s %d\n", cudaGetErrorString(stat), file, line);
-   }
-}
+#define CHECK_CUDA(func)                                                                                                           \
+    {                                                                                                                              \
+        cudaError_t status = (func);                                                                                               \
+        if (status != cudaSuccess)                                                                                                 \
+        {                                                                                                                          \
+            string error = "CUDA API failed at line " + to_string(__LINE__) + " with error: " + cudaGetErrorString(status) + "\n"; \
+            throw runtime_error(error);                                                                                            \
+        }                                                                                                                          \
+    }
 
 #include <mma.h>
 using namespace nvcuda;
@@ -75,16 +77,16 @@ __global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, co
    }
 }
 
-void quantWMMA(Data data, Setting setting) {
+void quantWmmaSimple(Data data, Setting setting) {
 
    int MATRIX_M = data.numDocs;
    int MATRIX_N = data.numReqs;
-   int MATRIX_K = data.numT1;
+   int MATRIX_K = data.numInt;
 
-   T1 *a_fp16 = data.d_doc;
-   T1 *b_fp16 = data.d_req;
+   T_QUANT *a_fp16 = data.d_doc;
+   T_QUANT *b_fp16 = data.d_req;
 
-   T2 *c_wmma = data.d_rst_wmma;
+   T_RST *c_wmma = data.d_rst_wmma;
 
    printf("\nM = %d, N = %d, K = %d.\n\n", MATRIX_M, MATRIX_N, MATRIX_K);
    
@@ -110,8 +112,8 @@ void quantWMMA(Data data, Setting setting) {
       if (t == 0)
          timer.tic();
       quantWmmaKernel <<< gridDim, blockDim >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
-      cudaErrCheck(cudaDeviceSynchronize());
-      cudaErrCheck(cudaGetLastError());
+      CHECK_CUDA(cudaDeviceSynchronize());
+      CHECK_CUDA(cudaGetLastError());
    }
    cout << "wmma took " << timer.tocMs() / setting.kNumTrials << "ms" << endl;
 }

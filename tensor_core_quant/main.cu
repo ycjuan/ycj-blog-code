@@ -109,7 +109,7 @@ int main()
 
     quantGpuCuda(data, setting);
     quantCpu(data, setting);
-    quantWMMA(data, setting);
+    quantWmmaUnroll(data, setting);
 
     checkData(data);
 

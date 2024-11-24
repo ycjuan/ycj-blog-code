@@ -13,13 +13,15 @@ https://github.com/pnnl/TCBNN/blob/de4713445fd1cd772ad176080a0ff61a5f862e3b/bmm/
 #include "common.cuh"
 #include "util.cuh"
 
-// Define some error checking macros.
-#define cudaErrCheck(stat) { cudaErrCheck_((stat), __FILE__, __LINE__); }
-void cudaErrCheck_(cudaError_t stat, const char *file, int line) {
-   if (stat != cudaSuccess) {
-      fprintf(stderr, "CUDA Error: %s %s %d\n", cudaGetErrorString(stat), file, line);
-   }
-}
+#define CHECK_CUDA(func)                                                                                                           \
+    {                                                                                                                              \
+        cudaError_t status = (func);                                                                                               \
+        if (status != cudaSuccess)                                                                                                 \
+        {                                                                                                                          \
+            string error = "CUDA API failed at line " + to_string(__LINE__) + " with error: " + cudaGetErrorString(status) + "\n"; \
+            throw runtime_error(error);                                                                                            \
+        }                                                                                                                          \
+    }
 
 #include <mma.h>
 using namespace nvcuda;
@@ -28,7 +30,7 @@ const int WMMA_M = 8;
 const int WMMA_N = 8;
 const int WMMA_K = 128;
 
-__global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, const unsigned M, const unsigned N, const unsigned K)
+__global__ void quantWmmaUnrollKernel(const unsigned *a, const unsigned *b, int *c, const unsigned M, const unsigned N, const unsigned K)
 {
    using namespace nvcuda::wmma::experimental;
    int lda = K;
@@ -187,7 +189,7 @@ __global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, co
    
 }
 
-void quantWMMA(Data data, Setting setting) {
+void quantWmmaUnroll(Data data, Setting setting) {
 
    int MATRIX_M = data.numDocs;
    int MATRIX_N = data.numReqs;
@@ -221,9 +223,9 @@ void quantWMMA(Data data, Setting setting) {
    {
       if (t == 0)
          timer.tic();
-      quantWmmaKernel <<< gridDim, blockDim >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
-      cudaErrCheck(cudaDeviceSynchronize());
-      cudaErrCheck(cudaGetLastError());
+      quantWmmaUnrollKernel <<< gridDim, blockDim >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
+      CHECK_CUDA(cudaDeviceSynchronize());
+      CHECK_CUDA(cudaGetLastError());
    }
    cout << "wmma took " << timer.tocMs() / setting.kNumTrials << "ms" << endl;
 }

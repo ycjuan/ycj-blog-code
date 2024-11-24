@@ -53,7 +53,7 @@ void quantGpuCuda(Data data, Setting setting)
 {
     int blockSize = 512;
     int gridSize = (size_t(data.numDocs) * data.numReqs + blockSize - 1) / blockSize;
-    cout << "gridSize (kernel): " << gridSize << endl;
+    cout << "gridSize (cuda): " << gridSize << endl;
     CudaTimer timer;
     for (int t = -3; t < setting.kNumTrials; t++)
     {
@@ -69,5 +69,5 @@ void quantGpuCuda(Data data, Setting setting)
             throw runtime_error(oss.str());
         }
     }
-    cout << "Kernel time: " << timer.tocMs() / setting.kNumTrials << " ms" << endl;
+    cout << "Cuda time: " << timer.tocMs() / setting.kNumTrials << " ms" << endl;
 }
