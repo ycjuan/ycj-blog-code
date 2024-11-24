@@ -108,6 +108,8 @@ void checkRst(Data data)
             }
         }
     }
+
+    cout << "\nAll results are correct!" << endl;
 }
 
 int main()

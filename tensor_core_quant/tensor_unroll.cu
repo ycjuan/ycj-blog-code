@@ -197,8 +197,8 @@ void quantWmmaUnroll(Data data, Setting setting) {
    int MATRIX_N = data.numReqs;
    int MATRIX_K = data.numInt;
 
-   T_QUANT *a_fp16 = data.d_doc;
-   T_QUANT *b_fp16 = data.d_req;
+   T_QUANT *a = data.d_doc;
+   T_QUANT *b = data.d_req;
 
    T_RST *c_wmma = data.d_rstTensorUnroll;
 
@@ -221,7 +221,7 @@ void quantWmmaUnroll(Data data, Setting setting) {
    {
       if (t == 0)
          timer.tic();
-      quantWmmaUnrollKernel <<< gridDim, blockDim >>> (a_fp16, b_fp16, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
+      quantWmmaUnrollKernel <<< gridDim, blockDim >>> (a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
       CHECK_CUDA(cudaDeviceSynchronize());
       CHECK_CUDA(cudaGetLastError());
    }
