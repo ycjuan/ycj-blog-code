@@ -12,12 +12,15 @@
 
 using namespace std;
 
-int kNumDocs = 1 << 10;
-int kNumReqs = 1 << 8;
-int kNumT1 = 1 << 3;
+int kNumDocs = 1 << 20;
+int kNumReqs = 1 << 7;
+int kNumT1 = 1 << 5;
 int kNumTrials = 100;
-MemLayout kMemLayoutDoc = ROW_MAJOR;
-MemLayout kMemLayoutReq = ROW_MAJOR;
+MemLayout kMemLayoutDoc = ROW_MAJOR; 
+// IMPORTANT: Don't change this. a_frag in WMMA requires ROW_MAJOR
+MemLayout kMemLayoutReq = ROW_MAJOR; 
+// IMPORTANT: Don't change this. b_frag in WMMA requires COL_MAJOR. 
+// However, since the matrix here has a shape of (numReqs, numT1), setting ROW_MAJOR here is equivalent to COL_MAJOR of a (numT1, numReqs) matrix
 MemLayout kMemLayoutRstCpu = COL_MAJOR;
 MemLayout kMemLayoutRstGpuKernel = COL_MAJOR;
 MemLayout kMemLayoutRstGpuTensor = COL_MAJOR;
