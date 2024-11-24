@@ -8,9 +8,9 @@
 class TopkSampling
 {
 public:
-    void init();
+    void malloc();
 
-    void reset();
+    void free();
 
     void retrieveTopk(TopkParam &param);
 
@@ -30,7 +30,7 @@ private:
     // functions
     void sample(TopkParam &param);
     void findThreshold(TopkParam &param);
-    void copyEligible(TopkParam &param, size_t &numCopied);
+    void copyEligible(TopkParam &param);
     void retrieveExact(TopkParam &param);
 };
 

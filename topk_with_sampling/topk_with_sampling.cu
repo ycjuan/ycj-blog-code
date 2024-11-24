@@ -16,6 +16,8 @@
 #include "common.cuh"
 #include "util.cuh"
 
+// Note: This is experimental code, so corner cases such as "numToRetrieve > numDocs" are not handled
+
 using namespace std;
 
 #define CHECK_CUDA(func)                                                                                                           \
@@ -28,14 +30,20 @@ using namespace std;
         }                                                                                                                          \
     }
 
-void TopkSampling::init()
+void TopkSampling::malloc()
 {
     CHECK_CUDA(cudaMallocManaged(&dm_scoreSample, kNumSamplesPerReq * kMaxNumReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&dm_scoreThreshold, kMaxNumReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&dm_eligiblePairs, kMaxNumReqs * kMaxEligiblePairsPerDoc * sizeof(Pair)));
+    CHECK_CUDA(cudaMallocManaged(&dm_copyCount, kMaxNumReqs * sizeof(int)));
 }
 
-void TopkSampling::reset()
+void TopkSampling::free()
 {
     CHECK_CUDA(cudaFree(dm_scoreSample));
+    CHECK_CUDA(cudaFree(dm_scoreThreshold));
+    CHECK_CUDA(cudaFree(dm_eligiblePairs));
+    CHECK_CUDA(cudaFree(dm_copyCount));
 }
 
 void TopkSampling::retrieveTopk(TopkParam &param)
@@ -53,7 +61,7 @@ void TopkSampling::retrieveTopk(TopkParam &param)
 
     // Step3 - Copy eligible 
     size_t numCopied = 0;
-    copyEligible(param, numCopied);
+    copyEligible(param);
     param.gpuApproxTimeMs = timerApprox.tocMs();
 
     // Step4 - retreiveExact
@@ -138,7 +146,7 @@ __global__ void copyEligibleKernel(float *dm_score,
     }
 }
 
-void TopkSampling::copyEligible(TopkParam &param, size_t &numCopied)
+void TopkSampling::copyEligible(TopkParam &param)
 {
     /*
     for (size_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
@@ -153,5 +161,31 @@ void TopkSampling::copyEligible(TopkParam &param, size_t &numCopied)
     }
     */
 
-   CHECK_CUDA(cudaMemset(dm_copyCount, 0, param.numReqs * sizeof(int)));
+    CHECK_CUDA(cudaMemset(dm_copyCount, 0, param.numReqs * sizeof(int)));
+    int blockSize = 256;
+    int gridSize = (param.numReqs * param.numDocs + blockSize - 1) / blockSize;
+    copyEligibleKernel<<<gridSize, blockSize>>>(param.dm_score,
+                                                dm_scoreThreshold,
+                                                dm_eligiblePairs,
+                                                dm_copyCount,
+                                                param.numReqs,
+                                                param.numDocs,
+                                                kMaxEligiblePairsPerDoc);
+}
+
+void TopkSampling::retrieveExact(TopkParam &param)
+{
+    for (size_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
+    {
+        Pair *dm_eligiblePairsStart = dm_eligiblePairs + reqIdx * kMaxEligiblePairsPerDoc;
+        Pair *dm_eligiblePairsEnd = dm_eligiblePairsStart + dm_copyCount[reqIdx];
+        thrust::sort(thrust::device,
+                     dm_eligiblePairsStart,
+                     dm_eligiblePairsEnd,
+                     scoreComparator);
+        thrust::copy(thrust::device,
+                     dm_eligiblePairsStart,
+                     dm_eligiblePairsStart + param.numToRetrieve,
+                     param.dm_rst + reqIdx * param.numToRetrieve);
+    }
 }
