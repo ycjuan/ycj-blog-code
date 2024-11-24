@@ -15,6 +15,11 @@ public:
     void retrieveTopk(TopkParam &param);
 
 private:
+
+    const size_t kNumSamplesPerReq = 10000;
+
+    const size_t kMaxNumReqs = 1 << 10;
+
     float *dm_scoreSample = nullptr;
 
     void sample(TopkParam &param);

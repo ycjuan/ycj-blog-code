@@ -30,12 +30,12 @@ using namespace std;
 
 void TopkSampling::init()
 {
-
+    CHECK_CUDA(cudaMallocManaged(&dm_scoreSample, kNumSamplesPerReq * kMaxNumReqs * sizeof(float)));
 }
 
 void TopkSampling::reset()
 {
-
+    CHECK_CUDA(cudaFree(dm_scoreSample));
 }
 
 void TopkSampling::retrieveTopk(TopkParam &param)
@@ -61,4 +61,24 @@ void TopkSampling::retrieveTopk(TopkParam &param)
     retrieveExact(param);
 
     param.gpuTotalTimeMs = timerTotal.tocMs();
+}
+
+__global__ void sampleKernelNonRandom(TopkParam &topkParam, float *dm_scoreSample, size_t sampleSizePerReq)
+{
+    int wid = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (wid < topkParam.numReqs * sampleSizePerReq)
+    {
+        int reqIdx = wid % topkParam.numReqs;
+        int docIdx = wid / topkParam.numReqs;
+        dm_scoreSample[wid] = topkParam.dm_score[reqIdx * topkParam.numDocs + docIdx];
+    }
+}
+
+void TopkSampling::sample(TopkParam &param)
+{
+    int blockSize = 256;
+    int gridSize = (param.numReqs * kNumSamplesPerReq + blockSize - 1) / blockSize;
+    sampleKernelNonRandom<<<gridSize, blockSize>>>(param, dm_scoreSample, kNumSamplesPerReq);
+    CHECK_CUDA(cudaDeviceSynchronize());
 }
