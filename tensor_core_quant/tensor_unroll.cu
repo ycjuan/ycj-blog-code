@@ -200,7 +200,7 @@ void quantWmmaUnroll(Data data, Setting setting) {
    T_QUANT *a_fp16 = data.d_doc;
    T_QUANT *b_fp16 = data.d_req;
 
-   T_RST *c_wmma = data.d_rst_wmma;
+   T_RST *c_wmma = data.d_rstTensorUnroll;
 
    printf("\nM = %d, N = %d, K = %d.\n\n", MATRIX_M, MATRIX_N, MATRIX_K);
    

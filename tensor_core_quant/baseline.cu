@@ -45,7 +45,7 @@ __global__ void quantKernel(Data data)
             uint64_t bitwiseRst64 = uint64_t(bitwiseRst);
             totalCount += __popcll(bitwiseRst64); // This counts the number of "1" in the 64bit bitwiseAnd
         }
-        data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)] = totalCount;
+        data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCuda)] = totalCount;
     }
 }
 

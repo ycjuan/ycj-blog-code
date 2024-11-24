@@ -14,7 +14,7 @@ using namespace std;
 
 int kNumDocs = 1 << 18;
 int kNumReqs = 1 << 7;
-int kNumT1 = 1 << 5;
+int kNumInt = 1 << 5;
 int kNumTrials = 100;
 MemLayout kMemLayoutDoc = ROW_MAJOR; 
 // IMPORTANT: Don't change this. a_frag in WMMA requires ROW_MAJOR
@@ -22,8 +22,9 @@ MemLayout kMemLayoutReq = ROW_MAJOR;
 // IMPORTANT: Don't change this. b_frag in WMMA requires COL_MAJOR. 
 // However, since the matrix here has a shape of (numReqs, numInt), setting ROW_MAJOR here is equivalent to COL_MAJOR of a (numInt, numReqs) matrix
 MemLayout kMemLayoutRstCpu = ROW_MAJOR;
-MemLayout kMemLayoutRstGpuKernel = ROW_MAJOR;
-MemLayout kMemLayoutRstGpuTensor = ROW_MAJOR;
+MemLayout kMemLayoutRstGpuCuda = ROW_MAJOR;
+MemLayout kMemLayoutRstGpuTensorSimple = ROW_MAJOR;
+MemLayout kMemLayoutRstGpuTensorUnroll = ROW_MAJOR;
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \
@@ -40,18 +41,20 @@ Data genData()
     Data data;
     data.numDocs = kNumDocs;
     data.numReqs = kNumReqs;
-    data.numInt = kNumT1;
+    data.numInt = kNumInt;
     data.docMemLayout = kMemLayoutDoc;
     data.reqMemLayout = kMemLayoutReq;
     data.rstLayoutCpu = kMemLayoutRstCpu;
-    data.rstLayoutGpuKernel = kMemLayoutRstGpuKernel;
-    data.rstLayoutGpuCublas = kMemLayoutRstGpuTensor;
+    data.rstLayoutGpuCuda = kMemLayoutRstGpuCuda;
+    data.rstLayoutGpuTensorSimple = kMemLayoutRstGpuTensorSimple;
+    data.rstLayoutGpuTensorUnroll = kMemLayoutRstGpuTensorUnroll;
     data.print();
     
     CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.numInt * sizeof(T_QUANT)));
     CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.numInt * sizeof(T_QUANT)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_kernel, (size_t)data.numDocs * data.numReqs * sizeof(T_RST)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rst_wmma, (size_t)data.numDocs * data.numReqs * sizeof(T_RST)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rstTensorSimple, (size_t)data.numDocs * data.numReqs * sizeof(T_RST)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rstTensorUnroll, (size_t)data.numDocs * data.numReqs * sizeof(T_RST)));
     CHECK_CUDA(cudaMallocHost(&data.h_rst_cpu, (size_t)data.numDocs * data.numReqs * sizeof(T_RST)));
 
 
@@ -83,19 +86,28 @@ void checkData(Data data)
         for (int j = 0; j < data.numReqs; j++)
         {
             T_RST cpuVal = data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)];
-            T_RST gpuKernelVal = data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)];
-            T_RST gpuWmma = data.d_rst_wmma[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
+            T_RST gpuCudaVal = data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCuda)];
+            T_RST gpuTensorSimpleVal = data.d_rstTensorSimple[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuTensorSimple)];
+            T_RST gpuTensorUnrollVal = data.d_rstTensorUnroll[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuTensorUnroll)];
 
-            if (false)
+            if (cpuVal != gpuCudaVal)
             {
-                cout << "Kernel error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuKernelVal << endl;
+                cout << "Kernel error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuCudaVal << endl;
                 return;
             }
             
-            if (cpuVal != gpuWmma)
+            if (cpuVal != gpuTensorSimpleVal)
             {
                 if (numPrinted++ < 256)
-                    cout << "Wmma error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuWmma << endl;
+                    cout << "Wmma error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuTensorSimpleVal << endl;
+                return;
+            }
+
+            if (cpuVal != gpuTensorUnrollVal)
+            {
+                if (numPrinted++ < 256)
+                    cout << "Wmma unroll error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuTensorUnrollVal << endl;
+                return;
             }
         }
     }
@@ -109,6 +121,7 @@ int main()
 
     quantGpuCuda(data, setting);
     quantCpu(data, setting);
+    quantWmmaSimple(data, setting);
     quantWmmaUnroll(data, setting);
 
     checkData(data);
