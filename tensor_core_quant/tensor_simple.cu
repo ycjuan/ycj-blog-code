@@ -35,13 +35,13 @@ const int WMMA_K = 128;
 __global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, const unsigned M, const unsigned N, const unsigned K)
 {
    using namespace nvcuda::wmma::experimental;
-   int lda = K;
-   int ldb = K;
-   int ldc = N;
+   size_t lda = K;
+   size_t ldb = K;
+   size_t ldc = N;
 
    // Tile using a 2D grid
-   int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
-   int warpN = (blockIdx.y * blockDim.y + threadIdx.y);
+   size_t warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
+   size_t warpN = (blockIdx.y * blockDim.y + threadIdx.y);
 
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag;
    wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag;

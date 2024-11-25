@@ -30,7 +30,7 @@ void quantCpu(Data data, Setting setting)
 
 __global__ void quantKernel(Data data)
 {
-    int threadId = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
+    size_t threadId = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
     int i = threadId / data.numReqs;
     int j = threadId % data.numReqs;
 
@@ -52,7 +52,7 @@ __global__ void quantKernel(Data data)
 void quantGpuCuda(Data data, Setting setting)
 {
     int blockSize = 512;
-    int gridSize = (size_t(data.numDocs) * data.numReqs + blockSize - 1) / blockSize;
+    size_t gridSize = (size_t(data.numDocs) * data.numReqs + blockSize - 1) / blockSize;
     cout << "gridSize (cuda): " << gridSize << endl;
     CudaTimer timer;
     for (int t = -3; t < setting.kNumTrials; t++)

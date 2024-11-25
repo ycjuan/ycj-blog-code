@@ -52,7 +52,7 @@ struct Data
     void print()
     {
         ostringstream oss;
-        oss << "numDocs: " << numDocs << ", numReqs: " << numReqs << ", numInt: " << numInt << ", numBits: " << sizeof(T_QUANT) * 8 << endl;
+        oss << "numDocs: " << numDocs << ", numReqs: " << numReqs << ", numInt: " << numInt << ", numBits: " << numInt * sizeof(T_QUANT) * 8 << endl;
         oss << "docMemLayout: " << (docMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "reqMemLayout: " << (reqMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "rstLayoutCpu: " << (rstLayoutCpu == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
