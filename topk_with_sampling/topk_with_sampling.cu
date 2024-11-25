@@ -39,29 +39,29 @@ void TopkSampling::malloc()
     allocateInBytes = kNumSamplesPerReq * kMaxNumReqs * sizeof(float);
     CHECK_CUDA(cudaMalloc(&d_scoreSample, allocateInBytes));
     totalAllocateInBytes += allocateInBytes;
-    cout << "allocated " << allocateInBytes / 1024 / 1024 / 1024 << " GiB for d_scoreSample" << endl;
+    cout << "allocated " << allocateInBytes / 1024.0 / 1024.0 / 1024.0 << " GiB for d_scoreSample" << endl;
 
     allocateInBytes = kMaxNumReqs * sizeof(float);
     CHECK_CUDA(cudaMallocManaged(&dm_scoreThreshold, allocateInBytes));
     totalAllocateInBytes += allocateInBytes;
-    cout << "allocated " << allocateInBytes / 1024 / 1024 / 1024 << " GiB for dm_scoreThreshold" << endl;
+    cout << "allocated " << allocateInBytes / 1024.0 / 1024.0 / 1024.0 << " GiB for dm_scoreThreshold" << endl;
 
     allocateInBytes = kMaxNumReqs * kMaxEligiblePairsPerReq * sizeof(Pair);
     CHECK_CUDA(cudaMalloc(&d_eligiblePairs, allocateInBytes));
     totalAllocateInBytes += allocateInBytes;
-    cout << "allocated " << allocateInBytes / 1024 / 1024 / 1024 << " GiB for d_eligiblePairs" << endl;
+    cout << "allocated " << allocateInBytes / 1024.0 / 1024.0 / 1024.0 << " GiB for d_eligiblePairs" << endl;
 
     allocateInBytes = kMaxNumReqs * sizeof(int);
     CHECK_CUDA(cudaMallocManaged(&dm_copyCount, allocateInBytes));
     totalAllocateInBytes += allocateInBytes;
-    cout << "allocated " << allocateInBytes / 1024 / 1024 / 1024 << " GiB for dm_copyCount" << endl;
+    cout << "allocated " << allocateInBytes / 1024.0 / 1024.0 / 1024.0 << " GiB for dm_copyCount" << endl;
 
     allocateInBytes = kMaxNumReqs * kMaxEligiblePairsPerReq * sizeof(Pair);
     thrustAllocator.malloc(allocateInBytes);
     totalAllocateInBytes += allocateInBytes;
-    cout << "allocated " << allocateInBytes / 1024 / 1024 / 1024 << " GiB for thrustAllocator" << endl;
+    cout << "allocated " << allocateInBytes / 1024.0 / 1024.0 / 1024.0 << " GiB for thrustAllocator" << endl;
 
-    cout << "total allocated " << totalAllocateInBytes / 1024 / 1024 / 1024 << " GiB" << endl;
+    cout << "total allocated " << totalAllocateInBytes / 1024.0 / 1024.0 / 1024.0 << " GiB" << endl;
 }
 
 void TopkSampling::free()
