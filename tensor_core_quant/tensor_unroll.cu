@@ -40,8 +40,8 @@ __global__ void quantWmmaUnrollKernel(const unsigned *a, const unsigned *b, int 
    int ldc = N;
 
    // Tile using a 2D grid
-   int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
-   int warpN = (blockIdx.y * blockDim.y + threadIdx.y);
+   size_t warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
+   size_t warpN = (blockIdx.y * blockDim.y + threadIdx.y);
 
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag0;
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag1;
