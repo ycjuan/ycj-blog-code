@@ -30,16 +30,34 @@ void runExp(int numReqs, int numDocs)
     param.numDocs = numDocs;
     param.numToRetrieve = kNumToRetrieve;
 
-    CHECK_CUDA(cudaMallocManaged(&param.dm_score, numDocs * numReqs * sizeof(float)));
-    CHECK_CUDA(cudaMallocHost(&param.hp_rstCpu, numReqs * kNumToRetrieve * sizeof(Pair)));
-    CHECK_CUDA(cudaMallocManaged(&param.dm_rstGpu, numReqs * kNumToRetrieve * sizeof(Pair)));
+    size_t allocateInBytes;
+    size_t totalAllocateInBytes = 0;
+    
+    allocateInBytes = numDocs * numReqs * sizeof(float);
+    CHECK_CUDA(cudaMallocManaged(&param.dm_score, allocateInBytes));
+    totalAllocateInBytes += allocateInBytes;
+    cout << "allocated " << allocateInBytes / 1024.0 / 1024.0 / 1024.0 << " GiB for dm_score" << endl;
 
+    allocateInBytes = numReqs * kNumToRetrieve * sizeof(Pair);
+    CHECK_CUDA(cudaMallocHost(&param.hp_rstCpu, allocateInBytes));
+    totalAllocateInBytes += allocateInBytes;
+    cout << "allocated " << allocateInBytes / 1024.0 / 1024.0 / 1024.0 << " GiB for hp_rstCpu" << endl;
+
+    allocateInBytes = numReqs * kNumToRetrieve * sizeof(Pair);
+    CHECK_CUDA(cudaMallocManaged(&param.dm_rstGpu, allocateInBytes));
+    totalAllocateInBytes += allocateInBytes;
+    cout << "allocated " << allocateInBytes / 1024.0 / 1024.0 / 1024.0 << " GiB for dm_rstGpu" << endl;
+
+    cout << "total allocated " << totalAllocateInBytes / 1024.0 / 1024.0 / 1024.0 << " GiB" << endl;
+
+    cout << "initializing scores" << endl;
     default_random_engine generator;
     uniform_real_distribution<float> distribution(-1.0, 1.0);
     for (size_t i = 0; i < numDocs * numReqs; i++)
     {
         param.dm_score[i] = distribution(generator);
     }
+    cout << "scores initialized" << endl;
 
     TopkSampling topkSampling;
     topkSampling.malloc();
@@ -51,13 +69,16 @@ void runExp(int numReqs, int numDocs)
     double gpuTotalTimeMs = 0;
     double gpuApproxTimeMs = 0;
 
+    cout << "retrieving topk with cpu" << endl;
     retrieveTopkCpu(param);
+    cout << "topk retrieved with cpu" << endl;
     for (int t = -3; t < kNumTrials; t++)
     {
         topkSampling.retrieveTopk(param);
 
         if (t == -1)
         {
+            cout << "compare results" << endl;
             for (int reqIdx = 0; reqIdx < numReqs; reqIdx++)
             {
                 for (int docIdx = 0; docIdx < kNumToRetrieve; docIdx++)
@@ -73,6 +94,7 @@ void runExp(int numReqs, int numDocs)
                     }
                 }
             }
+            cout << "results compared" << endl;
         }
 
         if (t >= 0)
