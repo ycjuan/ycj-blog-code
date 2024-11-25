@@ -56,19 +56,22 @@ void runExp(int numReqs, int numDocs)
     {
         topkSampling.retrieveTopk(param);
 
-        for (int reqIdx = 0; reqIdx < numReqs; reqIdx++)
+        if (t == -1)
         {
-            for (int docIdx = 0; docIdx < kNumToRetrieve; docIdx++)
+            for (int reqIdx = 0; reqIdx < numReqs; reqIdx++)
             {
-                size_t memAddr = getMemAddr(reqIdx, docIdx, kNumToRetrieve);
-                Pair cpuPair = param.hp_rstCpu[memAddr];
-                Pair gpuPair = param.dm_rstGpu[memAddr];
-                if (cpuPair.docId != gpuPair.docId || cpuPair.score != gpuPair.score)
+                for (int docIdx = 0; docIdx < kNumToRetrieve; docIdx++)
                 {
-                    cout << "mismatch at reqIdx: " << reqIdx << ", docIdx: " << docIdx << endl;
-                    cout << "cpuPair: " << cpuPair.reqId << ", " << cpuPair.docId << ", " << cpuPair.score << endl;
-                    cout << "gpuPair: " << gpuPair.reqId << ", " << gpuPair.docId << ", " << gpuPair.score << endl;
-                    break;
+                    size_t memAddr = getMemAddr(reqIdx, docIdx, kNumToRetrieve);
+                    Pair cpuPair = param.hp_rstCpu[memAddr];
+                    Pair gpuPair = param.dm_rstGpu[memAddr];
+                    if (cpuPair.docId != gpuPair.docId || cpuPair.score != gpuPair.score)
+                    {
+                        cout << "mismatch at reqIdx: " << reqIdx << ", docIdx: " << docIdx << endl;
+                        cout << "cpuPair: " << cpuPair.reqId << ", " << cpuPair.docId << ", " << cpuPair.score << endl;
+                        cout << "gpuPair: " << gpuPair.reqId << ", " << gpuPair.docId << ", " << gpuPair.score << endl;
+                        break;
+                    }
                 }
             }
         }
@@ -98,7 +101,7 @@ void runExp(int numReqs, int numDocs)
 
 int main()
 {
-    runExp(1, 4000000);
+    runExp(2, 16000000);
 
     return 0;
 }
