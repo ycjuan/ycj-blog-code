@@ -217,7 +217,7 @@ void TopkSampling::copyEligible(TopkParam &param)
 
     CHECK_CUDA(cudaMemset(dm_copyCount, 0, param.numReqs * sizeof(int)));
     int blockSize = 256;
-    int gridSize = (param.numReqs * param.numDocs + blockSize - 1) / blockSize;
+    int gridSize = (size_t(param.numReqs) * param.numDocs + blockSize - 1) / blockSize;
     copyEligibleKernel<<<gridSize, blockSize>>>(param.dm_score,
                                                 dm_scoreThreshold,
                                                 d_eligiblePairs,
