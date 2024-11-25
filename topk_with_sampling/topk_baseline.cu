@@ -2,10 +2,12 @@
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
 #include <algorithm>
+#include <omp.h>
 
 #include "common.cuh"
 #include "topk.cuh"
 #include "util.cuh"
+
 
 using namespace std;
 
@@ -24,12 +26,10 @@ void retrieveTopkCpu(TopkParam &param)
     CudaTimer timer;
     timer.tic();
 
+    omp_set_num_threads(8);
+    #pragma omp parallel for
     for (int j = 0; j < param.numReqs; j++)
     {
-        if (j % 8 == 0)
-        {
-            cout << "retrieving topk for req " << j << endl;
-        }
         vector<Pair> v_doc;
         for (int i = 0; i < param.numDocs; i++)
         {
@@ -44,6 +44,11 @@ void retrieveTopkCpu(TopkParam &param)
         for (int i = 0; i < param.numToRetrieve; i++)
         {
             param.hp_rstCpu[j * param.numToRetrieve + i] = v_doc[i];
+        }
+
+        if (j % 8 == 0)
+        {
+            cout << "retrieved topk for req " << j << endl;
         }
     }
 

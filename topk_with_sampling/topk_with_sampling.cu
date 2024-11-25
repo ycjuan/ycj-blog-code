@@ -108,6 +108,18 @@ __global__ void sampleKernelNonRandom(TopkParam topkParam, float *d_scoreSample,
     }
 }
 
+__global__ void sampleKernelRandom(TopkParam topkParam, float *d_scoreSample, size_t sampleSizePerReq, int docIdxGap)
+{
+    int wid = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (wid < topkParam.numReqs * sampleSizePerReq)
+    {
+        int reqIdx = wid % topkParam.numReqs;
+        int docIdx = ((wid / topkParam.numReqs) * docIdxGap) % topkParam.numDocs;
+        d_scoreSample[getMemAddr(reqIdx, docIdx, sampleSizePerReq)] = topkParam.dm_score[getMemAddr(reqIdx, docIdx, topkParam.numDocs)];
+    }
+}
+
 void TopkSampling::sample(TopkParam &param)
 {
     CudaTimer timer;
