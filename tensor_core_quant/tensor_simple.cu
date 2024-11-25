@@ -35,9 +35,9 @@ const int WMMA_K = 128;
 __global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, const unsigned M, const unsigned N, const unsigned K)
 {
    using namespace nvcuda::wmma::experimental;
-   int lda = K;
-   int ldb = K;
-   int ldc = N;
+   size_t lda = K;
+   size_t ldb = K;
+   size_t ldc = N;
 
    // Tile using a 2D grid
    size_t warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;

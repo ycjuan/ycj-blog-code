@@ -35,9 +35,9 @@ const int WMMA_K = 128;
 __global__ void quantWmmaUnrollKernel(const unsigned *a, const unsigned *b, int *c, const unsigned M, const unsigned N, const unsigned K)
 {
    using namespace nvcuda::wmma::experimental;
-   int lda = K;
-   int ldb = K;
-   int ldc = N;
+   size_t lda = K;
+   size_t ldb = K;
+   size_t ldc = N;
 
    // Tile using a 2D grid
    size_t warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
@@ -84,8 +84,8 @@ __global__ void quantWmmaUnrollKernel(const unsigned *a, const unsigned *b, int 
    wmma::fill_fragment(c_frag32, 0);
    wmma::fill_fragment(c_frag33, 0);
 
-   int lda32 = lda / 32;
-   int ldb32 = ldb / 32;
+   size_t lda32 = lda / 32;
+   size_t ldb32 = ldb / 32;
    for (int i = 0; i < K; i += WMMA_K) {
       int i32 = i / 32;
       size_t aRow0 = warpM * WMMA_M * 4;
