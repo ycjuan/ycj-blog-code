@@ -3,12 +3,12 @@
 
 struct Pair
 {
-    int reqId;
-    int docId;
+    int reqIdx;
+    int docIdx;
     float score;
     bool operator==(const Pair &other) const
     {
-        return docId == other.docId && score == other.score && reqId == other.reqId;
+        return docIdx == other.docIdx && score == other.score && reqIdx == other.reqIdx;
     }
 };
 
@@ -44,9 +44,9 @@ struct ScorePredicator
     }
 };
 
-inline __device__ __host__ size_t getMemAddr(int reqId, int docId, size_t numDocs)
+inline __device__ __host__ size_t getMemAddr(int reqIdx, int docIdx, size_t numDocs)
 {
-    return reqId * numDocs + docId;
+    return reqIdx * numDocs + docIdx;
 }
 
 #endif // COMMON_CUH

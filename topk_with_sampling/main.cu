@@ -65,12 +65,11 @@ void runExp(int numReqs, int numDocs)
                     size_t memAddr = getMemAddr(reqIdx, docIdx, kNumToRetrieve);
                     Pair cpuPair = param.hp_rstCpu[memAddr];
                     Pair gpuPair = param.dm_rstGpu[memAddr];
-                    if (cpuPair.docId != gpuPair.docId || cpuPair.score != gpuPair.score)
+                    if (cpuPair.docIdx != gpuPair.docIdx || cpuPair.score != gpuPair.score)
                     {
                         cout << "mismatch at reqIdx: " << reqIdx << ", docIdx: " << docIdx << endl;
-                        cout << "cpuPair: " << cpuPair.reqId << ", " << cpuPair.docId << ", " << cpuPair.score << endl;
-                        cout << "gpuPair: " << gpuPair.reqId << ", " << gpuPair.docId << ", " << gpuPair.score << endl;
-                        break;
+                        cout << "cpuPair: " << cpuPair.reqIdx << ", " << cpuPair.docIdx << ", " << cpuPair.score << endl;
+                        cout << "gpuPair: " << gpuPair.reqIdx << ", " << gpuPair.docIdx << ", " << gpuPair.score << endl;
                     }
                 }
             }

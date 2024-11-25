@@ -30,8 +30,8 @@ void retrieveTopkCpu(TopkParam &param)
         for (int i = 0; i < param.numDocs; i++)
         {
             Pair doc;
-            doc.reqId = j;
-            doc.docId = i;
+            doc.reqIdx = j;
+            doc.docIdx = i;
             doc.score = param.dm_score[j * param.numDocs + i];
             v_doc.push_back(doc);
         }

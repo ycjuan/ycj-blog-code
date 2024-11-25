@@ -176,8 +176,8 @@ __global__ void copyEligibleKernel(float *dm_score,
             if (count < kMaxEligiblePairsPerReq)
             {
                 Pair pair;
-                pair.reqId = reqIdx;
-                pair.docId = docIdx;
+                pair.reqIdx = reqIdx;
+                pair.docIdx = docIdx;
                 pair.score = score;
                 d_eligiblePairs[reqIdx * kMaxEligiblePairsPerReq + count] = pair;
             }
