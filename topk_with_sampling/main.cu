@@ -18,8 +18,8 @@ using namespace std;
         }                                                                                                                          \
     }
 
-int kNumToRetrieve = 10;
-int kNumTrials = 1;
+int kNumToRetrieve = 100;
+int kNumTrials = 10;
 
 void runExp(int numReqs, int numDocs)
 {
@@ -44,9 +44,16 @@ void runExp(int numReqs, int numDocs)
     TopkSampling topkSampling;
     topkSampling.malloc();
 
+    double gpuSampleTimeMs = 0;
+    double gpuFindThresholdTimeMs = 0;
+    double gpuCopyEligibleTimeMs = 0;
+    double gpuRetreiveExactTimeMs = 0;
+    double gpuTotalTimeMs = 0;
+    double gpuApproxTimeMs = 0;
+
+    retrieveTopkCpu(param);
     for (int t = -3; t < kNumTrials; t++)
     {
-        retrieveTopkCpu(param);
         topkSampling.retrieveTopk(param);
 
         for (int reqIdx = 0; reqIdx < numReqs; reqIdx++)
@@ -65,7 +72,24 @@ void runExp(int numReqs, int numDocs)
                 }
             }
         }
+
+        if (t >= 0)
+        {
+            gpuSampleTimeMs += param.gpuSampleTimeMs;
+            gpuFindThresholdTimeMs += param.gpuFindThresholdTimeMs;
+            gpuCopyEligibleTimeMs += param.gpuCopyEligibleTimeMs;
+            gpuRetreiveExactTimeMs += param.gpuRetreiveExactTimeMs;
+            gpuTotalTimeMs += param.gpuTotalTimeMs;
+            gpuApproxTimeMs += param.gpuApproxTimeMs;
+        }
     }
+
+    cout << "gpuSampleTimeMs: " << gpuSampleTimeMs / kNumTrials << endl;
+    cout << "gpuFindThresholdTimeMs: " << gpuFindThresholdTimeMs / kNumTrials << endl;
+    cout << "gpuCopyEligibleTimeMs: " << gpuCopyEligibleTimeMs / kNumTrials << endl;
+    cout << "gpuRetreiveExactTimeMs: " << gpuRetreiveExactTimeMs / kNumTrials << endl;
+    cout << "gpuTotalTimeMs: " << gpuTotalTimeMs / kNumTrials << endl;
+    cout << "gpuApproxTimeMs: " << gpuApproxTimeMs / kNumTrials << endl;
 
     CHECK_CUDA(cudaFree(param.dm_score));
     CHECK_CUDA(cudaFreeHost(param.hp_rstCpu));
@@ -74,7 +98,7 @@ void runExp(int numReqs, int numDocs)
 
 int main()
 {
-    runExp(1, 4000);
+    runExp(1, 4000000);
 
     return 0;
 }

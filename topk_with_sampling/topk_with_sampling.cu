@@ -83,10 +83,15 @@ __global__ void sampleKernelNonRandom(TopkParam topkParam, float *dm_scoreSample
 
 void TopkSampling::sample(TopkParam &param)
 {
+    CudaTimer timer;
+    timer.tic();
+
     int blockSize = 256;
     int gridSize = (param.numReqs * kNumSamplesPerReq + blockSize - 1) / blockSize;
     sampleKernelNonRandom<<<gridSize, blockSize>>>(param, dm_scoreSample, kNumSamplesPerReq);
     CHECK_CUDA(cudaDeviceSynchronize());
+
+    param.gpuSampleTimeMs = timer.tocMs();
 }
 
 __global__ void updateThreshold(float *dm_scoreSample, float *dm_scoreThreshold, int numReqs, int thIdx, size_t kNumSamplesPerReq)
@@ -100,6 +105,9 @@ __global__ void updateThreshold(float *dm_scoreSample, float *dm_scoreThreshold,
 
 void TopkSampling::findThreshold(TopkParam &param)
 {
+    CudaTimer timer;
+    timer.tic();
+
     int thIdx = ceil((double)param.numToRetrieve / param.numDocs * kNumSamplesPerReq * 4);
     for (size_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
     {
@@ -112,6 +120,8 @@ void TopkSampling::findThreshold(TopkParam &param)
     int blockSize = 256;
     int gridSize = (param.numReqs + blockSize - 1) / blockSize;
     updateThreshold<<<gridSize, blockSize>>>(dm_scoreSample, dm_scoreThreshold, param.numReqs, thIdx, kNumSamplesPerReq);
+
+    param.gpuFindThresholdTimeMs = timer.tocMs();
 }
 
 __global__ void copyEligibleKernel(float *dm_score,
@@ -160,6 +170,9 @@ void TopkSampling::copyEligible(TopkParam &param)
     }
     */
 
+    CudaTimer timer;
+    timer.tic();
+
     CHECK_CUDA(cudaMemset(dm_copyCount, 0, param.numReqs * sizeof(int)));
     int blockSize = 256;
     int gridSize = (param.numReqs * param.numDocs + blockSize - 1) / blockSize;
@@ -170,10 +183,16 @@ void TopkSampling::copyEligible(TopkParam &param)
                                                 param.numReqs,
                                                 param.numDocs,
                                                 kMaxEligiblePairsPerReq);
+
+    CHECK_CUDA(cudaDeviceSynchronize());
+
+    param.gpuCopyEligibleTimeMs = timer.tocMs();
 }
 
 void TopkSampling::retrieveExact(TopkParam &param)
 {
+    CudaTimer timer;
+    timer.tic();
     for (size_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
     {
         Pair *dm_eligiblePairsStart = dm_eligiblePairs + reqIdx * kMaxEligiblePairsPerReq;
@@ -187,4 +206,5 @@ void TopkSampling::retrieveExact(TopkParam &param)
                      dm_eligiblePairsStart + param.numToRetrieve,
                      param.dm_rstGpu + reqIdx * param.numToRetrieve);
     }
+    param.gpuRetreiveExactTimeMs = timer.tocMs();
 }
