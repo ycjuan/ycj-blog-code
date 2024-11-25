@@ -33,17 +33,17 @@ void runExp(int numReqs, int numDocs)
     size_t allocateInBytes;
     size_t totalAllocateInBytes = 0;
     
-    allocateInBytes = numDocs * numReqs * sizeof(float);
+    allocateInBytes = (size_t)numDocs * numReqs * sizeof(float);
     CHECK_CUDA(cudaMallocManaged(&param.dm_score, allocateInBytes));
     totalAllocateInBytes += allocateInBytes;
     cout << "allocated " << allocateInBytes / 1024.0 / 1024.0 / 1024.0 << " GiB for dm_score" << endl;
 
-    allocateInBytes = numReqs * kNumToRetrieve * sizeof(Pair);
+    allocateInBytes = (size_t)numReqs * kNumToRetrieve * sizeof(Pair);
     CHECK_CUDA(cudaMallocHost(&param.hp_rstCpu, allocateInBytes));
     totalAllocateInBytes += allocateInBytes;
     cout << "allocated " << allocateInBytes / 1024.0 / 1024.0 / 1024.0 << " GiB for hp_rstCpu" << endl;
 
-    allocateInBytes = numReqs * kNumToRetrieve * sizeof(Pair);
+    allocateInBytes = (size_t)numReqs * kNumToRetrieve * sizeof(Pair);
     CHECK_CUDA(cudaMallocManaged(&param.dm_rstGpu, allocateInBytes));
     totalAllocateInBytes += allocateInBytes;
     cout << "allocated " << allocateInBytes / 1024.0 / 1024.0 / 1024.0 << " GiB for dm_rstGpu" << endl;
