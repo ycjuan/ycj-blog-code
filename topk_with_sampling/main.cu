@@ -58,7 +58,9 @@ void runExp(int numReqs, int numDocs)
                 Pair gpuPair = param.dm_rstGpu[memAddr];
                 if (cpuPair.docId != gpuPair.docId || cpuPair.score != gpuPair.score)
                 {
-                    cout << "Error: CPU and GPU results do not match" << endl;
+                    cout << "mismatch at reqIdx: " << reqIdx << ", docIdx: " << docIdx << endl;
+                    cout << "cpuPair: " << cpuPair.reqId << ", " << cpuPair.docId << ", " << cpuPair.score << endl;
+                    cout << "gpuPair: " << gpuPair.reqId << ", " << gpuPair.docId << ", " << gpuPair.score << endl;
                     break;
                 }
             }
@@ -72,7 +74,7 @@ void runExp(int numReqs, int numDocs)
 
 int main()
 {
-    runExp(1, 1000000);
+    runExp(1, 4000);
 
     return 0;
 }

@@ -77,7 +77,7 @@ __global__ void sampleKernelNonRandom(TopkParam topkParam, float *dm_scoreSample
     {
         int reqIdx = wid % topkParam.numReqs;
         int docIdx = wid / topkParam.numReqs;
-        dm_scoreSample[wid] = topkParam.dm_score[reqIdx * topkParam.numDocs + docIdx];
+        dm_scoreSample[getMemAddr(reqIdx, docIdx, sampleSizePerReq)] = topkParam.dm_score[getMemAddr(reqIdx, docIdx, topkParam.numDocs)];
     }
 }
 
@@ -100,7 +100,7 @@ __global__ void updateThreshold(float *dm_scoreSample, float *dm_scoreThreshold,
 
 void TopkSampling::findThreshold(TopkParam &param)
 {
-    int thIdx = int((double)param.numToRetrieve / param.numDocs * kNumSamplesPerReq);
+    int thIdx = ceil((double)param.numToRetrieve / param.numDocs * kNumSamplesPerReq * 4);
     for (size_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
     {
         thrust::sort(thrust::device,
