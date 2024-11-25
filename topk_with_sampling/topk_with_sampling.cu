@@ -135,7 +135,7 @@ void TopkSampling::findThreshold(TopkParam &param)
     CudaTimer timer;
     timer.tic();
 
-    int thIdx = ceil((double)param.numToRetrieve / param.numDocs * kNumSamplesPerReq * 4);
+    int thIdx = ceil((double)param.numToRetrieve / param.numDocs * kNumSamplesPerReq * 8);
     //omp_set_num_threads(4);
     //#pragma omp parallel for
     // mutlithreading does not help much here

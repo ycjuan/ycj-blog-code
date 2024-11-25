@@ -26,6 +26,10 @@ void retrieveTopkCpu(TopkParam &param)
 
     for (int j = 0; j < param.numReqs; j++)
     {
+        if (j % 8 == 0)
+        {
+            cout << "retrieving topk for req " << j << endl;
+        }
         vector<Pair> v_doc;
         for (int i = 0; i < param.numDocs; i++)
         {
