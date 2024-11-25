@@ -28,27 +28,27 @@ void retrieveTopkCpu(TopkParam &param)
 
     omp_set_num_threads(8);
     #pragma omp parallel for
-    for (int j = 0; j < param.numReqs; j++)
+    for (int reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
     {
         vector<Pair> v_doc;
-        for (int i = 0; i < param.numDocs; i++)
+        for (int docIdx = 0; docIdx < param.numDocs; docIdx++)
         {
             Pair doc;
-            doc.reqIdx = j;
-            doc.docIdx = i;
-            doc.score = param.dm_score[j * param.numDocs + i];
+            doc.reqIdx = reqIdx;
+            doc.docIdx = docIdx;
+            doc.score = param.dm_score[getMemAddr(reqIdx, docIdx, param.numDocs)];
             v_doc.push_back(doc);
         }
 
         stable_sort(v_doc.begin(), v_doc.end(), scoreComparator);
-        for (int i = 0; i < param.numToRetrieve; i++)
+        for (int docIdx = 0; docIdx < param.numToRetrieve; docIdx++)
         {
-            param.hp_rstCpu[j * param.numToRetrieve + i] = v_doc[i];
+            param.hp_rstCpu[getMemAddr(reqIdx, docIdx, param.numToRetrieve)] = v_doc[docIdx];
         }
 
-        if (j % 8 == 0)
+        if (reqIdx % 8 == 0)
         {
-            cout << "retrieved topk for req " << j << endl;
+            cout << "retrieved topk for req " << reqIdx << endl;
         }
     }
 
