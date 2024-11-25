@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "common.cuh"
+#include "thrust_allocator.cuh"
 
 class TopkSampling
 {
@@ -32,6 +33,9 @@ private:
     void findThreshold(TopkParam &param);
     void copyEligible(TopkParam &param);
     void retrieveExact(TopkParam &param);
+
+    // others
+    StaticThrustAllocator thrustAllocator;
 };
 
 void retrieveTopkCpu(TopkParam &param);

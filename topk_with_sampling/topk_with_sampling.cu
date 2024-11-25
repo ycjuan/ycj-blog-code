@@ -11,6 +11,7 @@
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
 #include <string>
+#include <omp.h>
 
 #include "topk.cuh"
 #include "common.cuh"
@@ -36,6 +37,7 @@ void TopkSampling::malloc()
     CHECK_CUDA(cudaMallocManaged(&dm_scoreThreshold, kMaxNumReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocManaged(&dm_eligiblePairs, kMaxNumReqs * kMaxEligiblePairsPerReq * sizeof(Pair)));
     CHECK_CUDA(cudaMallocManaged(&dm_copyCount, kMaxNumReqs * sizeof(int)));
+    thrustAllocator.malloc(kMaxNumReqs * kMaxEligiblePairsPerReq * sizeof(Pair));
 }
 
 void TopkSampling::free()
@@ -44,6 +46,7 @@ void TopkSampling::free()
     CHECK_CUDA(cudaFree(dm_scoreThreshold));
     CHECK_CUDA(cudaFree(dm_eligiblePairs));
     CHECK_CUDA(cudaFree(dm_copyCount));
+    thrustAllocator.free();
 }
 
 void TopkSampling::retrieveTopk(TopkParam &param)
@@ -109,9 +112,12 @@ void TopkSampling::findThreshold(TopkParam &param)
     timer.tic();
 
     int thIdx = ceil((double)param.numToRetrieve / param.numDocs * kNumSamplesPerReq * 4);
+    //omp_set_num_threads(4);
+    //#pragma omp parallel for
+    // mutlithreading does not help much here
     for (size_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
     {
-        thrust::sort(thrust::device,
+        thrust::sort(thrust::cuda::par(thrustAllocator),
                      dm_scoreSample + reqIdx       * kNumSamplesPerReq,
                      dm_scoreSample + (reqIdx + 1) * kNumSamplesPerReq,
                      thrust::greater<float>());
@@ -197,11 +203,11 @@ void TopkSampling::retrieveExact(TopkParam &param)
     {
         Pair *dm_eligiblePairsStart = dm_eligiblePairs + reqIdx * kMaxEligiblePairsPerReq;
         Pair *dm_eligiblePairsEnd = dm_eligiblePairsStart + dm_copyCount[reqIdx];
-        thrust::stable_sort(thrust::device,
+        thrust::stable_sort(thrust::cuda::par(thrustAllocator),
                             dm_eligiblePairsStart,
                             dm_eligiblePairsEnd,
                             ScorePredicator());
-        thrust::copy(thrust::device,
+        thrust::copy(thrust::cuda::par(thrustAllocator),
                      dm_eligiblePairsStart,
                      dm_eligiblePairsStart + param.numToRetrieve,
                      param.dm_rstGpu + reqIdx * param.numToRetrieve);
