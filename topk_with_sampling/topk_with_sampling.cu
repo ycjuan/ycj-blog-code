@@ -56,7 +56,7 @@ void TopkSampling::malloc()
     totalAllocateInBytes += allocateInBytes;
     cout << "allocated " << allocateInBytes / 1024.0 / 1024.0 / 1024.0 << " GiB for dm_copyCount" << endl;
 
-    allocateInBytes = kMaxNumReqs * kMaxEligiblePairsPerReq * sizeof(Pair);
+    allocateInBytes = kMaxEligiblePairsPerReq * sizeof(Pair) + 10000000;
     thrustAllocator.malloc(allocateInBytes);
     totalAllocateInBytes += allocateInBytes;
     cout << "allocated " << allocateInBytes / 1024.0 / 1024.0 / 1024.0 << " GiB for thrustAllocator" << endl;
