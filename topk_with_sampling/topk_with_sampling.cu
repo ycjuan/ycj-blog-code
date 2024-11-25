@@ -102,8 +102,8 @@ __global__ void sampleKernelNonRandom(TopkParam topkParam, float *d_scoreSample,
 
     if (wid < topkParam.numReqs * sampleSizePerReq)
     {
-        int reqIdx = wid % topkParam.numReqs;
-        int docIdx = wid / topkParam.numReqs;
+        int reqIdx = wid / sampleSizePerReq;
+        int docIdx = wid % sampleSizePerReq;
         d_scoreSample[getMemAddr(reqIdx, docIdx, sampleSizePerReq)] = topkParam.dm_score[getMemAddr(reqIdx, docIdx, topkParam.numDocs)];
     }
 }
