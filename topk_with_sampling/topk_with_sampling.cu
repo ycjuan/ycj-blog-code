@@ -114,9 +114,10 @@ __global__ void sampleKernelRandom(TopkParam topkParam, float *d_scoreSample, si
 
     if (wid < topkParam.numReqs * sampleSizePerReq)
     {
-        int reqIdx = wid % topkParam.numReqs;
-        int docIdx = ((wid / topkParam.numReqs) * docIdxGap) % topkParam.numDocs;
-        d_scoreSample[getMemAddr(reqIdx, docIdx, sampleSizePerReq)] = topkParam.dm_score[getMemAddr(reqIdx, docIdx, topkParam.numDocs)];
+        int reqIdx = wid / sampleSizePerReq;
+        int docIdxSample = wid % sampleSizePerReq;
+        int docIdx = (docIdxSample * docIdxGap) % topkParam.numDocs;
+        d_scoreSample[getMemAddr(reqIdx, docIdxSample, sampleSizePerReq)] = topkParam.dm_score[getMemAddr(reqIdx, docIdx, topkParam.numDocs)];
     }
 }
 
@@ -127,7 +128,16 @@ void TopkSampling::sample(TopkParam &param)
 
     int blockSize = 256;
     int gridSize = (param.numReqs * kNumSamplesPerReq + blockSize - 1) / blockSize;
-    sampleKernelNonRandom<<<gridSize, blockSize>>>(param, d_scoreSample, kNumSamplesPerReq);
+    if (param.useRandomSampling)
+    {
+        int docIdxGap = ceil((double)param.numDocs / kNumSamplesPerReq);
+        // We sample every docIdxGap docs
+        sampleKernelRandom<<<gridSize, blockSize>>>(param, d_scoreSample, kNumSamplesPerReq, docIdxGap);
+    }
+    else
+    {
+        sampleKernelNonRandom<<<gridSize, blockSize>>>(param, d_scoreSample, kNumSamplesPerReq);
+    }
     CHECK_CUDA(cudaDeviceSynchronize());
 
     param.gpuSampleTimeMs = timer.tocMs();

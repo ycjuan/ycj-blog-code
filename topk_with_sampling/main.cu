@@ -21,7 +21,7 @@ using namespace std;
 int kNumToRetrieve = 100;
 int kNumTrials = 100;
 
-void runExp(int numReqs, int numDocs)
+void runExp(int numReqs, int numDocs, bool useRandomSampling, bool useCpu)
 {
     cout << "\n\nrunning exps with numReq: " << numReqs << ", numDocs: " << numDocs << endl;
 
@@ -29,6 +29,7 @@ void runExp(int numReqs, int numDocs)
     param.numReqs = numReqs;
     param.numDocs = numDocs;
     param.numToRetrieve = kNumToRetrieve;
+    param.useRandomSampling = useRandomSampling;
 
     size_t allocateInBytes;
     size_t totalAllocateInBytes = 0;
@@ -69,14 +70,17 @@ void runExp(int numReqs, int numDocs)
     double gpuTotalTimeMs = 0;
     double gpuApproxTimeMs = 0;
 
-    cout << "retrieving topk with cpu" << endl;
-    retrieveTopkCpu(param);
-    cout << "topk retrieved with cpu" << endl;
+    if (useCpu)
+    {
+        cout << "retrieving topk with cpu" << endl;
+        retrieveTopkCpu(param);
+        cout << "topk retrieved with cpu" << endl;
+    }
     for (int t = -3; t < kNumTrials; t++)
     {
         topkSampling.retrieveTopk(param);
 
-        if (t == -1)
+        if (useCpu && t == -1)
         {
             cout << "compare results" << endl;
             for (int reqIdx = 0; reqIdx < numReqs; reqIdx++)
@@ -122,7 +126,7 @@ void runExp(int numReqs, int numDocs)
 
 int main()
 {
-    runExp(2, 16000000);
+    runExp(2, 16000000, true, true);
 
     return 0;
 }
