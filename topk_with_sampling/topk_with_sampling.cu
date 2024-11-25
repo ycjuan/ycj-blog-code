@@ -177,8 +177,8 @@ __global__ void copyEligibleKernel(float *dm_score,
     size_t wid = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (wid < numReqs * numDocs)
     {
-        int reqIdx = wid % numReqs;
-        int docIdx = wid / numReqs;
+        int reqIdx = wid / numDocs;
+        int docIdx = wid % numDocs;
         size_t memAddr = getMemAddr(reqIdx, docIdx, numDocs);
         float score = dm_score[memAddr];
         float threshold = dm_scoreThreshold[reqIdx];
