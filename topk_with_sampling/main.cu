@@ -19,7 +19,7 @@ using namespace std;
     }
 
 int kNumToRetrieve = 100;
-int kNumTrials = 10;
+int kNumTrials = 100;
 
 void runExp(int numReqs, int numDocs)
 {

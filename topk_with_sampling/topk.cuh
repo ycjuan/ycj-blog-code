@@ -19,8 +19,8 @@ private:
 
     // constants
     const size_t kNumSamplesPerReq = 10000;
-    const size_t kMaxNumReqs = 1 << 10;
-    const size_t kMaxEligiblePairsPerReq = 1 << 20;
+    const size_t kMaxNumReqs = 1 << 9;
+    const size_t kMaxEligiblePairsPerReq = 1 << 18;
 
     // device memory
     float *dm_scoreSample = nullptr;

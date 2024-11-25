@@ -33,11 +33,35 @@ using namespace std;
 
 void TopkSampling::malloc()
 {
-    CHECK_CUDA(cudaMallocManaged(&dm_scoreSample, kNumSamplesPerReq * kMaxNumReqs * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&dm_scoreThreshold, kMaxNumReqs * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&dm_eligiblePairs, kMaxNumReqs * kMaxEligiblePairsPerReq * sizeof(Pair)));
-    CHECK_CUDA(cudaMallocManaged(&dm_copyCount, kMaxNumReqs * sizeof(int)));
-    thrustAllocator.malloc(kMaxNumReqs * kMaxEligiblePairsPerReq * sizeof(Pair));
+    size_t allocateInBytes;
+    size_t totalAllocateInBytes = 0;
+
+    allocateInBytes = kNumSamplesPerReq * kMaxNumReqs * sizeof(float);
+    CHECK_CUDA(cudaMallocManaged(&dm_scoreSample, allocateInBytes));
+    totalAllocateInBytes += allocateInBytes;
+    cout << "allocated " << allocateInBytes / 1024 / 1024 / 1024 << " GiB for dm_scoreSample" << endl;
+
+    allocateInBytes = kMaxNumReqs * sizeof(float);
+    CHECK_CUDA(cudaMallocManaged(&dm_scoreThreshold, allocateInBytes));
+    totalAllocateInBytes += allocateInBytes;
+    cout << "allocated " << allocateInBytes / 1024 / 1024 / 1024 << " GiB for dm_scoreThreshold" << endl;
+
+    allocateInBytes = kMaxNumReqs * kMaxEligiblePairsPerReq * sizeof(Pair);
+    CHECK_CUDA(cudaMalloc(&dm_eligiblePairs, allocateInBytes));
+    totalAllocateInBytes += allocateInBytes;
+    cout << "allocated " << allocateInBytes / 1024 / 1024 / 1024 << " GiB for dm_eligiblePairs" << endl;
+
+    allocateInBytes = kMaxNumReqs * sizeof(int);
+    CHECK_CUDA(cudaMallocManaged(&dm_copyCount, allocateInBytes));
+    totalAllocateInBytes += allocateInBytes;
+    cout << "allocated " << allocateInBytes / 1024 / 1024 / 1024 << " GiB for dm_copyCount" << endl;
+
+    allocateInBytes = kMaxNumReqs * kMaxEligiblePairsPerReq * sizeof(Pair);
+    thrustAllocator.malloc(allocateInBytes);
+    totalAllocateInBytes += allocateInBytes;
+    cout << "allocated " << allocateInBytes / 1024 / 1024 / 1024 << " GiB for thrustAllocator" << endl;
+
+    cout << "total allocated " << totalAllocateInBytes / 1024 / 1024 / 1024 << " GiB" << endl;
 }
 
 void TopkSampling::free()
