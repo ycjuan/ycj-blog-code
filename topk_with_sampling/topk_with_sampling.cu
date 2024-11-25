@@ -37,9 +37,9 @@ void TopkSampling::malloc()
     size_t totalAllocateInBytes = 0;
 
     allocateInBytes = kNumSamplesPerReq * kMaxNumReqs * sizeof(float);
-    CHECK_CUDA(cudaMallocManaged(&dm_scoreSample, allocateInBytes));
+    CHECK_CUDA(cudaMalloc(&d_scoreSample, allocateInBytes));
     totalAllocateInBytes += allocateInBytes;
-    cout << "allocated " << allocateInBytes / 1024 / 1024 / 1024 << " GiB for dm_scoreSample" << endl;
+    cout << "allocated " << allocateInBytes / 1024 / 1024 / 1024 << " GiB for d_scoreSample" << endl;
 
     allocateInBytes = kMaxNumReqs * sizeof(float);
     CHECK_CUDA(cudaMallocManaged(&dm_scoreThreshold, allocateInBytes));
@@ -47,9 +47,9 @@ void TopkSampling::malloc()
     cout << "allocated " << allocateInBytes / 1024 / 1024 / 1024 << " GiB for dm_scoreThreshold" << endl;
 
     allocateInBytes = kMaxNumReqs * kMaxEligiblePairsPerReq * sizeof(Pair);
-    CHECK_CUDA(cudaMalloc(&dm_eligiblePairs, allocateInBytes));
+    CHECK_CUDA(cudaMalloc(&d_eligiblePairs, allocateInBytes));
     totalAllocateInBytes += allocateInBytes;
-    cout << "allocated " << allocateInBytes / 1024 / 1024 / 1024 << " GiB for dm_eligiblePairs" << endl;
+    cout << "allocated " << allocateInBytes / 1024 / 1024 / 1024 << " GiB for d_eligiblePairs" << endl;
 
     allocateInBytes = kMaxNumReqs * sizeof(int);
     CHECK_CUDA(cudaMallocManaged(&dm_copyCount, allocateInBytes));
@@ -66,9 +66,9 @@ void TopkSampling::malloc()
 
 void TopkSampling::free()
 {
-    CHECK_CUDA(cudaFree(dm_scoreSample));
+    CHECK_CUDA(cudaFree(d_scoreSample));
     CHECK_CUDA(cudaFree(dm_scoreThreshold));
-    CHECK_CUDA(cudaFree(dm_eligiblePairs));
+    CHECK_CUDA(cudaFree(d_eligiblePairs));
     CHECK_CUDA(cudaFree(dm_copyCount));
     thrustAllocator.free();
 }
@@ -96,7 +96,7 @@ void TopkSampling::retrieveTopk(TopkParam &param)
     param.gpuTotalTimeMs = timerTotal.tocMs();
 }
 
-__global__ void sampleKernelNonRandom(TopkParam topkParam, float *dm_scoreSample, size_t sampleSizePerReq)
+__global__ void sampleKernelNonRandom(TopkParam topkParam, float *d_scoreSample, size_t sampleSizePerReq)
 {
     int wid = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -104,7 +104,7 @@ __global__ void sampleKernelNonRandom(TopkParam topkParam, float *dm_scoreSample
     {
         int reqIdx = wid % topkParam.numReqs;
         int docIdx = wid / topkParam.numReqs;
-        dm_scoreSample[getMemAddr(reqIdx, docIdx, sampleSizePerReq)] = topkParam.dm_score[getMemAddr(reqIdx, docIdx, topkParam.numDocs)];
+        d_scoreSample[getMemAddr(reqIdx, docIdx, sampleSizePerReq)] = topkParam.dm_score[getMemAddr(reqIdx, docIdx, topkParam.numDocs)];
     }
 }
 
@@ -115,18 +115,18 @@ void TopkSampling::sample(TopkParam &param)
 
     int blockSize = 256;
     int gridSize = (param.numReqs * kNumSamplesPerReq + blockSize - 1) / blockSize;
-    sampleKernelNonRandom<<<gridSize, blockSize>>>(param, dm_scoreSample, kNumSamplesPerReq);
+    sampleKernelNonRandom<<<gridSize, blockSize>>>(param, d_scoreSample, kNumSamplesPerReq);
     CHECK_CUDA(cudaDeviceSynchronize());
 
     param.gpuSampleTimeMs = timer.tocMs();
 }
 
-__global__ void updateThreshold(float *dm_scoreSample, float *dm_scoreThreshold, int numReqs, int thIdx, size_t kNumSamplesPerReq)
+__global__ void updateThreshold(float *d_scoreSample, float *dm_scoreThreshold, int numReqs, int thIdx, size_t kNumSamplesPerReq)
 {
     int reqIdx = blockIdx.x * blockDim.x + threadIdx.x;
     if (reqIdx < numReqs)
     {
-        dm_scoreThreshold[reqIdx] = dm_scoreSample[reqIdx * kNumSamplesPerReq + thIdx];
+        dm_scoreThreshold[reqIdx] = d_scoreSample[reqIdx * kNumSamplesPerReq + thIdx];
     }
 }
 
@@ -142,21 +142,21 @@ void TopkSampling::findThreshold(TopkParam &param)
     for (size_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
     {
         thrust::sort(thrust::cuda::par(thrustAllocator),
-                     dm_scoreSample + reqIdx       * kNumSamplesPerReq,
-                     dm_scoreSample + (reqIdx + 1) * kNumSamplesPerReq,
+                     d_scoreSample + reqIdx       * kNumSamplesPerReq,
+                     d_scoreSample + (reqIdx + 1) * kNumSamplesPerReq,
                      thrust::greater<float>());
     }
 
     int blockSize = 256;
     int gridSize = (param.numReqs + blockSize - 1) / blockSize;
-    updateThreshold<<<gridSize, blockSize>>>(dm_scoreSample, dm_scoreThreshold, param.numReqs, thIdx, kNumSamplesPerReq);
+    updateThreshold<<<gridSize, blockSize>>>(d_scoreSample, dm_scoreThreshold, param.numReqs, thIdx, kNumSamplesPerReq);
 
     param.gpuFindThresholdTimeMs = timer.tocMs();
 }
 
 __global__ void copyEligibleKernel(float *dm_score,
                                    float *dm_scoreThreshold,
-                                   Pair *dm_eligiblePairs,
+                                   Pair *d_eligiblePairs,
                                    int *dm_copyCount,
                                    int numReqs,
                                    int numDocs,
@@ -179,7 +179,7 @@ __global__ void copyEligibleKernel(float *dm_score,
                 pair.reqId = reqIdx;
                 pair.docId = docIdx;
                 pair.score = score;
-                dm_eligiblePairs[reqIdx * kMaxEligiblePairsPerReq + count] = pair;
+                d_eligiblePairs[reqIdx * kMaxEligiblePairsPerReq + count] = pair;
             }
         }
     }
@@ -208,7 +208,7 @@ void TopkSampling::copyEligible(TopkParam &param)
     int gridSize = (param.numReqs * param.numDocs + blockSize - 1) / blockSize;
     copyEligibleKernel<<<gridSize, blockSize>>>(param.dm_score,
                                                 dm_scoreThreshold,
-                                                dm_eligiblePairs,
+                                                d_eligiblePairs,
                                                 dm_copyCount,
                                                 param.numReqs,
                                                 param.numDocs,
@@ -225,7 +225,7 @@ void TopkSampling::retrieveExact(TopkParam &param)
     timer.tic();
     for (size_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
     {
-        Pair *dm_eligiblePairsStart = dm_eligiblePairs + reqIdx * kMaxEligiblePairsPerReq;
+        Pair *dm_eligiblePairsStart = d_eligiblePairs + reqIdx * kMaxEligiblePairsPerReq;
         Pair *dm_eligiblePairsEnd = dm_eligiblePairsStart + dm_copyCount[reqIdx];
         thrust::stable_sort(thrust::cuda::par(thrustAllocator),
                             dm_eligiblePairsStart,

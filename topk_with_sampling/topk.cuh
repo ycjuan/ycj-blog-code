@@ -23,9 +23,9 @@ private:
     const size_t kMaxEligiblePairsPerReq = 1 << 18;
 
     // device memory
-    float *dm_scoreSample = nullptr;
+    float *d_scoreSample = nullptr;
     float *dm_scoreThreshold = nullptr;
-    Pair *dm_eligiblePairs = nullptr;
+    Pair *d_eligiblePairs = nullptr;
     int *dm_copyCount = nullptr;
 
     // functions
