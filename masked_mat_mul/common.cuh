@@ -19,11 +19,13 @@ struct Data
     int numDocs;
     int numReqs;
     int embDim;
+    int numEligibleDocs;
     T *d_doc; // M=numDocs x N=embDim
     T *d_req; // M=numReqs x N=embDim
     float *d_rst_kernel; // M=numDocs x N=numReqs
     float *d_rst_cublas; // M=numDocs x N=numReqs
     float *h_rst_cpu;
+    int *d_eligibleDocIdx;
     MemLayout docMemLayout;
     MemLayout reqMemLayout;
     MemLayout rstLayoutCpu;
@@ -42,7 +44,7 @@ struct Data
     void print()
     {
         ostringstream oss;
-        oss << "numDocs: " << numDocs << ", numReqs: " << numReqs << ", embDim: " << embDim << endl;
+        oss << "numDocs: " << numDocs << ", numReqs: " << numReqs << ", embDim: " << embDim << ", numEligibleDocs: " << numEligibleDocs << endl;
         oss << "docMemLayout: " << (docMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "reqMemLayout: " << (reqMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "rstLayoutCpu: " << (rstLayoutCpu == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
