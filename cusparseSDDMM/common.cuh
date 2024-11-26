@@ -57,7 +57,7 @@ struct Setting
     int numTrials;
 };
 
-__device__ __host__ size_t getMemAddr(int i, int j, int M, int N, MemLayout layout)
+inline __device__ __host__ size_t getMemAddr(int i, int j, int M, int N, MemLayout layout)
 {
     if (layout == ROW_MAJOR)
         return (size_t)i * N + j;

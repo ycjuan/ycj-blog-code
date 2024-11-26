@@ -8,6 +8,7 @@
 
 #include "util.cuh"
 #include "common.cuh"
+#include "methods.cuh"
 
 using namespace std;
 
@@ -39,11 +40,9 @@ void cublasErrCheck_(cublasStatus_t stat, const char *file, int line) {
    }
 }
 
-
-template <typename T>
-Data<T> genData()
+Data genData()
 {
-    Data<T> data;
+    Data data;
     data.numDocs = kNumDocs;
     data.numReqs = kNumReqs;
     data.embDim = kEmbDim;
@@ -70,8 +69,7 @@ Data<T> genData()
     return data;
 }
 
-template <typename T>
-void checkData(Data<T> data)
+void checkData(Data data)
 {
     for (int i = 0; i < data.numDocs; i++)
     {
@@ -98,10 +96,13 @@ void checkData(Data<T> data)
 
 int main()
 {
-    Data<T> data = genData<T>();
+    Setting setting;
+    setting.numTrials = kNumTrials;
+    
+    Data data = genData();
 
-    methodCpu(data);
-    methodCuda(data);
+    methodCpu(data, setting);
+    methodCuda(data, setting);
 
     checkData(data);
 
