@@ -14,6 +14,12 @@ enum MemLayout
     COL_MAJOR
 };
 
+struct Pair
+{
+    int reqIdx;
+    int docIdx;
+};
+
 struct Data
 {
     int numDocs;
@@ -25,7 +31,7 @@ struct Data
     float *d_rst_kernel; // M=numDocs x N=numReqs
     float *d_rst_cublas; // M=numDocs x N=numReqs
     float *h_rst_cpu;
-    int *d_eligibleDocIdx;
+    Pair *d_eligiblePairs;
     MemLayout docMemLayout;
     MemLayout reqMemLayout;
     MemLayout rstLayoutCpu;
@@ -65,6 +71,14 @@ inline __device__ __host__ size_t getMemAddr(int i, int j, int M, int N, MemLayo
         return (size_t)i * N + j;
     else
         return (size_t)j * M + i;
+}
+
+bool pairComparator(const Pair &a, const Pair &b)
+{
+    if (a.reqIdx != b.reqIdx)
+        return a.reqIdx < b.reqIdx;
+    else
+        return a.docIdx < b.docIdx;
 }
 
 #endif
