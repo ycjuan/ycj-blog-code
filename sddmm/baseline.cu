@@ -10,6 +10,20 @@ void methodCpu(Data data, Setting setting)
     Timer timer;
     timer.tic();
     #pragma omp parallel for
+    for (size_t pairIdx = 0; pairIdx < data.numPairsToScore; pairIdx++)
+    {
+        Pair pair = data.d_PairsToScore[pairIdx];
+        float sum = 0;
+        for (int k = 0; k < data.embDim; k++)
+        {
+            T reqVal = data.d_req[getMemAddr(pair.reqIdx, k, data.numReqs, data.embDim, data.reqMemLayout)];
+            T docVal = data.d_doc[getMemAddr(pair.docIdx, k, data.numDocs, data.embDim, data.docMemLayout)];
+            sum += (float)reqVal * (float)docVal;
+        }
+        data.h_rst_cpu[getMemAddr(pair.docIdx, pair.reqIdx, data.numDocs, data.numReqs, data.rstLayoutCpu)] = (half)sum;
+    }
+
+
     for (int i = 0; i < data.numDocs; i++)
     {
         for (int j = 0; j < data.numReqs; j++)

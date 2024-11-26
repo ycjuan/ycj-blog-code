@@ -51,7 +51,7 @@ Data genData()
     CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.embDim * sizeof(T)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_kernel, (size_t)data.numDocs * data.numReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_cublas, (size_t)data.numDocs * data.numReqs * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_eligiblePairs, (size_t)data.numDocs * data.numReqs * sizeof(Pair)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_PairsToScore, (size_t)data.numDocs * data.numReqs * sizeof(Pair)));
     CHECK_CUDA(cudaMallocHost(&data.h_rst_cpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
 
     default_random_engine generator;
@@ -61,7 +61,7 @@ Data genData()
     for (int i = 0; i < data.numReqs * data.embDim; i++)
         data.d_req[i] = (T)distribution(generator);
     
-    data.numEligibleDocs = 0;
+    data.numPairsToScore = 0;
     for (int reqIdx = 0; reqIdx < data.numReqs; reqIdx++)
     {
         int numEligibleDocsPerReq = int(kDocDensity * data.numDocs);
@@ -79,7 +79,7 @@ Data genData()
             Pair pair;
             pair.reqIdx = reqIdx;
             pair.docIdx = v_docIdx1D[docIdx];
-            data.d_eligiblePairs[data.numEligibleDocs++] = pair;
+            data.d_PairsToScore[data.numPairsToScore++] = pair;
         }
     }
     

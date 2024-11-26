@@ -2,6 +2,7 @@
 #define COMMON_CUH
 
 #include <sstream>
+#include <iostream>
 #include <cublas_v2.h>
 
 using namespace std;
@@ -25,13 +26,13 @@ struct Data
     int numDocs;
     int numReqs;
     int embDim;
-    int numEligibleDocs;
+    int numPairsToScore;
     T *d_doc; // M=numDocs x N=embDim
     T *d_req; // M=numReqs x N=embDim
     float *d_rst_kernel; // M=numDocs x N=numReqs
     float *d_rst_cublas; // M=numDocs x N=numReqs
     float *h_rst_cpu;
-    Pair *d_eligiblePairs;
+    Pair *d_PairsToScore;
     MemLayout docMemLayout;
     MemLayout reqMemLayout;
     MemLayout rstLayoutCpu;
@@ -50,7 +51,7 @@ struct Data
     void print()
     {
         ostringstream oss;
-        oss << "numDocs: " << numDocs << ", numReqs: " << numReqs << ", embDim: " << embDim << ", numEligibleDocs: " << numEligibleDocs << endl;
+        oss << "numDocs: " << numDocs << ", numReqs: " << numReqs << ", embDim: " << embDim << ", numPairsToScore: " << numPairsToScore << endl;
         oss << "docMemLayout: " << (docMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "reqMemLayout: " << (reqMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "rstLayoutCpu: " << (rstLayoutCpu == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
@@ -73,7 +74,7 @@ inline __device__ __host__ size_t getMemAddr(int i, int j, int M, int N, MemLayo
         return (size_t)j * M + i;
 }
 
-bool pairComparator(const Pair &a, const Pair &b)
+inline bool pairComparator(const Pair &a, const Pair &b)
 {
     if (a.reqIdx != b.reqIdx)
         return a.reqIdx < b.reqIdx;
