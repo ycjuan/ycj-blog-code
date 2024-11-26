@@ -49,10 +49,10 @@ Data genData()
     
     CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.embDim * sizeof(T)));
     CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.embDim * sizeof(T)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rst_kernel, (size_t)data.numDocs * data.numReqs * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rst_cublas, (size_t)data.numDocs * data.numReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocManaged(&data.d_PairsToScore, (size_t)data.numDocs * data.numReqs * sizeof(Pair)));
-    CHECK_CUDA(cudaMallocHost(&data.h_rst_cpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rstCuda, (size_t)data.numDocs * data.numReqs * sizeof(Pair)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rstCusparse, (size_t)data.numDocs * data.numReqs * sizeof(Pair)));
+    CHECK_CUDA(cudaMallocHost(&data.h_rstCpu, (size_t)data.numDocs * data.numReqs * sizeof(Pair)));
 
     default_random_engine generator;
     uniform_real_distribution<float> distribution(0.0, 1.0);
@@ -88,27 +88,33 @@ Data genData()
 
 void checkData(Data data)
 {
-    for (int i = 0; i < data.numDocs; i++)
+    for (size_t pairIdx = 0; pairIdx < data.numPairsToScore; pairIdx++)
     {
-        for (int j = 0; j < data.numReqs; j++)
-        {
-            float cpuVal = data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)];
-            float gpuKernelVal = data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)];
-            float gpuCublasVal = data.d_rst_cublas[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
+        Pair pairCpu = data.h_rstCpu[pairIdx];
+        Pair pairCuda = data.d_rstCuda[pairIdx];
+        Pair pairCusparse = data.d_rstCusparse[pairIdx];
 
-            if (abs(cpuVal - gpuKernelVal) / abs(gpuKernelVal) > 1e-3)
-            {
-                cout << "Kernel error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuKernelVal << endl;
-                return;
-            }
-            
-            if (abs(cpuVal - gpuCublasVal) / abs(gpuKernelVal) > 1e-3)
-            {
-                cout << "Cublas error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuCublasVal << endl;
-                return;
-            }
+        if (pairCpu.reqIdx != pairCuda.reqIdx ||
+            pairCpu.docIdx != pairCuda.docIdx ||
+            abs(pairCpu.score - pairCuda.score) > 1e-3)
+        {
+            cout << "Mismatch at pairIdx " << pairIdx << endl;
+            cout << "CPU: " << pairCpu.reqIdx << " " << pairCpu.docIdx << " " << pairCpu.score << endl;
+            cout << "CUDA: " << pairCuda.reqIdx << " " << pairCuda.docIdx << " " << pairCuda.score << endl;
+            throw runtime_error("Mismatch detected!");
+        }
+
+        if (pairCpu.reqIdx != pairCusparse.reqIdx ||
+            pairCpu.docIdx != pairCusparse.docIdx ||
+            abs(pairCpu.score - pairCusparse.score) > 1e-3)
+        {
+            cout << "Mismatch at pairIdx " << pairIdx << endl;
+            cout << "CPU: " << pairCpu.reqIdx << " " << pairCpu.docIdx << " " << pairCpu.score << endl;
+            cout << "CUSPARSE: " << pairCusparse.reqIdx << " " << pairCusparse.docIdx << " " << pairCusparse.score << endl;
+            throw runtime_error("Mismatch detected!");
         }
     }
+    cout << "All results match!" << endl;
 }
 
 int main()

@@ -12,58 +12,40 @@ void methodCpu(Data data, Setting setting)
     #pragma omp parallel for
     for (size_t pairIdx = 0; pairIdx < data.numPairsToScore; pairIdx++)
     {
-        Pair pair = data.d_PairsToScore[pairIdx];
-        float sum = 0;
+        Pair &pair = data.d_PairsToScore[pairIdx];
+        pair.score = 0;
         for (int k = 0; k < data.embDim; k++)
         {
             T reqVal = data.d_req[getMemAddr(pair.reqIdx, k, data.numReqs, data.embDim, data.reqMemLayout)];
             T docVal = data.d_doc[getMemAddr(pair.docIdx, k, data.numDocs, data.embDim, data.docMemLayout)];
-            sum += (float)reqVal * (float)docVal;
-        }
-        data.h_rst_cpu[getMemAddr(pair.docIdx, pair.reqIdx, data.numDocs, data.numReqs, data.rstLayoutCpu)] = (half)sum;
-    }
-
-
-    for (int i = 0; i < data.numDocs; i++)
-    {
-        for (int j = 0; j < data.numReqs; j++)
-        {
-            float sum = 0;
-            for (int k = 0; k < data.embDim; k++)
-            {
-                T reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.embDim, data.reqMemLayout)];
-                T docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.embDim, data.docMemLayout)];
-                sum += (float)reqVal * (float)docVal;
-            }
-            data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)] = (half)sum;
+            pair.score += (float)reqVal * (float)docVal;
         }
     }
+
     cout << "CPU time: " << timer.tocMs() << " ms" << endl;
 }
 
 __global__ void cudaKernel(Data data)
 {
-    int threadId = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
-    int i = threadId / data.numReqs;
-    int j = threadId % data.numReqs;
+    int wid = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (i < data.numDocs && j < data.numReqs)
+    if (wid < data.numPairsToScore)
     {
-        float sum = 0;
+        Pair &pair = data.d_PairsToScore[wid];
+        pair.score = 0;
         for (int k = 0; k < data.embDim; k++)
         {
-            T reqVal = data.d_req[getMemAddr(j, k, data.numReqs, data.embDim, data.reqMemLayout)];
-            T docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.embDim, data.docMemLayout)];            
-            sum += float(reqVal * docVal);
+            T reqVal = data.d_req[getMemAddr(pair.reqIdx, k, data.numReqs, data.embDim, data.reqMemLayout)];
+            T docVal = data.d_doc[getMemAddr(pair.docIdx, k, data.numDocs, data.embDim, data.docMemLayout)];
+            pair.score += float(reqVal * docVal);
         }
-        data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)] = sum;
     }
 }
 
 void methodCuda(Data data, Setting setting)
 {
     int blockSize = 512;
-    int gridSize = size_t(data.numDocs) * data.numReqs / blockSize;
+    int gridSize = data.numPairsToScore / blockSize;
     CudaTimer timer;
     for (int t = -3; t < setting.numTrials; t++)
     {

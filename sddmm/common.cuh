@@ -19,6 +19,7 @@ struct Pair
 {
     int reqIdx;
     int docIdx;
+    float score;
 };
 
 struct Data
@@ -26,13 +27,14 @@ struct Data
     int numDocs;
     int numReqs;
     int embDim;
-    int numPairsToScore;
+    size_t numPairsToScore;
     T *d_doc; // M=numDocs x N=embDim
     T *d_req; // M=numReqs x N=embDim
-    float *d_rst_kernel; // M=numDocs x N=numReqs
-    float *d_rst_cublas; // M=numDocs x N=numReqs
-    float *h_rst_cpu;
-    Pair *d_PairsToScore;
+    Pair *d_PairsToScore;    
+    Pair *h_rstCpu;
+    Pair *d_rstCuda;
+    Pair *d_rstCusparse;
+    
     MemLayout docMemLayout;
     MemLayout reqMemLayout;
     MemLayout rstLayoutCpu;
@@ -43,9 +45,9 @@ struct Data
     {
         cudaFree(d_doc);
         cudaFree(d_req);
-        cudaFree(d_rst_kernel);
-        cudaFree(d_rst_cublas);
-        cudaFreeHost(h_rst_cpu);
+        cudaFree(d_rstCuda);
+        cudaFree(d_rstCusparse);
+        cudaFreeHost(h_rstCpu);
     }
 
     void print()
