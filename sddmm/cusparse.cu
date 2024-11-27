@@ -96,6 +96,7 @@ void methodCusparse(Data data, Setting setting)
     int   ldb          = B_num_cols;
     float alpha        = 1.0f;
     float beta         = 0.0f;
+    cout << "lda = " << lda << ", ldb = " << ldb << endl;
     //--------------------------------------------------------------------------
     // Device memory management
     int   *dC_offsets, *dC_columns;
@@ -111,7 +112,7 @@ void methodCusparse(Data data, Setting setting)
     #pragma omp parallel for
     for (size_t pairIdx = 0; pairIdx < data.numPairsToScore; pairIdx++)
         data.d_PairsToScore[pairIdx].score = 0;
-        
+
     coo2Csr(data, dC_offsets, dC_columns, dC_values);
 
 

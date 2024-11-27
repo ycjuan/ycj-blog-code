@@ -8,7 +8,7 @@
 
 using namespace std;
 
-typedef half T;
+typedef float T;
 
 enum MemLayout
 {

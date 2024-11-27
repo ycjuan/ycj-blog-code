@@ -78,7 +78,7 @@
 
 int main(void) {
     // Host problem definition
-    int   A_num_rows   = 4;
+    int   A_num_rows   = 5;
     int   A_num_cols   = 4;
     int   B_num_rows   = A_num_cols;
     int   B_num_cols   = 3;
@@ -87,10 +87,12 @@ int main(void) {
     int   ldb          = B_num_cols;
     int   A_size       = lda * A_num_rows;
     int   B_size       = ldb * B_num_rows;
+    printf("lda = %d, ldb = %d\n", lda, ldb);
     float hA[]         = { 1.0f,   2.0f,  3.0f,  4.0f,
                            5.0f,   6.0f,  7.0f,  8.0f,
                            9.0f,  10.0f, 11.0f, 12.0f,
-                           13.0f, 14.0f, 15.0f, 16.0f };
+                           13.0f, 14.0f, 15.0f, 16.0f,
+                           17.0f, 18.0f, 19.0f, 20.0f };
     float hB[]         = {  1.0f,  2.0f,  3.0f,
                             4.0f,  5.0f,  6.0f,
                             7.0f,  8.0f,  9.0f,
