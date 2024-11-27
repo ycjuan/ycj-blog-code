@@ -92,8 +92,8 @@ void methodCusparse(Data data, Setting setting)
     int   B_num_rows   = A_num_cols;
     int   B_num_cols   = data.numReqs;
     int   C_nnz        = data.numPairsToScore;
-    int   lda          = A_num_cols;
-    int   ldb          = B_num_cols;
+    int   lda          = (data.docMemLayout == ROW_MAJOR)? A_num_cols : A_num_rows;
+    int   ldb          = (data.reqMemLayout == COL_MAJOR)? B_num_cols : B_num_rows;
     int   A_size       = lda * A_num_rows;
     int   B_size       = ldb * B_num_rows;
     float alpha        = 1.0f;
