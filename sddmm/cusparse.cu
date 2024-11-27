@@ -105,12 +105,13 @@ void methodCusparse(Data data, Setting setting)
     float *dC_values;
     dA = data.d_doc;
     dB = data.d_req;
-    CHECK_CUDA( cudaMalloc((void**) &dC_offsets,
+    CHECK_CUDA( cudaMallocManaged((void**) &dC_offsets,
                            (A_num_rows + 1) * sizeof(int)) )
-    CHECK_CUDA( cudaMalloc((void**) &dC_columns, C_nnz * sizeof(int))   )
-    CHECK_CUDA( cudaMalloc((void**) &dC_values,  C_nnz * sizeof(float)) )
+    CHECK_CUDA( cudaMallocManaged((void**) &dC_columns, C_nnz * sizeof(int))   )
+    CHECK_CUDA( cudaMallocManaged((void**) &dC_values,  C_nnz * sizeof(float)) )
 
     coo2Csr(data, dC_offsets, dC_columns, dC_values);
+
 
     //--------------------------------------------------------------------------
     // CUSPARSE APIs
@@ -159,6 +160,21 @@ void methodCusparse(Data data, Setting setting)
     CHECK_CUSPARSE( cusparseDestroySpMat(matC) )
     CHECK_CUSPARSE( cusparseDestroy(handle) )
     //--------------------------------------------------------------------------
+
+    size_t pairIdx = 0;
+    for (int docIdx = 0; docIdx < data.numDocs; docIdx++)
+    {
+        int start = dC_offsets[docIdx];
+        int end = dC_offsets[docIdx + 1];
+        for (int i = start; i < end; i++)
+        {
+            Pair pair;
+            pair.reqIdx = dC_columns[i];
+            pair.docIdx = docIdx;
+            pair.score = dC_values[i];
+            data.d_rstCusparse[pairIdx++] = pair;
+        }
+    }
 
     //--------------------------------------------------------------------------
     // device memory deallocation

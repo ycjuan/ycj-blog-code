@@ -7,8 +7,14 @@ using namespace std;
 
 void methodCpu(Data data, Setting setting)
 {
+    #pragma omp parallel for
+    for (size_t pairIdx = 0; pairIdx < data.numPairsToScore; pairIdx++)
+        data.d_PairsToScore[pairIdx].score = 0;
+
+
     Timer timer;
     timer.tic();
+    
     #pragma omp parallel for
     for (size_t pairIdx = 0; pairIdx < data.numPairsToScore; pairIdx++)
     {
@@ -21,8 +27,11 @@ void methodCpu(Data data, Setting setting)
             pair.score += (float)reqVal * (float)docVal;
         }
     }
-
     cout << "CPU time: " << timer.tocMs() << " ms" << endl;
+
+    #pragma omp parallel for
+    for (size_t pairIdx = 0; pairIdx < data.numPairsToScore; pairIdx++)
+        data.h_rstCpu[pairIdx] = data.d_PairsToScore[pairIdx];
 }
 
 __global__ void cudaKernel(Data data)
@@ -45,7 +54,12 @@ __global__ void cudaKernel(Data data)
 void methodCuda(Data data, Setting setting)
 {
     int blockSize = 512;
-    int gridSize = data.numPairsToScore / blockSize;
+    int gridSize = (data.numPairsToScore + blockSize - 1)/ blockSize;
+
+    #pragma omp parallel for
+    for (size_t pairIdx = 0; pairIdx < data.numPairsToScore; pairIdx++)
+        data.d_PairsToScore[pairIdx].score = 0;
+
     CudaTimer timer;
     for (int t = -3; t < setting.numTrials; t++)
     {
@@ -62,4 +76,8 @@ void methodCuda(Data data, Setting setting)
         }
     }
     cout << "Kernel time: " << timer.tocMs() / setting.numTrials << " ms" << endl;
+
+    #pragma omp parallel for
+    for (size_t pairIdx = 0; pairIdx < data.numPairsToScore; pairIdx++)
+        data.d_rstCuda[pairIdx] = data.d_PairsToScore[pairIdx];
 }

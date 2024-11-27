@@ -4,7 +4,7 @@ CFLAGS       := -Xcompiler -fopenmp --gpu-architecture=sm_89 -O3 -lcublas -lcusp
 
 all: sddmm sddmm_test
 
-sddmm: main.cu baseline.cu
+sddmm: main.cu baseline.cu cusparse.cu
 	nvcc $(INC) -o $@ $^ $(CFLAGS)
 
 sddmm_test: test.cu

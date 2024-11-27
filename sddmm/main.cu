@@ -13,10 +13,10 @@
 
 using namespace std;
 
-int kNumDocs = 1 << 20;
-int kNumReqs = 1 << 0;
-int kEmbDim = 1 << 10;
-int kNumTrials = 100;
+int kNumDocs = 1 << 10;
+int kNumReqs = 1 << 2;
+int kEmbDim = 1 << 4;
+int kNumTrials = 3;
 double kDocDensity = 0.1;
 MemLayout kMemLayoutDoc = COL_MAJOR;
 MemLayout kMemLayoutReq = ROW_MAJOR;
@@ -88,6 +88,9 @@ Data genData()
 
 void checkData(Data data)
 {
+    sort(data.h_rstCpu, data.h_rstCpu + data.numPairsToScore, pairComparatorDocFirst);
+    sort(data.d_rstCuda, data.d_rstCuda + data.numPairsToScore, pairComparatorDocFirst);
+    sort(data.d_rstCusparse, data.d_rstCusparse + data.numPairsToScore, pairComparatorDocFirst);
     for (size_t pairIdx = 0; pairIdx < data.numPairsToScore; pairIdx++)
     {
         Pair pairCpu = data.h_rstCpu[pairIdx];
@@ -126,6 +129,7 @@ int main()
 
     methodCpu(data, setting);
     methodCuda(data, setting);
+    methodCusparse(data, setting);
 
     checkData(data);
 
