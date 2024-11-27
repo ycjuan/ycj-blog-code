@@ -94,8 +94,6 @@ void methodCusparse(Data data, Setting setting)
     int   C_nnz        = data.numPairsToScore;
     int   lda          = A_num_cols;
     int   ldb          = B_num_cols;
-    int   A_size       = lda * A_num_rows;
-    int   B_size       = ldb * B_num_rows;
     float alpha        = 1.0f;
     float beta         = 0.0f;
     //--------------------------------------------------------------------------
@@ -110,6 +108,10 @@ void methodCusparse(Data data, Setting setting)
     CHECK_CUDA( cudaMallocManaged((void**) &dC_columns, C_nnz * sizeof(int))   )
     CHECK_CUDA( cudaMallocManaged((void**) &dC_values,  C_nnz * sizeof(float)) )
 
+    #pragma omp parallel for
+    for (size_t pairIdx = 0; pairIdx < data.numPairsToScore; pairIdx++)
+        data.d_PairsToScore[pairIdx].score = 0;
+        
     coo2Csr(data, dC_offsets, dC_columns, dC_values);
 
 
