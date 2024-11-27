@@ -94,8 +94,8 @@ void methodCusparse(Data data, Setting setting)
     int   C_nnz        = data.numPairsToScore;
     int   lda          = (data.docMemLayout == ROW_MAJOR)? A_num_cols : A_num_rows;
     int   ldb          = (data.reqMemLayout == COL_MAJOR)? B_num_cols : B_num_rows;
-    int   A_size       = lda * A_num_rows;
-    int   B_size       = ldb * B_num_rows;
+    int   A_size       = (data.docMemLayout == ROW_MAJOR)? lda * A_num_rows : lda * A_num_cols;
+    int   B_size       = (data.reqMemLayout == COL_MAJOR)? ldb * B_num_rows : ldb * B_num_cols;
     float alpha        = 1.0f;
     float beta         = 0.0f;
     cout << "lda = " << lda << ", ldb = " << ldb << endl;

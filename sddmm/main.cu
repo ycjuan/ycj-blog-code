@@ -18,7 +18,7 @@ int kNumReqs = 1 << 4;
 int kEmbDim = 1 << 10;
 int kNumTrials = 10;
 double kDocDensity = 0.1;
-MemLayout kMemLayoutDoc = ROW_MAJOR;
+MemLayout kMemLayoutDoc = COL_MAJOR;
 MemLayout kMemLayoutReq = COL_MAJOR;
 
 #define CHECK_CUDA(func)                                                                                                           \
