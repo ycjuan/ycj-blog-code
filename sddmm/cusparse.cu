@@ -179,7 +179,7 @@ void methodCusparse(Data data, Setting setting)
         The function cusparseSDDMM_preprocess() can be called before cusparseSDDMM to speedup the actual computation. 
         It is useful when cusparseSDDMM is called multiple times with the same sparsity pattern (matC). 
         The values of the dense matrices (matA, matB) can change arbitrarily.
-    Since we can't assume "the same sparsity pattern (matC)" for our application, we don't use this function.
+    Since we can't assume "the same sparsity pattern (matC)" for our application, we don't use this function here.
     */
     /*
     CHECK_CUSPARSE( cusparseSDDMM_preprocess(
@@ -194,6 +194,15 @@ void methodCusparse(Data data, Setting setting)
     timer.tic();
     for (int t = -3; t < setting.numTrials; t++)
     {
+        /*
+        also tried to use this, but doesn't have any effect on the performance.
+        CHECK_CUSPARSE(cusparseSDDMM_preprocess(
+            handle,
+            CUSPARSE_OPERATION_NON_TRANSPOSE,
+            CUSPARSE_OPERATION_NON_TRANSPOSE,
+            &alpha, matA, matB, &beta, matC, CUDA_R_32F,
+            CUSPARSE_SDDMM_ALG_DEFAULT, dBuffer))
+        */
         CHECK_CUSPARSE(cusparseSDDMM(handle,
                                      CUSPARSE_OPERATION_NON_TRANSPOSE,
                                      CUSPARSE_OPERATION_NON_TRANSPOSE,
