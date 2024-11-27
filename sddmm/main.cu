@@ -20,9 +20,6 @@ int kNumTrials = 3;
 double kDocDensity = 0.1;
 MemLayout kMemLayoutDoc = COL_MAJOR;
 MemLayout kMemLayoutReq = ROW_MAJOR;
-MemLayout kMemLayoutRstCpu = COL_MAJOR;
-MemLayout kMemLayoutRstGpuCuda = COL_MAJOR;
-MemLayout kMemLayoutRstGpuCublas = COL_MAJOR;
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \
@@ -42,9 +39,6 @@ Data genData()
     data.embDim = kEmbDim;
     data.docMemLayout = kMemLayoutDoc;
     data.reqMemLayout = kMemLayoutReq;
-    data.rstLayoutCpu = kMemLayoutRstCpu;
-    data.rstLayoutGpuKernel = kMemLayoutRstGpuCuda;
-    data.rstLayoutGpuCublas = kMemLayoutRstGpuCublas;
     data.print();
     
     CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.embDim * sizeof(T)));

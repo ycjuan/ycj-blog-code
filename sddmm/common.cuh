@@ -38,9 +38,6 @@ struct Data
     
     MemLayout docMemLayout;
     MemLayout reqMemLayout;
-    MemLayout rstLayoutCpu;
-    MemLayout rstLayoutGpuKernel;
-    MemLayout rstLayoutGpuCublas;
 
     void free()
     {
@@ -57,9 +54,6 @@ struct Data
         oss << "numDocs: " << numDocs << ", numReqs: " << numReqs << ", embDim: " << embDim << ", numPairsToScore: " << numPairsToScore << endl;
         oss << "docMemLayout: " << (docMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "reqMemLayout: " << (reqMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
-        oss << "rstLayoutCpu: " << (rstLayoutCpu == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
-        oss << "rstLayoutGpuKernel: " << (rstLayoutGpuKernel == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
-        oss << "rstLayoutGpuCublas: " << (rstLayoutGpuCublas == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         cout << oss.str();
     }
 };

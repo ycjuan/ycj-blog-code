@@ -142,18 +142,34 @@ void methodCusparse(Data data, Setting setting)
     CHECK_CUDA( cudaMalloc(&dBuffer, bufferSize) )
 
     // execute preprocess (optional)
+    /*
+    The doc says:
+        The function cusparseSDDMM_preprocess() can be called before cusparseSDDMM to speedup the actual computation. 
+        It is useful when cusparseSDDMM is called multiple times with the same sparsity pattern (matC). 
+        The values of the dense matrices (matA, matB) can change arbitrarily.
+    Since we can't assume "the same sparsity pattern (matC)" for our application, we don't use this function.
+    */
+    /*
     CHECK_CUSPARSE( cusparseSDDMM_preprocess(
                                   handle,
                                   CUSPARSE_OPERATION_NON_TRANSPOSE,
                                   CUSPARSE_OPERATION_NON_TRANSPOSE,
                                   &alpha, matA, matB, &beta, matC, CUDA_R_32F,
                                   CUSPARSE_SDDMM_ALG_DEFAULT, dBuffer) )
+    */
     // execute SpMM
-    CHECK_CUSPARSE( cusparseSDDMM(handle,
-                                  CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                  CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                  &alpha, matA, matB, &beta, matC, CUDA_R_32F,
-                                  CUSPARSE_SDDMM_ALG_DEFAULT, dBuffer) )
+    Timer timer;
+    for (int t = -3; t < setting.numTrials; t++)
+    {
+        if (t == 0)
+            timer.tic();
+        CHECK_CUSPARSE(cusparseSDDMM(handle,
+                                     CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                     CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                     &alpha, matA, matB, &beta, matC, CUDA_R_32F,
+                                     CUSPARSE_SDDMM_ALG_DEFAULT, dBuffer))
+    }
+    cout << "CUSPARSE time: " << timer.tocMs() / setting.numTrials << " ms" << endl;
     // destroy matrix/vector descriptors
     CHECK_CUSPARSE( cusparseDestroyDnMat(matA) )
     CHECK_CUSPARSE( cusparseDestroyDnMat(matB) )
