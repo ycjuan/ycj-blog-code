@@ -143,8 +143,6 @@ void methodCusparse(Data data, Setting setting)
     CHECK_CUDA( cudaMemcpy(dC_values, hC_values, C_nnz * sizeof(float),
                            cudaMemcpyHostToDevice) )
 
-    cudaDeviceSynchronize();
-
     //--------------------------------------------------------------------------
     // CUSPARSE APIs
     cusparseHandle_t     handle = NULL;
