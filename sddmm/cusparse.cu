@@ -126,15 +126,15 @@ void methodCusparse(Data data, Setting setting)
     CHECK_CUDA( cudaMalloc((void**) &dB, B_size * sizeof(float)) )
     CHECK_CUDA( cudaMalloc((void**) &dC_offsets,
                            (A_num_rows + 1) * sizeof(int)) )
-    CHECK_CUDA( cudaMallocManaged((void**) &dC_offsets,
+    CHECK_CUDA( cudaMalloc((void**) &dC_offsets,
                            (A_num_rows + 1) * sizeof(int)) )
-    CHECK_CUDA( cudaMallocManaged((void**) &dC_columns, C_nnz * sizeof(int))   )
-    CHECK_CUDA( cudaMallocManaged((void**) &dC_values,  C_nnz * sizeof(float)) )
+    CHECK_CUDA( cudaMalloc((void**) &dC_columns, C_nnz * sizeof(int))   )
+    CHECK_CUDA( cudaMalloc((void**) &dC_values,  C_nnz * sizeof(float)) )
 
     CHECK_CUDA( cudaMemcpy(dA, hA, A_size * sizeof(float),
-                           cudaMemcpyHostToDevice) )
+                           cudaMemcpyDeviceToDevice) )
     CHECK_CUDA( cudaMemcpy(dB, hB, B_size * sizeof(float),
-                           cudaMemcpyHostToDevice) )
+                           cudaMemcpyDeviceToDevice) )
     CHECK_CUDA( cudaMemcpy(dC_offsets, hC_offsets,
                            (A_num_rows + 1) * sizeof(int),
                            cudaMemcpyHostToDevice) )
@@ -207,18 +207,20 @@ void methodCusparse(Data data, Setting setting)
     CHECK_CUSPARSE( cusparseDestroySpMat(matC) )
     CHECK_CUSPARSE( cusparseDestroy(handle) )
     //--------------------------------------------------------------------------
-
+    
+    CHECK_CUDA( cudaMemcpy(hC_values, dC_values, C_nnz * sizeof(float),
+                           cudaMemcpyDeviceToHost) )
     size_t pairIdx = 0;
     for (int docIdx = 0; docIdx < data.numDocs; docIdx++)
     {
-        int start = dC_offsets[docIdx];
-        int end = dC_offsets[docIdx + 1];
+        int start = hC_offsets[docIdx];
+        int end = hC_offsets[docIdx + 1];
         for (int i = start; i < end; i++)
         {
             Pair pair;
-            pair.reqIdx = dC_columns[i];
+            pair.reqIdx = hC_columns[i];
             pair.docIdx = docIdx;
-            pair.score = dC_values[i];
+            pair.score = hC_values[i];
             data.d_rstCusparse[pairIdx++] = pair;
         }
     }
@@ -226,7 +228,12 @@ void methodCusparse(Data data, Setting setting)
     //--------------------------------------------------------------------------
     // device memory deallocation
     CHECK_CUDA( cudaFree(dBuffer) )
+    CHECK_CUDA( cudaFree(dA) )
+    CHECK_CUDA( cudaFree(dB) )
     CHECK_CUDA( cudaFree(dC_offsets) )
     CHECK_CUDA( cudaFree(dC_columns) )
     CHECK_CUDA( cudaFree(dC_values) )
+    CHECK_CUDA( cudaFreeHost(hC_offsets) )
+    CHECK_CUDA( cudaFreeHost(hC_columns) )
+    CHECK_CUDA( cudaFreeHost(hC_values) )
 }

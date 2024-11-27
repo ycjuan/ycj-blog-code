@@ -13,11 +13,11 @@
 
 using namespace std;
 
-int kNumDocs = 5;
-int kNumReqs = 3;
-int kEmbDim = 4;
+int kNumDocs = 1 << 10;
+int kNumReqs = 1 << 4;
+int kEmbDim = 1 << 10;
 int kNumTrials = 1;
-double kDocDensity = 0.4;
+double kDocDensity = 0.1;
 MemLayout kMemLayoutDoc = ROW_MAJOR;
 MemLayout kMemLayoutReq = COL_MAJOR;
 
