@@ -154,11 +154,13 @@ void methodCusparse(Data data, Setting setting)
     size_t               bufferSize = 0;
     CHECK_CUSPARSE( cusparseCreate(&handle) )
     // Create dense matrix A
+    cusparseOrder_t orderA = (data.docMemLayout == ROW_MAJOR)? CUSPARSE_ORDER_ROW : CUSPARSE_ORDER_COL;
     CHECK_CUSPARSE( cusparseCreateDnMat(&matA, A_num_rows, A_num_cols, lda, dA,
-                                        CUDA_R_32F, CUSPARSE_ORDER_ROW) )
+                                        CUDA_R_32F, orderA) )
     // Create dense matrix B
+    cusparseOrder_t orderB = (data.reqMemLayout == COL_MAJOR)? CUSPARSE_ORDER_ROW : CUSPARSE_ORDER_COL;
     CHECK_CUSPARSE( cusparseCreateDnMat(&matB, A_num_cols, B_num_cols, ldb, dB,
-                                        CUDA_R_32F, CUSPARSE_ORDER_ROW) )
+                                        CUDA_R_32F, orderB) )
     // Create sparse matrix C in CSR format
     CHECK_CUSPARSE( cusparseCreateCsr(&matC, A_num_rows, B_num_cols, C_nnz,
                                       dC_offsets, dC_columns, dC_values,
