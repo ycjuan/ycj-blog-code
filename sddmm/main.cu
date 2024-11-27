@@ -18,8 +18,8 @@ int kNumReqs = 1 << 4;
 int kEmbDim = 1 << 10;
 int kNumTrials = 10;
 double kDocDensity = 0.1;
-MemLayout kMemLayoutDoc = COL_MAJOR;
-MemLayout kMemLayoutReq = COL_MAJOR;
+MemLayout kMemLayoutDoc = ROW_MAJOR;
+MemLayout kMemLayoutReq = ROW_MAJOR;
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \
@@ -64,7 +64,7 @@ Data genData()
             v_docIdx1D[i] = i;
         shuffle(v_docIdx1D.begin(), v_docIdx1D.end(), generator);
         sort(v_docIdx1D.begin(), v_docIdx1D.begin() + numEligibleDocsPerReq);
-        if (reqIdx == 0)
+        if (reqIdx < 4)
         {
             cout << "first 10 eligible doc indices for req " << reqIdx << ": ";
             for (int i = 0; i < 10; i++)
