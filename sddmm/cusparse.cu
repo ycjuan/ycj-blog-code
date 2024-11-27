@@ -13,16 +13,15 @@
 
 using namespace std;
 
-
-#define CHECK_CUDA(func)                                                       \
-{                                                                              \
-    cudaError_t status = (func);                                               \
-    if (status != cudaSuccess) {                                               \
-        printf("CUDA API failed at line %d with error: %s (%d)\n",             \
-               __LINE__, cudaGetErrorString(status), status);                  \
-        return EXIT_FAILURE;                                                   \
-    }                                                                          \
-}
+#define CHECK_CUDA(func)                                                                                                           \
+    {                                                                                                                              \
+        cudaError_t status = (func);                                                                                               \
+        if (status != cudaSuccess)                                                                                                 \
+        {                                                                                                                          \
+            string error = "CUDA API failed at line " + to_string(__LINE__) + " with error: " + cudaGetErrorString(status) + "\n"; \
+            throw runtime_error(error);                                                                                            \
+        }                                                                                                                          \
+    }
 
 #define CHECK_CUSPARSE(func)                                                   \
 {                                                                              \
@@ -34,50 +33,32 @@ using namespace std;
     }                                                                          \
 }
 
-int main(void) {
+void methodCusparse(Data data, Setting setting) 
+{
     // Host problem definition
-    int   A_num_rows   = 4;
-    int   A_num_cols   = 4;
+    int   A_num_rows   = data.numDocs;
+    int   A_num_cols   = data.embDim;
     int   B_num_rows   = A_num_cols;
-    int   B_num_cols   = 3;
-    int   C_nnz        = 9;
+    int   B_num_cols   = data.numReqs;
+    int   C_nnz        = data.numPairsToScore;
     int   lda          = A_num_cols;
     int   ldb          = B_num_cols;
     int   A_size       = lda * A_num_rows;
     int   B_size       = ldb * B_num_rows;
-    float hA[]         = { 1.0f,   2.0f,  3.0f,  4.0f,
-                           5.0f,   6.0f,  7.0f,  8.0f,
-                           9.0f,  10.0f, 11.0f, 12.0f,
-                           13.0f, 14.0f, 15.0f, 16.0f };
-    float hB[]         = {  1.0f,  2.0f,  3.0f,
-                            4.0f,  5.0f,  6.0f,
-                            7.0f,  8.0f,  9.0f,
-                           10.0f, 11.0f, 12.0f };
-    int   hC_offsets[] = { 0, 3, 4, 7, 9 };
-    int   hC_columns[] = { 0, 1, 2, 1, 0, 1, 2, 0, 2 };
-    float hC_values[]  = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-                           0.0f, 0.0f, 0.0f, 0.0f };
-    float hC_result[]  = { 70.0f, 80.0f, 90.0f,
-                           184.0f,
-                           246.0f, 288.0f, 330.0f,
-                           334.0f, 450.0f };
     float alpha        = 1.0f;
     float beta         = 0.0f;
     //--------------------------------------------------------------------------
     // Device memory management
     int   *dC_offsets, *dC_columns;
-    float *dC_values, *dB, *dA;
-    CHECK_CUDA( cudaMalloc((void**) &dA, A_size * sizeof(float)) )
-    CHECK_CUDA( cudaMalloc((void**) &dB, B_size * sizeof(float)) )
+    T *dB, *dA;
+    float *dC_values;
+    dA = data.d_doc;
+    dB = data.d_req;
     CHECK_CUDA( cudaMalloc((void**) &dC_offsets,
                            (A_num_rows + 1) * sizeof(int)) )
     CHECK_CUDA( cudaMalloc((void**) &dC_columns, C_nnz * sizeof(int))   )
     CHECK_CUDA( cudaMalloc((void**) &dC_values,  C_nnz * sizeof(float)) )
 
-    CHECK_CUDA( cudaMemcpy(dA, hA, A_size * sizeof(float),
-                           cudaMemcpyHostToDevice) )
-    CHECK_CUDA( cudaMemcpy(dB, hB, B_size * sizeof(float),
-                           cudaMemcpyHostToDevice) )
     CHECK_CUDA( cudaMemcpy(dC_offsets, hC_offsets,
                            (A_num_rows + 1) * sizeof(int),
                            cudaMemcpyHostToDevice) )
