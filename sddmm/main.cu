@@ -13,13 +13,13 @@
 
 using namespace std;
 
-int kNumDocs = 1 << 10;
-int kNumReqs = 1 << 2;
-int kEmbDim = 1 << 4;
-int kNumTrials = 10;
-double kDocDensity = 0.1;
-MemLayout kMemLayoutDoc = COL_MAJOR;
-MemLayout kMemLayoutReq = ROW_MAJOR;
+int kNumDocs = 5;
+int kNumReqs = 3;
+int kEmbDim = 4;
+int kNumTrials = 1;
+double kDocDensity = 0.4;
+MemLayout kMemLayoutDoc = ROW_MAJOR;
+MemLayout kMemLayoutReq = COL_MAJOR;
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \

@@ -94,27 +94,56 @@ void methodCusparse(Data data, Setting setting)
     int   C_nnz        = data.numPairsToScore;
     int   lda          = A_num_cols;
     int   ldb          = B_num_cols;
+    int   A_size       = lda * A_num_rows;
+    int   B_size       = ldb * B_num_rows;
     float alpha        = 1.0f;
     float beta         = 0.0f;
     cout << "lda = " << lda << ", ldb = " << ldb << endl;
     //--------------------------------------------------------------------------
+    int   *hC_offsets, *hC_columns;
+    T *hB, *hA;
+    float *hC_values;
+    // data.d_doc is allocated by cudaMallocManaged. however, it seems it doesn't work for cusparse for some reason..
+    // that's why I'm treating it as "host memory", and then copy to dA which is allocated by cudaMalloc.
+    hA = data.d_doc;
+    hB = data.d_req;
+    CHECK_CUDA( cudaMallocHost((void**) &hC_offsets,
+                           (A_num_rows + 1) * sizeof(int)) )
+    CHECK_CUDA( cudaMallocHost((void**) &hC_columns, C_nnz * sizeof(int))   )
+    CHECK_CUDA( cudaMallocHost((void**) &hC_values,  C_nnz * sizeof(float)) )
+    
+    #pragma omp parallel for
+    for (size_t pairIdx = 0; pairIdx < data.numPairsToScore; pairIdx++)
+        data.d_PairsToScore[pairIdx].score = 0;
+
+    coo2Csr(data, hC_offsets, hC_columns, hC_values);
+
     // Device memory management
     int   *dC_offsets, *dC_columns;
     T *dB, *dA;
     float *dC_values;
-    dA = data.d_doc;
-    dB = data.d_req;
+    CHECK_CUDA( cudaMalloc((void**) &dA, A_size * sizeof(float)) )
+    CHECK_CUDA( cudaMalloc((void**) &dB, B_size * sizeof(float)) )
+    CHECK_CUDA( cudaMalloc((void**) &dC_offsets,
+                           (A_num_rows + 1) * sizeof(int)) )
     CHECK_CUDA( cudaMallocManaged((void**) &dC_offsets,
                            (A_num_rows + 1) * sizeof(int)) )
     CHECK_CUDA( cudaMallocManaged((void**) &dC_columns, C_nnz * sizeof(int))   )
     CHECK_CUDA( cudaMallocManaged((void**) &dC_values,  C_nnz * sizeof(float)) )
 
-    #pragma omp parallel for
-    for (size_t pairIdx = 0; pairIdx < data.numPairsToScore; pairIdx++)
-        data.d_PairsToScore[pairIdx].score = 0;
+    CHECK_CUDA( cudaMemcpy(dA, hA, A_size * sizeof(float),
+                           cudaMemcpyHostToDevice) )
+    CHECK_CUDA( cudaMemcpy(dB, hB, B_size * sizeof(float),
+                           cudaMemcpyHostToDevice) )
+    CHECK_CUDA( cudaMemcpy(dC_offsets, hC_offsets,
+                           (A_num_rows + 1) * sizeof(int),
+                           cudaMemcpyHostToDevice) )
+    CHECK_CUDA( cudaMemcpy(dC_columns, hC_columns, C_nnz * sizeof(int),
+                           cudaMemcpyHostToDevice) )
+    CHECK_CUDA( cudaMemcpy(dC_values, hC_values, C_nnz * sizeof(float),
+                           cudaMemcpyHostToDevice) )
 
-    coo2Csr(data, dC_offsets, dC_columns, dC_values);
-
+    cudaDeviceSynchronize();
 
     //--------------------------------------------------------------------------
     // CUSPARSE APIs
@@ -162,10 +191,9 @@ void methodCusparse(Data data, Setting setting)
     */
     // execute SpMM
     Timer timer;
-    for (int t = -3; t < setting.numTrials; t++)
+    timer.tic();
+    //for (int t = -3; t < setting.numTrials; t++)
     {
-        if (t == 0)
-            timer.tic();
         CHECK_CUSPARSE(cusparseSDDMM(handle,
                                      CUSPARSE_OPERATION_NON_TRANSPOSE,
                                      CUSPARSE_OPERATION_NON_TRANSPOSE,
