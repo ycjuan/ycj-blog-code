@@ -13,10 +13,10 @@
 
 using namespace std;
 
-int kNumDocs = 1 << 10;
+int kNumDocs = 1 << 20;
 int kNumReqs = 1 << 4;
 int kEmbDim = 1 << 10;
-int kNumTrials = 1;
+int kNumTrials = 10;
 double kDocDensity = 0.1;
 MemLayout kMemLayoutDoc = ROW_MAJOR;
 MemLayout kMemLayoutReq = COL_MAJOR;
@@ -65,10 +65,12 @@ Data genData()
         shuffle(v_docIdx1D.begin(), v_docIdx1D.end(), generator);
         sort(v_docIdx1D.begin(), v_docIdx1D.begin() + numEligibleDocsPerReq);
         if (reqIdx == 0)
+        {
             cout << "first 10 eligible doc indices for req " << reqIdx << ": ";
-        for (int i = 0; i < 10; i++)
-            cout << v_docIdx1D[i] << " ";
-        cout << endl;
+            for (int i = 0; i < 10; i++)
+                cout << v_docIdx1D[i] << " ";
+            cout << endl;
+        }
         for (int docIdx = 0; docIdx < numEligibleDocsPerReq; docIdx++)
         {
             Pair pair;

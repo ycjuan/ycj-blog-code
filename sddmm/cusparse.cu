@@ -192,13 +192,14 @@ void methodCusparse(Data data, Setting setting)
     // execute SpMM
     Timer timer;
     timer.tic();
-    //for (int t = -3; t < setting.numTrials; t++)
+    for (int t = -3; t < setting.numTrials; t++)
     {
         CHECK_CUSPARSE(cusparseSDDMM(handle,
                                      CUSPARSE_OPERATION_NON_TRANSPOSE,
                                      CUSPARSE_OPERATION_NON_TRANSPOSE,
                                      &alpha, matA, matB, &beta, matC, CUDA_R_32F,
                                      CUSPARSE_SDDMM_ALG_DEFAULT, dBuffer))
+        CHECK_CUDA( cudaDeviceSynchronize() )
     }
     cout << "CUSPARSE time: " << timer.tocMs() / setting.numTrials << " ms" << endl;
     // destroy matrix/vector descriptors
