@@ -23,15 +23,15 @@ using namespace std;
         }                                                                                                                          \
     }
 
-#define CHECK_CUSPARSE(func)                                                   \
-{                                                                              \
-    cusparseStatus_t status = (func);                                          \
-    if (status != CUSPARSE_STATUS_SUCCESS) {                                   \
-        printf("CUSPARSE API failed at line %d with error: %s (%d)\n",         \
-               __LINE__, cusparseGetErrorString(status), status);              \
-        return EXIT_FAILURE;                                                   \
-    }                                                                          \
-}
+#define CHECK_CUSPARSE(func)                                                     \
+    {                                                                            \
+        cusparseStatus_t status = (func);                                        \
+        if (status != CUSPARSE_STATUS_SUCCESS)                                   \
+        {                                                                        \
+            string error = "CUSPARSE API failed at line " + to_string(__LINE__); \
+            throw runtime_error(error);                                          \
+        }                                                                        \
+    }
 
 void methodCusparse(Data data, Setting setting) 
 {
@@ -113,27 +113,11 @@ void methodCusparse(Data data, Setting setting)
     CHECK_CUSPARSE( cusparseDestroySpMat(matC) )
     CHECK_CUSPARSE( cusparseDestroy(handle) )
     //--------------------------------------------------------------------------
-    // device result check
-    CHECK_CUDA( cudaMemcpy(hC_values, dC_values, C_nnz * sizeof(float),
-                           cudaMemcpyDeviceToHost) )
-    int correct = 1;
-    for (int i = 0; i < C_nnz; i++) {
-        if (hC_values[i] != hC_result[i]) {
-            correct = 0; // direct floating point comparison is not reliable
-            break;
-        }
-    }
-    if (correct)
-        printf("sddmm_csr_example test PASSED\n");
-    else
-        printf("sddmm_csr_example test FAILED: wrong result\n");
+
     //--------------------------------------------------------------------------
     // device memory deallocation
     CHECK_CUDA( cudaFree(dBuffer) )
-    CHECK_CUDA( cudaFree(dA) )
-    CHECK_CUDA( cudaFree(dB) )
     CHECK_CUDA( cudaFree(dC_offsets) )
     CHECK_CUDA( cudaFree(dC_columns) )
     CHECK_CUDA( cudaFree(dC_values) )
-    return EXIT_SUCCESS;
 }
