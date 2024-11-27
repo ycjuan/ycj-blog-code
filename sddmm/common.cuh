@@ -3,6 +3,7 @@
 
 #include <sstream>
 #include <iostream>
+#include <algorithm>
 #include <cublas_v2.h>
 
 using namespace std;
@@ -76,12 +77,42 @@ inline __device__ __host__ size_t getMemAddr(int i, int j, int M, int N, MemLayo
         return (size_t)j * M + i;
 }
 
-inline bool pairComparator(const Pair &a, const Pair &b)
+inline bool pairComparatorReqFirst(const Pair &a, const Pair &b)
 {
     if (a.reqIdx != b.reqIdx)
         return a.reqIdx < b.reqIdx;
     else
         return a.docIdx < b.docIdx;
+}
+
+inline bool pairComparatorDocFirst(const Pair &a, const Pair &b)
+{
+    if (a.docIdx != b.docIdx)
+        return a.docIdx < b.docIdx;
+    else
+        return a.reqIdx < b.reqIdx;
+}
+
+inline void coo2Csr(Data data, int *dC_offsets, int *dC_columns, float *dC_values)
+{
+    sort(data.d_PairsToScore, data.d_PairsToScore + data.numPairsToScore, pairComparatorDocFirst);
+
+    Pair pair = data.d_PairsToScore[0];
+    dC_offsets[0] = 0;
+    dC_columns[0] = pair.reqIdx;
+    dC_values[0]  = 0;
+    int currDocIdx = pair.docIdx;
+    for (size_t v = 1; v < data.numPairsToScore; v++)
+    {
+        pair = data.d_PairsToScore[v];
+        for (int docIdx = currDocIdx + 1; docIdx < pair.docIdx; docIdx++)
+        {
+            dC_offsets[docIdx + 1] = v;
+        }
+        currDocIdx = pair.docIdx;
+        dC_columns[v] = pair.reqIdx;
+        dC_values[v]  = 0;
+    }
 }
 
 #endif
