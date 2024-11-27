@@ -18,8 +18,8 @@ enum MemLayout
 
 struct Pair
 {
-    int reqIdx;
     int docIdx;
+    int reqIdx;
     float score;
 };
 
@@ -100,19 +100,22 @@ inline void coo2Csr(Data data, int *dC_offsets, int *dC_columns, float *dC_value
     Pair pair = data.d_PairsToScore[0];
     dC_offsets[0] = 0;
     dC_columns[0] = pair.reqIdx;
-    dC_values[0]  = 0;
+    dC_values[0]  = pair.score;
     int currDocIdx = pair.docIdx;
     for (size_t v = 1; v < data.numPairsToScore; v++)
     {
         pair = data.d_PairsToScore[v];
-        for (int docIdx = currDocIdx + 1; docIdx < pair.docIdx; docIdx++)
+        for (int docIdx = currDocIdx; docIdx < pair.docIdx; docIdx++)
         {
+            //cout << "docIdx: " << docIdx << ", currDocIdx: " << currDocIdx << ", pair.docIdx: " << pair.docIdx << ", v: " << v << endl;
             dC_offsets[docIdx + 1] = v;
         }
         currDocIdx = pair.docIdx;
         dC_columns[v] = pair.reqIdx;
-        dC_values[v]  = 0;
+        dC_values[v]  = pair.score;
     }
+    for (int docIdx = currDocIdx; docIdx < data.numDocs; docIdx++)
+        dC_offsets[docIdx + 1] = data.numPairsToScore;
 }
 
 #endif

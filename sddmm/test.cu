@@ -17,7 +17,7 @@ using namespace std;
 void testCooToCsr()
 {
     Data data;
-    data.numDocs = 6;
+    data.numDocs = 8;
     data.numReqs = 14;
     data.numPairsToScore = 9;
     vector<Pair> v_pairsToScore = {
@@ -31,6 +31,7 @@ void testCooToCsr()
         {5, 12, 0.7},
         {5, 13, 0.8}
     };
+    data.d_PairsToScore = v_pairsToScore.data();
 
     shuffle(v_pairsToScore.begin(), v_pairsToScore.end(), default_random_engine(0));
 
@@ -40,13 +41,16 @@ void testCooToCsr()
 
     coo2Csr(data, v_offsets.data(), v_columns.data(), v_values.data());
 
-    assert(v_offsets == vector<int>({0, 2, 2, 5, 5, 5, 9}));
+    assert(v_offsets == vector<int>({0, 2, 2, 5, 5, 5, 9, 9, 9}));
     assert(v_columns == vector<int>({0, 7, 1, 6, 10, 3, 9, 12, 13}));
     assert(v_values == vector<float>({0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8}));
+
+    cout << "testCooToCsr passed" << endl;
 }
 
 int main()
 {
+    testCooToCsr();
 
     return 0;
 }
