@@ -59,6 +59,11 @@ void methodCuda(Data data, Setting setting)
     #pragma omp parallel for
     for (size_t pairIdx = 0; pairIdx < data.numPairsToScore; pairIdx++)
         data.d_PairsToScore[pairIdx].score = 0;
+    
+    if (setting.reqFirst)
+        sort(data.d_PairsToScore, data.d_PairsToScore + data.numPairsToScore, pairComparatorReqFirst);
+    else
+        sort(data.d_PairsToScore, data.d_PairsToScore + data.numPairsToScore, pairComparatorDocFirst);
 
     CudaTimer timer;
     for (int t = -3; t < setting.numTrials; t++)

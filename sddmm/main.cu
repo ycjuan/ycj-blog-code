@@ -19,9 +19,11 @@ int kEmbDim = 1 << 10;
 double kDocDensity = 0.1;
 MemLayout kMemLayoutDoc = ROW_MAJOR;
 MemLayout kMemLayoutReq = ROW_MAJOR;
+bool kSwapDocReq = true;
+bool kReqFirst = false;
 
 int kNumTrials = 10;
-bool kSwapDocReq = false;
+
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \
@@ -124,6 +126,7 @@ int main()
     Setting setting;
     setting.numTrials = kNumTrials;
     setting.swapDocReq = kSwapDocReq;
+    setting.reqFirst = kReqFirst;
     
     Data data = genData();
 

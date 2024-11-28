@@ -71,6 +71,7 @@ struct Setting
 {
     int numTrials;
     bool swapDocReq;
+    bool reqFirst;
 };
 
 inline __device__ __host__ size_t getMemAddr(int i, int j, int M, int N, MemLayout layout)
