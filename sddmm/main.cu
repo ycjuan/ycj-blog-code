@@ -16,10 +16,12 @@ using namespace std;
 int kNumDocs = 1 << 20;
 int kNumReqs = 1 << 4;
 int kEmbDim = 1 << 10;
-int kNumTrials = 10;
 double kDocDensity = 0.1;
 MemLayout kMemLayoutDoc = ROW_MAJOR;
 MemLayout kMemLayoutReq = ROW_MAJOR;
+
+int kNumTrials = 10;
+bool kSwapDocReq = false;
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \
@@ -121,6 +123,7 @@ int main()
 {
     Setting setting;
     setting.numTrials = kNumTrials;
+    setting.swapDocReq = kSwapDocReq;
     
     Data data = genData();
 

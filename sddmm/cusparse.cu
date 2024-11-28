@@ -84,8 +84,11 @@ using namespace std;
         }                                                                        \
     }
 
-void methodCusparse(Data data, Setting setting) 
+void methodCusparse(Data &data, Setting setting)
 {
+    if (setting.swapDocReq)
+        data.swapDocReq();
+    data.print();
     // Host problem definition
     int   A_num_rows   = data.numDocs;
     int   A_num_cols   = data.embDim;
@@ -228,8 +231,8 @@ void methodCusparse(Data data, Setting setting)
         for (int i = start; i < end; i++)
         {
             Pair pair;
-            pair.reqIdx = hC_columns[i];
-            pair.docIdx = docIdx;
+            pair.reqIdx = setting.swapDocReq? docIdx : hC_columns[i];
+            pair.docIdx = setting.swapDocReq? hC_columns[i] : docIdx;
             pair.score = hC_values[i];
             data.d_rstCusparse[pairIdx++] = pair;
         }

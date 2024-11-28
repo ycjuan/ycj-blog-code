@@ -56,11 +56,21 @@ struct Data
         oss << "reqMemLayout: " << (reqMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         cout << oss.str();
     }
+
+    void swapDocReq()
+    {
+        swap(d_doc, d_req);
+        swap(numDocs, numReqs);
+        swap(docMemLayout, reqMemLayout);
+        for (size_t i = 0; i < numPairsToScore; i++)
+            swap(d_PairsToScore[i].docIdx, d_PairsToScore[i].reqIdx);
+    }
 };
 
 struct Setting
 {
     int numTrials;
+    bool swapDocReq;
 };
 
 inline __device__ __host__ size_t getMemAddr(int i, int j, int M, int N, MemLayout layout)
