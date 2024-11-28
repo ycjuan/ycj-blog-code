@@ -43,7 +43,6 @@ Data genData()
     data.embDim = kEmbDim;
     data.docMemLayout = kMemLayoutDoc;
     data.reqMemLayout = kMemLayoutReq;
-    data.print();
     
     CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.embDim * sizeof(T)));
     CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.embDim * sizeof(T)));
@@ -83,6 +82,8 @@ Data genData()
             data.d_PairsToScore[data.numPairsToScore++] = pair;
         }
     }
+    
+    data.print();
     
     return data;
 }
