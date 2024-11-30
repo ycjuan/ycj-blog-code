@@ -56,9 +56,9 @@ void curandErrCheck_(curandStatus_t stat, const char *file, int line) {
 using namespace nvcuda;
 
 // Must be multiples of 16 for wmma code to work
-#define MATRIX_M 32
-#define MATRIX_N 32 
-#define MATRIX_K 32
+#define MATRIX_M 1048576
+#define MATRIX_N 16 
+#define MATRIX_K 1024
 
 // The only dimensions currently supported by WMMA
 const int WMMA_M = 16;
@@ -79,7 +79,7 @@ __global__ void wmma_example(half *a, half *b, float *c, int M, int N, int K, fl
    int ldc = M;
 
    // Tile using a 2D grid
-   int warpM = (blockIdx.x * blockDim.x + threadIdx.x);
+   int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
    int warpN = (blockIdx.y * blockDim.y + threadIdx.y);
  
    // Declare the fragments
@@ -100,8 +100,6 @@ __global__ void wmma_example(half *a, half *b, float *c, int M, int N, int K, fl
 
       // Bounds checking
       if (aRow < M && aCol < K && bRow < K && bCol < N) {
-
-         printf("aRow = %d, aCol = %d, bRow = %d, bCol = %d\n", aRow, aCol, bRow, bCol);
          // Load the inputs
          wmma::load_matrix_sync(a_frag, a + aRow + aCol * lda, lda);
          wmma::load_matrix_sync(b_frag, b + bRow + bCol * ldb, ldb);
@@ -214,7 +212,7 @@ int main(int argc, char* argv[]) {
    blockDim.x = 128;
    blockDim.y = 4;
 
-   gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x - 1)) / (WMMA_M * blockDim.x);
+   gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / 32 - 1)) / (WMMA_M * blockDim.x / 32);
    gridDim.y = (MATRIX_N + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y);
    
    printf("Running with wmma...\n");
