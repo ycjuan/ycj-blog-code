@@ -74,6 +74,17 @@ struct Setting
     int numTrials;
     bool swapDocReq;
     bool reqFirst;
+    MemLayout docMemLayout;
+    MemLayout reqMemLayout;
+
+    void print()
+    {
+        ostringstream oss;
+        oss << "numTrials: " << numTrials << ", swapDocReq: " << swapDocReq << ", reqFirst: " << reqFirst << endl;
+        oss << "docMemLayout: " << (docMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
+        oss << "reqMemLayout: " << (reqMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
+        cout << oss.str();
+    }
 };
 
 inline __device__ __host__ size_t getMemAddr(int i, int j, int M, int N, MemLayout layout)

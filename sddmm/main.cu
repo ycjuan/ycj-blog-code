@@ -13,17 +13,11 @@
 
 using namespace std;
 
-int kNumDocs = 1 << 20;
+int kNumDocs = 1 << 10;
 int kNumReqs = 1 << 4;
 int kEmbDim = 1 << 10;
 double kDocDensity = 0.1;
-MemLayout kMemLayoutDoc = ROW_MAJOR;
-MemLayout kMemLayoutReq = ROW_MAJOR;
-bool kSwapDocReq = true;
-bool kReqFirst = false;
-
 int kNumTrials = 10;
-
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \
@@ -35,14 +29,14 @@ int kNumTrials = 10;
         }                                                                                                                          \
     }
 
-Data genData()
+Data genData(Setting setting)
 {
     Data data;
     data.numDocs = kNumDocs;
     data.numReqs = kNumReqs;
     data.embDim = kEmbDim;
-    data.docMemLayout = kMemLayoutDoc;
-    data.reqMemLayout = kMemLayoutReq;
+    data.docMemLayout = setting.docMemLayout;
+    data.reqMemLayout = setting.reqMemLayout;
     
     CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.embDim * sizeof(T)));
     CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.embDim * sizeof(T)));
@@ -122,14 +116,11 @@ void checkData(Data data)
     cout << "All results match!" << endl;
 }
 
-int main()
+void runExp(Setting setting)
 {
-    Setting setting;
-    setting.numTrials = kNumTrials;
-    setting.swapDocReq = kSwapDocReq;
-    setting.reqFirst = kReqFirst;
-    
-    Data data = genData();
+    cout << endl << endl;
+    setting.print();
+    Data data = genData(setting);
 
     methodCpu(data, setting);
     methodCuda(data, setting);
@@ -138,6 +129,31 @@ int main()
     checkData(data);
 
     data.free();
+}
+
+int main()
+{
+    vector<MemLayout> docMemLayouts = {ROW_MAJOR, COL_MAJOR};
+    vector<MemLayout> reqMemLayouts = {ROW_MAJOR, COL_MAJOR};
+    vector<bool> swapDocReqs = {false, true};
+    vector<bool> reqFirsts = {false, true};
+
+    Setting setting;
+    setting.numTrials = kNumTrials;
+    for (auto docMemLayout : docMemLayouts)
+    {
+        for (auto reqMemLayout : reqMemLayouts)
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                setting.docMemLayout = docMemLayout;
+                setting.reqMemLayout = reqMemLayout;
+                setting.swapDocReq = swapDocReqs[i];
+                setting.reqFirst = reqFirsts[i];
+                runExp(setting);
+            }
+        }
+    }
 
     return 0;
 }
