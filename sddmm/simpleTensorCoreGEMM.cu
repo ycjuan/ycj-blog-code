@@ -28,6 +28,9 @@
 #include <stdio.h>
 #include <curand.h>
 #include <cublas_v2.h>
+#include <iostream>
+
+using namespace std;
 
 // Define some error checking macros.
 #define cudaErrCheck(stat) { cudaErrCheck_((stat), __FILE__, __LINE__); }
@@ -56,9 +59,9 @@ void curandErrCheck_(curandStatus_t stat, const char *file, int line) {
 using namespace nvcuda;
 
 // Must be multiples of 16 for wmma code to work
-#define MATRIX_M 1048576
-#define MATRIX_N 16 
-#define MATRIX_K 1024
+#define MATRIX_M 128
+#define MATRIX_N 32 
+#define MATRIX_K 64
 
 // The only dimensions currently supported by WMMA
 const int WMMA_M = 16;
@@ -80,7 +83,14 @@ __global__ void wmma_example(half *a, half *b, float *c, int M, int N, int K, fl
 
    // Tile using a 2D grid
    int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
+   int mul = (blockIdx.x * blockDim.x + threadIdx.x);
    int warpN = (blockIdx.y * blockDim.y + threadIdx.y);
+   printf("blockIdx.x = %d, blockDim.x = %d, threadIdx.x = %d, mul = %d, warpSize = %d, warpM = %d, warpN = %d\n",
+          blockIdx.x, blockDim.x, threadIdx.x, mul, warpSize, warpM, warpN);
+   
+   if (warpM > 0 || warpN > 0) {
+      return;
+   }
  
    // Declare the fragments
    wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> a_frag;
@@ -115,15 +125,8 @@ __global__ void wmma_example(half *a, half *b, float *c, int M, int N, int K, fl
    int cCol = warpN * WMMA_N;
 
    if (cRow < M && cCol < N) {
-      wmma::load_matrix_sync(c_frag, c + cRow + cCol * ldc, ldc, wmma::mem_col_major);
-
-#pragma unroll
-      for(int i=0; i < c_frag.num_elements; i++) {
-         c_frag.x[i] = alpha * acc_frag.x[i] + beta * c_frag.x[i];
-      }
-
       // Store the output
-      wmma::store_matrix_sync(c + cRow + cCol * ldc, c_frag, ldc, wmma::mem_col_major);
+      wmma::store_matrix_sync(c + cRow + cCol * ldc, acc_frag, ldc, wmma::mem_col_major);
    }
 }
 
@@ -197,7 +200,7 @@ int main(int argc, char* argv[]) {
    cudaErrCheck(cudaMemcpy(c_cublas, c, MATRIX_M * MATRIX_N * sizeof(float), cudaMemcpyDeviceToDevice));
    cudaErrCheck(cudaMemcpy(c_wmma, c, MATRIX_M * MATRIX_N * sizeof(float), cudaMemcpyDeviceToDevice));
 
-   float alpha = 2.0f;
+   float alpha = 1.0f;
    float beta = 0.0f;
 
 
@@ -209,11 +212,13 @@ int main(int argc, char* argv[]) {
  
    // blockDim.x must be a multple of warpSize
    // 128x4 means we have 16 warps and a block computes a 64x64 output tile
+   // One warp computes 16x16. So 16 warps computes (16 * 4) * (16 * 4)  = 64x64
    blockDim.x = 128;
    blockDim.y = 4;
 
    gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / 32 - 1)) / (WMMA_M * blockDim.x / 32);
    gridDim.y = (MATRIX_N + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y);
+   cout << "gridDim.x = " << gridDim.x << ", gridDim.y = " << gridDim.y << endl;
    
    printf("Running with wmma...\n");
    cudaErrCheck(cudaEventRecord(startWMMA));
@@ -256,15 +261,21 @@ int main(int argc, char* argv[]) {
    
    // 0.01% relative tolerance. 1e-5 absolute tolerance.
    int errors = 0;
-   for (int i = 0; i < MATRIX_M * MATRIX_N; i++) {
-      float v1 = c_host_wmma[i];
-      float v2 = c_host_cublas[i];
-      float diff  = fabs(v1 - v2);
-      float relative_err = diff / v2;
-      float eps = 1e-4;
-      if ((relative_err >= eps)) {
-         errors++;
-         if (errors < 10) printf("%f %f\n", v1, v2);
+   for (int j = 0; j < MATRIX_N; j++)
+   {
+      for (int i = 0; i < MATRIX_M; i++)
+      {
+         float v1 = c_host_wmma[j * MATRIX_M + i];
+         float v2 = c_host_cublas[j * MATRIX_M + i];
+         float diff = fabs(v1 - v2);
+         float relative_err = diff / v2;
+         float eps = 1e-4;
+         if ((relative_err <= eps))
+         {
+            errors++;
+            //if (errors < 10)
+            printf("i = %d, j = %d, v_wmma = %f, v_cublas = %f\n", i, j, v1, v2);
+         }
       }
    }
    
