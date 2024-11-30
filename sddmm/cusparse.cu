@@ -58,6 +58,7 @@
 #include <cusparse.h>         // cusparseSpMM
 #include <stdio.h>            // printf
 #include <stdlib.h>           // EXIT_FAILURE
+#include <type_traits>
 
 #include "common.cuh"
 #include "util.cuh"
@@ -101,6 +102,8 @@ void methodCusparse(Data &data, Setting setting)
     size_t B_size      = (data.reqMemLayout == COL_MAJOR)? (size_t)ldb * B_num_rows : (size_t)ldb * B_num_cols;
     float alpha        = 1.0f;
     float beta         = 0.0f;
+    cudaDataType aType = is_same<T, float>::value? CUDA_R_32F : is_same<T, half>::value? CUDA_R_16F : CUDA_R_16BF;
+    cudaDataType bType = aType;
     cout << "lda = " << lda << ", ldb = " << ldb << endl;
     //--------------------------------------------------------------------------
     int   *hC_offsets, *hC_columns;
@@ -125,8 +128,8 @@ void methodCusparse(Data &data, Setting setting)
     int   *dC_offsets, *dC_columns;
     T *dB, *dA;
     float *dC_values;
-    CHECK_CUDA( cudaMalloc((void**) &dA, A_size * sizeof(float)) )
-    CHECK_CUDA( cudaMalloc((void**) &dB, B_size * sizeof(float)) )
+    CHECK_CUDA( cudaMalloc((void**) &dA, A_size * sizeof(T)) )
+    CHECK_CUDA( cudaMalloc((void**) &dB, B_size * sizeof(T)) )
     CHECK_CUDA( cudaMalloc((void**) &dC_offsets,
                            (A_num_rows + 1) * sizeof(int)) )
     CHECK_CUDA( cudaMalloc((void**) &dC_offsets,
@@ -134,9 +137,9 @@ void methodCusparse(Data &data, Setting setting)
     CHECK_CUDA( cudaMalloc((void**) &dC_columns, C_nnz * sizeof(int))   )
     CHECK_CUDA( cudaMalloc((void**) &dC_values,  C_nnz * sizeof(float)) )
 
-    CHECK_CUDA( cudaMemcpy(dA, hA, A_size * sizeof(float),
+    CHECK_CUDA( cudaMemcpy(dA, hA, A_size * sizeof(T),
                            cudaMemcpyDeviceToDevice) )
-    CHECK_CUDA( cudaMemcpy(dB, hB, B_size * sizeof(float),
+    CHECK_CUDA( cudaMemcpy(dB, hB, B_size * sizeof(T),
                            cudaMemcpyDeviceToDevice) )
     CHECK_CUDA( cudaMemcpy(dC_offsets, hC_offsets,
                            (A_num_rows + 1) * sizeof(int),
@@ -157,11 +160,11 @@ void methodCusparse(Data &data, Setting setting)
     // Create dense matrix A
     cusparseOrder_t orderA = (data.docMemLayout == ROW_MAJOR)? CUSPARSE_ORDER_ROW : CUSPARSE_ORDER_COL;
     CHECK_CUSPARSE( cusparseCreateDnMat(&matA, A_num_rows, A_num_cols, lda, dA,
-                                        CUDA_R_32F, orderA) )
+                                        aType, orderA) )
     // Create dense matrix B
     cusparseOrder_t orderB = (data.reqMemLayout == COL_MAJOR)? CUSPARSE_ORDER_ROW : CUSPARSE_ORDER_COL;
     CHECK_CUSPARSE( cusparseCreateDnMat(&matB, A_num_cols, B_num_cols, ldb, dB,
-                                        CUDA_R_32F, orderB) )
+                                        bType, orderB) )
     // Create sparse matrix C in CSR format
     CHECK_CUSPARSE( cusparseCreateCsr(&matC, A_num_rows, B_num_cols, C_nnz,
                                       dC_offsets, dC_columns, dC_values,

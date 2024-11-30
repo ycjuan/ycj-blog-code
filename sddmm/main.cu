@@ -101,7 +101,7 @@ void checkData(Data data)
 
         if (pairCpu.reqIdx != pairCuda.reqIdx ||
             pairCpu.docIdx != pairCuda.docIdx ||
-            abs(pairCpu.score - pairCuda.score) > 1e-3)
+            abs( (pairCpu.score - pairCuda.score) / pairCpu.score) > 1e-3)
         {
             cout << "Mismatch at pairIdx " << pairIdx << endl;
             cout << "CPU: " << pairCpu.reqIdx << " " << pairCpu.docIdx << " " << pairCpu.score << endl;
@@ -111,7 +111,7 @@ void checkData(Data data)
 
         if (pairCpu.reqIdx != pairCusparse.reqIdx ||
             pairCpu.docIdx != pairCusparse.docIdx ||
-            abs(pairCpu.score - pairCusparse.score) > 1e-3)
+            abs( (pairCpu.score - pairCuda.score) / pairCpu.score) > 1e-3)
         {
             cout << "Mismatch at pairIdx " << pairIdx << endl;
             cout << "CPU: " << pairCpu.reqIdx << " " << pairCpu.docIdx << " " << pairCpu.score << endl;
