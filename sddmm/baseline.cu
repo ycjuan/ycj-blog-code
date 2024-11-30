@@ -40,7 +40,7 @@ __global__ void cudaKernel(Data data)
 
     if (wid < data.numPairsToScore)
     {
-        Pair &pair = data.d_PairsToScore[wid];
+        Pair pair = data.d_PairsToScore[wid];
         pair.score = 0;
         for (int k = 0; k < data.embDim; k++)
         {
@@ -48,6 +48,7 @@ __global__ void cudaKernel(Data data)
             T docVal = data.d_doc[getMemAddr(pair.docIdx, k, data.numDocs, data.embDim, data.docMemLayout)];
             pair.score += float(reqVal * docVal);
         }
+        data.d_PairsToScore[wid] = pair;
     }
 }
 
