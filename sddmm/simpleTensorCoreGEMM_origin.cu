@@ -56,9 +56,9 @@ void curandErrCheck_(curandStatus_t stat, const char *file, int line) {
 using namespace nvcuda;
 
 // Must be multiples of 16 for wmma code to work
-#define MATRIX_M 1048576
-#define MATRIX_N 16 
-#define MATRIX_K 1024
+#define MATRIX_M 16384
+#define MATRIX_N 16384
+#define MATRIX_K 16384
 
 // The only dimensions currently supported by WMMA
 const int WMMA_M = 16;
@@ -198,7 +198,7 @@ int main(int argc, char* argv[]) {
    cudaErrCheck(cudaMemcpy(c_wmma, c, MATRIX_M * MATRIX_N * sizeof(float), cudaMemcpyDeviceToDevice));
 
    float alpha = 2.0f;
-   float beta = 0.0f;
+   float beta = 2.0f;
 
 
    printf("\nM = %d, N = %d, K = %d. alpha = %f, beta = %f\n\n", MATRIX_M, MATRIX_N, MATRIX_K, alpha, beta);
