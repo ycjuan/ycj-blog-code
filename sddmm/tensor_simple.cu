@@ -74,7 +74,8 @@ void dedupPairBlock(PairBlock *pairBlock, int numPairsToScore, int &numPairBlock
 }
 
 template <typename WMMA_A_MEM_LAYOUT, typename WMMA_B_MEM_LAYOUT>
-__global__ void tensorSimpleKernel(T *a, T *b, float *c, int M, int N, int K, wmma::layout_t c_layout, Setting setting) {
+__global__ void tensorSimpleKernel(T *a, T *b, float *c, int M, int N, int K, Setting setting) {
+         wmma::layout_t c_layout = setting.wmmaOutputMemLayout == ROW_MAJOR ? wmma::mem_row_major : wmma::mem_col_major;
    int lda = setting.docMemLayout == ROW_MAJOR ? K : M;
    int ldb = setting.reqMemLayout == ROW_MAJOR ? K : N;
    int ldc = setting.wmmaOutputMemLayout == ROW_MAJOR ? N : M;
@@ -197,19 +198,19 @@ void methodTensorSimple(Data data, Setting setting) {
    {
       if (t == 0)
          timer.tic();
-      wmma::layout_t c_layout = setting.wmmaOutputMemLayout == ROW_MAJOR ? wmma::mem_row_major : wmma::mem_col_major;
+
       if (data.docMemLayout == ROW_MAJOR && data.reqMemLayout == ROW_MAJOR)
          tensorSimpleKernel<wmma::row_major, wmma::col_major>
-             <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, c_layout, setting);
+             <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, setting);
       else if (data.docMemLayout == ROW_MAJOR && data.reqMemLayout == COL_MAJOR)
          tensorSimpleKernel<wmma::row_major, wmma::row_major>
-             <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, c_layout, setting);
+             <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, setting);
       else if (data.docMemLayout == COL_MAJOR && data.reqMemLayout == ROW_MAJOR)
          tensorSimpleKernel<wmma::col_major, wmma::col_major>
-             <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, c_layout, setting);
+             <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, setting);
       else
          tensorSimpleKernel<wmma::col_major, wmma::row_major>
-             <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, c_layout, setting);
+             <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, setting);
 
       CHECK_CUDA(cudaDeviceSynchronize());
       CHECK_CUDA(cudaGetLastError());
