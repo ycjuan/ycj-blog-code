@@ -73,14 +73,15 @@ void dedupPairBlock(PairBlock *pairBlock, int numPairsToScore, int &numPairBlock
       }
       else
       {
-         pairBlock[numPairBlocks++] = currPair;
+         pairBlock[++numPairBlocks] = pair;
          currPair = pair;
       }
    }
 }
 
 template <typename WMMA_A_MEM_LAYOUT, typename WMMA_B_MEM_LAYOUT>
-__global__ void tensorSimpleKernel(T *a, T *b, float *c, int M, int N, int K, Setting setting) {
+__global__ void tensorSimpleKernel(
+   T *a, T *b, float *c, int M, int N, int K, Setting setting, int numPairBlocks, PairBlock *d_pairBlock) {
          wmma::layout_t c_layout = setting.wmmaOutputMemLayout == ROW_MAJOR ? wmma::mem_row_major : wmma::mem_col_major;
    int lda = setting.docMemLayout == ROW_MAJOR ? K : M;
    int ldb = setting.reqMemLayout == ROW_MAJOR ? K : N;
@@ -88,9 +89,9 @@ __global__ void tensorSimpleKernel(T *a, T *b, float *c, int M, int N, int K, Se
 
    // Tile using a 2D grid
    // blockIdx.x * blockDim.x + threadIdx.x ==> 0 - 255
-   int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
+   int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / 32;
    //int mul = (blockIdx.x * blockDim.x + threadIdx.x);
-   int warpN = (blockIdx.y * blockDim.y + threadIdx.y);
+   //int warpN = (blockIdx.y * blockDim.y + threadIdx.y);
    //printf("blockIdx.x = %d, blockDim.x = %d, threadIdx.x = %d, mul = %d, warpSize = %d, warpM = %d, warpN = %d\n",
    //       blockIdx.x, blockDim.x, threadIdx.x, mul, warpSize, warpM, warpN);
 
@@ -112,12 +113,15 @@ __global__ void tensorSimpleKernel(T *a, T *b, float *c, int M, int N, int K, Se
    //int aRow = warpM * WMMA_M;
    //int bCol = warpN * WMMA_N;
    //printf("aRow = %d, warpM = %d, WMMA_M = %d, bCol = %d, warpN = %d, WMMA_N = %d\n", aRow, warpM, WMMA_M, bCol, warpN, WMMA_N);
+   PairBlock pairBlock = d_pairBlock[warpM];
+   int row = pairBlock.docBlockIdx * PAIR_BLOCK_SIZE_X;
+   int col = pairBlock.reqBlockIdx * PAIR_BLOCK_SIZE_Y;
    for (int i = 0; i < K; i += WMMA_K) {
-      int aRow = warpM * WMMA_M;
+      int aRow = row;
       int aCol = i;
 
       int bRow = i;
-      int bCol = warpN * WMMA_N;
+      int bCol = col;
 
       // Bounds checking
       if (aRow < M && aCol < K && bRow < K && bCol < N) {
@@ -134,8 +138,8 @@ __global__ void tensorSimpleKernel(T *a, T *b, float *c, int M, int N, int K, Se
    }
 
    // Load in the current value of c, scale it by beta, and add this our result scaled by alpha
-   int cRow = warpM * WMMA_M;
-   int cCol = warpN * WMMA_N;
+   int cRow = row;
+   int cCol = col;
 
    if (cRow < M && cCol < N) {
       // Store the output
@@ -192,8 +196,8 @@ void methodTensorSimple(Data data, Setting setting) {
    blockDim.x = BLOCK_X;
    blockDim.y = BLOCK_Y;
 
-   gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / WARP_SIZE - 1)) / (WMMA_M * blockDim.x / WARP_SIZE);
-   gridDim.y = (MATRIX_N + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y);
+   gridDim.x = numPairBlocksToScore * 32;
+   gridDim.y = 1;//(MATRIX_N + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y);
 
    printf("\nRunning with wmma (simple)...\n");
    printf("M = %d, N = %d, K = %d.\n", MATRIX_M, MATRIX_N, MATRIX_K);
@@ -207,16 +211,16 @@ void methodTensorSimple(Data data, Setting setting) {
 
       if (data.docMemLayout == ROW_MAJOR && data.reqMemLayout == ROW_MAJOR)
          tensorSimpleKernel<wmma::row_major, wmma::col_major>
-             <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, setting);
+             <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, setting, numPairBlocksToScore, pairBlock);
       else if (data.docMemLayout == ROW_MAJOR && data.reqMemLayout == COL_MAJOR)
          tensorSimpleKernel<wmma::row_major, wmma::row_major>
-             <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, setting);
+             <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, setting, numPairBlocksToScore, pairBlock);
       else if (data.docMemLayout == COL_MAJOR && data.reqMemLayout == ROW_MAJOR)
          tensorSimpleKernel<wmma::col_major, wmma::col_major>
-             <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, setting);
+             <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, setting, numPairBlocksToScore, pairBlock);
       else
          tensorSimpleKernel<wmma::col_major, wmma::row_major>
-             <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, setting);
+             <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, setting, numPairBlocksToScore, pairBlock);
 
       CHECK_CUDA(cudaDeviceSynchronize());
       CHECK_CUDA(cudaGetLastError());
