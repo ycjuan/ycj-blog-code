@@ -37,6 +37,7 @@ struct Data
     Pair *h_rstCpu;
     Pair *d_rstCuda;
     Pair *d_rstCusparse;
+    Pair *d_rstWmma;
     
     MemLayout docMemLayout;
     MemLayout reqMemLayout;
