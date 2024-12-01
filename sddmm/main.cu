@@ -13,7 +13,7 @@
 
 using namespace std;
 
-int kNumDocs = 1 << 20;
+int kNumDocs = 1 << 12;
 int kNumReqs = 1 << 4;
 int kEmbDim = 1 << 10;
 double kDocDensity = 0.1;
@@ -137,6 +137,7 @@ void runExp(Setting setting)
 
     methodCpu(data, setting);
     methodCuda(data, setting);
+    methodTensorSimple(data, setting);
     methodCusparse(data, setting);
 
     checkData(data);
