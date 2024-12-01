@@ -77,6 +77,7 @@ struct Setting
     bool reqFirst;
     MemLayout docMemLayout;
     MemLayout reqMemLayout;
+    MemLayout wmmaOutputMemLayout = COL_MAJOR;
 
     void print()
     {

@@ -8,6 +8,7 @@ https://github.com/NVIDIA-developer-blog/code-samples/blob/708ce9137eb5ac7682f78
 #include <stdio.h>
 #include <cublas_v2.h>
 #include <mma.h>
+#include <set>
 
 #include "common.cuh"
 #include "util.cuh"
@@ -24,10 +25,53 @@ using namespace nvcuda;
         }                                                                                                                          \
     }
 
+struct PairBlock
+{
+   int docIdx;
+   int reqIdx;
+   int docBlockIdx;
+   int docBlockOffset;
+   int reqBlockIdx;
+   int reqBlockOffset;
+   float score;
+};
 
 const int WMMA_M = 16;
 const int WMMA_N = 16;
 const int WMMA_K = 16;
+
+void convertToPairBlock(Data data, PairBlock *pairBlock)
+{
+   for (int i = 0; i < data.numPairsToScore; i++)
+   {
+      Pair pair = data.d_PairsToScore[i];
+      pairBlock[i].docIdx = pair.docIdx;
+      pairBlock[i].reqIdx = pair.reqIdx;
+      pairBlock[i].docBlockIdx = pair.docIdx / WMMA_M;
+      pairBlock[i].docBlockOffset = pair.docIdx % WMMA_M;
+      pairBlock[i].reqBlockIdx = pair.reqIdx / WMMA_N;
+      pairBlock[i].reqBlockOffset = pair.reqIdx % WMMA_N;
+   }
+}
+
+void dedupPairBlock(PairBlock *pairBlock, int numPairsToScore, int numPairBlocks)
+{
+   numPairBlocks = 0;
+   PairBlock currPair = pairBlock[0];
+   for (int i = 1; i < numPairsToScore; i++)
+   {
+      PairBlock pair = pairBlock[i];
+      if (pair.docBlockIdx == currPair.docBlockIdx && pair.reqBlockIdx == currPair.reqBlockIdx)
+      {
+         continue;
+      }
+      else
+      {
+         pairBlock[numPairBlocks++] = currPair;
+         currPair = pair;
+      }
+   }
+}
 
 __global__ void tensorSimpleKernel(T *a, T *b, float *c, int M, int N, int K) {
    // Leading dimensions. Packed with no transpositions.
@@ -90,6 +134,16 @@ __global__ void tensorSimpleKernel(T *a, T *b, float *c, int M, int N, int K) {
    }
 }
 
+void updatePair(Data data, Setting setting, float *c)
+{
+   for (int i = 0; i < data.numPairsToScore; i++)
+   {
+      Pair pair = data.d_PairsToScore[i];
+      pair.score = c[getMemAddr(pair.docIdx, pair.reqIdx, data.numDocs, data.numReqs, COL_MAJOR)];
+      data.d_rstWmma[i] = pair;
+   }
+}
+
 void methodTensorSimple(Data data, Setting setting) {
 
    int MATRIX_M = data.numDocs;
@@ -100,7 +154,13 @@ void methodTensorSimple(Data data, Setting setting) {
    T *b = data.d_req;
 
    float *c_wmma;
+   CHECK_CUDA(cudaMallocManaged(&c_wmma, MATRIX_M * MATRIX_N * sizeof(float)));
 
+   PairBlock *pairBlock;
+   CHECK_CUDA(cudaMallocManaged(&pairBlock, data.numPairsToScore * sizeof(PairBlock)));
+   convertToPairBlock(data, pairBlock);
+   int numPairBlocksToScore;
+   dedupPairBlock(pairBlock, data.numPairsToScore, numPairBlocksToScore);
    
    // First: using WMMA
    dim3 gridDim;
@@ -128,6 +188,8 @@ void methodTensorSimple(Data data, Setting setting) {
       CHECK_CUDA(cudaGetLastError());
    }
    cout << "wmma (simple) took " << timer.tocMs() / setting.numTrials << "ms" << endl;
+
+   updatePair(data, setting, c_wmma);
 }
 
 
