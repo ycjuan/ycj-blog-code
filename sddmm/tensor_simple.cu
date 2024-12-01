@@ -90,6 +90,9 @@ __global__ void tensorSimpleKernel(
    // Tile using a 2D grid
    // blockIdx.x * blockDim.x + threadIdx.x ==> 0 - 255
    int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / 32;
+   if (warpM > numPairBlocks) {
+      return;
+   }
    //int mul = (blockIdx.x * blockDim.x + threadIdx.x);
    //int warpN = (blockIdx.y * blockDim.y + threadIdx.y);
    //printf("blockIdx.x = %d, blockDim.x = %d, threadIdx.x = %d, mul = %d, warpSize = %d, warpM = %d, warpN = %d\n",
