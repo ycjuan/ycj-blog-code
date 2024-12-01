@@ -82,6 +82,7 @@ struct Setting
     void print()
     {
         ostringstream oss;
+        oss << "<<<<<<<<<<<Setting>>>>>>>>>>>>" << endl;
         oss << "numTrials: " << numTrials << ", swapDocReq: " << swapDocReq << ", reqFirst: " << reqFirst << endl;
         oss << "docMemLayout: " << (docMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "reqMemLayout: " << (reqMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;

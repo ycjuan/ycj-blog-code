@@ -118,7 +118,7 @@ void checkData(Data data)
 
         if (pairCpu.reqIdx != pairWmma.reqIdx ||
             pairCpu.docIdx != pairWmma.docIdx ||
-            abs( (pairCpu.score - pairCuda.score) / pairCpu.score) > 1e-3)
+            abs( (pairCpu.score - pairWmma.score) / pairCpu.score) > 1e-3)
         {
             cout << "Mismatch at pairIdx " << pairIdx << endl;
             cout << "CPU: " << pairCpu.reqIdx << " " << pairCpu.docIdx << " " << pairCpu.score << endl;
@@ -135,11 +135,16 @@ void runExp(Setting setting)
     setting.print();
     Data data = genData(setting);
 
+    cout << "==============CPU method==============" << endl;
     methodCpu(data, setting);
+    cout << "\n\n==============CUDA method==============" << endl;
     methodCuda(data, setting);
+    cout << "\n\n==============TensorSimple method==============" << endl;
     methodTensorSimple(data, setting);
+    cout << "\n\n==============CUSPARSE method==============" << endl;
     methodCusparse(data, setting);
 
+    cout << "\n\n==============Checking results==============" << endl;
     checkData(data);
 
     data.free();
@@ -147,10 +152,17 @@ void runExp(Setting setting)
 
 int main()
 {
+    /*
     vector<MemLayout> docMemLayouts = {ROW_MAJOR, COL_MAJOR};
     vector<MemLayout> reqMemLayouts = {ROW_MAJOR, COL_MAJOR};
     vector<bool> swapDocReqs = {false, true};
     vector<bool> reqFirsts = {true, false};
+    */
+
+    vector<MemLayout> docMemLayouts = {COL_MAJOR};
+    vector<MemLayout> reqMemLayouts = {ROW_MAJOR};
+    vector<bool> swapDocReqs = {true};
+    vector<bool> reqFirsts = {false};
 
     Setting setting;
     setting.numTrials = kNumTrials;
