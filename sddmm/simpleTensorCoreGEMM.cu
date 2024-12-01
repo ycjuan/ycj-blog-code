@@ -82,15 +82,18 @@ __global__ void wmma_example(half *a, half *b, float *c, int M, int N, int K, fl
    int ldc = M;
 
    // Tile using a 2D grid
+   // blockIdx.x * blockDim.x + threadIdx.x ==> 0 - 255
    int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
    int mul = (blockIdx.x * blockDim.x + threadIdx.x);
    int warpN = (blockIdx.y * blockDim.y + threadIdx.y);
-   printf("blockIdx.x = %d, blockDim.x = %d, threadIdx.x = %d, mul = %d, warpSize = %d, warpM = %d, warpN = %d\n",
-          blockIdx.x, blockDim.x, threadIdx.x, mul, warpSize, warpM, warpN);
-   
+   //printf("blockIdx.x = %d, blockDim.x = %d, threadIdx.x = %d, mul = %d, warpSize = %d, warpM = %d, warpN = %d\n",
+   //       blockIdx.x, blockDim.x, threadIdx.x, mul, warpSize, warpM, warpN);
+
+   /* 
    if (warpM > 0 || warpN > 0) {
       return;
    }
+   */
  
    // Declare the fragments
    wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> a_frag;
@@ -101,6 +104,9 @@ __global__ void wmma_example(half *a, half *b, float *c, int M, int N, int K, fl
    wmma::fill_fragment(acc_frag, 0.0f);
 
    // Loop over k
+   //int aRow = warpM * WMMA_M;
+   //int bCol = warpN * WMMA_N;
+   //printf("aRow = %d, warpM = %d, WMMA_M = %d, bCol = %d, warpN = %d, WMMA_N = %d\n", aRow, warpM, WMMA_M, bCol, warpN, WMMA_N);
    for (int i = 0; i < K; i += WMMA_K) {
       int aRow = warpM * WMMA_M;
       int aCol = i;
@@ -270,7 +276,7 @@ int main(int argc, char* argv[]) {
          float diff = fabs(v1 - v2);
          float relative_err = diff / v2;
          float eps = 1e-4;
-         if ((relative_err <= eps))
+         if ((relative_err >= eps))
          {
             errors++;
             //if (errors < 10)
