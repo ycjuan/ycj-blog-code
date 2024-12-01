@@ -13,7 +13,7 @@
 
 using namespace std;
 
-int kNumDocs = 1 << 20;
+int kNumDocs = 1 << 12;
 int kNumReqs = 1 << 4;
 int kEmbDim = 1 << 10;
 double kDocDensity = 0.1;
@@ -106,16 +106,6 @@ void checkData(Data data)
             throw runtime_error("Mismatch detected!");
         }
 
-        if (pairCpu.reqIdx != pairCusparse.reqIdx ||
-            pairCpu.docIdx != pairCusparse.docIdx ||
-            abs( (pairCpu.score - pairCuda.score) / pairCpu.score) > 1e-3)
-        {
-            cout << "Mismatch at pairIdx " << pairIdx << endl;
-            cout << "CPU: " << pairCpu.reqIdx << " " << pairCpu.docIdx << " " << pairCpu.score << endl;
-            cout << "CUSPARSE: " << pairCusparse.reqIdx << " " << pairCusparse.docIdx << " " << pairCusparse.score << endl;
-            throw runtime_error("Mismatch detected!");
-        }
-
         if (pairCpu.reqIdx != pairWmma.reqIdx ||
             pairCpu.docIdx != pairWmma.docIdx ||
             abs( (pairCpu.score - pairWmma.score) / pairCpu.score) > 1e-3)
@@ -123,6 +113,16 @@ void checkData(Data data)
             cout << "Mismatch at pairIdx " << pairIdx << endl;
             cout << "CPU: " << pairCpu.reqIdx << " " << pairCpu.docIdx << " " << pairCpu.score << endl;
             cout << "WMMA: " << pairWmma.reqIdx << " " << pairWmma.docIdx << " " << pairWmma.score << endl;
+            throw runtime_error("Mismatch detected!");
+        }
+
+        if (pairCpu.reqIdx != pairCusparse.reqIdx ||
+            pairCpu.docIdx != pairCusparse.docIdx ||
+            abs( (pairCpu.score - pairCuda.score) / pairCpu.score) > 1e-3)
+        {
+            cout << "Mismatch at pairIdx " << pairIdx << endl;
+            cout << "CPU: " << pairCpu.reqIdx << " " << pairCpu.docIdx << " " << pairCpu.score << endl;
+            cout << "CUSPARSE: " << pairCusparse.reqIdx << " " << pairCusparse.docIdx << " " << pairCusparse.score << endl;
             throw runtime_error("Mismatch detected!");
         }
     }
@@ -152,17 +152,19 @@ void runExp(Setting setting)
 
 int main()
 {
-    /*
+   /* 
     vector<MemLayout> docMemLayouts = {ROW_MAJOR, COL_MAJOR};
     vector<MemLayout> reqMemLayouts = {ROW_MAJOR, COL_MAJOR};
     vector<bool> swapDocReqs = {false, true};
     vector<bool> reqFirsts = {true, false};
-    */
-
+    
+*/
+   
     vector<MemLayout> docMemLayouts = {COL_MAJOR};
-    vector<MemLayout> reqMemLayouts = {ROW_MAJOR};
+    vector<MemLayout> reqMemLayouts = {COL_MAJOR};
     vector<bool> swapDocReqs = {true};
     vector<bool> reqFirsts = {false};
+    
 
     Setting setting;
     setting.numTrials = kNumTrials;
