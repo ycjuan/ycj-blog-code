@@ -156,6 +156,15 @@ void methodTensorSimple(Data data, Setting setting) {
    float *c_wmma;
    CHECK_CUDA(cudaMallocManaged(&c_wmma, MATRIX_M * MATRIX_N * sizeof(float)));
 
+#pragma omp parallel for
+   for (size_t pairIdx = 0; pairIdx < data.numPairsToScore; pairIdx++)
+      data.d_PairsToScore[pairIdx].score = 0;
+
+   if (setting.reqFirst)
+      sort(data.d_PairsToScore, data.d_PairsToScore + data.numPairsToScore, pairComparatorReqFirst);
+   else
+      sort(data.d_PairsToScore, data.d_PairsToScore + data.numPairsToScore, pairComparatorDocFirst);
+
    PairBlock *pairBlock;
    CHECK_CUDA(cudaMallocManaged(&pairBlock, data.numPairsToScore * sizeof(PairBlock)));
    convertToPairBlock(data, pairBlock);

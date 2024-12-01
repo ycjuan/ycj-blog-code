@@ -43,6 +43,7 @@ Data genData(Setting setting)
     CHECK_CUDA(cudaMallocManaged(&data.d_PairsToScore, (size_t)data.numDocs * data.numReqs * sizeof(Pair)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rstCuda, (size_t)data.numDocs * data.numReqs * sizeof(Pair)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rstCusparse, (size_t)data.numDocs * data.numReqs * sizeof(Pair)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rstWmma, (size_t)data.numDocs * data.numReqs * sizeof(Pair)));
     CHECK_CUDA(cudaMallocHost(&data.h_rstCpu, (size_t)data.numDocs * data.numReqs * sizeof(Pair)));
 
     default_random_engine generator;
@@ -87,11 +88,13 @@ void checkData(Data data)
     sort(data.h_rstCpu, data.h_rstCpu + data.numPairsToScore, pairComparatorDocFirst);
     sort(data.d_rstCuda, data.d_rstCuda + data.numPairsToScore, pairComparatorDocFirst);
     sort(data.d_rstCusparse, data.d_rstCusparse + data.numPairsToScore, pairComparatorDocFirst);
+    sort(data.d_rstWmma, data.d_rstWmma + data.numPairsToScore, pairComparatorDocFirst);
     for (size_t pairIdx = 0; pairIdx < data.numPairsToScore; pairIdx++)
     {
         Pair pairCpu = data.h_rstCpu[pairIdx];
         Pair pairCuda = data.d_rstCuda[pairIdx];
         Pair pairCusparse = data.d_rstCusparse[pairIdx];
+        Pair pairWmma = data.d_rstWmma[pairIdx];
 
         if (pairCpu.reqIdx != pairCuda.reqIdx ||
             pairCpu.docIdx != pairCuda.docIdx ||
@@ -110,6 +113,16 @@ void checkData(Data data)
             cout << "Mismatch at pairIdx " << pairIdx << endl;
             cout << "CPU: " << pairCpu.reqIdx << " " << pairCpu.docIdx << " " << pairCpu.score << endl;
             cout << "CUSPARSE: " << pairCusparse.reqIdx << " " << pairCusparse.docIdx << " " << pairCusparse.score << endl;
+            throw runtime_error("Mismatch detected!");
+        }
+
+        if (pairCpu.reqIdx != pairWmma.reqIdx ||
+            pairCpu.docIdx != pairWmma.docIdx ||
+            abs( (pairCpu.score - pairCuda.score) / pairCpu.score) > 1e-3)
+        {
+            cout << "Mismatch at pairIdx " << pairIdx << endl;
+            cout << "CPU: " << pairCpu.reqIdx << " " << pairCpu.docIdx << " " << pairCpu.score << endl;
+            cout << "WMMA: " << pairWmma.reqIdx << " " << pairWmma.docIdx << " " << pairWmma.score << endl;
             throw runtime_error("Mismatch detected!");
         }
     }
