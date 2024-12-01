@@ -9,8 +9,8 @@
 using namespace std;
 
 //typedef __nv_bfloat16 T; // This is only supposed by CUSPARSE_FORMAT_BSR format
-//typedef half T;
-typedef float T;
+typedef half T;
+//typedef float T;
 
 enum MemLayout
 {

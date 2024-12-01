@@ -7,7 +7,7 @@ all: example
 example: simpleTensorCoreGEMM.cu
 	nvcc $(INC) -o $@ $^ $(CFLAGS)
 
-sddmm: main.cu baseline.cu cusparse.cu
+sddmm: main.cu baseline.cu cusparse.cu tensor_simple.cu
 	nvcc $(INC) -o $@ $^ $(CFLAGS)
 
 sddmm_test: test.cu

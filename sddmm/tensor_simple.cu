@@ -29,7 +29,7 @@ const int WMMA_M = 16;
 const int WMMA_N = 16;
 const int WMMA_K = 16;
 
-__global__ void tensorSimpleKernel(half *a, half *b, float *c, int M, int N, int K, float alpha, float beta) {
+__global__ void tensorSimpleKernel(T *a, T *b, float *c, int M, int N, int K) {
    // Leading dimensions. Packed with no transpositions.
    int lda = M;
    int ldb = K;
@@ -123,11 +123,11 @@ void methodTensorSimple(Data data, Setting setting) {
    {
       if (t == 0)
          timer.tic();
-      tensorSimpleKernel <<< gridDim, blockDim >>> (a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
+      tensorSimpleKernel <<< gridDim, blockDim >>> (a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K);
       CHECK_CUDA(cudaDeviceSynchronize());
       CHECK_CUDA(cudaGetLastError());
    }
-   cout << "wmma (simple) took " << timer.tocMs() / setting.kNumTrials << "ms" << endl;
+   cout << "wmma (simple) took " << timer.tocMs() / setting.numTrials << "ms" << endl;
 }
 
 
