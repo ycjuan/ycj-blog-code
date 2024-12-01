@@ -54,7 +54,7 @@ void convertToPairBlock(Data data, PairBlock *pairBlock)
    }
 }
 
-void dedupPairBlock(PairBlock *pairBlock, int numPairsToScore, int numPairBlocks)
+void dedupPairBlock(PairBlock *pairBlock, int numPairsToScore, int &numPairBlocks)
 {
    numPairBlocks = 0;
    PairBlock currPair = pairBlock[0];
@@ -82,7 +82,7 @@ __global__ void tensorSimpleKernel(T *a, T *b, float *c, int M, int N, int K) {
    // Tile using a 2D grid
    // blockIdx.x * blockDim.x + threadIdx.x ==> 0 - 255
    int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
-   int mul = (blockIdx.x * blockDim.x + threadIdx.x);
+   //int mul = (blockIdx.x * blockDim.x + threadIdx.x);
    int warpN = (blockIdx.y * blockDim.y + threadIdx.y);
    //printf("blockIdx.x = %d, blockDim.x = %d, threadIdx.x = %d, mul = %d, warpSize = %d, warpM = %d, warpN = %d\n",
    //       blockIdx.x, blockDim.x, threadIdx.x, mul, warpSize, warpM, warpN);
@@ -97,7 +97,7 @@ __global__ void tensorSimpleKernel(T *a, T *b, float *c, int M, int N, int K) {
    wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> a_frag;
    wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> b_frag;
    wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> acc_frag;
-   wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_frag;
+   //wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_frag;
 
    wmma::fill_fragment(acc_frag, 0.0f);
 
@@ -170,7 +170,10 @@ void methodTensorSimple(Data data, Setting setting) {
    convertToPairBlock(data, pairBlock);
    int numPairBlocksToScore;
    dedupPairBlock(pairBlock, data.numPairsToScore, numPairBlocksToScore);
-   
+
+   cout << "numPairsToScore: " << data.numPairsToScore
+        << ", numPairBlocksToScore: " << numPairBlocksToScore << endl;
+
    // First: using WMMA
    dim3 gridDim;
    dim3 blockDim;
