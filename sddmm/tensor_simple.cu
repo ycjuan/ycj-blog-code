@@ -39,18 +39,24 @@ struct PairBlock
 const int WMMA_M = 16;
 const int WMMA_N = 16;
 const int WMMA_K = 16;
+const int BLOCK_X = 32;
+const int BLOCK_Y = 1;
+const int WARP_SIZE = 32;
+const int PAIR_BLOCK_SIZE_X = BLOCK_X * WMMA_M / WARP_SIZE;
+const int PAIR_BLOCK_SIZE_Y = BLOCK_Y * WMMA_N;
 
 void convertToPairBlock(Data data, PairBlock *pairBlock)
 {
+   cout << "PAIR_BLOCK_SIZE_X: " << PAIR_BLOCK_SIZE_X << ", PAIR_BLOCK_SIZE_Y: " << PAIR_BLOCK_SIZE_Y << endl;
    for (int i = 0; i < data.numPairsToScore; i++)
    {
       Pair pair = data.d_PairsToScore[i];
       pairBlock[i].docIdx = pair.docIdx;
       pairBlock[i].reqIdx = pair.reqIdx;
-      pairBlock[i].docBlockIdx = pair.docIdx / WMMA_M;
-      pairBlock[i].docBlockOffset = pair.docIdx % WMMA_M;
-      pairBlock[i].reqBlockIdx = pair.reqIdx / WMMA_N;
-      pairBlock[i].reqBlockOffset = pair.reqIdx % WMMA_N;
+      pairBlock[i].docBlockIdx = pair.docIdx / PAIR_BLOCK_SIZE_X;
+      pairBlock[i].docBlockOffset = pair.docIdx % PAIR_BLOCK_SIZE_X;
+      pairBlock[i].reqBlockIdx = pair.reqIdx / PAIR_BLOCK_SIZE_Y;
+      pairBlock[i].reqBlockOffset = pair.reqIdx % PAIR_BLOCK_SIZE_Y;
    }
 }
 
@@ -183,10 +189,10 @@ void methodTensorSimple(Data data, Setting setting) {
  
    // blockDim.x must be a multple of warpSize
    // 128x4 means we have 16 warps and a block computes a 64x64 output tile
-   blockDim.x = 128;
-   blockDim.y = 4;
+   blockDim.x = BLOCK_X;
+   blockDim.y = BLOCK_Y;
 
-   gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / 32 - 1)) / (WMMA_M * blockDim.x / 32);
+   gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / WARP_SIZE - 1)) / (WMMA_M * blockDim.x / WARP_SIZE);
    gridDim.y = (MATRIX_N + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y);
 
    printf("\nRunning with wmma (simple)...\n");

@@ -13,7 +13,7 @@
 
 using namespace std;
 
-int kNumDocs = 1 << 12;
+int kNumDocs = 1 << 20;
 int kNumReqs = 1 << 4;
 int kEmbDim = 1 << 10;
 double kDocDensity = 0.1;
@@ -152,18 +152,17 @@ void runExp(Setting setting)
 
 int main()
 {
-    
+    /*
     vector<MemLayout> docMemLayouts = {ROW_MAJOR, COL_MAJOR};
     vector<MemLayout> reqMemLayouts = {ROW_MAJOR, COL_MAJOR};
     vector<bool> swapDocReqs = {false, true};
     vector<bool> reqFirsts = {true, false};
+    */
     
-   /*
     vector<MemLayout> docMemLayouts = {COL_MAJOR};
     vector<MemLayout> reqMemLayouts = {COL_MAJOR};
     vector<bool> swapDocReqs = {true};
     vector<bool> reqFirsts = {false};
-    */
 
     Setting setting;
     setting.numTrials = kNumTrials;
