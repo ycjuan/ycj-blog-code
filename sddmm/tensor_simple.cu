@@ -73,8 +73,8 @@ void dedupPairBlock(PairBlock *pairBlock, int numPairsToScore, int &numPairBlock
    }
 }
 
-__global__ void tensorSimpleKernel(T *a, T *b, float *c, int M, int N, int K) {
-   // Leading dimensions. Packed with no transpositions.
+template <typename WMMA_A_MEM_LAYOUT, typename WMMA_B_MEM_LAYOUT>
+__global__ void tensorSimpleKernel(T *a, T *b, float *c, int M, int N, int K, wmma::layout_t c_layout) {
    int lda = M;
    int ldb = K;
    int ldc = M;
@@ -94,8 +94,8 @@ __global__ void tensorSimpleKernel(T *a, T *b, float *c, int M, int N, int K) {
    */
  
    // Declare the fragments
-   wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> a_frag;
-   wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> b_frag;
+   wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, WMMA_A_MEM_LAYOUT> a_frag;
+   wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, WMMA_B_MEM_LAYOUT> b_frag;
    wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> acc_frag;
    //wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_frag;
 
@@ -130,7 +130,7 @@ __global__ void tensorSimpleKernel(T *a, T *b, float *c, int M, int N, int K) {
 
    if (cRow < M && cCol < N) {
       // Store the output
-      wmma::store_matrix_sync(c + cRow + cCol * ldc, acc_frag, ldc, wmma::mem_col_major);
+      wmma::store_matrix_sync(c + cRow + cCol * ldc, acc_frag, ldc, c_layout);
    }
 }
 
@@ -195,7 +195,8 @@ void methodTensorSimple(Data data, Setting setting) {
    {
       if (t == 0)
          timer.tic();
-      tensorSimpleKernel <<< gridDim, blockDim >>> (a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K);
+      tensorSimpleKernel< wmma::col_major, wmma::col_major >
+          <<<gridDim, blockDim>>>(a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K, wmma::mem_col_major);
       CHECK_CUDA(cudaDeviceSynchronize());
       CHECK_CUDA(cudaGetLastError());
    }

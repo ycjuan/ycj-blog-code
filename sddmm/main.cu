@@ -170,7 +170,7 @@ int main()
     {
         for (auto reqMemLayout : reqMemLayouts)
         {
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < swapDocReqs.size(); i++)
             {
                 setting.docMemLayout = docMemLayout;
                 setting.reqMemLayout = reqMemLayout;
