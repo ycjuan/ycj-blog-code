@@ -77,6 +77,7 @@ void dedupPairBlock(PairBlock *pairBlock, int numPairsToScore, int &numPairBlock
          currPair = pair;
       }
    }
+   numPairBlocks++;
 }
 
 template <typename WMMA_A_MEM_LAYOUT, typename WMMA_B_MEM_LAYOUT>
@@ -90,7 +91,7 @@ __global__ void tensorSimpleKernel(
    // Tile using a 2D grid
    // blockIdx.x * blockDim.x + threadIdx.x ==> 0 - 255
    int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / 32;
-   if (warpM > numPairBlocks) {
+   if (warpM >= numPairBlocks) {
       return;
    }
    //int mul = (blockIdx.x * blockDim.x + threadIdx.x);
