@@ -13,7 +13,7 @@
 
 using namespace std;
 
-int kNumDocs = 1 << 12;
+int kNumDocs = 1 << 20;
 int kNumReqs = 1 << 4;
 int kEmbDim = 1 << 10;
 double kDocDensity = 0.1;
