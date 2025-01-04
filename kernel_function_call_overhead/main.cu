@@ -21,10 +21,14 @@ int kNumTrials = 100;
 
 int main()
 {
-    long *d_count;
-    CHECK_CUDA(cudaMalloc(&d_count, kDataSize * sizeof(long)));
 
-    runSetupBaseline(d_count, kDataSize, kNumCountInc, kNumTrials);
+    Param param;
+    param.dataSize = kDataSize;
+    param.numCountInc = kNumCountInc;
+    param.numTrials = kNumTrials;
+    CHECK_CUDA(cudaMalloc(&param.d_count, kDataSize * sizeof(long)));
+
+    runSetupBaseline(param);
 
     return 0;
 }

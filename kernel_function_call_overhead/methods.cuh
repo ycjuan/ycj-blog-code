@@ -1,6 +1,8 @@
 #ifndef METHODS_CUH
 #define METHODS_CUH
 
-void runSetupBaseline(long *d_count, long size, int numCountInc, int numTrials);
+#include "common.cuh"
+
+void runSetupBaseline(Param param);
 
 #endif // METHODS_CUH
