@@ -15,57 +15,57 @@ using namespace std;
         }                                                                                                                          \
     }
 
-__device__ void func0(Param param, size_t wid)
+__device__ void func0(Param param, size_t taskId)
 {
-    param.d_count[wid] = wid;
+    param.d_count[taskId] = taskId;
     for (int i = 0; i < param.numCountInc; i++)
     {
-        param.d_count[wid] += 1;
+        param.d_count[taskId] += 1;
     }
 }
 
-__device__ void func1(Param param, size_t wid)
+__device__ void func1(Param param, size_t taskId)
 {
-    func0(param, wid);
+    func0(param, taskId);
 }
 
-__device__ void func2(Param param, size_t wid)
+__device__ void func2(Param param, size_t taskId)
 {
-    func1(param, wid);
+    func1(param, taskId);
 }
 
-__device__ void func3(Param param, size_t wid)
+__device__ void func3(Param param, size_t taskId)
 {
-    func2(param, wid);
+    func2(param, taskId);
 }
 
-__device__ void func4(Param param, size_t wid)
+__device__ void func4(Param param, size_t taskId)
 {
-    func3(param, wid);
+    func3(param, taskId);
 }
 
-__device__ void func5(Param param, size_t wid)
+__device__ void func5(Param param, size_t taskId)
 {
-    func4(param, wid);
+    func4(param, taskId);
 }
 
-__device__ void func6(Param param, size_t wid)
+__device__ void func6(Param param, size_t taskId)
 {
-    func5(param, wid);
+    func5(param, taskId);
 }
 
-__device__ void func7(Param param, size_t wid)
+__device__ void func7(Param param, size_t taskId)
 {
-    func6(param, wid);
+    func6(param, taskId);
 }
 
 __global__ void setupAKernel(Param param)
 {
-    size_t wid = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
+    size_t taskId = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (wid < param.dataSize)
+    if (taskId < param.dataSize)
     {
-        func7(param, wid);
+        func7(param, taskId);
     }
 }
 

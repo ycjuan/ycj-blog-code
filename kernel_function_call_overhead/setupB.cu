@@ -18,11 +18,11 @@ using namespace std;
 
 __global__ void setupBKernel(Param param, FuncRunnerB funcRunnerB)
 {
-    size_t wid = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
+    size_t taskId = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (wid < param.dataSize)
+    if (taskId < param.dataSize)
     {
-        funcRunnerB.runFunc(param, wid);
+        funcRunnerB.runFunc(param, taskId);
     }
 }
 

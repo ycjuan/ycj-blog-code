@@ -17,14 +17,14 @@ using namespace std;
 
 __global__ void baselineKernel(Param param)
 {
-    size_t wid = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
+    size_t taskId = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (wid < param.dataSize)
+    if (taskId < param.dataSize)
     {
-        param.d_count[wid] = wid;
+        param.d_count[taskId] = taskId;
         for (int i = 0; i < param.numCountInc; i++)
         {
-            param.d_count[wid] += 1;
+            param.d_count[taskId] += 1;
         }
     }
 }
