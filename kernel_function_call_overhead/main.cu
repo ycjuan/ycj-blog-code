@@ -5,8 +5,8 @@
 
 using namespace std;
 
-int kDataSize = 1 << 10;
-int kNumCountInc = 1 << 5;
+int kDataSize = 1 << 20;
+int kNumCountInc = 1 << 10;
 int kNumTrials = 100;
 
 #define CHECK_CUDA(func)                                                                                                           \

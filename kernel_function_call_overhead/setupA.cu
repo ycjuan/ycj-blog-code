@@ -15,7 +15,7 @@ using namespace std;
         }                                                                                                                          \
     }
 
-__device__ void func1(Param param, size_t wid)
+__device__ void func0(Param param, size_t wid)
 {
     param.d_count[wid] = wid;
     for (int i = 0; i < param.numCountInc; i++)
@@ -24,13 +24,48 @@ __device__ void func1(Param param, size_t wid)
     }
 }
 
+__device__ void func1(Param param, size_t wid)
+{
+    func0(param, wid);
+}
+
+__device__ void func2(Param param, size_t wid)
+{
+    func1(param, wid);
+}
+
+__device__ void func3(Param param, size_t wid)
+{
+    func2(param, wid);
+}
+
+__device__ void func4(Param param, size_t wid)
+{
+    func3(param, wid);
+}
+
+__device__ void func5(Param param, size_t wid)
+{
+    func4(param, wid);
+}
+
+__device__ void func6(Param param, size_t wid)
+{
+    func5(param, wid);
+}
+
+__device__ void func7(Param param, size_t wid)
+{
+    func6(param, wid);
+}
+
 __global__ void setupAKernel(Param param)
 {
     size_t wid = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
 
     if (wid < param.dataSize)
     {
-        func1(param, wid);
+        func7(param, wid);
     }
 }
 
