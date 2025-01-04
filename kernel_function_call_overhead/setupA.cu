@@ -34,7 +34,7 @@ __global__ void setupAKernel(Param param)
     }
 }
 
-void runSetupBaseline(Param param)
+void runSetupA(Param param)
 {
     int blockSize = 256;
     int numBlocks = (param.dataSize + blockSize - 1) / blockSize;

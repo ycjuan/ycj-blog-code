@@ -5,4 +5,6 @@
 
 void runSetupBaseline(Param param);
 
+void runSetupA(Param param);
+
 #endif // METHODS_CUH

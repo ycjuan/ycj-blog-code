@@ -30,5 +30,7 @@ int main()
 
     runSetupBaseline(param);
 
+    runSetupA(param);
+
     return 0;
 }
