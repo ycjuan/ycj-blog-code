@@ -1,0 +1,5 @@
+nvcc -I/usr/local/cuda/bin/../include -o main main.cu kernel.cu -Xcompiler -fopenmp --gpu-architecture=sm_89 -O3 -lcublas
+Method 0 time: 3.84922 ms
+Method 1 time: 126.264 ms
+Method 2 time: 64.1135 ms
+Method 3 time: 64.1466 ms
