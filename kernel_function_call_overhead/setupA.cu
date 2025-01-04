@@ -15,17 +15,22 @@ using namespace std;
         }                                                                                                                          \
     }
 
-__global__ void baselineKernel(Param param)
+__device__ void func1(Param param, size_t wid)
+{
+    param.d_count[wid] = wid;
+    for (int i = 0; i < param.numCountInc; i++)
+    {
+        param.d_count[wid] += 1;
+    }
+}
+
+__global__ void setupAKernel(Param param)
 {
     size_t wid = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
 
     if (wid < param.dataSize)
     {
-        param.d_count[wid] = wid;
-        for (int i = 0; i < param.numCountInc; i++)
-        {
-            param.d_count[wid] += 1;
-        }
+        func1(param, wid);
     }
 }
 
@@ -38,9 +43,9 @@ void runSetupBaseline(Param param)
     timer.tic();
     for (int i = 0; i < param.numTrials; i++)
     {
-        baselineKernel<<<numBlocks, blockSize>>>(param);
+        setupAKernel<<<numBlocks, blockSize>>>(param);
         CHECK_CUDA(cudaDeviceSynchronize());
         CHECK_CUDA(cudaGetLastError());
     }
-    cout << "baselineKernel time: " << timer.tocMs() << " ms" << endl;
+    cout << "setupAKernel time: " << timer.tocMs() << " ms" << endl;
 }
