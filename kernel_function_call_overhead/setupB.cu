@@ -2,12 +2,9 @@
 
 #include "util.cuh"
 #include "methods.cuh"
+#include "setupB.cuh"
 
 using namespace std;
-
-int kDataSize = 1 << 20;
-int kNumCountInc = 1 << 10;
-int kNumTrials = 100;
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \
@@ -19,20 +16,30 @@ int kNumTrials = 100;
         }                                                                                                                          \
     }
 
-int main()
+__global__ void setupBKernel(Param param, FuncRunnerB funcRunnerB)
 {
+    size_t wid = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
 
-    Param param;
-    param.dataSize = kDataSize;
-    param.numCountInc = kNumCountInc;
-    param.numTrials = kNumTrials;
-    CHECK_CUDA(cudaMalloc(&param.d_count, kDataSize * sizeof(long)));
+    if (wid < param.dataSize)
+    {
+        funcRunnerB.runFunc(param, wid);
+    }
+}
 
-    runSetupBaseline(param);
+void runSetupB(Param param)
+{
+    int blockSize = 256;
+    int numBlocks = (param.dataSize + blockSize - 1) / blockSize;
 
-    runSetupA(param);
+    FuncRunnerB funcRunnerB;
 
-    runSetupB(param);
-
-    return 0;
+    CudaTimer timer;
+    timer.tic();
+    for (int i = -3; i < param.numTrials; i++)
+    {
+        setupBKernel<<<numBlocks, blockSize>>>(param, funcRunnerB);
+        CHECK_CUDA(cudaDeviceSynchronize());
+        CHECK_CUDA(cudaGetLastError());
+    }
+    cout << "setupBKernel time: " << timer.tocMs() << " ms" << endl;
 }
