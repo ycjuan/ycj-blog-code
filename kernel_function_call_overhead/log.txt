@@ -1,0 +1,4 @@
+nvcc -I/usr/local/cuda/bin/../include -o main main.cu baseline.cu setupA.cu setupB.cu -Xcompiler -fopenmp --gpu-architecture=sm_89 -O3 -lcublas
+baselineKernel time: 64.2619 ms
+setupAKernel time: 64.0981 ms
+setupBKernel time: 64.1168 ms
