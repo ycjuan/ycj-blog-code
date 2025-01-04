@@ -41,7 +41,7 @@ void runSetupA(Param param)
 
     CudaTimer timer;
     timer.tic();
-    for (int i = 0; i < param.numTrials; i++)
+    for (int i = -3; i < param.numTrials; i++)
     {
         setupAKernel<<<numBlocks, blockSize>>>(param);
         CHECK_CUDA(cudaDeviceSynchronize());
