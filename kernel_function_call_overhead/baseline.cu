@@ -24,7 +24,21 @@ __global__ void baselineKernel(Param param)
         param.d_count[taskId] = taskId;
         for (int i = 0; i < param.numCountInc; i++)
         {
-            param.d_count[taskId] += 1;
+            if (taskId == 1)
+                continue;
+            else if (taskId == 2)
+                continue;
+            else if (taskId == 3)
+                continue;
+            else if (taskId == 4)
+                continue;
+            else if (taskId == 5)
+                continue;
+            else if (taskId == 6)
+                continue;
+            else if (taskId == 7)
+                continue;
+            param.d_count[taskId]++;
         }
     }
 }

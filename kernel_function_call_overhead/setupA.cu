@@ -17,46 +17,49 @@ using namespace std;
 
 __device__ void func0(Param param, size_t taskId)
 {
-    param.d_count[taskId] = taskId;
-    for (int i = 0; i < param.numCountInc; i++)
-    {
-        param.d_count[taskId] += 1;
-    }
+    param.d_count[taskId]++;
 }
 
 __device__ void func1(Param param, size_t taskId)
 {
-    func0(param, taskId);
+    if (taskId != 1)
+        func0(param, taskId);
 }
 
 __device__ void func2(Param param, size_t taskId)
 {
-    func1(param, taskId);
+    if (taskId != 2)
+        func1(param, taskId);
 }
 
 __device__ void func3(Param param, size_t taskId)
 {
-    func2(param, taskId);
+    if (taskId != 3)
+        func2(param, taskId);
 }
 
 __device__ void func4(Param param, size_t taskId)
 {
-    func3(param, taskId);
+    if (taskId != 4)
+        func3(param, taskId);
 }
 
 __device__ void func5(Param param, size_t taskId)
 {
-    func4(param, taskId);
+    if (taskId != 5)
+        func4(param, taskId);
 }
 
 __device__ void func6(Param param, size_t taskId)
 {
-    func5(param, taskId);
+    if (taskId != 6)
+        func5(param, taskId);
 }
 
 __device__ void func7(Param param, size_t taskId)
 {
-    func6(param, taskId);
+    if (taskId != 7)
+        func6(param, taskId);
 }
 
 __global__ void setupAKernel(Param param)
@@ -65,7 +68,11 @@ __global__ void setupAKernel(Param param)
 
     if (taskId < param.dataSize)
     {
-        func7(param, taskId);
+        param.d_count[taskId] = taskId;
+        for (int i = 0; i < param.numCountInc; i++)
+        {
+            func7(param, taskId);
+        }
     }
 }
 

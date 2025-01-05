@@ -21,8 +21,12 @@ __global__ void setupBKernel(Param param, FuncRunnerB funcRunnerB)
     size_t taskId = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
 
     if (taskId < param.dataSize)
-    {
-        funcRunnerB.runFunc(param, taskId);
+    {        
+        param.d_count[taskId] = taskId;
+        for (int i = 0; i < param.numCountInc; i++)
+        {
+            funcRunnerB.runFunc(param, taskId);
+        }
     }
 }
 
