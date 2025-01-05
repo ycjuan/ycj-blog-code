@@ -14,7 +14,7 @@ public:
 private:
     __device__ void func0(Param param, size_t taskId)
     {
-        param.d_count[taskId] += 1;\
+        param.d_count[taskId]++;
     }
 
     __device__ void func1(Param param, size_t taskId)
