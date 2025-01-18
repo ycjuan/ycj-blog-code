@@ -218,7 +218,7 @@ __global__ void copyEligibleKernel2(float *dm_score,
     size_t wid = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (wid < numDocs)
     {
-        int docIdx = numDocs;
+        int docIdx = wid;
         size_t memAddr = getMemAddr(reqIdx, docIdx, numDocs);
         float score = dm_score[memAddr];
         float threshold = dm_scoreThreshold[reqIdx];
@@ -274,7 +274,9 @@ void TopkSampling::copyEligible(TopkParam &param)
 
     param.gpuCopyEligibleTimeMs = timer.tocMs();
     */
+    
 
+    
     CudaTimer timer;
     timer.tic();
 
@@ -294,6 +296,7 @@ void TopkSampling::copyEligible(TopkParam &param)
     }
 
     param.gpuCopyEligibleTimeMs = timer.tocMs();
+    
 }
 
 void TopkSampling::retrieveExact(TopkParam &param)
