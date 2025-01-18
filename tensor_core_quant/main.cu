@@ -121,7 +121,7 @@ int main()
     quantGpuCuda(data, setting);
     quantCpu(data, setting);
     quantWmmaSimple(data, setting);
-    quantWmmaUnroll(data, setting);
+    quantWmmaUnrollV2(data, setting);
 
     checkRst(data);
 
