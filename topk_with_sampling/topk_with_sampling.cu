@@ -255,7 +255,7 @@ void TopkSampling::copyEligible(TopkParam &param)
     }
     */
 
-    /*
+
     CudaTimer timer;
     timer.tic();
 
@@ -273,8 +273,9 @@ void TopkSampling::copyEligible(TopkParam &param)
     CHECK_CUDA(cudaDeviceSynchronize());
 
     param.gpuCopyEligibleTimeMs = timer.tocMs();
-    */
 
+
+    /*
     CudaTimer timer;
     timer.tic();
 
@@ -329,6 +330,7 @@ void TopkSampling::copyEligible(TopkParam &param)
     CHECK_CUDA(cudaDeviceSynchronize());
 
     param.gpuCopyEligibleTimeMs = timer.tocMs();
+    */
 }
 
 void TopkSampling::retrieveExact(TopkParam &param)
