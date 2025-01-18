@@ -43,6 +43,7 @@ __global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, co
    size_t warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
    size_t warpN = (blockIdx.y * blockDim.y + threadIdx.y);
 
+   // 8: WWMA_M, 8: WMMA_N, 128: WMMA_K
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag;
    wmma::fragment<wmma::matrix_b, 8, 8, 128, precision::b1, wmma::col_major> b_frag;
    wmma::fragment<wmma::accumulator, 8, 8, 128, int> c_frag;
@@ -50,16 +51,16 @@ __global__ void quantWmmaKernel(const unsigned *a, const unsigned *b, int *c, co
 
    for (int i = 0; i < K; i += WMMA_K) {
       size_t aRow = warpM * WMMA_M;
-      size_t aCol = i / 32;
+      size_t aCol = i / 32; // 32: number of bytes of int32
 
-      size_t bRow = i / 32;
+      size_t bRow = i / 32; // 32: number of bytes of int32
       size_t bCol = warpN * WMMA_N;
 
       // Bounds checking
       if (aRow < M && aCol < K && bRow < K && bCol < N) {
          // Load the inputs
-         wmma::load_matrix_sync(a_frag, a + aRow * lda / 32 + aCol, lda);
-         wmma::load_matrix_sync(b_frag, b + bCol * ldb / 32 + bRow, ldb);
+         wmma::load_matrix_sync(a_frag, a + aRow * lda / 32 + aCol, lda); // 32: number of bytes of int32
+         wmma::load_matrix_sync(b_frag, b + bCol * ldb / 32 + bRow, ldb); // 32: number of bytes of int32
 
          // Perform the matrix multiplication
          wmma::bmma_sync(c_frag, a_frag, b_frag, c_frag);
@@ -100,7 +101,7 @@ void quantWmmaSimple(Data data, Setting setting) {
    blockDim.x = 128;
    blockDim.y = 4;
 
-   gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / 32 - 1)) / (WMMA_M * blockDim.x / 32);
+   gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / 32 - 1)) / (WMMA_M * blockDim.x / 32); // 32: warpSize
    gridDim.y = (MATRIX_N + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y);
 
    printf("\nRunning with wmma (simple)...\n");

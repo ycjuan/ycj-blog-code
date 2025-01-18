@@ -43,6 +43,7 @@ __global__ void quantWmmaUnrollKernel(const unsigned *a, const unsigned *b, int 
    size_t warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
    size_t warpN = (blockIdx.y * blockDim.y + threadIdx.y);
 
+   // 8: WWMA_M, 8: WMMA_N, 128: WMMA_K
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag0;
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag1;
    wmma::fragment<wmma::matrix_a, 8, 8, 128, precision::b1, wmma::row_major> a_frag2;
@@ -84,11 +85,11 @@ __global__ void quantWmmaUnrollKernel(const unsigned *a, const unsigned *b, int 
    wmma::fill_fragment(c_frag32, 0);
    wmma::fill_fragment(c_frag33, 0);
 
-   size_t lda32 = lda / 32;
-   size_t ldb32 = ldb / 32;
+   size_t lda32 = lda / 32; // 32: number of bytes of int32
+   size_t ldb32 = ldb / 32; // 32: number of bytes of int32
    for (int i = 0; i < K; i += WMMA_K) {
-      int i32 = i / 32;
-      size_t aRow0 = warpM * WMMA_M * 4;
+      int i32 = i / 32; // 32: number of bytes of int32
+      size_t aRow0 = warpM * WMMA_M * 4; // 4: because we do 4x unrolling
       size_t aCol0 = i32;
 
       size_t aRow1 = aRow0 + WMMA_M;
@@ -101,7 +102,7 @@ __global__ void quantWmmaUnrollKernel(const unsigned *a, const unsigned *b, int 
       size_t aCol3 = i32;
 
       size_t bRow0 = i32;
-      size_t bCol0 = warpN * WMMA_N * 4;
+      size_t bCol0 = warpN * WMMA_N * 4; // 4: because we do 4x unrolling
 
       size_t bRow1 = i32;
       size_t bCol1 = bCol0 + WMMA_N;
@@ -141,12 +142,12 @@ __global__ void quantWmmaUnrollKernel(const unsigned *a, const unsigned *b, int 
 
    }
 
-   int cRow0 = warpM * WMMA_M * 4;
+   int cRow0 = warpM * WMMA_M * 4; // 4: because we do 4x unrolling
    int cRow1 = cRow0 + WMMA_M;
    int cRow2 = cRow0 + WMMA_M * 2;
    int cRow3 = cRow0 + WMMA_M * 3;
 
-   int cCol0 = warpN * WMMA_N * 4;
+   int cCol0 = warpN * WMMA_N * 4; // 4: because we do 4x unrolling
    int cCol1 = cCol0 + WMMA_N;
    int cCol2 = cCol0 + WMMA_N * 2;
    int cCol3 = cCol0 + WMMA_N * 3;
@@ -209,8 +210,8 @@ void quantWmmaUnroll(Data data, Setting setting) {
    blockDim.x = 128;
    blockDim.y = 4;
 
-   gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / 32 - 1)) / (WMMA_M * blockDim.x / 32) / 4;
-   gridDim.y = (MATRIX_N + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y) / 4;
+   gridDim.x = (MATRIX_M + (WMMA_M * blockDim.x / 32 - 1)) / (WMMA_M * blockDim.x / 32) / 4; // 32: warpSize; 4: because we do 4x unrolling
+   gridDim.y = (MATRIX_N + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y) / 4; // 4: because we do 4x unrolling
 
    printf("\nRunning with wmma (unroll)...\n");
    printf("M = %d, N = %d, K = %d.\n", MATRIX_M, MATRIX_N, MATRIX_K);
@@ -221,7 +222,7 @@ void quantWmmaUnroll(Data data, Setting setting) {
    {
       if (t == 0)
          timer.tic();
-      quantWmmaUnrollKernel <<< gridDim, blockDim >>> (a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32);
+      quantWmmaUnrollKernel <<< gridDim, blockDim >>> (a, b, c_wmma, MATRIX_M, MATRIX_N, MATRIX_K * 32); // 32: number of bytes of int32
       CHECK_CUDA(cudaDeviceSynchronize());
       CHECK_CUDA(cudaGetLastError());
    }
