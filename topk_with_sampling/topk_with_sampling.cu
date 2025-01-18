@@ -158,13 +158,13 @@ void TopkSampling::findThreshold(TopkParam &param)
     timer.tic();
 
     int thIdx = ceil((double)param.numToRetrieve / param.numDocs * kNumSamplesPerReq * 8);
-    //omp_set_num_threads(4);
-    //#pragma omp parallel for
-    // mutlithreading does not help much here
+    // omp_set_num_threads(4);
+    // #pragma omp parallel for
+    //  mutlithreading does not help much here
     for (size_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
     {
         thrust::sort(thrust::cuda::par(thrustAllocator),
-                     d_scoreSample + reqIdx       * kNumSamplesPerReq,
+                     d_scoreSample + reqIdx * kNumSamplesPerReq,
                      d_scoreSample + (reqIdx + 1) * kNumSamplesPerReq,
                      thrust::greater<float>());
     }
@@ -207,21 +207,55 @@ __global__ void copyEligibleKernel(float *dm_score,
     }
 }
 
+__global__ void copyEligibleKernel2(float *dm_score,
+                                    float *dm_scoreThreshold,
+                                    Pair *d_eligiblePairs,
+                                    int *dm_copyCount,
+                                    int reqIdx,
+                                    int numDocs,
+                                    size_t kMaxEligiblePairsPerReq)
+{
+    size_t wid = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
+    if (wid < numDocs)
+    {
+        int docIdx = numDocs;
+        size_t memAddr = getMemAddr(reqIdx, docIdx, numDocs);
+        float score = dm_score[memAddr];
+        float threshold = dm_scoreThreshold[reqIdx];
+        if (score >= threshold)
+        {
+            int count = atomicAdd(dm_copyCount + reqIdx, 1);
+            if (count < kMaxEligiblePairsPerReq)
+            {
+                Pair pair;
+                pair.reqIdx = reqIdx;
+                pair.docIdx = docIdx;
+                pair.score = score;
+                d_eligiblePairs[reqIdx * kMaxEligiblePairsPerReq + count] = pair;
+            }
+        }
+    }
+}
+
 void TopkSampling::copyEligible(TopkParam &param)
 {
     /*
+    This doesn't work. Just for reference.
     for (size_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
     {
-        thrust::copy_if(thrust::device,
+        cudaStream_t stream;
+        cudaStreamCreate(&stream);
+        thrust::copy_if(thrust::device.on(stream), //thrust::cuda::par(thrustAllocator).on(stream),
                         param.dm_score + reqIdx * param.numDocs,
                         param.dm_score + (reqIdx + 1) * param.numDocs,
-                        param.dm_rst + reqIdx * param.numToRetrieve,
-                        [thIdx = dm_scoreThreshold[reqIdx]] __device__(float score) mutable {
-                            return score >= thIdx;
+                        d_eligiblePairs + reqIdx * kMaxEligiblePairsPerReq,
+                        [thScore = dm_scoreThreshold[reqIdx]] __device__(float score) mutable {
+                            return score >= thScore;
                         });
     }
     */
 
+    /*
     CudaTimer timer;
     timer.tic();
 
@@ -237,6 +271,27 @@ void TopkSampling::copyEligible(TopkParam &param)
                                                 kMaxEligiblePairsPerReq);
 
     CHECK_CUDA(cudaDeviceSynchronize());
+
+    param.gpuCopyEligibleTimeMs = timer.tocMs();
+    */
+
+    CudaTimer timer;
+    timer.tic();
+
+    CHECK_CUDA(cudaMemset(dm_copyCount, 0, param.numReqs * sizeof(int)));
+    int blockSize = 256;
+    int gridSize = (param.numDocs + blockSize - 1) / blockSize;
+    for (int reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
+    {
+        copyEligibleKernel2<<<gridSize, blockSize>>>(param.dm_score,
+                                                     dm_scoreThreshold,
+                                                     d_eligiblePairs,
+                                                     dm_copyCount,
+                                                     reqIdx,
+                                                     param.numDocs,
+                                                     kMaxEligiblePairsPerReq);
+        CHECK_CUDA(cudaDeviceSynchronize());
+    }
 
     param.gpuCopyEligibleTimeMs = timer.tocMs();
 }
