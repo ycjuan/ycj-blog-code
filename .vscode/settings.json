@@ -1,0 +1,87 @@
+{
+    "workbench.colorCustomizations": {
+        // Make active tabe more obvious
+        // https://stackoverflow.com/questions/59121072/is-there-a-way-of-making-the-active-tab-border-highlighted-on-top-instead-of-at
+        "tab.activeBorder": "#ff0000",
+        "tab.unfocusedActiveBorder": "#000000",
+        "tab.activeBackground": "#26549e",
+        // Make Github Copilot suggestions more obvious
+        // https://github.com/orgs/community/discussions/7447
+        "editorGhostText.border": "#ff0000",
+        "editorGhostText.foreground": "#ff0000",
+        // Make errors more obvious
+        // https://stackoverflow.com/questions/40697223/how-to-change-error-styles-in-vs-code
+        "editorError.foreground": "#000000", // don't show squiggly line
+        "editorError.border": "#000000", // don't show additional border under squiggly line
+        "editorError.background": "#800080", // fuchsia background
+        "editor.wordHighlightTextBackground": "#20B2AA", // highlight same variable
+        "workbench.editor.enablePreview": false
+    },
+    "files.associations": {
+        "stdexcept": "cpp",
+        "numeric": "cpp",
+        "iostream": "cpp",
+        "ostream": "cpp",
+        "array": "cpp",
+        "string_view": "cpp",
+        "initializer_list": "cpp",
+        "ranges": "cpp",
+        "utility": "cpp",
+        "atomic": "cpp",
+        "bit": "cpp",
+        "*.tcc": "cpp",
+        "cctype": "cpp",
+        "chrono": "cpp",
+        "clocale": "cpp",
+        "cmath": "cpp",
+        "compare": "cpp",
+        "concepts": "cpp",
+        "condition_variable": "cpp",
+        "cstdarg": "cpp",
+        "cstddef": "cpp",
+        "cstdint": "cpp",
+        "cstdio": "cpp",
+        "cstdlib": "cpp",
+        "cstring": "cpp",
+        "ctime": "cpp",
+        "cwchar": "cpp",
+        "cwctype": "cpp",
+        "deque": "cpp",
+        "map": "cpp",
+        "set": "cpp",
+        "unordered_map": "cpp",
+        "unordered_set": "cpp",
+        "vector": "cpp",
+        "exception": "cpp",
+        "algorithm": "cpp",
+        "functional": "cpp",
+        "iterator": "cpp",
+        "memory": "cpp",
+        "memory_resource": "cpp",
+        "optional": "cpp",
+        "random": "cpp",
+        "ratio": "cpp",
+        "string": "cpp",
+        "system_error": "cpp",
+        "tuple": "cpp",
+        "type_traits": "cpp",
+        "fstream": "cpp",
+        "iomanip": "cpp",
+        "iosfwd": "cpp",
+        "istream": "cpp",
+        "limits": "cpp",
+        "mutex": "cpp",
+        "new": "cpp",
+        "sstream": "cpp",
+        "stop_token": "cpp",
+        "streambuf": "cpp",
+        "thread": "cpp",
+        "typeinfo": "cpp",
+        "bitset": "cpp",
+        "codecvt": "cpp",
+        "filesystem": "cpp",
+        "__nullptr": "cpp",
+        "__locale": "cpp",
+        "__config": "cpp"
+    }
+}
