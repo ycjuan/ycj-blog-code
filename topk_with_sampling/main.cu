@@ -126,7 +126,7 @@ void runExp(int numReqs, int numDocs, bool useRandomSampling, bool useCpu)
 
 int main()
 {
-    runExp(2, 1600000, true, true);
+    runExp(64, 1600000, true, true);
 
     return 0;
 }

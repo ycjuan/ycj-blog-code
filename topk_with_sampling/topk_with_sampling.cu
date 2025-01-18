@@ -274,29 +274,61 @@ void TopkSampling::copyEligible(TopkParam &param)
 
     param.gpuCopyEligibleTimeMs = timer.tocMs();
     */
-    
 
-    
     CudaTimer timer;
     timer.tic();
 
     CHECK_CUDA(cudaMemset(dm_copyCount, 0, param.numReqs * sizeof(int)));
     int blockSize = 256;
     int gridSize = (param.numDocs + blockSize - 1) / blockSize;
-    for (int reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
+
+    cudaStream_t stream0;
+    cudaStream_t stream1;
+    cudaStream_t stream2;
+    cudaStream_t stream3;
+    cudaStreamCreate(&stream0);
+    cudaStreamCreate(&stream1);
+    cudaStreamCreate(&stream2);
+    cudaStreamCreate(&stream3);
+    for (int reqIdx = 0; reqIdx < param.numReqs; reqIdx += 4)
     {
-        copyEligibleKernel2<<<gridSize, blockSize>>>(param.dm_score,
-                                                     dm_scoreThreshold,
-                                                     d_eligiblePairs,
-                                                     dm_copyCount,
-                                                     reqIdx,
-                                                     param.numDocs,
-                                                     kMaxEligiblePairsPerReq);
-        CHECK_CUDA(cudaDeviceSynchronize());
+
+        copyEligibleKernel2<<<gridSize, blockSize, 0, stream0>>>(param.dm_score,
+                                                                 dm_scoreThreshold,
+                                                                 d_eligiblePairs,
+                                                                 dm_copyCount,
+                                                                 reqIdx,
+                                                                 param.numDocs,
+                                                                 kMaxEligiblePairsPerReq);
+        copyEligibleKernel2<<<gridSize, blockSize, 0, stream1>>>(param.dm_score,
+                                                                 dm_scoreThreshold,
+                                                                 d_eligiblePairs,
+                                                                 dm_copyCount,
+                                                                 reqIdx + 1,
+                                                                 param.numDocs,
+                                                                 kMaxEligiblePairsPerReq);
+        copyEligibleKernel2<<<gridSize, blockSize, 0, stream2>>>(param.dm_score,
+                                                                 dm_scoreThreshold,
+                                                                 d_eligiblePairs,
+                                                                 dm_copyCount,
+                                                                 reqIdx + 2,
+                                                                 param.numDocs,
+                                                                 kMaxEligiblePairsPerReq);
+        copyEligibleKernel2<<<gridSize, blockSize, 0, stream3>>>(param.dm_score,
+                                                                 dm_scoreThreshold,
+                                                                 d_eligiblePairs,
+                                                                 dm_copyCount,
+                                                                 reqIdx + 3,
+                                                                 param.numDocs,
+                                                                 kMaxEligiblePairsPerReq);
+        CHECK_CUDA(cudaStreamSynchronize(stream0));
+        CHECK_CUDA(cudaStreamSynchronize(stream1));
+        CHECK_CUDA(cudaStreamSynchronize(stream2));
+        CHECK_CUDA(cudaStreamSynchronize(stream3));
     }
+    CHECK_CUDA(cudaDeviceSynchronize());
 
     param.gpuCopyEligibleTimeMs = timer.tocMs();
-    
 }
 
 void TopkSampling::retrieveExact(TopkParam &param)
