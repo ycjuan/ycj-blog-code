@@ -1,5 +1,5 @@
 #include <random>
-#include "quant_data_struct.cuh"
+#include "quant.cuh"
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \

@@ -37,4 +37,8 @@ struct QuantData
     void print();
 };
 
+void quantOpGpu(QuantData &data);
+
+void quantOpCpu(QuantData &data);
+
 #endif // QUANT_DATA_STRUCT_CUH

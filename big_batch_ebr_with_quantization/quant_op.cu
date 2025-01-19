@@ -13,7 +13,7 @@ Thanks to the authors of the original code!
 #include <cublas_v2.h>
 #include <bitset>
 
-#include "quant_data_struct.cuh"
+#include "quant.cuh"
 #include "util.cuh"
 
 #define CHECK_CUDA(func)                                                                                                           \

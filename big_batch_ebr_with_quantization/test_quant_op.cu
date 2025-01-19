@@ -2,8 +2,7 @@
 #include <vector>
 #include <cassert>
 
-#include "quant_data_struct.cuh"
-#include "quant_op.cuh"
+#include "quant.cuh"
 
 using namespace std;
 

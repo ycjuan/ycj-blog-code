@@ -2,7 +2,7 @@
 #include <sstream>
 #include <random>
 
-#include "emb_data_struct.cuh"
+#include "emb.cuh"
 
 #define CHECK_CUDA(func)                                                                                                           \
     {                                                                                                                              \

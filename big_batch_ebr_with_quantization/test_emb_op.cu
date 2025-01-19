@@ -1,8 +1,7 @@
 #include <iostream>
 #include <vector>
 
-#include "emb_data_struct.cuh"
-#include "emb_op.cuh"
+#include "emb.cuh"
 
 using namespace std;
 

@@ -1,5 +1,5 @@
-#ifndef DATA_STRUCT_CUH
-#define DATA_STRUCT_CUH
+#ifndef EMB_DATA_STRUCT_CUH
+#define EMB_DATA_STRUCT_CUH
 
 #include <cuda_fp16.h>
 #include <sstream>
@@ -41,5 +41,10 @@ struct EmbData
 
     void print();
 };
+
+
+void embOpGpu(EmbData &data);
+
+void embOpCpu(EmbData &data);
 
 #endif
