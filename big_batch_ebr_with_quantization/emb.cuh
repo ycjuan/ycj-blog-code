@@ -47,4 +47,8 @@ void embOpGpu(EmbData &data);
 
 void embOpCpu(EmbData &data);
 
+void embMaskOpGpu(EmbData &data);
+
+void embMaskOpCpu(EmbData &data);
+
 #endif

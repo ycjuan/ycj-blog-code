@@ -250,6 +250,7 @@ void TopkSampling::retrieveExact(TopkParam &param)
     CHECK_CUDA(cudaMemcpy(h_copyCount, d_copyCount, param.numReqs * sizeof(int), cudaMemcpyDeviceToHost));
     for (size_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
     {
+        //TODO: dm -> d
         Pair *dm_eligiblePairsStart = d_eligiblePairs + reqIdx * kMaxEligiblePairsPerReq;
         Pair *dm_eligiblePairsEnd = dm_eligiblePairsStart + h_copyCount[reqIdx];
         thrust::stable_sort(thrust::cuda::par(thrustAllocator),
