@@ -82,6 +82,8 @@
         "filesystem": "cpp",
         "__nullptr": "cpp",
         "__locale": "cpp",
-        "__config": "cpp"
+        "__config": "cpp",
+        "future": "cpp",
+        "cinttypes": "cpp"
     }
 }
