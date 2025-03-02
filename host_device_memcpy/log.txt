@@ -1,0 +1,29 @@
+
+numRows: 1048576
+numCols: 1024
+dataSize: 1073741824
+dataSizeInGiB: 4 GiB
+h2h_r2r memcpy (pageable): 17.0779 GiB/s
+h2h_r2r memcpy (pinned): 15.7785 GiB/s
+h2h_r2r cudaMemcpy (pinned): 16.043 GiB/s
+h2h_r2r custom: 15.6832 GiB/s
+h2h_r2c custom: 3.1111 GiB/s
+h2h_c2r custom: 2.60867 GiB/s
+h2h_c2c custom: 15.7596 GiB/s
+h2d_r2r cudaMemcpy (pageable): 12.2721 GiB/s
+h2d_r2r cudaMemcpy (pinned): 12.546 GiB/s
+h2d_r2r custom: 12.5461 GiB/s
+h2d_r2c custom: 12.5461 GiB/s
+h2d_c2r custom: 12.5461 GiB/s
+h2d_c2c custom: 12.546 GiB/s
+d2h_r2r cudaMemcpy (pageable): 12.0898 GiB/s
+d2h_r2r cudaMemcpy (pinned): 12.3086 GiB/s
+d2h_r2r custom: 4.02892 GiB/s
+d2h_r2c custom: 4.00549 GiB/s
+d2h_c2r custom: 4.00494 GiB/s
+d2h_c2c custom: 4.02414 GiB/s
+d2d_r2r cudaMemcpy: 110.847 GiB/s
+d2d_r2r custom: 120.285 GiB/s
+d2d_r2c custom: 100.173 GiB/s
+d2d_c2r custom: 97.8521 GiB/s
+d2d_c2c custom: 118.312 GiB/s
