@@ -1,10 +1,9 @@
 #include <string>
-#include <stdexcept>
 #include <iostream>
-#include <random>
 #include <sstream>
-#include <cublas_v2.h>
-#include <type_traits>
+#include <vector>
+#include <stdexcept>
+#include <future>
 
 #include "util.cuh"
 
@@ -24,7 +23,7 @@ int kNumTrials = 10;
         }                                                                                                                          \
     }
 
-void runExp(vector<void *> &d_ptrs, vector<void *> &h_ptrs, int numCudaStreams)
+void runExp(vector<void *> &d_ptrs, vector<void *> &h_ptrs, int numCudaStreams, bool useFuture)
 {
     // ----------------
     // Create streams
@@ -42,21 +41,43 @@ void runExp(vector<void *> &d_ptrs, vector<void *> &h_ptrs, int numCudaStreams)
     timer.tic();
     for (int t = 0; t < kNumTrials; ++t)
     {
-        for (int i = 0; i < kNumCopies; ++i)
+        if (useFuture)
         {
-            auto &stream = streams[i % numCudaStreams];
-            CHECK_CUDA(cudaMemcpyAsync(d_ptrs[i], h_ptrs[i], kCopySizeInBytes, cudaMemcpyHostToDevice, stream));
-        }
+            vector<future<void>> futures;
+            for (int i = 0; i < kNumCopies; ++i)
+            {
+                auto &stream = streams[i % numCudaStreams];
+                futures.push_back(async(launch::async, [=]()
+                                        { CHECK_CUDA(cudaMemcpyAsync(d_ptrs[i], h_ptrs[i], kCopySizeInBytes, cudaMemcpyHostToDevice, stream)); }));
+            }
+            for (int i = 0; i < numCudaStreams; ++i)
+            {
+                CHECK_CUDA(cudaStreamSynchronize(streams[i]));
+            }
 
-        for (int i = 0; i < numCudaStreams; ++i)
+            for (auto &f : futures)
+            {
+                f.get();
+            }
+        }
+        else
         {
-            CHECK_CUDA(cudaStreamSynchronize(streams[i]));
+            for (int i = 0; i < kNumCopies; ++i)
+            {
+                auto &stream = streams[i % numCudaStreams];
+                CHECK_CUDA(cudaMemcpyAsync(d_ptrs[i], h_ptrs[i], kCopySizeInBytes, cudaMemcpyHostToDevice, stream));
+            }
+            for (int i = 0; i < numCudaStreams; ++i)
+            {
+                CHECK_CUDA(cudaStreamSynchronize(streams[i]));
+            }
         }
     }
     float elapsedMs = timer.tocMs();
-    cout << "numCudaStreams: " << numCudaStreams << ", elapsed time per trial: " << elapsedMs / kNumTrials << " ms" << endl;
+    cout << "numCudaStreams: " << numCudaStreams
+         << ", useFuture: " << useFuture
+         << ", elapsed time per trial: " << elapsedMs / kNumTrials << " ms" << endl;
 
-    // ----------------
     // Free streams
     for (int i = 0; i < numCudaStreams; ++i)
     {
@@ -101,7 +122,8 @@ int main()
     // Run experiments
     for (int numCudaStreams = 1; numCudaStreams <= kNumCopies; numCudaStreams *= 2)
     {
-        runExp(d_ptrs, h_ptrs, numCudaStreams);
+        runExp(d_ptrs, h_ptrs, numCudaStreams, false);
+        runExp(d_ptrs, h_ptrs, numCudaStreams, true);
     }
 
     // ----------------
