@@ -10,7 +10,7 @@
 
 using namespace std;
 
-size_t kNumCopies = 1 << 16;
+size_t kNumCopies = 1 << 12;
 size_t kCopySizeInBytes = 1 << 20;
 int kNumTrials = 10;
 
