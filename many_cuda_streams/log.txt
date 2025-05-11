@@ -1,0 +1,55 @@
+copy size: 1 MB
+num copies: 16384
+num trials: 10
+
+Device 0: NVIDIA L4
+  Total global memory: 22574 MB
+  Multiprocessor count: 58
+  Max threads per block: 1024
+  Max threads dim: (1024, 1024, 64)
+  Max grid size: (2147483647, 65535, 65535)
+  Clock rate: 2040 MHz
+  Compute capability: 8.9
+  Memory clock rate: 6251 MHz
+  Memory bus width: 192 bits
+  L2 cache size: 49152 KB
+  concurrentKernels: Yes
+  asyncEngineCount: 2
+  streamPrioritiesSupported: Yes
+  unifiedAddressing: Yes
+  pageableMemoryAccess: Yes
+  canMapHostMemory: Yes
+  sharedMemPerBlock: 48 KB
+  sharedMemPerMultiprocessor: 100 KB
+
+numCudaStreams: 1, useFuture: 0, elapsed time per trial: 1300.98 ms
+numCudaStreams: 1, useFuture: 1, elapsed time per trial: 1469.07 ms
+numCudaStreams: 2, useFuture: 0, elapsed time per trial: 1302.16 ms
+numCudaStreams: 2, useFuture: 1, elapsed time per trial: 1417.36 ms
+numCudaStreams: 4, useFuture: 0, elapsed time per trial: 1302.45 ms
+numCudaStreams: 4, useFuture: 1, elapsed time per trial: 1482.04 ms
+numCudaStreams: 8, useFuture: 0, elapsed time per trial: 1302.45 ms
+numCudaStreams: 8, useFuture: 1, elapsed time per trial: 1482 ms
+numCudaStreams: 16, useFuture: 0, elapsed time per trial: 1302.45 ms
+numCudaStreams: 16, useFuture: 1, elapsed time per trial: 1483.4 ms
+numCudaStreams: 32, useFuture: 0, elapsed time per trial: 1302.47 ms
+numCudaStreams: 32, useFuture: 1, elapsed time per trial: 1491.74 ms
+numCudaStreams: 64, useFuture: 0, elapsed time per trial: 1302.46 ms
+numCudaStreams: 64, useFuture: 1, elapsed time per trial: 1486.52 ms
+numCudaStreams: 128, useFuture: 0, elapsed time per trial: 1302.45 ms
+numCudaStreams: 128, useFuture: 1, elapsed time per trial: 1480.71 ms
+numCudaStreams: 256, useFuture: 0, elapsed time per trial: 1302.46 ms
+numCudaStreams: 256, useFuture: 1, elapsed time per trial: 1475.32 ms
+numCudaStreams: 512, useFuture: 0, elapsed time per trial: 1302.54 ms
+numCudaStreams: 512, useFuture: 1, elapsed time per trial: 1476.73 ms
+numCudaStreams: 1024, useFuture: 0, elapsed time per trial: 1302.49 ms
+numCudaStreams: 1024, useFuture: 1, elapsed time per trial: 1477.63 ms
+numCudaStreams: 2048, useFuture: 0, elapsed time per trial: 1302.6 ms
+numCudaStreams: 2048, useFuture: 1, elapsed time per trial: 1476.47 ms
+numCudaStreams: 4096, useFuture: 0, elapsed time per trial: 1304.77 ms
+numCudaStreams: 4096, useFuture: 1, elapsed time per trial: 1473.43 ms
+numCudaStreams: 8192, useFuture: 0, elapsed time per trial: 1304.72 ms
+numCudaStreams: 8192, useFuture: 1, elapsed time per trial: 1474.79 ms
+numCudaStreams: 16384, useFuture: 0, elapsed time per trial: 1304.74 ms
+numCudaStreams: 16384, useFuture: 1, elapsed time per trial: 1479.33 ms
+
