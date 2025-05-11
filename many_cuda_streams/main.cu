@@ -9,8 +9,8 @@
 
 using namespace std;
 
-size_t kNumCopies = 1 << 12;
-size_t kCopySizeInBytes = 1 << 20;
+size_t kNumCopies = 1 << 14; // 16,384
+size_t kCopySizeInBytes = 1 << 20; // 1 MiB
 int kNumTrials = 10;
 
 #define CHECK_CUDA(func)                                                                                                           \
@@ -92,6 +92,10 @@ int main()
     cout << "copy size: " << kCopySizeInBytes / (1024 * 1024) << " MB" << endl;
     cout << "num copies: " << kNumCopies << endl;
     cout << "num trials: " << kNumTrials << endl;
+
+    // ----------------
+    // Print device info
+    printDeviceInfo();
 
     // ----------------
     // Common variables
