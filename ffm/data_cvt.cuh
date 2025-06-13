@@ -1,0 +1,77 @@
+#ifndef DATA_CVT_CUH
+#define DATA_CVT_CUH
+
+#include <vector>
+#include <stdexcept>
+
+#include "data_struct.cuh"
+
+FFMData convertToFFMData(const std::vector<std::vector<std::vector<float>>> &data3D)
+{
+    using namespace std;
+
+    FFMData ffmData;
+
+    // -----------------
+    // Some meta data
+    const int numRows = data3D.size();
+    const int numFields = data3D.at(0).size();
+    const int embDimPerField = data3D.at(0).at(0).size();
+    ffmData.numRows = numRows;
+    ffmData.numFields = numFields;
+    ffmData.embDimPerField = embDimPerField;
+
+    // -----------------
+    // Malloc buffer
+    EMB_T *hp_embData;
+    const size_t embDataSizeInBytes = numRows * numFields * embDimPerField * sizeof(EMB_T);
+    cudaError_t cudaError = cudaMallocHost(&hp_embData, embDataSizeInBytes);
+    if (cudaError != cudaSuccess) 
+    {
+        throw std::runtime_error("Failed to allocate pinned memory for embedding data: " + std::to_string(cudaError));
+    }
+
+    // -----------------
+    // Fill the buffer with data
+    for (int rowIdx = 0; rowIdx < numRows; ++rowIdx) 
+    {
+        for (int fieldIdx = 0; fieldIdx < numFields; ++fieldIdx) 
+        {
+            for (int embIdx = 0; embIdx < embDimPerField; ++embIdx) 
+            {
+                size_t memAddr = ffmData.getMemAddr(rowIdx, fieldIdx, embIdx);
+                hp_embData[memAddr] = static_cast<EMB_T>(data3D[rowIdx][fieldIdx][embIdx]);
+            }
+        }
+    }
+
+    // -----------------
+    // Malloc device memory
+    cudaError = cudaMalloc(&ffmData.d_embData, embDataSizeInBytes);
+    if (cudaError != cudaSuccess) 
+    {
+        throw std::runtime_error("Failed to allocate device memory for embedding data: " + std::to_string(cudaError));
+    }
+
+    // -----------------
+    // Copy data to device
+    cudaError = cudaMemcpy(ffmData.d_embData, hp_embData, embDataSizeInBytes, cudaMemcpyHostToDevice);
+    if (cudaError != cudaSuccess) 
+    {
+        throw std::runtime_error("Failed to copy embedding data to device: " + std::to_string(cudaError));
+    }
+
+    // -----------------
+    // Free pinned memory
+    cudaError = cudaFreeHost(hp_embData);
+    if (cudaError != cudaSuccess) 
+    {
+        throw std::runtime_error("Failed to free pinned memory for embedding data: " + std::to_string(cudaError));
+    }
+
+    // -----------------
+    // Return the populated FFMData structure
+    return ffmData;
+}
+
+#endif // DATA_CVT_CUH
