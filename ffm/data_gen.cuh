@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <random>
+#include <omp.h>
 
 #include "data_struct.cuh"
 
@@ -10,18 +11,29 @@ std::vector<std::vector<std::vector<float>>> genRandFFMData(int numRows, int num
 {
     using namespace std;
 
-    default_random_engine generator;
-    uniform_real_distribution<float> distribution(0, sqrt(1.0f / embDimPerField));
+    // -----------------
+    // Prepare random number generators
+    int numThreads = omp_get_max_threads();
+    random_device rd;
+    vector<default_random_engine> generators;
+    for (int t = 0; t < numThreads; t++)
+    {
+        generators.emplace_back(rd());
+    }
 
+    // -----------------
+    // Generate random data
     vector<vector<vector<float>>> data(numRows, vector<vector<float>>(numFields, vector<float>(embDimPerField)));
 
+    #pragma omp parallel for num_threads(numThreads) schedule(static)
     for (int i = 0; i < numRows; ++i)
     {
+        uniform_real_distribution<float> distribution(0, sqrt(1.0f / embDimPerField));
         for (int j = 0; j < numFields; ++j)
         {
             for (int k = 0; k < embDimPerField; ++k)
             {
-                data[i][j][k] = distribution(generator);
+                data[i][j][k] = distribution(generators[omp_get_thread_num()]);
             }
         }
     }
