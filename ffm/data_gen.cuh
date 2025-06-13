@@ -29,19 +29,19 @@ std::vector<std::vector<std::vector<float>>> genRandFFMData(int numRows, int num
     return data;
 }
 
-std::vector<ScoringTask> genRandScoringTasks(int numReqs, int numDocsPerReqs, int numTotalDocs)
+std::vector<ScoringTask> genRandScoringTasks(int numReqs, int numToScore, int numDocs)
 {
     using namespace std;
 
     default_random_engine generator;
-    uniform_int_distribution<int> distribution(0, numTotalDocs - 1);
+    uniform_int_distribution<int> distribution(0, numDocs - 1);
 
-    vector<ScoringTask> tasks(numReqs * numDocsPerReqs);
+    vector<ScoringTask> tasks(numReqs * numToScore);
     for (int reqIdx = 0; reqIdx < numReqs; ++reqIdx)
     {
-        for (int docIdx = 0; docIdx < numDocsPerReqs; ++docIdx)
+        for (int docIdx = 0; docIdx < numToScore; ++docIdx)
         {
-            int taskIdx = reqIdx * numDocsPerReqs + docIdx;
+            int taskIdx = reqIdx * numToScore + docIdx;
             tasks[taskIdx].reqIdx = reqIdx;
             tasks[taskIdx].docIdx = distribution(generator);
             tasks[taskIdx].result = 0.0f;

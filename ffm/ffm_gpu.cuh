@@ -3,7 +3,7 @@
 
 #include "data_struct.cuh"
 
-__global__ void ffmKernel(FFMData reqData, FFMData docData, ScoringTasks tasks)
+__global__ void ffmKernel(FFMData reqData, FFMData docData, ScoringTasksGpu tasks)
 {
     int taskIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -32,7 +32,7 @@ __global__ void ffmKernel(FFMData reqData, FFMData docData, ScoringTasks tasks)
     }
 }
 
-void ffmScorer(FFMData reqData, FFMData docData, ScoringTasks tasks)
+void ffmScorer(FFMData reqData, FFMData docData, ScoringTasksGpu tasks)
 {
     // Launch the FFM kernel
     int blockSize = 256;

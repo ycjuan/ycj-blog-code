@@ -33,7 +33,7 @@ struct ScoringTask
     float result;
 };
 
-struct ScoringTasks
+struct ScoringTasksGpu
 {
     int numTasks;
     ScoringTask* d_tasks;

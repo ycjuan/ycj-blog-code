@@ -6,7 +6,7 @@
 
 #include "data_struct.cuh"
 
-FFMData convertToFFMData(const std::vector<std::vector<std::vector<float>>> &data3D)
+FFMData convertFFMDataToGpu(const std::vector<std::vector<std::vector<float>>> &data3D)
 {
     using namespace std;
 
@@ -74,28 +74,28 @@ FFMData convertToFFMData(const std::vector<std::vector<std::vector<float>>> &dat
     return ffmData;
 }
 
-ScoringTasks convertToScoringTasks(const std::vector<ScoringTask> &tasks)
+ScoringTasksGpu convertScoringTasksToGpu(const std::vector<ScoringTask> &tasks)
 {
     using namespace std;
 
-    ScoringTasks scoringTasks;
-    scoringTasks.numTasks = tasks.size();
+    ScoringTasksGpu scoringTasksGpu;
+    scoringTasksGpu.numTasks = tasks.size();
 
     // Malloc device memory for tasks
-    cudaError_t cudaError = cudaMalloc(&scoringTasks.d_tasks, scoringTasks.numTasks * sizeof(ScoringTask));
+    cudaError_t cudaError = cudaMalloc(&scoringTasksGpu.d_tasks, scoringTasksGpu.numTasks * sizeof(ScoringTask));
     if (cudaError != cudaSuccess) 
     {
         throw std::runtime_error("Failed to allocate device memory for scoring tasks: " + std::to_string(cudaError));
     }
 
     // Copy tasks to device
-    cudaError = cudaMemcpy(scoringTasks.d_tasks, tasks.data(), scoringTasks.numTasks * sizeof(ScoringTask), cudaMemcpyHostToDevice);
+    cudaError = cudaMemcpy(scoringTasksGpu.d_tasks, tasks.data(), scoringTasksGpu.numTasks * sizeof(ScoringTask), cudaMemcpyHostToDevice);
     if (cudaError != cudaSuccess) 
     {
         throw std::runtime_error("Failed to copy scoring tasks to device: " + std::to_string(cudaError));
     }
 
-    return scoringTasks;
+    return scoringTasksGpu;
 }
 
 #endif // DATA_CVT_CUH
