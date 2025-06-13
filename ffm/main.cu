@@ -90,7 +90,7 @@ int main()
     const int kNumReqs = 16;
     const int kNumDocs = 1000;
     const int kNumFields = 10;
-    const int kEmbDimPerField = 8;
+    const int kEmbDimPerField = 512;
     const int kNumToScore = 5;
 
     runTest(kNumReqs, kNumDocs, kNumFields, kEmbDimPerField, kNumToScore, 100);
