@@ -1,6 +1,9 @@
 #ifndef FFM_GPU_CUH
 #define FFM_GPU_CUH
 
+#include <sstream>
+#include <stdexcept>
+
 #include "data_struct.cuh"
 
 __global__ void ffmKernel(FFMData reqData, FFMData docData, ScoringTasksGpu tasks)
@@ -34,10 +37,19 @@ __global__ void ffmKernel(FFMData reqData, FFMData docData, ScoringTasksGpu task
 
 void ffmScorerGpu(FFMData reqData, FFMData docData, ScoringTasksGpu tasks)
 {
+    using namespace std;
+    
     // Launch the FFM kernel
     int blockSize = 256;
     int numBlocks = (tasks.numTasks + blockSize - 1) / blockSize;
     ffmKernel<<<numBlocks, blockSize>>>(reqData, docData, tasks);
+    cudaError_t cudaError = cudaDeviceSynchronize();
+    if (cudaError != cudaSuccess)
+    {
+        ostringstream oss;
+        oss << "CUDA error in ffmScorerGpu: " << cudaGetErrorString(cudaError);
+        throw runtime_error(oss.str());
+    }
 }
 
 #endif // FFM_GPU_CUH
