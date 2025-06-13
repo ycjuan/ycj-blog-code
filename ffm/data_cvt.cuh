@@ -24,7 +24,7 @@ FFMData convertFFMDataToGpu(const std::vector<std::vector<std::vector<float>>> &
     // -----------------
     // Malloc buffer
     EMB_T *hp_embData;
-    const size_t embDataSizeInBytes = numRows * numFields * embDimPerField * sizeof(EMB_T);
+    const size_t embDataSizeInBytes = (size_t)numRows * numFields * embDimPerField * sizeof(EMB_T);
     cudaError_t cudaError = cudaMallocHost(&hp_embData, embDataSizeInBytes);
     if (cudaError != cudaSuccess) 
     {

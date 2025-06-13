@@ -69,9 +69,12 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
     // -------------------
     // Test latency
     Timer timer;
-    timer.tic();
-    for (int trial = 0; trial < kNumTrials; ++trial) 
+    for (int trial = -3; trial < kNumTrials; ++trial) 
     {
+        if (trial == 0) 
+        {
+            timer.tic();
+        }
         ffmScorerGpu(reqDataGpu, docDataGpu, taskDataGpu);
     }
     float latencyMs = timer.tocMs() / kNumTrials;
@@ -91,12 +94,12 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
 int main() 
 {
     const int kNumReqs = 16;
-    const int kNumDocs = 1000;
+    const int kNumDocs = 50000;
     const int kNumFields = 10;
     const int kEmbDimPerField = 512;
-    const int kNumToScore = 5;
+    const int kNumToScore = 1000;
 
-    runTest(kNumReqs, kNumDocs, kNumFields, kEmbDimPerField, kNumToScore, 100);
+    runTest(kNumReqs, kNumDocs, kNumFields, kEmbDimPerField, kNumToScore, 20);
 
     return 0;
 }
