@@ -1,9 +1,12 @@
 #include <sstream>
+#include <iostream>
 
 #include "ffm_gpu.cuh"
+#include "ffm_cpu.cuh"
 #include "data_struct.cuh"
 #include "data_cvt.cuh"
 #include "data_gen.cuh"
+#include "util.cuh"
 
 using namespace std;
 
@@ -27,28 +30,56 @@ void compareResults(const std::vector<ScoringTask>& cpuTasks, const ScoringTasks
     }
 }
 
-void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const int kEmbDimPerField, const int kNumToScore)
+void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const int kEmbDimPerField, const int kNumToScore, const int kNumTrials)
 {
     using namespace std;
 
     // -------------------
-    // Random data CPU
-    auto randReqDataCpu = genRandFFMData(kNumReqs, kNumFields, kEmbDimPerField);
-    auto randDocDataCpu = genRandFFMData(kNumDocs, kNumFields, kEmbDimPerField);
+    // Print test parameters
+    cout << "kNumReqs: " << kNumReqs << ", "
+         << "kNumDocs: " << kNumDocs << ", "
+         << "kNumFields: " << kNumFields << ", "
+         << "kEmbDimPerField: " << kEmbDimPerField << ", "
+         << "kNumToScore: " << kNumToScore << endl;
 
     // -------------------
-    // Random task CPU
-    auto randTaskCpu = genRandScoringTasks(kNumReqs, kNumToScore, kNumDocs);
+    // Random data CPU
+    auto reqDataCpu = genRandFFMData(kNumReqs, kNumFields, kEmbDimPerField);
+    auto docDataCpu = genRandFFMData(kNumDocs, kNumFields, kEmbDimPerField);
+    auto taskDataCpu = genRandScoringTasks(kNumReqs, kNumToScore, kNumDocs);
 
     // -------------------
     // Convert to GPU data
-    auto reqDataGpu = convertFFMDataToGpu(randReqDataCpu);
-    auto docDataGpu = convertFFMDataToGpu(randDocDataCpu);
-    auto taskDataGpu = convertScoringTasksToGpu(randTaskCpu);
+    auto reqDataGpu = convertFFMDataToGpu(reqDataCpu);
+    auto docDataGpu = convertFFMDataToGpu(docDataCpu);
+    auto taskDataGpu = convertScoringTasksToGpu(taskDataCpu);
     
     // -------------------
-    // Run the scoring kernel
-    ffmScorer(reqDataGpu, docDataGpu, taskDataGpu);
+    // Run scoring
+    ffmScorerCpu(reqDataCpu, docDataCpu, taskDataCpu);
+    ffmScorerGpu(reqDataGpu, docDataGpu, taskDataGpu);
+
+    // -------------------
+    // Compare results
+    compareResults(taskDataCpu, taskDataGpu);
+
+    // -------------------
+    // Test latency
+    Timer timer;
+    timer.tic();
+    for (int trial = 0; trial < kNumTrials; ++trial) 
+    {
+        ffmScorerGpu(reqDataGpu, docDataGpu, taskDataGpu);
+    }
+    float latencyMs = timer.tocMs() / kNumTrials;
+    cout << "Average latency per trial: " << latencyMs << " ms" << endl;
+
+    // -------------------
+    // Compare results just in case
+    compareResults(taskDataCpu, taskDataGpu);
+
+    // -------------------
+    // Free GPU data
 }
 
 int main() 
@@ -59,7 +90,7 @@ int main()
     const int kEmbDimPerField = 8;
     const int kNumToScore = 5;
 
-    runTest(kNumReqs, kNumDocs, kNumFields, kEmbDimPerField, kNumToScore);
+    runTest(kNumReqs, kNumDocs, kNumFields, kEmbDimPerField, kNumToScore, 100);
 
     return 0;
 }

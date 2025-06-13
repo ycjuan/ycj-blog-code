@@ -32,7 +32,7 @@ __global__ void ffmKernel(FFMData reqData, FFMData docData, ScoringTasksGpu task
     }
 }
 
-void ffmScorer(FFMData reqData, FFMData docData, ScoringTasksGpu tasks)
+void ffmScorerGpu(FFMData reqData, FFMData docData, ScoringTasksGpu tasks)
 {
     // Launch the FFM kernel
     int blockSize = 256;
