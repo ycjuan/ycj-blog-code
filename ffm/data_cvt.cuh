@@ -98,4 +98,19 @@ ScoringTasksGpu convertScoringTasksToGpu(const std::vector<ScoringTask> &tasks)
     return scoringTasksGpu;
 }
 
+std::vector<ScoringTask> convertScoringTasksBackToCpu(const ScoringTasksGpu &scoringTasksGpu)
+{
+    using namespace std;
+
+    vector<ScoringTask> tasks(scoringTasksGpu.numTasks);
+
+    cudaError_t cudaError = cudaMemcpy(tasks.data(), scoringTasksGpu.d_tasks, scoringTasksGpu.numTasks * sizeof(ScoringTask), cudaMemcpyDeviceToHost);
+    if (cudaError != cudaSuccess)
+    {
+        throw std::runtime_error("Failed to copy scoring tasks from device to host: " + std::to_string(cudaError));
+    }
+
+    return tasks;
+}
+
 #endif // DATA_CVT_CUH

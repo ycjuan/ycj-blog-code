@@ -1,7 +1,31 @@
+#include <sstream>
+
 #include "ffm_gpu.cuh"
 #include "data_struct.cuh"
 #include "data_cvt.cuh"
 #include "data_gen.cuh"
+
+using namespace std;
+
+void compareResults(const std::vector<ScoringTask>& cpuTasks, const ScoringTasksGpu& gpuTasksRaw)
+{
+    using namespace std;
+
+    // Copy results back from GPU
+    vector<ScoringTask> gpuTasks = convertScoringTasksBackToCpu(gpuTasksRaw);
+
+    // Compare CPU and GPU results
+    for (size_t i = 0; i < cpuTasks.size(); ++i) 
+    {
+        if (abs(cpuTasks[i].result - gpuTasks[i].result) > 1e-3) 
+        {
+            ostringstream oss;
+            oss << "Mismatch at task " << i << ": CPU result = " << cpuTasks[i].result 
+                << ", GPU result = " << gpuTasks[i].result;
+            throw runtime_error(oss.str());
+        }
+    }
+}
 
 void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const int kEmbDimPerField, const int kNumToScore)
 {
@@ -26,7 +50,6 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
     // Run the scoring kernel
     ffmScorer(reqDataGpu, docDataGpu, taskDataGpu);
 }
-
 
 int main() 
 {
