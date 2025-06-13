@@ -20,7 +20,10 @@ void compareResults(const std::vector<ScoringTask>& cpuTasks, const ScoringTasks
     // Compare CPU and GPU results
     for (size_t i = 0; i < cpuTasks.size(); ++i) 
     {
-        if (abs(cpuTasks[i].result - gpuTasks[i].result) > 1e-3) 
+        float cpuResult = cpuTasks[i].result;
+        float gpuResult = gpuTasks[i].result;
+        float relativeError = abs(cpuResult - gpuResult) / (abs(cpuResult) + 1e-6f); // Avoid division by zero
+        if (relativeError > 1e-3) // Use relative error for comparison
         {
             ostringstream oss;
             oss << "Mismatch at task " << i << ": CPU result = " << cpuTasks[i].result 
