@@ -80,6 +80,9 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
 
     // -------------------
     // Free GPU data
+    reqDataGpu.free();
+    docDataGpu.free();
+    taskDataGpu.free();
 }
 
 int main() 

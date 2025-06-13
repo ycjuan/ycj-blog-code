@@ -11,7 +11,7 @@ struct FFMData
     int numFields;
     int numRows;
 
-    EMB_T* d_embData;
+    EMB_T* d_embData = nullptr;
 
     __device__ __host__ size_t getMemAddr(size_t rowIdx, size_t fieldIdx, size_t embIdx)
     {
@@ -23,6 +23,15 @@ struct FFMData
         size_t offset1 = embDimPerField;
 
         return idx0 * offset0 + idx1 * offset1 + idx2;
+    }
+
+    void free()
+    {
+        if (d_embData != nullptr)
+        {
+            cudaFree(d_embData);
+            d_embData = nullptr;
+        }
     }
 };
 
@@ -36,7 +45,16 @@ struct ScoringTask
 struct ScoringTasksGpu
 {
     int numTasks;
-    ScoringTask* d_tasks;
+    ScoringTask* d_tasks = nullptr;
+
+    void free()
+    {
+        if (d_tasks != nullptr)
+        {
+            cudaFree(d_tasks);
+            d_tasks = nullptr;
+        }
+    }
 };
 
 #endif // DATA_STRUCT_CUH
