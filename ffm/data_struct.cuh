@@ -15,6 +15,7 @@ struct FFMData
 
     __device__ __host__ size_t getMemAddr(size_t rowIdx, size_t fieldIdx, size_t embIdx)
     {
+
         size_t idx0 = rowIdx;
         size_t idx1 = fieldIdx;
         size_t idx2 = embIdx;
@@ -23,6 +24,61 @@ struct FFMData
         size_t offset1 = embDimPerField;
 
         return idx0 * offset0 + idx1 * offset1 + idx2;
+
+        /*
+        size_t idx0 = rowIdx;
+        size_t idx1 = embIdx;
+        size_t idx2 = fieldIdx;
+
+        size_t offset0 = embDimPerField * numFields;
+        size_t offset1 = numFields;
+
+        return idx0 * offset0 + idx1 * offset1 + idx2;
+        */
+
+        /*
+        size_t idx0 = fieldIdx;
+        size_t idx1 = rowIdx;
+        size_t idx2 = embIdx;
+
+        size_t offset0 = numRows * embDimPerField;
+        size_t offset1 = embDimPerField;
+
+        return idx0 * offset0 + idx1 * offset1 + idx2;
+        */
+
+        /*
+        size_t idx0 = fieldIdx;
+        size_t idx1 = embIdx;
+        size_t idx2 = rowIdx;
+
+        size_t offset0 = embDimPerField * numRows;
+        size_t offset1 = numRows;
+
+        return idx0 * offset0 + idx1 * offset1 + idx2;
+        */
+
+        /*
+        size_t idx0 = embIdx;
+        size_t idx1 = rowIdx;
+        size_t idx2 = fieldIdx;
+
+        size_t offset0 = numRows * numFields;
+        size_t offset1 = numFields;
+
+        return idx0 * offset0 + idx1 * offset1 + idx2;
+        */
+
+        /*
+        size_t idx0 = embIdx;
+        size_t idx1 = fieldIdx;
+        size_t idx2 = rowIdx;
+
+        size_t offset0 = numFields * numRows;
+        size_t offset1 = numRows;
+
+        return idx0 * offset0 + idx1 * offset1 + idx2;
+        */
     }
 
     void free()
