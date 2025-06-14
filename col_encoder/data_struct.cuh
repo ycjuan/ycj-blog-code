@@ -12,6 +12,7 @@ struct EmbData
     int numRows;
 
     EMB_T* d_embData = nullptr;
+    EMB_T* hp_embData = nullptr;
 
     __device__ __host__ size_t getMemAddr(size_t rowIdx, size_t fieldIdx, size_t embIdx)
     {

@@ -33,12 +33,18 @@ void compareResults(const std::vector<ScoringTask>& cpuTasks, const ScoringTasks
     }
 }
 
-void runTest(const int kNumReqs,
-             const int kNumDocs, 
-             const int kNumFields, 
-             const int kEmbDimPerField, 
-             const int kNumToScore, 
-             const int kNumTrials,
+struct TestParams
+{
+    int kNumReqs;
+    int kNumDocs;
+    int kNumFields;
+    int kEmbDimPerField;
+    int kNumToScore;
+    float kH2DRatio;
+    int kNumTrials;
+};
+
+void runTest(const TestParams& params,
              const vector<vector<vector<float>>> &docDataCpu,
              const EmbData &docDataGpu)
 {
@@ -46,16 +52,17 @@ void runTest(const int kNumReqs,
 
     // -------------------
     // Print test parameters
-    cout << "kNumReqs: " << kNumReqs << ", "
-         << "kNumDocs: " << kNumDocs << ", "
-         << "kNumFields: " << kNumFields << ", "
-         << "kEmbDimPerField: " << kEmbDimPerField << ", "
-         << "kNumToScore: " << kNumToScore << endl;
+    cout << "kNumReqs: " << params.kNumReqs << ", "
+         << "kNumDocs: " << params.kNumDocs << ", "
+         << "kNumFields: " << params.kNumFields << ", "
+         << "kEmbDimPerField: " << params.kEmbDimPerField << ", "
+         << "kNumToScore: " << params.kNumToScore << ", "
+         << "kH2DRatio: " << params.kH2DRatio << endl;
 
     // -------------------
     // Random data CPU
-    auto reqDataCpu = genRandEmbData(kNumReqs, kNumFields, kEmbDimPerField);
-    auto taskDataCpu = genRandScoringTasks(kNumReqs, kNumToScore, kNumDocs);
+    auto reqDataCpu = genRandEmbData(params.kNumReqs, params.kNumFields, params.kEmbDimPerField);
+    auto taskDataCpu = genRandScoringTasks(params.kNumReqs, params.kNumToScore, params.kNumDocs);
 
     // -------------------
     // Convert to GPU data
@@ -65,7 +72,7 @@ void runTest(const int kNumReqs,
     // -------------------
     // Run scoring
     colEncoderScorerCpu(reqDataCpu, docDataCpu, taskDataCpu);
-    colEncoderScorerGpu(reqDataGpu, docDataGpu, taskDataGpu);
+    colEncoderScorerGpu(reqDataGpu, docDataGpu, taskDataGpu, params.kH2DRatio);
 
     // -------------------
     // Compare results
@@ -73,17 +80,25 @@ void runTest(const int kNumReqs,
 
     // -------------------
     // Test latency
-    Timer timer;
-    for (int trial = -3; trial < kNumTrials; ++trial) 
+    double timeMsTotalSum = 0.0;
+    double timeMsCopySum = 0.0;
+    double timeMsScoringSum = 0.0;
+    for (int trial = -3; trial < params.kNumTrials; ++trial) 
     {
-        if (trial == 0) 
+        auto rst = colEncoderScorerGpu(reqDataGpu, docDataGpu, taskDataGpu, params.kH2DRatio);
+        if (trial >= 0) 
         {
-            timer.tic();
+            timeMsTotalSum += rst.totalTimeMs;
+            timeMsCopySum += rst.copyTimeMs;
+            timeMsScoringSum += rst.scoringTimeMs;
         }
-        colEncoderScorerGpu(reqDataGpu, docDataGpu, taskDataGpu);
     }
-    float latencyMs = timer.tocMs() / kNumTrials;
-    cout << "Average latency per trial: " << latencyMs << " ms" << endl << endl;
+    float latencyMsTotal = (timeMsTotalSum / params.kNumTrials);
+    float latencyMsCopy = (timeMsCopySum / params.kNumTrials);
+    float latencyMsScoring = (timeMsScoringSum / params.kNumTrials);
+    cout << "Average latency per trial: " << latencyMsTotal << " ms" << endl;
+    cout << "Average copy latency per trial: " << latencyMsCopy << " ms" << endl;
+    cout << "Average scoring latency per trial: " << latencyMsScoring << " ms" << endl;
 
     // -------------------
     // Compare results just in case
@@ -101,8 +116,9 @@ int main()
     const int kNumDocs = 50000;
     const int kNumFields = 10;
     const int kEmbDimPerField = 512;
-    const std::vector<int> kNumReqLists = {1, 2, 4, 8, 16};
-    const vector<int> kNumToScoreList = {1000, 2000, 4000, 8000, 16000, 32000};
+    const std::vector<int> kNumReqLists = {4};
+    const vector<int> kNumToScoreList = {4000};
+    const vector<float> kH2DRatioList = {0, 0.25, 0.5, 0.75, 1.0};
 
     // -------------------
     // DocSize data
@@ -115,7 +131,18 @@ int main()
     {
         for (const int kNumToScore : kNumToScoreList) 
         {
-            runTest(kNumReqs, kNumDocs, kNumFields, kEmbDimPerField, kNumToScore, kNumTrials, docDataCpu, docDataGpu);
+            for (const float kH2DRatio : kH2DRatioList)
+            {
+                TestParams params;
+                params.kNumReqs = kNumReqs;
+                params.kNumDocs = kNumDocs;
+                params.kNumFields = kNumFields;
+                params.kEmbDimPerField = kEmbDimPerField;
+                params.kNumToScore = kNumToScore;
+                params.kH2DRatio = kH2DRatio;
+                params.kNumTrials = kNumTrials;
+                runTest(params, docDataCpu, docDataGpu);
+            }
         }
     }
 
