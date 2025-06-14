@@ -15,7 +15,7 @@ __global__ void ffmKernel(FFMData reqData, FFMData docData, ScoringTasksGpu task
         ScoringTask &task = tasks.d_tasks[taskIdx];
         task.result = 0.0f;
 
-        for (int reqFieldIdx = 0; reqFieldIdx < reqData.numFields; ++reqFieldIdx)
+        for (int reqFieldIdx = 0; reqFieldIdx < reqData.numFields; ++reqFieldIdx) // swapping req / doc loops may be 10% faster
         {
             for (int docFieldIdx = 0; docFieldIdx < docData.numFields; ++docFieldIdx)
             {
@@ -28,7 +28,7 @@ __global__ void ffmKernel(FFMData reqData, FFMData docData, ScoringTasksGpu task
                     EMB_T docVal = docData.d_embData[docAddr];
                     EMB_T product = reqVal * docVal;
 
-                    task.result += __bfloat162float(product);
+                    task.result += static_cast<float>(product);
                 }
             }
         }
