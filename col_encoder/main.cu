@@ -102,7 +102,7 @@ int main()
     const int kNumFields = 10;
     const int kEmbDimPerField = 512;
     const std::vector<int> kNumReqLists = {1, 2, 4, 8, 16};
-    const vector<int> kNumToScoreList = {1000, 2000, 4000, 8000, 16000, 32000, 64000};
+    const vector<int> kNumToScoreList = {1000, 2000, 4000, 8000, 16000, 32000};
 
     // -------------------
     // DocSize data
