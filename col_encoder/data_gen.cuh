@@ -4,6 +4,8 @@
 #include <vector>
 #include <random>
 #include <omp.h>
+#include <unordered_set>
+#include <algorithm>
 
 #include "data_struct.cuh"
 
@@ -51,11 +53,26 @@ std::vector<ScoringTask> genRandScoringTasks(int numReqs, int numToScore, int nu
     vector<ScoringTask> tasks(numReqs * numToScore);
     for (int reqIdx = 0; reqIdx < numReqs; ++reqIdx)
     {
+        // Fine unique document indices for this request
+        unordered_set<int> docIdxSet;
+        while (true)
+        {
+            int docIdx = distribution(generator);
+            docIdxSet.insert(docIdx);
+            if (docIdxSet.size() == numToScore)
+                break;
+        }
+
+        // Sort
+        vector<int> docIdxVec(docIdxSet.begin(), docIdxSet.end());
+        sort(docIdxVec.begin(), docIdxVec.end());
+
+        // Add to tasks
         for (int docIdx = 0; docIdx < numToScore; ++docIdx)
         {
             int taskIdx = reqIdx * numToScore + docIdx;
             tasks[taskIdx].reqIdx = reqIdx;
-            tasks[taskIdx].docIdx = distribution(generator);
+            tasks[taskIdx].docIdx = docIdxVec.at(docIdx);
             tasks[taskIdx].result = 0.0f;
         }
     }
