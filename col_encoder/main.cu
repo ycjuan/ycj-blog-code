@@ -33,7 +33,14 @@ void compareResults(const std::vector<ScoringTask>& cpuTasks, const ScoringTasks
     }
 }
 
-void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const int kEmbDimPerField, const int kNumToScore, const int kNumTrials)
+void runTest(const int kNumReqs,
+             const int kNumDocs, 
+             const int kNumFields, 
+             const int kEmbDimPerField, 
+             const int kNumToScore, 
+             const int kNumTrials,
+             const vector<vector<vector<float>>> &docDataCpu,
+             const EmbData &docDataGpu)
 {
     using namespace std;
 
@@ -48,13 +55,11 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
     // -------------------
     // Random data CPU
     auto reqDataCpu = genRandEmbData(kNumReqs, kNumFields, kEmbDimPerField);
-    auto docDataCpu = genRandEmbData(kNumDocs, kNumFields, kEmbDimPerField);
     auto taskDataCpu = genRandScoringTasks(kNumReqs, kNumToScore, kNumDocs);
 
     // -------------------
     // Convert to GPU data
     auto reqDataGpu = convertEmbDataToGpu(reqDataCpu);
-    auto docDataGpu = convertEmbDataToGpu(docDataCpu);
     auto taskDataGpu = convertScoringTasksToGpu(taskDataCpu);
     
     // -------------------
@@ -78,7 +83,7 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
         colEncoderScorerGpu(reqDataGpu, docDataGpu, taskDataGpu);
     }
     float latencyMs = timer.tocMs() / kNumTrials;
-    cout << "Average latency per trial: " << latencyMs << " ms" << endl;
+    cout << "Average latency per trial: " << latencyMs << " ms" << endl << endl;
 
     // -------------------
     // Compare results just in case
@@ -87,19 +92,36 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
     // -------------------
     // Free GPU data
     reqDataGpu.free();
-    docDataGpu.free();
     taskDataGpu.free();
 }
 
 int main() 
 {
-    const int kNumReqs = 16;
+    const int kNumTrials = 50;
     const int kNumDocs = 50000;
     const int kNumFields = 10;
     const int kEmbDimPerField = 512;
-    const int kNumToScore = 1000;
+    const std::vector<int> kNumReqLists = {1, 2, 4, 8, 16};
+    const vector<int> kNumToScoreList = {1000, 2000, 4000, 8000, 16000, 32000, 64000};
 
-    runTest(kNumReqs, kNumDocs, kNumFields, kEmbDimPerField, kNumToScore, 20);
+    // -------------------
+    // DocSize data
+    auto docDataCpu = genRandEmbData(kNumDocs, kNumFields, kEmbDimPerField);
+    auto docDataGpu = convertEmbDataToGpu(docDataCpu);
+
+    // -------------------
+    // Run tests for different numbers of requests and documents to score
+    for (const int kNumReqs : kNumReqLists) 
+    {
+        for (const int kNumToScore : kNumToScoreList) 
+        {
+            runTest(kNumReqs, kNumDocs, kNumFields, kEmbDimPerField, kNumToScore, kNumTrials, docDataCpu, docDataGpu);
+        }
+    }
+
+    // -------------------
+    // Free GPU data
+    docDataGpu.free();
 
     return 0;
 }
