@@ -1,12 +1,12 @@
-#ifndef FFM_GPU_CUH
-#define FFM_GPU_CUH
+#ifndef COL_ENCODER_GPU_CUH
+#define COL_ENCODER_GPU_CUH
 
 #include <sstream>
 #include <stdexcept>
 
 #include "data_struct.cuh"
 
-__global__ void ffmKernel(FFMData reqData, FFMData docData, ScoringTasksGpu tasks)
+__global__ void colEncoderKernel(EmbData reqData, EmbData docData, ScoringTasksGpu tasks)
 {
     int taskIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -35,21 +35,20 @@ __global__ void ffmKernel(FFMData reqData, FFMData docData, ScoringTasksGpu task
     }
 }
 
-void ffmScorerGpu(FFMData reqData, FFMData docData, ScoringTasksGpu tasks)
+void colEncoderScorerGpu(EmbData reqData, EmbData docData, ScoringTasksGpu tasks)
 {
     using namespace std;
     
-    // Launch the FFM kernel
     int blockSize = 256;
     int numBlocks = (tasks.numTasks + blockSize - 1) / blockSize;
-    ffmKernel<<<numBlocks, blockSize>>>(reqData, docData, tasks);
+    colEncoderKernel<<<numBlocks, blockSize>>>(reqData, docData, tasks);
     cudaError_t cudaError = cudaDeviceSynchronize();
     if (cudaError != cudaSuccess)
     {
         ostringstream oss;
-        oss << "CUDA error in ffmScorerGpu: " << cudaGetErrorString(cudaError);
+        oss << "CUDA error in colEncoderScorerGpu: " << cudaGetErrorString(cudaError);
         throw runtime_error(oss.str());
     }
 }
 
-#endif // FFM_GPU_CUH
+#endif // COL_ENCODER_GPU_CUH

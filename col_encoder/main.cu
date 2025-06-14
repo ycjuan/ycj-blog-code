@@ -1,8 +1,8 @@
 #include <sstream>
 #include <iostream>
 
-#include "ffm_gpu.cuh"
-#include "ffm_cpu.cuh"
+#include "col_encoder_gpu.cuh"
+#include "col_encoder_cpu.cuh"
 #include "data_struct.cuh"
 #include "data_cvt.cuh"
 #include "data_gen.cuh"
@@ -47,20 +47,20 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
 
     // -------------------
     // Random data CPU
-    auto reqDataCpu = genRandFFMData(kNumReqs, kNumFields, kEmbDimPerField);
-    auto docDataCpu = genRandFFMData(kNumDocs, kNumFields, kEmbDimPerField);
+    auto reqDataCpu = genRandEmbData(kNumReqs, kNumFields, kEmbDimPerField);
+    auto docDataCpu = genRandEmbData(kNumDocs, kNumFields, kEmbDimPerField);
     auto taskDataCpu = genRandScoringTasks(kNumReqs, kNumToScore, kNumDocs);
 
     // -------------------
     // Convert to GPU data
-    auto reqDataGpu = convertFFMDataToGpu(reqDataCpu);
-    auto docDataGpu = convertFFMDataToGpu(docDataCpu);
+    auto reqDataGpu = convertEmbDataToGpu(reqDataCpu);
+    auto docDataGpu = convertEmbDataToGpu(docDataCpu);
     auto taskDataGpu = convertScoringTasksToGpu(taskDataCpu);
     
     // -------------------
     // Run scoring
-    ffmScorerCpu(reqDataCpu, docDataCpu, taskDataCpu);
-    ffmScorerGpu(reqDataGpu, docDataGpu, taskDataGpu);
+    colEncoderScorerCpu(reqDataCpu, docDataCpu, taskDataCpu);
+    colEncoderScorerGpu(reqDataGpu, docDataGpu, taskDataGpu);
 
     // -------------------
     // Compare results
@@ -75,7 +75,7 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
         {
             timer.tic();
         }
-        ffmScorerGpu(reqDataGpu, docDataGpu, taskDataGpu);
+        colEncoderScorerGpu(reqDataGpu, docDataGpu, taskDataGpu);
     }
     float latencyMs = timer.tocMs() / kNumTrials;
     cout << "Average latency per trial: " << latencyMs << " ms" << endl;

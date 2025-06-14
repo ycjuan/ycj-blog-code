@@ -5,7 +5,7 @@
 
 typedef __nv_bfloat16 EMB_T;
 
-struct FFMData
+struct EmbData
 {
     int embDimPerField;
     int numFields;

@@ -1,14 +1,14 @@
-#ifndef FFM_CPU_CUH
-#define FFM_CPU_CUH
+#ifndef COL_ENCODER_CPU_CUH
+#define COL_ENCODER_CPU_CUH
 
 #include <vector>
 #include <stdexcept>
 
 #include "data_struct.cuh"
 
-void ffmScorerCpu(const std::vector<std::vector<std::vector<float>>> &reqData,
-                  const std::vector<std::vector<std::vector<float>>> &docData,
-                  std::vector<ScoringTask> &tasks)
+void colEncoderScorerCpu(const std::vector<std::vector<std::vector<float>>> &reqData,
+                         const std::vector<std::vector<std::vector<float>>> &docData,
+                         std::vector<ScoringTask> &tasks)
 {
     int numFields = reqData.at(0).size();
     int embDimPerField = reqData.at(0).at(0).size();
@@ -35,4 +35,4 @@ void ffmScorerCpu(const std::vector<std::vector<std::vector<float>>> &reqData,
     }
 }
 
-#endif // FFM_CPU_CUH
+#endif // COL_ENCODER_CPU_CUH
