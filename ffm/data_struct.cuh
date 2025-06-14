@@ -15,7 +15,6 @@ struct FFMData
 
     __device__ __host__ size_t getMemAddr(size_t rowIdx, size_t fieldIdx, size_t embIdx)
     {
-
         size_t idx0 = rowIdx;
         size_t idx1 = fieldIdx;
         size_t idx2 = embIdx;
@@ -25,7 +24,7 @@ struct FFMData
 
         return idx0 * offset0 + idx1 * offset1 + idx2;
 
-        /*
+        /* (this one is the fastest, but only slightly faster than the one above)
         size_t idx0 = rowIdx;
         size_t idx1 = embIdx;
         size_t idx2 = fieldIdx;
