@@ -3,6 +3,7 @@
 
 #include <sstream>
 #include <stdexcept>
+#include <limits>
 
 #include "data_struct.cuh"
 
@@ -17,8 +18,11 @@ __global__ void colEncoderKernel(EmbData reqData, EmbData docData, ScoringTasksG
 
         for (int reqFieldIdx = 0; reqFieldIdx < reqData.numFields; ++reqFieldIdx) // swapping req / doc loops may be 10% faster
         {
+            // float maxSim = std::numeric_limits<float>::lowest(); // can't compile, will figure out later
+            float maxSim = -10000000.0f; // using a large negative value as a substitute for lowest float
             for (int docFieldIdx = 0; docFieldIdx < docData.numFields; ++docFieldIdx)
             {
+                float sim = 0.0f;
                 for (int embIdx = 0; embIdx < reqData.embDimPerField; ++embIdx)
                 {
                     size_t reqAddr = reqData.getMemAddr(task.reqIdx, reqFieldIdx, embIdx);
@@ -28,9 +32,11 @@ __global__ void colEncoderKernel(EmbData reqData, EmbData docData, ScoringTasksG
                     EMB_T docVal = docData.d_embData[docAddr];
                     EMB_T product = reqVal * docVal;
 
-                    task.result += static_cast<float>(product);
+                    sim += static_cast<float>(product);
                 }
+                maxSim = fmaxf(maxSim, sim);
             }
+            task.result += maxSim;
         }
     }
 }

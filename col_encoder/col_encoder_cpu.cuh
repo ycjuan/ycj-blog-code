@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <stdexcept>
+#include <limits>
 
 #include "data_struct.cuh"
 
@@ -22,15 +23,19 @@ void colEncoderScorerCpu(const std::vector<std::vector<std::vector<float>>> &req
 
         for (int reqFieldIdx = 0; reqFieldIdx < numFields; ++reqFieldIdx) 
         {
+            float maxSim = std::numeric_limits<float>::lowest();
             for (int docFieldIdx = 0; docFieldIdx < numFields; ++docFieldIdx) 
             {
+                float sim = 0.0f;
                 for (int embIdx = 0; embIdx < embDimPerField; ++embIdx) 
                 {
                     float reqVal = reqData.at(task.reqIdx).at(reqFieldIdx).at(embIdx);
                     float docVal = docData.at(task.docIdx).at(docFieldIdx).at(embIdx);
-                    task.result += reqVal * docVal;
+                    sim += reqVal * docVal;
                 }
+                maxSim = std::max(maxSim, sim);
             }
+            task.result += maxSim;
         }
     }
 }
