@@ -20,8 +20,7 @@ __global__ void h2dKernel(EmbData docData, ScoringTasksGpu tasks, int numToCopy)
             for (int embIdx = 0; embIdx < docData.embDimPerField; ++embIdx)
             {
                 size_t addr = docData.getMemAddr(task.docIdx, fieldIdx, embIdx);
-                EMB_T value = docData.hp_embData[addr];
-                docData.d_embData[addr] = value;
+                docData.d_embData[addr] = docData.hp_embData[addr];
             }
         }
     }
@@ -72,6 +71,8 @@ ColEncoderScorerRst colEncoderScorerGpu(EmbData reqData, EmbData docData, Scorin
 {
     using namespace std;
 
+    Timer totalTimer;
+    totalTimer.tic();
     ColEncoderScorerRst rst;
     const int numToCopy = tasks.numTasks * h2dRatio;
     const int kBlockSize = 256;
@@ -97,6 +98,8 @@ ColEncoderScorerRst colEncoderScorerGpu(EmbData reqData, EmbData docData, Scorin
     // ---------------
     // Scoring
     {
+        CudaTimer scoringTimer;
+        scoringTimer.tic();
         int numBlocks = (tasks.numTasks + kBlockSize - 1) / kBlockSize;
         colEncoderKernel<<<numBlocks, kBlockSize>>>(reqData, docData, tasks);
         cudaError_t cudaError = cudaDeviceSynchronize();
@@ -106,7 +109,10 @@ ColEncoderScorerRst colEncoderScorerGpu(EmbData reqData, EmbData docData, Scorin
             oss << "CUDA error in colEncoderKernel: " << cudaGetErrorString(cudaError);
             throw runtime_error(oss.str());
         }
+        rst.scoringTimeMs = scoringTimer.tocMs();
     }
+
+    rst.totalTimeMs = totalTimer.tocMs();
 
     return rst;
 }

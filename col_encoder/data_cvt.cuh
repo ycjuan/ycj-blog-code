@@ -61,14 +61,6 @@ EmbData convertEmbDataToGpu(const std::vector<std::vector<std::vector<float>>> &
     }
 
     // -----------------
-    // Free pinned memory
-    cudaError = cudaFreeHost(embData.hp_embData);
-    if (cudaError != cudaSuccess) 
-    {
-        throw std::runtime_error("Failed to free pinned memory for embedding data: " + std::to_string(cudaError));
-    }
-
-    // -----------------
     // Return the populated EmbData structure
     return embData;
 }
