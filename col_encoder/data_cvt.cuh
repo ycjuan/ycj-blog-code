@@ -23,9 +23,8 @@ EmbData convertEmbDataToGpu(const std::vector<std::vector<std::vector<float>>> &
 
     // -----------------
     // Malloc buffer
-    EMB_T *hp_embData;
     const size_t embDataSizeInBytes = (size_t)numRows * numFields * embDimPerField * sizeof(EMB_T);
-    cudaError_t cudaError = cudaMallocHost(&hp_embData, embDataSizeInBytes);
+    cudaError_t cudaError = cudaMallocHost(&embData.hp_embData, embDataSizeInBytes);
     if (cudaError != cudaSuccess) 
     {
         throw std::runtime_error("Failed to allocate pinned memory for embedding data: " + std::to_string(cudaError));
@@ -40,7 +39,7 @@ EmbData convertEmbDataToGpu(const std::vector<std::vector<std::vector<float>>> &
             for (int embIdx = 0; embIdx < embDimPerField; ++embIdx) 
             {
                 size_t memAddr = embData.getMemAddr(rowIdx, fieldIdx, embIdx);
-                hp_embData[memAddr] = static_cast<EMB_T>(data3D[rowIdx][fieldIdx][embIdx]);
+                embData.hp_embData[memAddr] = static_cast<EMB_T>(data3D[rowIdx][fieldIdx][embIdx]);
             }
         }
     }
@@ -55,7 +54,7 @@ EmbData convertEmbDataToGpu(const std::vector<std::vector<std::vector<float>>> &
 
     // -----------------
     // Copy data to device
-    cudaError = cudaMemcpy(embData.d_embData, hp_embData, embDataSizeInBytes, cudaMemcpyHostToDevice);
+    cudaError = cudaMemcpy(embData.d_embData, embData.hp_embData, embDataSizeInBytes, cudaMemcpyHostToDevice);
     if (cudaError != cudaSuccess) 
     {
         throw std::runtime_error("Failed to copy embedding data to device: " + std::to_string(cudaError));
@@ -63,7 +62,7 @@ EmbData convertEmbDataToGpu(const std::vector<std::vector<std::vector<float>>> &
 
     // -----------------
     // Free pinned memory
-    cudaError = cudaFreeHost(hp_embData);
+    cudaError = cudaFreeHost(embData.hp_embData);
     if (cudaError != cudaSuccess) 
     {
         throw std::runtime_error("Failed to free pinned memory for embedding data: " + std::to_string(cudaError));

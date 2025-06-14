@@ -6,6 +6,26 @@
 #include <limits>
 
 #include "data_struct.cuh"
+#include "util.cuh"
+
+__global__ void h2dKernel(EmbData docData, ScoringTasksGpu tasks, int numToCopy)
+{
+    int taskIdx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (taskIdx < numToCopy)
+    {
+        ScoringTask &task = tasks.d_tasks[taskIdx];
+        for (int fieldIdx = 0; fieldIdx < docData.numFields; ++fieldIdx)
+        {
+            for (int embIdx = 0; embIdx < docData.embDimPerField; ++embIdx)
+            {
+                size_t addr = docData.getMemAddr(task.docIdx, fieldIdx, embIdx);
+                EMB_T value = docData.hp_embData[addr];
+                docData.d_embData[addr] = value;
+            }
+        }
+    }
+}
 
 __global__ void colEncoderKernel(EmbData reqData, EmbData docData, ScoringTasksGpu tasks)
 {
@@ -41,20 +61,54 @@ __global__ void colEncoderKernel(EmbData reqData, EmbData docData, ScoringTasksG
     }
 }
 
-void colEncoderScorerGpu(EmbData reqData, EmbData docData, ScoringTasksGpu tasks)
+struct ColEncoderScorerRst
+{
+    float copyTimeMs = 0.0f;
+    float scoringTimeMs = 0.0f;
+    float totalTimeMs = 0.0f;
+};
+
+ColEncoderScorerRst colEncoderScorerGpu(EmbData reqData, EmbData docData, ScoringTasksGpu tasks, float h2dRatio)
 {
     using namespace std;
-    
-    int blockSize = 256;
-    int numBlocks = (tasks.numTasks + blockSize - 1) / blockSize;
-    colEncoderKernel<<<numBlocks, blockSize>>>(reqData, docData, tasks);
-    cudaError_t cudaError = cudaDeviceSynchronize();
-    if (cudaError != cudaSuccess)
+
+    ColEncoderScorerRst rst;
+    const int numToCopy = tasks.numTasks * h2dRatio;
+    const int kBlockSize = 256;
+
+    // ---------------
+    // H2D copy
+    if (numToCopy > 0)
     {
-        ostringstream oss;
-        oss << "CUDA error in colEncoderScorerGpu: " << cudaGetErrorString(cudaError);
-        throw runtime_error(oss.str());
+        CudaTimer h2dTimer;
+        h2dTimer.tic();
+        int numBlocks = (numToCopy + kBlockSize - 1) / kBlockSize;
+        h2dKernel<<<numBlocks, kBlockSize>>>(docData, tasks, numToCopy);
+        cudaError_t cudaError = cudaDeviceSynchronize();
+        if (cudaError != cudaSuccess)
+        {
+            ostringstream oss;
+            oss << "CUDA error in h2dKernel: " << cudaGetErrorString(cudaError);
+            throw runtime_error(oss.str());
+        }
+        rst.copyTimeMs = h2dTimer.tocMs();
     }
+
+    // ---------------
+    // Scoring
+    {
+        int numBlocks = (tasks.numTasks + kBlockSize - 1) / kBlockSize;
+        colEncoderKernel<<<numBlocks, kBlockSize>>>(reqData, docData, tasks);
+        cudaError_t cudaError = cudaDeviceSynchronize();
+        if (cudaError != cudaSuccess)
+        {
+            ostringstream oss;
+            oss << "CUDA error in colEncoderKernel: " << cudaGetErrorString(cudaError);
+            throw runtime_error(oss.str());
+        }
+    }
+
+    return rst;
 }
 
 #endif // COL_ENCODER_GPU_CUH
