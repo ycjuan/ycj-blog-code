@@ -7,65 +7,31 @@ import java.util.concurrent.Future;
 
 public class TestJni {
 
-    public static void worker()
-    {
-        for (int i = 0; i < 100000000L; i++)
-        {
-            int[] largeArray = new int[10000000];
-            for (int j = 0; j < largeArray.length; j++) {
-                largeArray[j] = j;
-            }
-            /*
-            try {
-                Thread.sleep(1);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-                 */
-            //System.gc();
-        }
-    }
-    
     public static void main(String[] args) {
+
+        int numTrials = 10000;
+        int numThreads = 4;
 
         JniMain jni = new JniMain();
 
         jni.construct();
 
-        ExecutorService executorService = Executors.newFixedThreadPool(1);
-
-        /*
-        Future<Void> future = executorService.submit(() -> {
-            while (true) {
-                jni.process();
-                Thread.sleep(10);
-            }
-        });
-         */
-
-        Future<Void> future = executorService.submit(() -> {
-            worker();
-            return null;
-        });
-
-        for (int i = 0; i < 100000000L; i++)
+        // Run benchmark
+        System.out.println("Running benchmark with " + numTrials + " trials and " + numThreads + " threads");
+        long startTime = 0;
+        for (int i = -3; i < numTrials; i++)
         {
-            jni.process();
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+            if (i == 0) {
+                startTime = System.currentTimeMillis();
             }
+            jni.process(numThreads);
         }
-
-        try {
-            future.get();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        long endTime = System.currentTimeMillis();
+        long timeSpent = endTime - startTime;
+        double avgTime = (double)timeSpent / numTrials;
+        System.out.println("Average time per trial: " + avgTime + " ms");
 
         jni.destroy();
 
-        executorService.shutdown();
     }
 }

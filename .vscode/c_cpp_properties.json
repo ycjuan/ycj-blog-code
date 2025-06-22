@@ -6,8 +6,8 @@
                 "${workspaceFolder}/**",
                 "/home/ec2-user/git/ycj-blog-code/jni",
                 "/usr/local/cuda/include",
-                "/usr/lib/jvm/java-11-openjdk/include",
-                "/usr/lib/jvm/java-11-openjdk/include/linux"
+                "/usr/lib/jvm/java-11-openjdk-amd64/include",
+                "/usr/lib/jvm/java-11-openjdk-amd64/include/linux"
             ],
             "compilerPath": "/usr/local/cuda/bin/nvcc",
             "cStandard": "c17",
