@@ -13,3 +13,6 @@ g++ -fPIC -std=c++14 -O3 -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" -sh
 javac com/jni/JniMain.java
 javac com/jni/TestJni.java
 java -Xms1G -Xmx2G -Djava.library.path=. -cp . com.jni.TestJni
+
+g++ -fPIC -std=c++14 -O3 main.cc
+./a.out
