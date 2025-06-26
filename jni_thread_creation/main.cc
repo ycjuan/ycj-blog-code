@@ -3,10 +3,14 @@
 
 #include <iostream>
 
+using namespace std;
+
 int main(int argc, char* argv[])
 {
-    int numTrials = 10000;
+    int numTrials = 2000;
     int numThreads = 16;
+
+    cout << "numThreads: " << numThreads << ", numTrials: " << numTrials << endl;
 
     // Create an instance of Core
     Core core;

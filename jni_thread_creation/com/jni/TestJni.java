@@ -9,8 +9,9 @@ public class TestJni {
 
     public static void main(String[] args) {
 
-        int numTrials = 10000;
+        int numTrials = 2000;
         int numThreads = 16;
+
 
         JniMain jni = new JniMain();
 

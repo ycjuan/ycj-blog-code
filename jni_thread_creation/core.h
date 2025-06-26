@@ -12,10 +12,8 @@ class Core
 public:
     void process(int numThreads)
     {
-        if (numThreads == 1)
+        if (numThreads == 0)
         {
-            // If only one thread is requested, we can just return
-            // or perform a simple operation without async
             std::this_thread::sleep_for(std::chrono::milliseconds(1)); // Simulate work
         }
         else

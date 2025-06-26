@@ -1,0 +1,86 @@
+
+➜  jni_thread_creation git:(jni_thread_creation) ✗ ./run_jni.sh
++ export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
++ JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
++ javac -h . com/jni/JniMain.java
++ g++ -fPIC -std=c++14 -O3 -I/usr/lib/jvm/java-11-openjdk-amd64/include -I/usr/lib/jvm/java-11-openjdk-amd64/include/linux -shared -o libcore.so jni.cc
++ javac com/jni/JniMain.java
++ javac com/jni/TestJni.java
++ java -Xms1G -Xmx2G -Djava.library.path=. -cp . com.jni.TestJni
+Running benchmark with 2000 trials and 0 threads
+Average time per trial: 1.059 ms
++ g++ -fPIC -std=c++14 -O3 main.cc
++ ./a.out
+numThreads: 0, numTrials: 2000
+Average time per trial: 1.05882 ms
+➜  jni_thread_creation git:(jni_thread_creation) ✗ ./run_jni.sh
++ export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
++ JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
++ javac -h . com/jni/JniMain.java
++ g++ -fPIC -std=c++14 -O3 -I/usr/lib/jvm/java-11-openjdk-amd64/include -I/usr/lib/jvm/java-11-openjdk-amd64/include/linux -shared -o libcore.so jni.cc
++ javac com/jni/JniMain.java
++ javac com/jni/TestJni.java
++ java -Xms1G -Xmx2G -Djava.library.path=. -cp . com.jni.TestJni
+Running benchmark with 2000 trials and 1 threads
+Average time per trial: 1.0955 ms
++ g++ -fPIC -std=c++14 -O3 main.cc
++ ./a.out
+numThreads: 1, numTrials: 2000
+Average time per trial: 1.097 ms
+➜  jni_thread_creation git:(jni_thread_creation) ✗ ./run_jni.sh
++ export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
++ JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
++ javac -h . com/jni/JniMain.java
++ g++ -fPIC -std=c++14 -O3 -I/usr/lib/jvm/java-11-openjdk-amd64/include -I/usr/lib/jvm/java-11-openjdk-amd64/include/linux -shared -o libcore.so jni.cc
++ javac com/jni/JniMain.java
++ javac com/jni/TestJni.java
++ java -Xms1G -Xmx2G -Djava.library.path=. -cp . com.jni.TestJni
+Running benchmark with 2000 trials and 2 threads
+Average time per trial: 1.106 ms
++ g++ -fPIC -std=c++14 -O3 main.cc
++ ./a.out
+numThreads: 2, numTrials: 2000
+Average time per trial: 1.10564 ms
+➜  jni_thread_creation git:(jni_thread_creation) ✗ ./run_jni.sh
++ export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
++ JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
++ javac -h . com/jni/JniMain.java
++ g++ -fPIC -std=c++14 -O3 -I/usr/lib/jvm/java-11-openjdk-amd64/include -I/usr/lib/jvm/java-11-openjdk-amd64/include/linux -shared -o libcore.so jni.cc
++ javac com/jni/JniMain.java
++ javac com/jni/TestJni.java
++ java -Xms1G -Xmx2G -Djava.library.path=. -cp . com.jni.TestJni
+Running benchmark with 2000 trials and 4 threads
+Average time per trial: 1.1215 ms
++ g++ -fPIC -std=c++14 -O3 main.cc
++ ./a.out
+numThreads: 4, numTrials: 2000
+Average time per trial: 1.12089 ms
+➜  jni_thread_creation git:(jni_thread_creation) ✗ ./run_jni.sh
++ export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
++ JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
++ javac -h . com/jni/JniMain.java
++ g++ -fPIC -std=c++14 -O3 -I/usr/lib/jvm/java-11-openjdk-amd64/include -I/usr/lib/jvm/java-11-openjdk-amd64/include/linux -shared -o libcore.so jni.cc
++ javac com/jni/JniMain.java
++ javac com/jni/TestJni.java
++ java -Xms1G -Xmx2G -Djava.library.path=. -cp . com.jni.TestJni
+Running benchmark with 2000 trials and 8 threads
+Average time per trial: 1.2615 ms
++ g++ -fPIC -std=c++14 -O3 main.cc
++ ./a.out
+numThreads: 8, numTrials: 2000
+Average time per trial: 1.25812 ms
+➜  jni_thread_creation git:(jni_thread_creation) ✗ ./run_jni.sh
++ export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
++ JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
++ javac -h . com/jni/JniMain.java
++ g++ -fPIC -std=c++14 -O3 -I/usr/lib/jvm/java-11-openjdk-amd64/include -I/usr/lib/jvm/java-11-openjdk-amd64/include/linux -shared -o libcore.so jni.cc
++ javac com/jni/JniMain.java
++ javac com/jni/TestJni.java
++ java -Xms1G -Xmx2G -Djava.library.path=. -cp . com.jni.TestJni
+Running benchmark with 2000 trials and 16 threads
+Average time per trial: 1.4745 ms
++ g++ -fPIC -std=c++14 -O3 main.cc
++ ./a.out
+numThreads: 16, numTrials: 2000
+Average time per trial: 1.4713 ms
+
