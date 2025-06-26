@@ -6,7 +6,7 @@
 int main(int argc, char* argv[])
 {
     int numTrials = 10000;
-    int numThreads = 4;
+    int numThreads = 16;
 
     // Create an instance of Core
     Core core;

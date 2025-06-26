@@ -10,7 +10,7 @@ public class TestJni {
     public static void main(String[] args) {
 
         int numTrials = 10000;
-        int numThreads = 4;
+        int numThreads = 16;
 
         JniMain jni = new JniMain();
 
