@@ -16,10 +16,9 @@ __global__ void ffmStep1Kernel(FFMData reqData, FFMData docData, ScoringTasksGpu
     {
         ScoringTask &task = tasks.d_tasks[taskIdx];
 
-        float maxSim = -10000000.0f; // using a large negative value as a substitute for lowest float
+        float sim = 0.0f;
         for (int docFieldIdx = 0; docFieldIdx < docData.numFields; ++docFieldIdx)
         {
-            float sim = 0.0f;
             for (int embIdx = 0; embIdx < reqData.embDimPerField; ++embIdx)
             {
                 size_t reqAddr = reqData.getMemAddr(task.reqIdx, reqFieldIdx, embIdx);
@@ -31,10 +30,9 @@ __global__ void ffmStep1Kernel(FFMData reqData, FFMData docData, ScoringTasksGpu
 
                 sim += static_cast<float>(product);
             }
-            maxSim = fmaxf(maxSim, sim);
         }
 
-        d_buffer[taskIdx * reqData.numFields + reqFieldIdx] = maxSim;
+        d_buffer[taskIdx * reqData.numFields + reqFieldIdx] = sim;
     }
 }
 
