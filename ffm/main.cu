@@ -84,7 +84,7 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
         {
             timer.tic();
         }
-        ffmScorerGpu(reqDataGpu, docDataGpu, taskDataGpu);
+        ffmScorerGpu(reqDataGpu, docDataGpu, taskDataGpu, d_buffer);
     }
     float latencyMs = timer.tocMs() / kNumTrials;
     cout << "Average latency per trial: " << latencyMs << " ms" << endl;
