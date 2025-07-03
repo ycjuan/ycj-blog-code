@@ -6,7 +6,37 @@
 
 #include "data_struct.cuh"
 
-__global__ void ffmKernel(FFMData reqData, FFMData docData, ScoringTasksGpu tasks)
+__global__ void ffmStep1Kernel(FFMData reqData, FFMData docData, ScoringTasksGpu tasks, float *d_buffer)
+{
+    int idx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
+    size_t taskIdx = idx / reqData.numFields;
+    size_t reqFieldIdx = idx % reqData.numFields;
+
+    if (taskIdx < tasks.numTasks && reqFieldIdx < reqData.numFields)
+    {
+        ScoringTask &task = tasks.d_tasks[taskIdx];
+
+        float sim = 0.0f;
+        for (int docFieldIdx = 0; docFieldIdx < docData.numFields; ++docFieldIdx)
+        {
+            for (int embIdx = 0; embIdx < reqData.embDimPerField; ++embIdx)
+            {
+                size_t reqAddr = reqData.getMemAddr(task.reqIdx, reqFieldIdx, embIdx);
+                size_t docAddr = docData.getMemAddr(task.docIdx, docFieldIdx, embIdx);
+
+                EMB_T reqVal = reqData.d_embData[reqAddr];
+                EMB_T docVal = docData.d_embData[docAddr];
+                EMB_T product = reqVal * docVal;
+
+                sim += static_cast<float>(product);
+            }
+        }
+
+        d_buffer[taskIdx * reqData.numFields + reqFieldIdx] = sim;
+    }
+}
+
+__global__ void ffmStep2Kernel(FFMData reqData, ScoringTasksGpu tasks, float *d_buffer)
 {
     int taskIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -14,40 +44,38 @@ __global__ void ffmKernel(FFMData reqData, FFMData docData, ScoringTasksGpu task
     {
         ScoringTask &task = tasks.d_tasks[taskIdx];
         task.result = 0.0f;
-
-        for (int reqFieldIdx = 0; reqFieldIdx < reqData.numFields; ++reqFieldIdx) // swapping req / doc loops may be 10% faster
+        for (int reqFieldIdx = 0; reqFieldIdx < reqData.numFields; ++reqFieldIdx)
         {
-            for (int docFieldIdx = 0; docFieldIdx < docData.numFields; ++docFieldIdx)
-            {
-                for (int embIdx = 0; embIdx < reqData.embDimPerField; ++embIdx)
-                {
-                    size_t reqAddr = reqData.getMemAddr(task.reqIdx, reqFieldIdx, embIdx);
-                    size_t docAddr = docData.getMemAddr(task.docIdx, docFieldIdx, embIdx);
-
-                    EMB_T reqVal = reqData.d_embData[reqAddr];
-                    EMB_T docVal = docData.d_embData[docAddr];
-                    EMB_T product = reqVal * docVal;
-
-                    task.result += static_cast<float>(product);
-                }
-            }
+            task.result += d_buffer[taskIdx * reqData.numFields + reqFieldIdx];
         }
     }
+
 }
 
-void ffmScorerGpu(FFMData reqData, FFMData docData, ScoringTasksGpu tasks)
+void ffmScorerGpu(FFMData reqData, FFMData docData, ScoringTasksGpu tasks, float *d_buffer)
 {
     using namespace std;
     
-    // Launch the FFM kernel
+    // Launch the FFM kernel - step1
     int blockSize = 256;
-    int numBlocks = (tasks.numTasks + blockSize - 1) / blockSize;
-    ffmKernel<<<numBlocks, blockSize>>>(reqData, docData, tasks);
+    int numBlocks = (tasks.numTasks * reqData.numFields + blockSize - 1) / blockSize;
+    ffmStep1Kernel<<<numBlocks, blockSize>>>(reqData, docData, tasks, d_buffer);
     cudaError_t cudaError = cudaDeviceSynchronize();
     if (cudaError != cudaSuccess)
     {
         ostringstream oss;
-        oss << "CUDA error in ffmScorerGpu: " << cudaGetErrorString(cudaError);
+        oss << "CUDA error in ffmScorerGpu (step 1): " << cudaGetErrorString(cudaError);
+        throw runtime_error(oss.str());
+    }
+
+    // Launch the FFM kernel - step2
+    numBlocks = (tasks.numTasks + blockSize - 1) / blockSize;
+    ffmStep2Kernel<<<numBlocks, blockSize>>>(reqData, tasks, d_buffer);
+    cudaError = cudaDeviceSynchronize();
+    if (cudaError != cudaSuccess)
+    {
+        ostringstream oss;
+        oss << "CUDA error in ffmScorerGpu (step 2): " << cudaGetErrorString(cudaError);
         throw runtime_error(oss.str());
     }
 }

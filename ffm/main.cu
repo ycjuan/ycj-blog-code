@@ -56,11 +56,20 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
     auto reqDataGpu = convertFFMDataToGpu(reqDataCpu);
     auto docDataGpu = convertFFMDataToGpu(docDataCpu);
     auto taskDataGpu = convertScoringTasksToGpu(taskDataCpu);
-    
+
+    // Malloc buffer
+    float* d_buffer;
+    size_t bufferSizeInBytes = (size_t)taskDataGpu.numTasks * reqDataGpu.numFields * sizeof(float);
+    cudaError_t cudaError = cudaMalloc(&d_buffer, bufferSizeInBytes);
+    if (cudaError != cudaSuccess)
+    {
+        throw runtime_error("Failed to allocate device memory for buffer: " + std::to_string(cudaError));
+    }
+
     // -------------------
     // Run scoring
     ffmScorerCpu(reqDataCpu, docDataCpu, taskDataCpu);
-    ffmScorerGpu(reqDataGpu, docDataGpu, taskDataGpu);
+    ffmScorerGpu(reqDataGpu, docDataGpu, taskDataGpu, d_buffer);
 
     // -------------------
     // Compare results
@@ -75,7 +84,7 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
         {
             timer.tic();
         }
-        ffmScorerGpu(reqDataGpu, docDataGpu, taskDataGpu);
+        ffmScorerGpu(reqDataGpu, docDataGpu, taskDataGpu, d_buffer);
     }
     float latencyMs = timer.tocMs() / kNumTrials;
     cout << "Average latency per trial: " << latencyMs << " ms" << endl;
@@ -89,6 +98,7 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
     reqDataGpu.free();
     docDataGpu.free();
     taskDataGpu.free();
+    cudaFree(d_buffer);
 }
 
 int main() 
