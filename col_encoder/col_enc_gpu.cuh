@@ -16,9 +16,10 @@ __global__ void colEncStep1Kernel(ColEncData reqData, ColEncData docData, Scorin
     {
         ScoringTask &task = tasks.d_tasks[taskIdx];
 
-        float sim = 0.0f;
+        float maxSim = -1e9f; // Initialize to a very low value
         for (int docFieldIdx = 0; docFieldIdx < docData.numFields; ++docFieldIdx)
         {
+            float sim = 0.0f;
             for (int embIdx = 0; embIdx < reqData.embDimPerField; ++embIdx)
             {
                 size_t reqAddr = reqData.getMemAddr(task.reqIdx, reqFieldIdx, embIdx);
@@ -30,9 +31,10 @@ __global__ void colEncStep1Kernel(ColEncData reqData, ColEncData docData, Scorin
 
                 sim += static_cast<float>(product);
             }
+            maxSim = fmaxf(maxSim, sim);
         }
 
-        d_buffer[taskIdx * reqData.numFields + reqFieldIdx] = sim;
+        d_buffer[taskIdx * reqData.numFields + reqFieldIdx] = maxSim;
     }
 }
 
