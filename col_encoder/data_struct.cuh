@@ -5,7 +5,7 @@
 
 typedef __nv_bfloat16 EMB_T;
 
-struct FFMData
+struct ColEncData
 {
     int embDimPerField;
     int numFields;
@@ -112,4 +112,4 @@ struct ScoringTasksGpu
     }
 };
 
-#endif // DATA_STRUCT_CUH
+#endif

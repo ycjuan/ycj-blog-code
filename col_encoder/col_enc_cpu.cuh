@@ -1,12 +1,12 @@
-#ifndef FFM_CPU_CUH
-#define FFM_CPU_CUH
+#ifndef COLENC_CPU_CUH
+#define COLENC_CPU_CUH
 
 #include <vector>
 #include <stdexcept>
 
 #include "data_struct.cuh"
 
-void ffmScorerCpu(const std::vector<std::vector<std::vector<float>>> &reqData,
+void colEncScorerCpu(const std::vector<std::vector<std::vector<float>>> &reqData,
                   const std::vector<std::vector<std::vector<float>>> &docData,
                   std::vector<ScoringTask> &tasks)
 {
@@ -22,17 +22,21 @@ void ffmScorerCpu(const std::vector<std::vector<std::vector<float>>> &reqData,
 
         for (int reqFieldIdx = 0; reqFieldIdx < numFields; ++reqFieldIdx) 
         {
+            float maxSim = -1e9f; // Initialize to a very low value
             for (int docFieldIdx = 0; docFieldIdx < numFields; ++docFieldIdx) 
             {
+                float sim = 0.0f;
                 for (int embIdx = 0; embIdx < embDimPerField; ++embIdx) 
                 {
                     float reqVal = reqData.at(task.reqIdx).at(reqFieldIdx).at(embIdx);
                     float docVal = docData.at(task.docIdx).at(docFieldIdx).at(embIdx);
-                    task.result += reqVal * docVal;
+                    sim += reqVal * docVal;
                 }
+                maxSim = std::max(maxSim, sim);
             }
+            task.result += maxSim;
         }
     }
 }
 
-#endif // FFM_CPU_CUH
+#endif

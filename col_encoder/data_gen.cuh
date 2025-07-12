@@ -7,7 +7,7 @@
 
 #include "data_struct.cuh"
 
-std::vector<std::vector<std::vector<float>>> genRandFFMData(int numRows, int numFields, int embDimPerField)
+std::vector<std::vector<std::vector<float>>> genRandColEncData(int numRows, int numFields, int embDimPerField)
 {
     using namespace std;
 

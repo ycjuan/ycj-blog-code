@@ -1,12 +1,12 @@
-#ifndef FFM_GPU_CUH
-#define FFM_GPU_CUH
+#ifndef COLENC_GPU_CUH
+#define COLENC_GPU_CUH
 
 #include <sstream>
 #include <stdexcept>
 
 #include "data_struct.cuh"
 
-__global__ void ffmStep1Kernel(FFMData reqData, FFMData docData, ScoringTasksGpu tasks, float *d_buffer)
+__global__ void colEncStep1Kernel(ColEncData reqData, ColEncData docData, ScoringTasksGpu tasks, float *d_buffer)
 {
     int idx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
     size_t taskIdx = idx / reqData.numFields;
@@ -16,9 +16,10 @@ __global__ void ffmStep1Kernel(FFMData reqData, FFMData docData, ScoringTasksGpu
     {
         ScoringTask &task = tasks.d_tasks[taskIdx];
 
-        float sim = 0.0f;
+        float maxSim = -1e9f; // Initialize to a very low value
         for (int docFieldIdx = 0; docFieldIdx < docData.numFields; ++docFieldIdx)
         {
+            float sim = 0.0f;
             for (int embIdx = 0; embIdx < reqData.embDimPerField; ++embIdx)
             {
                 size_t reqAddr = reqData.getMemAddr(task.reqIdx, reqFieldIdx, embIdx);
@@ -30,13 +31,14 @@ __global__ void ffmStep1Kernel(FFMData reqData, FFMData docData, ScoringTasksGpu
 
                 sim += static_cast<float>(product);
             }
+            maxSim = fmaxf(maxSim, sim);
         }
 
-        d_buffer[taskIdx * reqData.numFields + reqFieldIdx] = sim;
+        d_buffer[taskIdx * reqData.numFields + reqFieldIdx] = maxSim;
     }
 }
 
-__global__ void ffmStep2Kernel(FFMData reqData, ScoringTasksGpu tasks, float *d_buffer)
+__global__ void colEncStep2Kernel(ColEncData reqData, ScoringTasksGpu tasks, float *d_buffer)
 {
     int taskIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -52,32 +54,32 @@ __global__ void ffmStep2Kernel(FFMData reqData, ScoringTasksGpu tasks, float *d_
 
 }
 
-void ffmScorerGpu(FFMData reqData, FFMData docData, ScoringTasksGpu tasks, float *d_buffer)
+void colEncScorerGpu(ColEncData reqData, ColEncData docData, ScoringTasksGpu tasks, float *d_buffer)
 {
     using namespace std;
     
-    // Launch the FFM kernel - step1
+    // Launch the ColEnc kernel - step1
     int blockSize = 256;
     int numBlocks = (tasks.numTasks * reqData.numFields + blockSize - 1) / blockSize;
-    ffmStep1Kernel<<<numBlocks, blockSize>>>(reqData, docData, tasks, d_buffer);
+    colEncStep1Kernel<<<numBlocks, blockSize>>>(reqData, docData, tasks, d_buffer);
     cudaError_t cudaError = cudaDeviceSynchronize();
     if (cudaError != cudaSuccess)
     {
         ostringstream oss;
-        oss << "CUDA error in ffmScorerGpu (step 1): " << cudaGetErrorString(cudaError);
+        oss << "CUDA error in colEncScorerGpu (step 1): " << cudaGetErrorString(cudaError);
         throw runtime_error(oss.str());
     }
 
-    // Launch the FFM kernel - step2
+    // Launch the ColEnc kernel - step2
     numBlocks = (tasks.numTasks + blockSize - 1) / blockSize;
-    ffmStep2Kernel<<<numBlocks, blockSize>>>(reqData, tasks, d_buffer);
+    colEncStep2Kernel<<<numBlocks, blockSize>>>(reqData, tasks, d_buffer);
     cudaError = cudaDeviceSynchronize();
     if (cudaError != cudaSuccess)
     {
         ostringstream oss;
-        oss << "CUDA error in ffmScorerGpu (step 2): " << cudaGetErrorString(cudaError);
+        oss << "CUDA error in colEncScorerGpu (step 2): " << cudaGetErrorString(cudaError);
         throw runtime_error(oss.str());
     }
 }
 
-#endif // FFM_GPU_CUH
+#endif
