@@ -1,5 +1,5 @@
-#ifndef ColEnc_CPU_CUH
-#define ColEnc_CPU_CUH
+#ifndef COLENC_CPU_CUH
+#define COLENC_CPU_CUH
 
 #include <vector>
 #include <stdexcept>
@@ -35,4 +35,4 @@ void colEncScorerCpu(const std::vector<std::vector<std::vector<float>>> &reqData
     }
 }
 
-#endif // ColEnc_CPU_CUH
+#endif

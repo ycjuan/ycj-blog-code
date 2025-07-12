@@ -1,5 +1,5 @@
-#ifndef ColEnc_GPU_CUH
-#define ColEnc_GPU_CUH
+#ifndef COLENC_GPU_CUH
+#define COLENC_GPU_CUH
 
 #include <sstream>
 #include <stdexcept>
@@ -80,4 +80,4 @@ void colEncScorerGpu(ColEncData reqData, ColEncData docData, ScoringTasksGpu tas
     }
 }
 
-#endif // ColEnc_GPU_CUH
+#endif

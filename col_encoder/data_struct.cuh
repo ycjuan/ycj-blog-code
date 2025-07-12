@@ -112,4 +112,4 @@ struct ScoringTasksGpu
     }
 };
 
-#endif // DATA_STRUCT_CUH
+#endif
