@@ -1,12 +1,12 @@
-#ifndef FFM_GPU_CUH
-#define FFM_GPU_CUH
+#ifndef ColEnc_GPU_CUH
+#define ColEnc_GPU_CUH
 
 #include <sstream>
 #include <stdexcept>
 
 #include "data_struct.cuh"
 
-__global__ void ffmStep1Kernel(FFMData reqData, FFMData docData, ScoringTasksGpu tasks, float *d_buffer)
+__global__ void ffmStep1Kernel(ColEncData reqData, ColEncData docData, ScoringTasksGpu tasks, float *d_buffer)
 {
     int idx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
     size_t taskIdx = idx / reqData.numFields;
@@ -36,7 +36,7 @@ __global__ void ffmStep1Kernel(FFMData reqData, FFMData docData, ScoringTasksGpu
     }
 }
 
-__global__ void ffmStep2Kernel(FFMData reqData, ScoringTasksGpu tasks, float *d_buffer)
+__global__ void ffmStep2Kernel(ColEncData reqData, ScoringTasksGpu tasks, float *d_buffer)
 {
     int taskIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -52,11 +52,11 @@ __global__ void ffmStep2Kernel(FFMData reqData, ScoringTasksGpu tasks, float *d_
 
 }
 
-void ffmScorerGpu(FFMData reqData, FFMData docData, ScoringTasksGpu tasks, float *d_buffer)
+void ffmScorerGpu(ColEncData reqData, ColEncData docData, ScoringTasksGpu tasks, float *d_buffer)
 {
     using namespace std;
     
-    // Launch the FFM kernel - step1
+    // Launch the ColEnc kernel - step1
     int blockSize = 256;
     int numBlocks = (tasks.numTasks * reqData.numFields + blockSize - 1) / blockSize;
     ffmStep1Kernel<<<numBlocks, blockSize>>>(reqData, docData, tasks, d_buffer);
@@ -68,7 +68,7 @@ void ffmScorerGpu(FFMData reqData, FFMData docData, ScoringTasksGpu tasks, float
         throw runtime_error(oss.str());
     }
 
-    // Launch the FFM kernel - step2
+    // Launch the ColEnc kernel - step2
     numBlocks = (tasks.numTasks + blockSize - 1) / blockSize;
     ffmStep2Kernel<<<numBlocks, blockSize>>>(reqData, tasks, d_buffer);
     cudaError = cudaDeviceSynchronize();
@@ -80,4 +80,4 @@ void ffmScorerGpu(FFMData reqData, FFMData docData, ScoringTasksGpu tasks, float
     }
 }
 
-#endif // FFM_GPU_CUH
+#endif // ColEnc_GPU_CUH

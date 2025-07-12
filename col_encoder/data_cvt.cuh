@@ -6,11 +6,11 @@
 
 #include "data_struct.cuh"
 
-FFMData convertFFMDataToGpu(const std::vector<std::vector<std::vector<float>>> &data3D)
+ColEncData convertColEncDataToGpu(const std::vector<std::vector<std::vector<float>>> &data3D)
 {
     using namespace std;
 
-    FFMData ffmData;
+    ColEncData ffmData;
 
     // -----------------
     // Some meta data
@@ -70,7 +70,7 @@ FFMData convertFFMDataToGpu(const std::vector<std::vector<std::vector<float>>> &
     }
 
     // -----------------
-    // Return the populated FFMData structure
+    // Return the populated ColEncData structure
     return ffmData;
 }
 

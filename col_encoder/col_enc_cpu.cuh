@@ -1,5 +1,5 @@
-#ifndef FFM_CPU_CUH
-#define FFM_CPU_CUH
+#ifndef ColEnc_CPU_CUH
+#define ColEnc_CPU_CUH
 
 #include <vector>
 #include <stdexcept>
@@ -35,4 +35,4 @@ void ffmScorerCpu(const std::vector<std::vector<std::vector<float>>> &reqData,
     }
 }
 
-#endif // FFM_CPU_CUH
+#endif // ColEnc_CPU_CUH

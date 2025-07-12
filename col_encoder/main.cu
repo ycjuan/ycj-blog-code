@@ -47,14 +47,14 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
 
     // -------------------
     // Random data CPU
-    auto reqDataCpu = genRandFFMData(kNumReqs, kNumFields, kEmbDimPerField);
-    auto docDataCpu = genRandFFMData(kNumDocs, kNumFields, kEmbDimPerField);
+    auto reqDataCpu = genRandColEncData(kNumReqs, kNumFields, kEmbDimPerField);
+    auto docDataCpu = genRandColEncData(kNumDocs, kNumFields, kEmbDimPerField);
     auto taskDataCpu = genRandScoringTasks(kNumReqs, kNumToScore, kNumDocs);
 
     // -------------------
     // Convert to GPU data
-    auto reqDataGpu = convertFFMDataToGpu(reqDataCpu);
-    auto docDataGpu = convertFFMDataToGpu(docDataCpu);
+    auto reqDataGpu = convertColEncDataToGpu(reqDataCpu);
+    auto docDataGpu = convertColEncDataToGpu(docDataCpu);
     auto taskDataGpu = convertScoringTasksToGpu(taskDataCpu);
 
     // Malloc buffer
