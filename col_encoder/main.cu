@@ -1,8 +1,8 @@
 #include <sstream>
 #include <iostream>
 
-#include "ffm_gpu.cuh"
-#include "ffm_cpu.cuh"
+#include "col_enc_gpu.cuh"
+#include "col_enc_cpu.cuh"
 #include "data_struct.cuh"
 #include "data_cvt.cuh"
 #include "data_gen.cuh"
