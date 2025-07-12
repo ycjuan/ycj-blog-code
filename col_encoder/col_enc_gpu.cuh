@@ -6,7 +6,7 @@
 
 #include "data_struct.cuh"
 
-__global__ void ffmStep1Kernel(ColEncData reqData, ColEncData docData, ScoringTasksGpu tasks, float *d_buffer)
+__global__ void colEncStep1Kernel(ColEncData reqData, ColEncData docData, ScoringTasksGpu tasks, float *d_buffer)
 {
     int idx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
     size_t taskIdx = idx / reqData.numFields;
@@ -36,7 +36,7 @@ __global__ void ffmStep1Kernel(ColEncData reqData, ColEncData docData, ScoringTa
     }
 }
 
-__global__ void ffmStep2Kernel(ColEncData reqData, ScoringTasksGpu tasks, float *d_buffer)
+__global__ void colEncStep2Kernel(ColEncData reqData, ScoringTasksGpu tasks, float *d_buffer)
 {
     int taskIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -52,30 +52,30 @@ __global__ void ffmStep2Kernel(ColEncData reqData, ScoringTasksGpu tasks, float 
 
 }
 
-void ffmScorerGpu(ColEncData reqData, ColEncData docData, ScoringTasksGpu tasks, float *d_buffer)
+void colEncScorerGpu(ColEncData reqData, ColEncData docData, ScoringTasksGpu tasks, float *d_buffer)
 {
     using namespace std;
     
     // Launch the ColEnc kernel - step1
     int blockSize = 256;
     int numBlocks = (tasks.numTasks * reqData.numFields + blockSize - 1) / blockSize;
-    ffmStep1Kernel<<<numBlocks, blockSize>>>(reqData, docData, tasks, d_buffer);
+    colEncStep1Kernel<<<numBlocks, blockSize>>>(reqData, docData, tasks, d_buffer);
     cudaError_t cudaError = cudaDeviceSynchronize();
     if (cudaError != cudaSuccess)
     {
         ostringstream oss;
-        oss << "CUDA error in ffmScorerGpu (step 1): " << cudaGetErrorString(cudaError);
+        oss << "CUDA error in colEncScorerGpu (step 1): " << cudaGetErrorString(cudaError);
         throw runtime_error(oss.str());
     }
 
     // Launch the ColEnc kernel - step2
     numBlocks = (tasks.numTasks + blockSize - 1) / blockSize;
-    ffmStep2Kernel<<<numBlocks, blockSize>>>(reqData, tasks, d_buffer);
+    colEncStep2Kernel<<<numBlocks, blockSize>>>(reqData, tasks, d_buffer);
     cudaError = cudaDeviceSynchronize();
     if (cudaError != cudaSuccess)
     {
         ostringstream oss;
-        oss << "CUDA error in ffmScorerGpu (step 2): " << cudaGetErrorString(cudaError);
+        oss << "CUDA error in colEncScorerGpu (step 2): " << cudaGetErrorString(cudaError);
         throw runtime_error(oss.str());
     }
 }

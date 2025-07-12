@@ -6,7 +6,7 @@
 
 #include "data_struct.cuh"
 
-void ffmScorerCpu(const std::vector<std::vector<std::vector<float>>> &reqData,
+void colEncScorerCpu(const std::vector<std::vector<std::vector<float>>> &reqData,
                   const std::vector<std::vector<std::vector<float>>> &docData,
                   std::vector<ScoringTask> &tasks)
 {

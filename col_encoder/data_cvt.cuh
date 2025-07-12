@@ -10,16 +10,16 @@ ColEncData convertColEncDataToGpu(const std::vector<std::vector<std::vector<floa
 {
     using namespace std;
 
-    ColEncData ffmData;
+    ColEncData colEncData;
 
     // -----------------
     // Some meta data
     const int numRows = data3D.size();
     const int numFields = data3D.at(0).size();
     const int embDimPerField = data3D.at(0).at(0).size();
-    ffmData.numRows = numRows;
-    ffmData.numFields = numFields;
-    ffmData.embDimPerField = embDimPerField;
+    colEncData.numRows = numRows;
+    colEncData.numFields = numFields;
+    colEncData.embDimPerField = embDimPerField;
 
     // -----------------
     // Malloc buffer
@@ -39,7 +39,7 @@ ColEncData convertColEncDataToGpu(const std::vector<std::vector<std::vector<floa
         {
             for (int embIdx = 0; embIdx < embDimPerField; ++embIdx) 
             {
-                size_t memAddr = ffmData.getMemAddr(rowIdx, fieldIdx, embIdx);
+                size_t memAddr = colEncData.getMemAddr(rowIdx, fieldIdx, embIdx);
                 hp_embData[memAddr] = static_cast<EMB_T>(data3D[rowIdx][fieldIdx][embIdx]);
             }
         }
@@ -47,7 +47,7 @@ ColEncData convertColEncDataToGpu(const std::vector<std::vector<std::vector<floa
 
     // -----------------
     // Malloc device memory
-    cudaError = cudaMalloc(&ffmData.d_embData, embDataSizeInBytes);
+    cudaError = cudaMalloc(&colEncData.d_embData, embDataSizeInBytes);
     if (cudaError != cudaSuccess) 
     {
         throw std::runtime_error("Failed to allocate device memory for embedding data: " + std::to_string(cudaError));
@@ -55,7 +55,7 @@ ColEncData convertColEncDataToGpu(const std::vector<std::vector<std::vector<floa
 
     // -----------------
     // Copy data to device
-    cudaError = cudaMemcpy(ffmData.d_embData, hp_embData, embDataSizeInBytes, cudaMemcpyHostToDevice);
+    cudaError = cudaMemcpy(colEncData.d_embData, hp_embData, embDataSizeInBytes, cudaMemcpyHostToDevice);
     if (cudaError != cudaSuccess) 
     {
         throw std::runtime_error("Failed to copy embedding data to device: " + std::to_string(cudaError));
@@ -71,7 +71,7 @@ ColEncData convertColEncDataToGpu(const std::vector<std::vector<std::vector<floa
 
     // -----------------
     // Return the populated ColEncData structure
-    return ffmData;
+    return colEncData;
 }
 
 ScoringTasksGpu convertScoringTasksToGpu(const std::vector<ScoringTask> &tasks)
