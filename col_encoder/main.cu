@@ -58,18 +58,33 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
     auto taskDataGpu = convertScoringTasksToGpu(taskDataCpu);
 
     // Malloc buffer
-    float* d_buffer;
-    size_t bufferSizeInBytes = (size_t)taskDataGpu.numTasks * reqDataGpu.numFields * sizeof(float);
-    cudaError_t cudaError = cudaMalloc(&d_buffer, bufferSizeInBytes);
+    EMB_T* d_tmpDocData = nullptr;
+    size_t size_byte_tmpDocData = (size_t)kNumToScore * docDataGpu.numFields * docDataGpu.embDimPerField * sizeof(EMB_T);
+    cudaError_t cudaError = cudaMalloc(&d_tmpDocData, size_byte_tmpDocData);
     if (cudaError != cudaSuccess)
     {
-        throw runtime_error("Failed to allocate device memory for buffer: " + std::to_string(cudaError));
+        throw runtime_error("Failed to allocate device memory for d_tmpDocData: " + std::to_string(cudaError));
+    }
+
+    float *d_tmpRst = nullptr;
+    size_t size_byte_tmpRst = (size_t)kNumToScore * docDataGpu.numFields * sizeof(float);
+    cudaError = cudaMalloc(&d_tmpRst, size_byte_tmpRst);
+    if (cudaError != cudaSuccess)
+    {
+        throw runtime_error("Failed to allocate device memory for d_tmpRst: " + std::to_string(cudaError));
     }
 
     // -------------------
     // Run scoring
     colEncScorerCpu(reqDataCpu, docDataCpu, taskDataCpu);
-    colEncScorerGpu(reqDataGpu, docDataGpu, taskDataGpu, d_buffer);
+    // Create cuBLAS handle
+    cublasHandle_t cublasHandle;
+    cublasStatus_t cublasStatus = cublasCreate(&cublasHandle);
+    if (cublasStatus != CUBLAS_STATUS_SUCCESS) 
+    {
+        throw runtime_error("Failed to create cuBLAS handle");
+    }
+    colEncScorerGpu(reqDataGpu, docDataGpu, taskDataGpu, 0, cublasHandle, d_tmpDocData, d_tmpRst);
 
     // -------------------
     // Compare results
@@ -84,7 +99,7 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
         {
             timer.tic();
         }
-        colEncScorerGpu(reqDataGpu, docDataGpu, taskDataGpu, d_buffer);
+        colEncScorerGpu(reqDataGpu, docDataGpu, taskDataGpu, 0, cublasHandle, d_tmpDocData, d_tmpRst);
     }
     float latencyMs = timer.tocMs() / kNumTrials;
     cout << "Average latency per trial: " << latencyMs << " ms" << endl;
@@ -98,7 +113,13 @@ void runTest(const int kNumReqs, const int kNumDocs, const int kNumFields, const
     reqDataGpu.free();
     docDataGpu.free();
     taskDataGpu.free();
-    cudaFree(d_buffer);
+    cudaFree(d_tmpDocData);
+    cudaFree(d_tmpRst);
+    cublasStatus = cublasDestroy(cublasHandle);
+    if (cublasStatus != CUBLAS_STATUS_SUCCESS) 
+    {
+        throw runtime_error("Failed to destroy cuBLAS handle: " + std::to_string(cublasStatus));
+    }
 }
 
 int main() 
