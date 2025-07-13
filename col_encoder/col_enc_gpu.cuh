@@ -20,29 +20,14 @@ enum class MemLayout
 constexpr MemLayout reqMemLayout = MemLayout::ROW_MAJOR;
 constexpr MemLayout docMemLayout = MemLayout::ROW_MAJOR;
 
-__device__ size_t getDocMemAddr(size_t docIdx, size_t fieldIdx, size_t embIdx, size_t numToScore, size_t numFields, size_t embDimPerField)
-{
-    if constexpr (docMemLayout == MemLayout::ROW_MAJOR)
-    {
-        size_t idx0 = docIdx;
-        size_t idx1 = fieldIdx;
-        size_t idx2 = embIdx;
-
-        size_t offset0 = numFields * embDimPerField;
-        size_t offset1 = embDimPerField;
-
-        return idx0 * offset0 + idx1 * offset1 + idx2;
-    }
-}
-
 struct CublasGemmExParam
 {
-    int numDocs; // Here, numDocs is actually numToScore * numFields
+    int numTasks; // This is numToScore * numFields
     int numFields;
     int embDim;
-    void *d_doc = nullptr; // M=(numFields x numToScore) x N=embDim
+    void *d_doc = nullptr; // M=numTasks x N=embDim
     void *d_req = nullptr; // M=numFields x N=embDim
-    void *d_rst = nullptr; // M=(numDocs x numFields) x N=numFields
+    void *d_rst = nullptr; // M=numTasks x N=numFields
     cublasComputeType_t computeType = CUBLAS_COMPUTE_32F;
     cudaDataType dataType = CUDA_R_16BF;
     const cublasHandle_t *p_cublasHandle;
@@ -53,7 +38,7 @@ void cublasGemmExWrapper(CublasGemmExParam &data)
     const float alpha = 1.0;
     const float beta = 0.0;
 
-    int M = data.numDocs; // It is actually numToScore * numFields
+    int M = data.numTasks;
     int N = data.numFields;
     int K = data.embDim;
 
@@ -110,7 +95,7 @@ __global__ void densifyKernel(ColEncData docData, ScoringTasksGpu tasks, size_t 
     }
 }
 
-__global__ void colEncoderMergeKernel(ColEncData docData, ScoringTasksGpu tasks, size_t reqIdx, size_t numToScore, float *d_tmpRst)
+__global__ void mergeKernel(ColEncData docData, ScoringTasksGpu tasks, size_t reqIdx, size_t numToScore, float *d_tmpRst)
 {
     size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     size_t densifiedDocIdx = idx;
@@ -158,7 +143,6 @@ void colEncScorerGpu(ColEncData reqData,
     {
         for (int reqIdx = 0; reqIdx < kNumReqs; ++reqIdx)
         {
-
             // ---------------
             // Step 1 - copy document data to temporary storage
             {
@@ -179,7 +163,7 @@ void colEncScorerGpu(ColEncData reqData,
             // Step 2 - perform scoring with cublasGemmEx
             {
                 CublasGemmExParam cublasParam;
-                cublasParam.numDocs = kNumToScorePerReq * kNumFields;
+                cublasParam.numTasks = kNumToScorePerReq * kNumFields;
                 cublasParam.numFields = kNumFields;
                 cublasParam.embDim = kEmbDim;
                 cublasParam.d_doc = d_tmpDocData;
@@ -196,7 +180,7 @@ void colEncScorerGpu(ColEncData reqData,
             {
                 int blockSize = 256;
                 int numBlocks = (kNumToScorePerReq + blockSize - 1) / blockSize;
-                colEncoderMergeKernel<<<numBlocks, blockSize, 0, stream>>>(docData, tasks, reqIdx, kNumToScorePerReq, d_tmpRst);
+                mergeKernel<<<numBlocks, blockSize, 0, stream>>>(docData, tasks, reqIdx, kNumToScorePerReq, d_tmpRst);
                 cudaError_t cudaError = cudaStreamSynchronize(stream);
                 if (cudaError != cudaSuccess)
                 {
