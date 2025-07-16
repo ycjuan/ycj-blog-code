@@ -4,7 +4,7 @@ CFLAGS       := -Xcompiler -fopenmp --gpu-architecture=sm_89 -O3 -lcublas
 
 all: is_in
 
-is_in: main.cu baseline.cu binary_search_plus.cu
+is_in: main.cu baseline.cu binary_search.cu
 	nvcc $(INC) -o $@ $^ $(CFLAGS)
 
 clean:
