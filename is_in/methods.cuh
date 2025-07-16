@@ -9,8 +9,4 @@ void methodGpuNaive(Data &data, Setting setting);
 
 void methodGpuBinarySearch(Data &data, Setting setting);
 
-void methodGpuBitTrick(Data &data, Setting setting);
-
-void methodGpuBinarySearchPlus(Data &data, Setting setting);
-
 #endif

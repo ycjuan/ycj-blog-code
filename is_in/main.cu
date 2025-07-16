@@ -16,7 +16,6 @@ int kNumDocs = 1 << 19;
 int kListSize = 1 << 4;
 int kCardinality = 1 << 10;
 int kNumTrials = 10;
-int kNumBitTrickLayers = 4;
 bool runCpu = true;
 
 #define CHECK_CUDA(func)                                                                                                           \
@@ -68,8 +67,6 @@ int main()
 
     methodGpuBinarySearch(data, setting);
 
-    methodGpuBitTrick(data, setting);
-
     if (runCpu)
     {
         methodCpu(data, setting);
@@ -81,9 +78,6 @@ int main()
 
         cout << "\nChecking results (binary search)...";
         checkRst(data.rstCpu1D, data.d_rstGpuBinarySearch, data.rstGpuBinarySearchSize);
-
-        cout << "\nChecking results (bit trick)...";
-        checkRst(data.rstCpu1D, data.d_rstGpuBitTrick, data.rstGpuBitTrickSize);
     }
 
     return 0;
