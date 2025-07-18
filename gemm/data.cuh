@@ -38,11 +38,15 @@ struct Data
     int numDocs;
     int numReqs;
     int embDim;
+    int hiddenDim;
     T *d_doc; // M=numDocs x N=embDim
     T *d_req; // M=numReqs x N=embDim
-    float *d_rst_kernel; // M=numDocs x N=numReqs
+    T *d_wa; // embDim x hiddenDim
+    T *d_wb; // hiddenDim x 1
     float *d_rst_cublas; // M=numDocs x N=numReqs
+    float *d_rst_mlp_gpu_naive;
     float *h_rst_cpu;
+    float *h_rst_mlp_cpu;
     MemLayout docMemLayout;
     MemLayout reqMemLayout;
     MemLayout rstLayoutCpu;
@@ -53,9 +57,12 @@ struct Data
     {
         cudaFree(d_doc);
         cudaFree(d_req);
-        cudaFree(d_rst_kernel);
+        cudaFree(d_wa);
+        cudaFree(d_wb);
         cudaFree(d_rst_cublas);
+        cudaFree(d_rst_mlp_gpu_naive);
         cudaFreeHost(h_rst_cpu);
+        cudaFreeHost(h_rst_mlp_cpu);
     }
 
     void print()

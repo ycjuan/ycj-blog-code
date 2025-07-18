@@ -43,9 +43,12 @@ Data<T> genData()
     
     CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.embDim * sizeof(T)));
     CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.embDim * sizeof(T)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rst_kernel, (size_t)data.numDocs * data.numReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_wa, (size_t)data.embDim * data.hiddenDim * sizeof(T)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_wb, (size_t)data.hiddenDim * sizeof(T)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_cublas, (size_t)data.numDocs * data.numReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rst_mlp_gpu_naive, (size_t)data.numDocs * data.numReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocHost(&data.h_rst_cpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocHost(&data.h_rst_mlp_cpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
 
     default_random_engine generator;
     uniform_real_distribution<float> distribution(0.0, 1.0);
@@ -53,6 +56,10 @@ Data<T> genData()
         data.d_doc[i] = (T)distribution(generator);
     for (int i = 0; i < data.numReqs * data.embDim; i++)
         data.d_req[i] = (T)distribution(generator);
+    for (int i = 0; i < data.embDim * data.hiddenDim; i++)
+        data.d_wa[i] = (T)distribution(generator);
+    for (int i = 0; i < data.hiddenDim; i++)
+        data.d_wb[i] = (T)distribution(generator);
 
     return data;
 }
@@ -65,16 +72,9 @@ void checkData(Data<T> data)
         for (int j = 0; j < data.numReqs; j++)
         {
             float cpuVal = data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)];
-            float gpuKernelVal = data.d_rst_kernel[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)];
             float gpuCublasVal = data.d_rst_cublas[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
 
-            if (abs(cpuVal - gpuKernelVal) / abs(gpuKernelVal) > 1e-3)
-            {
-                cout << "Kernel error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuKernelVal << endl;
-                return;
-            }
-            
-            if (abs(cpuVal - gpuCublasVal) / abs(gpuKernelVal) > 1e-3)
+            if (abs(cpuVal - gpuCublasVal) / abs(gpuCublasVal) > 1e-3)
             {
                 cout << "Cublas error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuCublasVal << endl;
                 return;
