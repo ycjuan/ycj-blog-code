@@ -14,11 +14,11 @@
 #include "method_mlp_cpu.cuh"
 
 using namespace std;
-
-int kNumDocs = 1000000;
-int kNumReqs = 32;
-int kEmbDim = 64;
-int kNumTrials = 100;
+size_t kNumDocs = 100000;
+size_t kNumReqs = 32;
+size_t kEmbDim = 64;
+size_t kHiddenDim = 128;
+size_t kNumTrials = 100;
 
 Data genData()
 {
@@ -26,17 +26,18 @@ Data genData()
     data.numDocs = kNumDocs;
     data.numReqs = kNumReqs;
     data.embDim = kEmbDim;
+    data.hiddenDim = kHiddenDim;
     data.print();
     
-    CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.embDim * sizeof(T)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.embDim * sizeof(T)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_wa, (size_t)data.embDim * data.hiddenDim * sizeof(T)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_wb, (size_t)data.hiddenDim * sizeof(T)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rst_dp_gpu_naive, (size_t)data.numDocs * data.numReqs * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rst_dp_gpu_cublas, (size_t)data.numDocs * data.numReqs * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rst_mlp_gpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
-    CHECK_CUDA(cudaMallocHost(&data.h_rst_dp_cpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
-    CHECK_CUDA(cudaMallocHost(&data.h_rst_mlp_cpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_doc, data.numDocs * data.embDim * sizeof(T)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_req, data.numReqs * data.embDim * sizeof(T)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_wa, data.embDim * data.hiddenDim * sizeof(T)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_wb, data.hiddenDim * sizeof(T)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rst_dp_gpu_naive, data.numDocs * data.numReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rst_dp_gpu_cublas, data.numDocs * data.numReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rst_mlp_gpu, data.numDocs * data.numReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocHost(&data.h_rst_dp_cpu, data.numDocs * data.numReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocHost(&data.h_rst_mlp_cpu, data.numDocs * data.numReqs * sizeof(float)));
 
     default_random_engine generator;
     uniform_real_distribution<float> distribution(0.0, 1.0);
