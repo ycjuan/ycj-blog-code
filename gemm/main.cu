@@ -9,6 +9,7 @@
 #include "method_dp_gpu_cublas.cuh"
 #include "method_dp_gpu_naive.cuh"
 #include "method_mlp_cpu.cuh"
+#include "method_mlp_gpu.cuh"
 
 using namespace std;
 size_t kNumDocs = 1000;
@@ -86,6 +87,8 @@ int main()
     methodDpGpuNaive(data, kNumTrials);
 
     methodMlpCpu(data);
+
+    methodMlpGpu(data, kNumTrials);
 
     checkData(data);
 
