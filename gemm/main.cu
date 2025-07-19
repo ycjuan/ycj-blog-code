@@ -15,8 +15,6 @@
 
 using namespace std;
 
-typedef half T; 
-// IMPORTANT!!! only __nv_bfloat16 and half are supported for now
 
 int kNumDocs = 1 << 20;
 int kNumReqs = 1 << 4;
@@ -29,10 +27,9 @@ MemLayout kMemLayoutRstCpu = COL_MAJOR;
 MemLayout kMemLayoutRstGpuCuda = COL_MAJOR;
 MemLayout kMemLayoutRstGpuCublas = COL_MAJOR;
 
-template <typename T>
-Data<T> genData()
+Data genData()
 {
-    Data<T> data;
+    Data data;
     data.numDocs = kNumDocs;
     data.numReqs = kNumReqs;
     data.embDim = kEmbDim;
@@ -67,8 +64,7 @@ Data<T> genData()
     return data;
 }
 
-template <typename T>
-void checkData(Data<T> data)
+void checkData(Data data)
 {
     for (int i = 0; i < data.numDocs; i++)
     {
@@ -95,7 +91,7 @@ void checkData(Data<T> data)
 
 int main()
 {
-    Data<T> data = genData<T>();
+    Data data = genData();
 
     methodDpCublas(data, kNumTrials);
 

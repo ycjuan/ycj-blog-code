@@ -16,6 +16,9 @@ using namespace std;
         }                                                                                                                          \
     }
 
+typedef half T; 
+// IMPORTANT!!! only __nv_bfloat16 and half are supported for now
+
 enum MemLayout
 {
     ROW_MAJOR,
@@ -32,7 +35,6 @@ __device__ __host__ size_t getMemAddr(int i, int j, int M, int N, MemLayout layo
         return (size_t)j * M + i;
 }
 
-template <typename T>
 struct Data
 {
     int numDocs;

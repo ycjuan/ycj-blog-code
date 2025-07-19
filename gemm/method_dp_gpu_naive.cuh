@@ -7,8 +7,7 @@
 
 using namespace std;
 
-template <typename T>
-__global__ void matMul(Data<T> data)
+__global__ void matMul(Data data)
 {
     int taskIdx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
     int i = taskIdx / data.numReqs;
@@ -27,8 +26,7 @@ __global__ void matMul(Data<T> data)
     }
 }
 
-template <typename T>
-void methodDpGpuNaive(Data<T> data, int numTrials)
+void methodDpGpuNaive(Data data, int numTrials)
 {
     int blockSize = 512;
     int gridSize = size_t(data.numDocs) * data.numReqs / blockSize;

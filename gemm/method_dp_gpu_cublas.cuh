@@ -14,8 +14,7 @@ void cublasErrCheck_(cublasStatus_t stat, const char *file, int line) {
    }
 }
 
-template <typename T>
-void methodDpCublas(Data<T> data, int numTrials)
+void methodDpCublas(Data data, int numTrials)
 {
     cublasHandle_t cublasHandle;
     cublasCreate(&cublasHandle);

@@ -5,8 +5,7 @@
 
 using namespace std;
 
-template<typename T>
-void methodDpCpu(Data<T> data)
+void methodDpCpu(Data data)
 {
     Timer timer;
     timer.tic();
