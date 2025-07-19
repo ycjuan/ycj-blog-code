@@ -17,7 +17,7 @@ using namespace std;
 
 int kNumDocs = 1000000;
 int kNumReqs = 32;
-int kEmbDim = 128;
+int kEmbDim = 64;
 int kNumTrials = 100;
 
 Data genData()
@@ -32,9 +32,9 @@ Data genData()
     CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.embDim * sizeof(T)));
     CHECK_CUDA(cudaMallocManaged(&data.d_wa, (size_t)data.embDim * data.hiddenDim * sizeof(T)));
     CHECK_CUDA(cudaMallocManaged(&data.d_wb, (size_t)data.hiddenDim * sizeof(T)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rst_dp_gpu_naive, (size_t)data.numDocs * data.numReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_dp_gpu_cublas, (size_t)data.numDocs * data.numReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_mlp_gpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rst_dp_gpu_naive, (size_t)data.numDocs * data.numReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocHost(&data.h_rst_dp_cpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocHost(&data.h_rst_mlp_cpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
 

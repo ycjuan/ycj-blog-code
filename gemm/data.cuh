@@ -38,10 +38,10 @@ __device__ __host__ size_t getMemAddr(int i, int j, int M, int N, MemLayout layo
 struct Data
 {
     // Meta data
-    int numDocs;
-    int numReqs;
-    int embDim;
-    int hiddenDim;
+    size_t numDocs;
+    size_t numReqs;
+    size_t embDim;
+    size_t hiddenDim;
 
     // Read embeddings
     T *d_doc; // numDocs x embDim
@@ -50,11 +50,11 @@ struct Data
     T *d_wb; // hiddenDim x 1
 
     // Write results
-    float *h_rst_dp_cpu; // numDocs x numReqs
     float *d_rst_dp_gpu_naive; // numDocs x numReqs
     float *d_rst_dp_gpu_cublas; // numDocs x numReqs
-    float *h_rst_mlp_cpu; // numDocs x numReqs
     float *d_rst_mlp_gpu; // numDocs x numReqs
+    float *h_rst_dp_cpu; // numDocs x numReqs
+    float *h_rst_mlp_cpu; // numDocs x numReqs
 
     // Memory layouts
     MemLayout docMemLayout = ROW_MAJOR;
@@ -73,9 +73,9 @@ struct Data
         cudaFree(d_req);
         cudaFree(d_wa);
         cudaFree(d_wb);
+        cudaFree(d_rst_dp_gpu_naive);
         cudaFree(d_rst_dp_gpu_cublas);
         cudaFree(d_rst_mlp_gpu);
-        cudaFree(d_rst_dp_gpu_naive);
         cudaFreeHost(h_rst_dp_cpu);
         cudaFreeHost(h_rst_mlp_cpu);
     }
