@@ -1,5 +1,5 @@
-#ifndef METHOD_DOT_PROD_GPU_CUBLAS_CUH
-#define METHOD_DOT_PROD_GPU_CUBLAS_CUH
+#ifndef METHOD_DP_GPU_CUBLAS_CUH
+#define METHOD_DP_GPU_CUBLAS_CUH
 
 #include <iostream>
 

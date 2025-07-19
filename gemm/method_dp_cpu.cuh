@@ -1,5 +1,5 @@
-#ifndef METHOD_DOT_PROD_CPU_CUH
-#define METHOD_DOT_PROD_CPU_CUH
+#ifndef METHOD_DP_CPU_CUH
+#define METHOD_DP_CPU_CUH
 
 #include "data.cuh"
 
