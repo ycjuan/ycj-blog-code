@@ -8,8 +8,8 @@
 
 #include "util.cuh"
 #include "data.cuh"
-#include "method_dot_prod_cpu.cuh"
-#include "method_dot_prod_gpu_cublas.cuh"
+#include "method_dp_cpu.cuh"
+#include "method_dp_gpu_cublas.cuh"
 #include "method_mlp_cpu.cuh"
 
 using namespace std;
