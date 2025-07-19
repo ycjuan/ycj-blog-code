@@ -3,6 +3,9 @@
 
 #include <iostream>
 #include <random>
+#include <sstream>
+#include <stdexcept>
+#include <cublas_v2.h>
 
 using namespace std;
 

@@ -2,11 +2,8 @@
 #include <stdexcept>
 #include <iostream>
 #include <random>
-#include <sstream>
-#include <cublas_v2.h>
-#include <type_traits>
 
-#include "util.cuh"
+#include "timer.cuh"
 #include "data.cuh"
 #include "method_dp_cpu.cuh"
 #include "method_dp_gpu_cublas.cuh"
@@ -88,7 +85,7 @@ int main()
 
     methodDpGpuNaive(data, kNumTrials);
 
-    //methodMlpCpu(data);
+    methodMlpCpu(data);
 
     checkData(data);
 

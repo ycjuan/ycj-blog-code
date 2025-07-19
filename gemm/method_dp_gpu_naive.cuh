@@ -2,6 +2,7 @@
 #define METHOD_DP_GPU_NAIVE_CUH
 
 #include <iostream>
+#include <sstream>
 
 #include "data.cuh"
 
