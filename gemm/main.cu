@@ -87,8 +87,9 @@ int main()
 {
     Data<T> data = genData<T>();
 
-    matMulCublas(data, kNumTrials);
-    matMulCpu(data);
+    methodDotProdCublas(data, kNumTrials);
+    
+    methodDotProdCpu(data);
 
     checkData(data);
 

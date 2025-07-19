@@ -15,7 +15,7 @@ void cublasErrCheck_(cublasStatus_t stat, const char *file, int line) {
 }
 
 template <typename T>
-void matMulCublas(Data<T> data, int kNumTrials)
+void methodDotProdCublas(Data<T> data, int kNumTrials)
 {
     cublasHandle_t cublasHandle;
     cublasCreate(&cublasHandle);

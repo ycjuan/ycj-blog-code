@@ -6,7 +6,7 @@
 using namespace std;
 
 template<typename T>
-void matMulCpu(Data<T> data)
+void methodDotProdCpu(Data<T> data)
 {
     Timer timer;
     timer.tic();
