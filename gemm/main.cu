@@ -14,7 +14,7 @@
 #include "method_mlp_cpu.cuh"
 
 using namespace std;
-size_t kNumDocs = 1000000;
+size_t kNumDocs = 1000;
 size_t kNumReqs = 32;
 size_t kEmbDim = 64;
 size_t kHiddenDim = 32;
