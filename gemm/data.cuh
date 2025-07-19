@@ -9,16 +9,6 @@
 
 using namespace std;
 
-#define CHECK_CUDA(func)                                                                                                           \
-    {                                                                                                                              \
-        cudaError_t status = (func);                                                                                               \
-        if (status != cudaSuccess)                                                                                                 \
-        {                                                                                                                          \
-            string error = "CUDA API failed at line " + to_string(__LINE__) + " with error: " + cudaGetErrorString(status) + "\n"; \
-            throw runtime_error(error);                                                                                            \
-        }                                                                                                                          \
-    }
-
 typedef half T; 
 // IMPORTANT!!! only __nv_bfloat16 and half are supported for now
 

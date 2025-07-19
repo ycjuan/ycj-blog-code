@@ -18,6 +18,17 @@ size_t kEmbDim = 64;
 size_t kHiddenDim = 32;
 size_t kNumTrials = 100;
 
+
+#define CHECK_CUDA(func)                                                                                                           \
+    {                                                                                                                              \
+        cudaError_t status = (func);                                                                                               \
+        if (status != cudaSuccess)                                                                                                 \
+        {                                                                                                                          \
+            string error = "CUDA API failed at line " + to_string(__LINE__) + " with error: " + cudaGetErrorString(status) + "\n"; \
+            throw runtime_error(error);                                                                                            \
+        }                                                                                                                          \
+    }
+
 Data genData()
 {
     Data data;
