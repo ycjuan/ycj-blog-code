@@ -76,10 +76,17 @@ void checkData(Data<T> data)
         {
             float cpuVal = data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)];
             float gpuCublasVal = data.d_rst_cublas[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
+            float gpuNaiveVal = data.d_rst_dp_gpu_naive[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)];
 
-            if (abs(cpuVal - gpuCublasVal) / abs(gpuCublasVal) > 1e-3)
+            if (abs(cpuVal - gpuCublasVal) / abs(cpuVal) > 1e-3)
             {
                 cout << "Cublas error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuCublasVal << endl;
+                return;
+            }
+
+            if (abs(cpuVal - gpuNaiveVal) / abs(cpuVal) > 1e-3)
+            {
+                cout << "Naive GPU error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuNaiveVal << endl;
                 return;
             }
         }
