@@ -15,7 +15,7 @@ void cublasErrCheck_(cublasStatus_t stat, const char *file, int line) {
 }
 
 template <typename T>
-void methodDotProdCublas(Data<T> data, int kNumTrials)
+void methodDpCublas(Data<T> data, int numTrials)
 {
     cublasHandle_t cublasHandle;
     cublasCreate(&cublasHandle);
@@ -38,7 +38,7 @@ void methodDotProdCublas(Data<T> data, int kNumTrials)
     cudaDataType bType = (is_same<T, half>::value) ? CUDA_R_16F : CUDA_R_16BF;
 
     CudaTimer timer;
-    for (int t = -3; t < kNumTrials; t++)
+    for (int t = -3; t < numTrials; t++)
     {
         if (t == 0)
             timer.tic();
@@ -51,7 +51,7 @@ void methodDotProdCublas(Data<T> data, int kNumTrials)
                                     c_cublas, CUDA_R_32F, MATRIX_M,
                                     CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
     }
-    cout << "Cublas time: " << timer.tocMs() / kNumTrials << " ms" << endl;
+    cout << "Cublas time: " << timer.tocMs() / numTrials << " ms" << endl;
 
     cublasDestroy(cublasHandle);
 }

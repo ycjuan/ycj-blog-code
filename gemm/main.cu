@@ -10,6 +10,7 @@
 #include "data.cuh"
 #include "method_dp_cpu.cuh"
 #include "method_dp_gpu_cublas.cuh"
+#include "method_dp_gpu_naive.cuh"
 #include "method_mlp_cpu.cuh"
 
 using namespace std;
@@ -48,6 +49,7 @@ Data<T> genData()
     CHECK_CUDA(cudaMallocManaged(&data.d_wb, (size_t)data.hiddenDim * sizeof(T)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_cublas, (size_t)data.numDocs * data.numReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_mlp_gpu_naive, (size_t)data.numDocs * data.numReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rst_dp_gpu_naive, (size_t)data.numDocs * data.numReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocHost(&data.h_rst_cpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocHost(&data.h_rst_mlp_cpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
 
@@ -88,11 +90,13 @@ int main()
 {
     Data<T> data = genData<T>();
 
-    methodDotProdCublas(data, kNumTrials);
+    methodDpCublas(data, kNumTrials);
+
+    methodDpCpu(data);
+
+    methodDpGpuNaive(data, kNumTrials);
 
     methodMlpCpu(data);
-
-    methodDotProdCpu(data);
 
     checkData(data);
 

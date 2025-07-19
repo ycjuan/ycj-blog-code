@@ -47,6 +47,7 @@ struct Data
     float *d_rst_mlp_gpu_naive;
     float *h_rst_cpu;
     float *h_rst_mlp_cpu;
+    float *d_rst_dp_gpu_naive;
     MemLayout docMemLayout;
     MemLayout reqMemLayout;
     MemLayout waLayout;
@@ -63,6 +64,7 @@ struct Data
         cudaFree(d_wb);
         cudaFree(d_rst_cublas);
         cudaFree(d_rst_mlp_gpu_naive);
+        cudaFree(d_rst_dp_gpu_naive);
         cudaFreeHost(h_rst_cpu);
         cudaFreeHost(h_rst_mlp_cpu);
     }
