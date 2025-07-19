@@ -57,20 +57,41 @@ void checkData(Data data)
     {
         for (int j = 0; j < data.numReqs; j++)
         {
-            float cpuVal = data.h_rst_dp_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstDpCpuMemLayout)];
-            float gpuCublasVal = data.d_rst_dp_gpu_cublas[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstDpGpuCublasMemLayout)];
-            float gpuNaiveVal = data.d_rst_dp_gpu_naive[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstDpGpuNaiveMemLayout)];
-
-            if (abs(cpuVal - gpuCublasVal) / abs(cpuVal) > 1e-3)
+            // Check DP results
             {
-                cout << "Cublas error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuCublasVal << endl;
-                return;
+                float cpuVal = data.h_rst_dp_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstDpCpuMemLayout)];
+                float gpuCublasVal = data.d_rst_dp_gpu_cublas[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstDpGpuCublasMemLayout)];
+                float gpuNaiveVal = data.d_rst_dp_gpu_naive[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstDpGpuNaiveMemLayout)];
+
+                if (abs(cpuVal - gpuCublasVal) / abs(cpuVal) > 1e-3)
+                {
+                    cout << "Cublas error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuCublasVal << endl;
+                    return;
+                }
+
+                if (abs(cpuVal - gpuNaiveVal) / abs(cpuVal) > 1e-3)
+                {
+                    cout << "Naive GPU error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuNaiveVal << endl;
+                    return;
+                }
             }
 
-            if (abs(cpuVal - gpuNaiveVal) / abs(cpuVal) > 1e-3)
+            // Check MLP results
             {
-                cout << "Naive GPU error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuNaiveVal << endl;
-                return;
+                float cpuVal = data.h_rst_mlp_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstMlpCpuMemLayout)];
+                float gpuVal = data.d_rst_mlp_gpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstMlpGpuMemLayout)];
+
+                // Enable the check below after GPU MLP implementation is complete
+                bool gpuMlpImplemented = false;
+                if (!gpuMlpImplemented)
+                {
+                    continue;
+                }
+                if (abs(cpuVal - gpuVal) / abs(cpuVal) > 1e-3)
+                {
+                    cout << "MLP error at (" << i << ", " << j << "): " << cpuVal << " != " << gpuVal << endl;
+                    return;
+                }
             }
         }
     }
@@ -80,11 +101,11 @@ int main()
 {
     Data data = genData();
 
-    methodDpCublas(data, kNumTrials);
-
     methodDpCpu(data);
 
     methodDpGpuNaive(data, kNumTrials);
+
+    methodDpCublas(data, kNumTrials);
 
     methodMlpCpu(data);
 
