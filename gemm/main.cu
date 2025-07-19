@@ -10,6 +10,7 @@
 #include "data.cuh"
 #include "method_dot_prod_cpu.cuh"
 #include "method_dot_prod_gpu_cublas.cuh"
+#include "method_mlp_cpu.cuh"
 
 using namespace std;
 
@@ -88,7 +89,9 @@ int main()
     Data<T> data = genData<T>();
 
     methodDotProdCublas(data, kNumTrials);
-    
+
+    methodMlpCpu(data);
+
     methodDotProdCpu(data);
 
     checkData(data);

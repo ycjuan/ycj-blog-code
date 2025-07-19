@@ -49,6 +49,8 @@ struct Data
     float *h_rst_mlp_cpu;
     MemLayout docMemLayout;
     MemLayout reqMemLayout;
+    MemLayout waLayout;
+    MemLayout wbLayout;
     MemLayout rstLayoutCpu;
     MemLayout rstLayoutGpuKernel;
     MemLayout rstLayoutGpuCublas;
