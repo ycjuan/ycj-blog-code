@@ -45,7 +45,7 @@ void methodDpGpuNaive(Data data, int numTrials)
             throw runtime_error(oss.str());
         }
     }
-    cout << "Kernel time: " << timer.tocMs() / numTrials << " ms" << endl;
+    cout << "DP-Naive time: " << timer.tocMs() / numTrials << " ms" << endl;
 }
 
 #endif

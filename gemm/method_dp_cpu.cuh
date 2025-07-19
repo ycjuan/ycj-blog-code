@@ -24,7 +24,7 @@ void methodDpCpu(Data data)
             data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)] = (half)sum;
         }
     }
-    cout << "CPU time: " << timer.tocMs() << " ms" << endl;
+    cout << "DP-CPU time: " << timer.tocMs() << " ms" << endl;
 }
 
 #endif

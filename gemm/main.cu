@@ -15,13 +15,12 @@
 
 using namespace std;
 
-
-int kNumDocs = 1 << 20;
-int kNumReqs = 1 << 4;
-int kEmbDim = 1 << 5;
+int kNumDocs = 1000000;
+int kNumReqs = 32;
+int kEmbDim = 128;
 int kNumTrials = 100;
 
-MemLayout kMemLayoutDoc = COL_MAJOR;
+MemLayout kMemLayoutDoc = ROW_MAJOR;
 MemLayout kMemLayoutReq = ROW_MAJOR;
 MemLayout kMemLayoutRstCpu = COL_MAJOR;
 MemLayout kMemLayoutRstGpuCuda = COL_MAJOR;

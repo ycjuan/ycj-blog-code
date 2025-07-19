@@ -50,7 +50,7 @@ void methodDpCublas(Data data, int numTrials)
                                     c_cublas, CUDA_R_32F, MATRIX_M,
                                     CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
     }
-    cout << "Cublas time: " << timer.tocMs() / numTrials << " ms" << endl;
+    cout << "DP-Cublas time: " << timer.tocMs() / numTrials << " ms" << endl;
 
     cublasDestroy(cublasHandle);
 }
