@@ -19,8 +19,8 @@ typedef half T;
 // IMPORTANT!!! only __nv_bfloat16 and half are supported for now
 
 int kNumDocs = 1 << 20;
-int kNumReqs = 1 << 0;
-int kEmbDim = 1 << 10;
+int kNumReqs = 1 << 4;
+int kEmbDim = 1 << 5;
 int kNumTrials = 100;
 
 MemLayout kMemLayoutDoc = COL_MAJOR;
@@ -103,7 +103,7 @@ int main()
 
     methodDpGpuNaive(data, kNumTrials);
 
-    methodMlpCpu(data);
+    //methodMlpCpu(data);
 
     checkData(data);
 
