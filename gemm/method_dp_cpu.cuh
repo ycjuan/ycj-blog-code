@@ -21,7 +21,7 @@ void methodDpCpu(Data data)
                 T docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.embDim, data.docMemLayout)];
                 sum += (float)reqVal * (float)docVal;
             }
-            data.h_rst_dp_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)] = (half)sum;
+            data.h_rst_dp_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstDpCpuMemLayout)] = (half)sum;
         }
     }
     cout << "DP-CPU time: " << timer.tocMs() << " ms" << endl;

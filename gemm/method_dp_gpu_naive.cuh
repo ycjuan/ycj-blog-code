@@ -22,7 +22,7 @@ __global__ void matMul(Data data)
             T docVal = data.d_doc[getMemAddr(i, k, data.numDocs, data.embDim, data.docMemLayout)];            
             sum += float(reqVal * docVal);
         }
-        data.d_rst_dp_gpu_naive[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuNaive)] = sum;
+        data.d_rst_dp_gpu_naive[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstDpGpuNaiveMemLayout)] = sum;
     }
 }
 

@@ -37,27 +37,35 @@ __device__ __host__ size_t getMemAddr(int i, int j, int M, int N, MemLayout layo
 
 struct Data
 {
+    // Meta data
     int numDocs;
     int numReqs;
     int embDim;
     int hiddenDim;
+
+    // Read embeddings
     T *d_doc; // numDocs x embDim
     T *d_req; // numReqs x embDim
     T *d_wa; // embDim x hiddenDim
     T *d_wb; // hiddenDim x 1
+
+    // Write results
     float *h_rst_dp_cpu; // numDocs x numReqs
     float *d_rst_dp_gpu_naive; // numDocs x numReqs
     float *d_rst_dp_gpu_cublas; // numDocs x numReqs
     float *h_rst_mlp_cpu; // numDocs x numReqs
     float *d_rst_mlp_gpu; // numDocs x numReqs
-    MemLayout docMemLayout;
-    MemLayout reqMemLayout;
-    MemLayout waLayout;
-    MemLayout wbLayout;
-    MemLayout rstLayoutCpu;
-    MemLayout rstLayoutGpuNaive;
-    MemLayout rstLayoutGpuCublas;
-    MemLayout rstLayoutMlpCpu;
+
+    // Memory layouts
+    MemLayout docMemLayout = ROW_MAJOR;
+    MemLayout reqMemLayout = ROW_MAJOR;
+    MemLayout waMemLayout = ROW_MAJOR;
+    MemLayout wbMemLayout = ROW_MAJOR;
+    MemLayout rstDpCpuMemLayout = COL_MAJOR;
+    MemLayout rstDpGpuNaiveMemLayout = ROW_MAJOR;
+    MemLayout rstDpGpuCublasMemLayout = COL_MAJOR; // The output matrix of cublas is always in column-major order
+    MemLayout rstMlpCpuMemLayout = COL_MAJOR;
+    MemLayout rstMlpGpuMemLayout = COL_MAJOR;
 
     void free()
     {
@@ -78,9 +86,13 @@ struct Data
         oss << "numDocs: " << numDocs << ", numReqs: " << numReqs << ", embDim: " << embDim << endl;
         oss << "docMemLayout: " << (docMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "reqMemLayout: " << (reqMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
-        oss << "rstLayoutCpu: " << (rstLayoutCpu == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
-        oss << "rstLayoutGpuKernel: " << (rstLayoutGpuNaive == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
-        oss << "rstLayoutGpuCublas: " << (rstLayoutGpuCublas == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
+        oss << "waMemLayout: " << (waMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
+        oss << "wbMemLayout: " << (wbMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
+        oss << "rstDpCpuMemLayout: " << (rstDpCpuMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
+        oss << "rstDpGpuNaiveMemLayout: " << (rstDpGpuNaiveMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
+        oss << "rstDpGpuCublasMemLayout: " << (rstDpGpuCublasMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
+        oss << "rstMlpCpuMemLayout: " << (rstMlpCpuMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
+        oss << "rstMlpGpuMemLayout: " << (rstMlpGpuMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         cout << oss.str();
     }
 };

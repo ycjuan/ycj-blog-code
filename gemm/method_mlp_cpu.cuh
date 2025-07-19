@@ -34,7 +34,7 @@ void methodMlpCpu(Data data)
                 float sum = 0.0f;
                 for (int embIdx = 0; embIdx < data.embDim; embIdx++)
                 {
-                    T waVal = data.d_wa[getMemAddr(embIdx, hiddenIdx, data.embDim, data.hiddenDim, data.waLayout)];
+                    T waVal = data.d_wa[getMemAddr(embIdx, hiddenIdx, data.embDim, data.hiddenDim, data.waMemLayout)];
                     sum += hprod[embIdx] * (float)waVal;
                 }
                 sum = 1.0f / (1.0f + expf(-sum));
@@ -48,12 +48,12 @@ void methodMlpCpu(Data data)
             float rst = 0.0f;
             for (int hiddenIdx = 0; hiddenIdx < data.hiddenDim; hiddenIdx++)
             {
-                T wbVal = data.d_wb[getMemAddr(hiddenIdx, 0, data.hiddenDim, 1, data.wbLayout)];
+                T wbVal = data.d_wb[getMemAddr(hiddenIdx, 0, data.hiddenDim, 1, data.wbMemLayout)];
                 rst += hiddenLayer[hiddenIdx] * (float)wbVal;
             }
             rst = 1.0f / (1.0f + expf(-rst));
 
-            data.h_rst_dp_cpu[getMemAddr(docIdx, reqIdx, data.numDocs, data.numReqs, data.rstLayoutCpu)] = (T)rst;
+            data.h_rst_dp_cpu[getMemAddr(docIdx, reqIdx, data.numDocs, data.numReqs, data.rstDpCpuMemLayout)] = (T)rst;
         }
     }
     cout << "CPU time: " << timer.tocMs() << " ms" << endl;

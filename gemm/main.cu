@@ -20,23 +20,12 @@ int kNumReqs = 32;
 int kEmbDim = 128;
 int kNumTrials = 100;
 
-MemLayout kMemLayoutDoc = ROW_MAJOR;
-MemLayout kMemLayoutReq = ROW_MAJOR;
-MemLayout kMemLayoutRstCpu = COL_MAJOR;
-MemLayout kMemLayoutRstGpuCuda = COL_MAJOR;
-MemLayout kMemLayoutRstGpuCublas = COL_MAJOR;
-
 Data genData()
 {
     Data data;
     data.numDocs = kNumDocs;
     data.numReqs = kNumReqs;
     data.embDim = kEmbDim;
-    data.docMemLayout = kMemLayoutDoc;
-    data.reqMemLayout = kMemLayoutReq;
-    data.rstLayoutCpu = kMemLayoutRstCpu;
-    data.rstLayoutGpuNaive = kMemLayoutRstGpuCuda;
-    data.rstLayoutGpuCublas = kMemLayoutRstGpuCublas;
     data.print();
     
     CHECK_CUDA(cudaMallocManaged(&data.d_doc, (size_t)data.numDocs * data.embDim * sizeof(T)));
@@ -69,9 +58,9 @@ void checkData(Data data)
     {
         for (int j = 0; j < data.numReqs; j++)
         {
-            float cpuVal = data.h_rst_dp_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)];
-            float gpuCublasVal = data.d_rst_dp_gpu_cublas[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
-            float gpuNaiveVal = data.d_rst_dp_gpu_naive[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuNaive)];
+            float cpuVal = data.h_rst_dp_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstDpCpuMemLayout)];
+            float gpuCublasVal = data.d_rst_dp_gpu_cublas[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstDpGpuCublasMemLayout)];
+            float gpuNaiveVal = data.d_rst_dp_gpu_naive[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstDpGpuNaiveMemLayout)];
 
             if (abs(cpuVal - gpuCublasVal) / abs(cpuVal) > 1e-3)
             {
