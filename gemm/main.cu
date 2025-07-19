@@ -14,10 +14,10 @@
 #include "method_mlp_cpu.cuh"
 
 using namespace std;
-size_t kNumDocs = 100000;
+size_t kNumDocs = 1000000;
 size_t kNumReqs = 32;
 size_t kEmbDim = 64;
-size_t kHiddenDim = 128;
+size_t kHiddenDim = 32;
 size_t kNumTrials = 100;
 
 Data genData()
