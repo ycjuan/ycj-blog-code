@@ -41,22 +41,23 @@ struct Data
     int numReqs;
     int embDim;
     int hiddenDim;
-    T *d_doc; // M=numDocs x N=embDim
-    T *d_req; // M=numReqs x N=embDim
+    T *d_doc; // numDocs x embDim
+    T *d_req; // numReqs x embDim
     T *d_wa; // embDim x hiddenDim
     T *d_wb; // hiddenDim x 1
-    float *d_rst_cublas; // M=numDocs x N=numReqs
-    float *d_rst_mlp_gpu_naive;
-    float *h_rst_cpu;
-    float *h_rst_mlp_cpu;
-    float *d_rst_dp_gpu_naive;
+    float *h_rst_dp_cpu; // numDocs x numReqs
+    float *d_rst_dp_gpu_naive; // numDocs x numReqs
+    float *d_rst_dp_gpu_cublas; // numDocs x numReqs
+    float *h_rst_mlp_cpu; // numDocs x numReqs
+    float *d_rst_mlp_gpu; // numDocs x numReqs
     MemLayout docMemLayout;
     MemLayout reqMemLayout;
     MemLayout waLayout;
     MemLayout wbLayout;
     MemLayout rstLayoutCpu;
-    MemLayout rstLayoutGpuKernel;
+    MemLayout rstLayoutGpuNaive;
     MemLayout rstLayoutGpuCublas;
+    MemLayout rstLayoutMlpCpu;
 
     void free()
     {
@@ -64,10 +65,10 @@ struct Data
         cudaFree(d_req);
         cudaFree(d_wa);
         cudaFree(d_wb);
-        cudaFree(d_rst_cublas);
-        cudaFree(d_rst_mlp_gpu_naive);
+        cudaFree(d_rst_dp_gpu_cublas);
+        cudaFree(d_rst_mlp_gpu);
         cudaFree(d_rst_dp_gpu_naive);
-        cudaFreeHost(h_rst_cpu);
+        cudaFreeHost(h_rst_dp_cpu);
         cudaFreeHost(h_rst_mlp_cpu);
     }
 
@@ -78,7 +79,7 @@ struct Data
         oss << "docMemLayout: " << (docMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "reqMemLayout: " << (reqMemLayout == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "rstLayoutCpu: " << (rstLayoutCpu == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
-        oss << "rstLayoutGpuKernel: " << (rstLayoutGpuKernel == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
+        oss << "rstLayoutGpuKernel: " << (rstLayoutGpuNaive == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         oss << "rstLayoutGpuCublas: " << (rstLayoutGpuCublas == ROW_MAJOR ? "ROW_MAJOR" : "COL_MAJOR") << endl;
         cout << oss.str();
     }

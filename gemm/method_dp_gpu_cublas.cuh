@@ -27,7 +27,7 @@ void methodDpCublas(Data data, int numTrials)
     int MATRIX_K = data.embDim;
     T *a_fp16 = data.d_doc;
     T *b_fp16 = data.d_req;
-    float *c_cublas = data.d_rst_cublas;
+    float *c_cublas = data.d_rst_dp_gpu_cublas;
 
     cublasOperation_t trana = (data.docMemLayout == COL_MAJOR) ? CUBLAS_OP_N : CUBLAS_OP_T;
     cublasOperation_t tranb = (data.reqMemLayout == COL_MAJOR) ? CUBLAS_OP_T : CUBLAS_OP_N;

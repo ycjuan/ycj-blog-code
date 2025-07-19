@@ -53,7 +53,7 @@ void methodMlpCpu(Data data)
             }
             rst = 1.0f / (1.0f + expf(-rst));
 
-            data.h_rst_cpu[getMemAddr(docIdx, reqIdx, data.numDocs, data.numReqs, data.rstLayoutCpu)] = (T)rst;
+            data.h_rst_dp_cpu[getMemAddr(docIdx, reqIdx, data.numDocs, data.numReqs, data.rstLayoutCpu)] = (T)rst;
         }
     }
     cout << "CPU time: " << timer.tocMs() << " ms" << endl;

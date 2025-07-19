@@ -35,7 +35,7 @@ Data genData()
     data.docMemLayout = kMemLayoutDoc;
     data.reqMemLayout = kMemLayoutReq;
     data.rstLayoutCpu = kMemLayoutRstCpu;
-    data.rstLayoutGpuKernel = kMemLayoutRstGpuCuda;
+    data.rstLayoutGpuNaive = kMemLayoutRstGpuCuda;
     data.rstLayoutGpuCublas = kMemLayoutRstGpuCublas;
     data.print();
     
@@ -43,10 +43,10 @@ Data genData()
     CHECK_CUDA(cudaMallocManaged(&data.d_req, (size_t)data.numReqs * data.embDim * sizeof(T)));
     CHECK_CUDA(cudaMallocManaged(&data.d_wa, (size_t)data.embDim * data.hiddenDim * sizeof(T)));
     CHECK_CUDA(cudaMallocManaged(&data.d_wb, (size_t)data.hiddenDim * sizeof(T)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rst_cublas, (size_t)data.numDocs * data.numReqs * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rst_mlp_gpu_naive, (size_t)data.numDocs * data.numReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rst_dp_gpu_cublas, (size_t)data.numDocs * data.numReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_rst_mlp_gpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocManaged(&data.d_rst_dp_gpu_naive, (size_t)data.numDocs * data.numReqs * sizeof(float)));
-    CHECK_CUDA(cudaMallocHost(&data.h_rst_cpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
+    CHECK_CUDA(cudaMallocHost(&data.h_rst_dp_cpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
     CHECK_CUDA(cudaMallocHost(&data.h_rst_mlp_cpu, (size_t)data.numDocs * data.numReqs * sizeof(float)));
 
     default_random_engine generator;
@@ -69,9 +69,9 @@ void checkData(Data data)
     {
         for (int j = 0; j < data.numReqs; j++)
         {
-            float cpuVal = data.h_rst_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)];
-            float gpuCublasVal = data.d_rst_cublas[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
-            float gpuNaiveVal = data.d_rst_dp_gpu_naive[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuKernel)];
+            float cpuVal = data.h_rst_dp_cpu[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutCpu)];
+            float gpuCublasVal = data.d_rst_dp_gpu_cublas[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuCublas)];
+            float gpuNaiveVal = data.d_rst_dp_gpu_naive[getMemAddr(i, j, data.numDocs, data.numReqs, data.rstLayoutGpuNaive)];
 
             if (abs(cpuVal - gpuCublasVal) / abs(cpuVal) > 1e-3)
             {
