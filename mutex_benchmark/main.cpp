@@ -9,7 +9,21 @@ using namespace std;
 
 #include "timer.h"
 
-class LatencyRecorderWithMutex
+// -------------
+// Configuration
+constexpr int kMaxNumRecords = 1000000;
+constexpr int kNumThreads = 10;
+constexpr int kSleepDurationMs = 0;
+constexpr int kNumRecordsPerThread = 10000;
+
+class LatencyRecorderBase
+{
+public:
+    virtual void record(float latencyMs) = 0;
+    virtual ~LatencyRecorderBase() = default;
+};
+
+class LatencyRecorderWithMutex : public LatencyRecorderBase
 {
 public:
     LatencyRecorderWithMutex(int maxNumRecords)
@@ -28,7 +42,7 @@ private:
     vector<float> latencies_;
 };
 
-class LatencyRecorderWithoutMutex
+class LatencyRecorderWithoutMutex : public LatencyRecorderBase
 {
 public:
     LatencyRecorderWithoutMutex(int maxNumRecords)
@@ -45,17 +59,57 @@ private:
     vector<float> latencies_;
 };
 
+void runExperiment(LatencyRecorderBase &recorder)
+{
+        Timer timer;
+        timer.tic();
+
+        // --------------
+        // Create threads to record latencies
+        vector<thread> threads;
+        for (int threadIdx = 0; threadIdx < kNumThreads; threadIdx++)
+        {
+            threads.emplace_back([&recorder]()
+                                 {
+                                 for (int recordIdx = 0; recordIdx < kNumRecordsPerThread; recordIdx++)
+                                 {
+                                    if (kSleepDurationMs > 0)
+                                    {
+                                        std::this_thread::sleep_for(std::chrono::milliseconds(kSleepDurationMs));
+                                    }
+                                    float latency = recordIdx;
+                                    recorder.record(latency);
+                                 } });
+        }
+
+        // --------------
+        // Wait for all threads to finish
+        for (auto &t : threads)
+        {
+            t.join();
+        }
+
+        // --------------
+        // Calculate total time taken
+        int64_t totalTimeMicrosec = timer.tocMicrosec();
+        int64_t totalSleepTimeMicrosec = kNumRecordsPerThread * kSleepDurationMs * 1000;
+        int64_t totalRecordTimeMicrosec = totalTimeMicrosec - totalSleepTimeMicrosec;
+        cout << "Total time: " << totalTimeMicrosec << " microseconds" << endl;
+        cout << "Total sleep time: " << totalSleepTimeMicrosec << " microseconds" << endl;
+        cout << "Total record time: " << totalRecordTimeMicrosec << " microseconds" << endl;
+        cout << "Average record time: " << (double)totalRecordTimeMicrosec / kNumRecordsPerThread << " microseconds" << endl;
+
+}
+
 int main()
 {
-    // -------------
-    // Configuration
-    const int kMaxNumRecords = 1000000;
-    const int kNumThreads = 10;
-    const int kSleepDurationMs = 1;
-    const int kNumRecordsPerThread = 10000;
-
     cout << "Configuration:" << endl;
-    cout << "Max number of records: "
+    cout << "Max number of records: " << kMaxNumRecords << endl;
+    cout << "Number of threads: " << kNumThreads << endl;
+    cout << "Sleep duration (ms): " << kSleepDurationMs << endl;
+    cout << "Number of records per thread: " << kNumRecordsPerThread << endl;
+    cout << endl;
+
     // --------------
     // Validate configuration
     if (kNumThreads * kNumRecordsPerThread > kMaxNumRecords)
@@ -66,87 +120,18 @@ int main()
 
     // --------------------
     // Run recorder with mutex
-    {
-        LatencyRecorderWithMutex recorderWithMutex(kMaxNumRecords);
-        Timer timer;
-        timer.tic();
-
-        // --------------
-        // Create threads to record latencies
-        vector<thread> threads;
-        for (int threadIdx = 0; threadIdx < kNumThreads; threadIdx++)
-        {
-            threads.emplace_back([&recorderWithMutex, kSleepDurationMs]()
-                                 {
-                                 for (int recordIdx = 0; recordIdx < kNumRecordsPerThread; recordIdx++)
-                                 {
-                                    if (kSleepDurationMs > 0)
-                                    {
-                                        std::this_thread::sleep_for(std::chrono::milliseconds(kSleepDurationMs));
-                                    }
-                                    float latency = recordIdx;
-                                    recorderWithMutex.record(latency);
-                                 } });
-        }
-
-        // --------------
-        // Wait for all threads to finish
-        for (auto &t : threads)
-        {
-            t.join();
-        }
-
-        // --------------
-        // Calculate total time taken
-        float totalTimeMs = timer.tocMs();
-        float totalSleepTimeMs = kNumRecordsPerThread * kSleepDurationMs;
-        float totalRecordTimeMs = totalTimeMs - totalSleepTimeMs;
-        cout << "Total time with mutex: " << totalTimeMs << " ms" << endl;
-        cout << "Total record time with mutex: " << totalRecordTimeMs << " ms" << endl;
-        cout << "Average record time with mutex: " << totalRecordTimeMs / kNumRecordsPerThread << " ms" << endl;
-    }
+    cout << "Running recorder with mutex..." << endl;
+    cout << "--------------------------------" << endl;
+    LatencyRecorderWithMutex recorderWithMutex(kMaxNumRecords);
+    runExperiment(recorderWithMutex);
 
     // ---------------------
     // Run recorder without mutex
-    {
-        LatencyRecorderWithoutMutex recorderWithoutMutex(kMaxNumRecords);
-        Timer timer;
-        timer.tic();
-
-        // --------------
-        // Create threads to record latencies
-        vector<thread> threads;
-        for (int threadIdx = 0; threadIdx < kNumThreads; threadIdx++)
-        {
-            threads.emplace_back([&recorderWithoutMutex, kSleepDurationMs]()
-                                 {
-                                 for (int recordIdx = 0; recordIdx < kNumRecordsPerThread; recordIdx++)
-                                 {
-                                    if (kSleepDurationMs > 0)
-                                    {
-                                        std::this_thread::sleep_for(std::chrono::milliseconds(kSleepDurationMs));
-                                    }
-                                    float latency = recordIdx;
-                                    recorderWithoutMutex.record(latency);
-                                 } });
-        }
-
-        // --------------
-        // Wait for all threads to finish
-        for (auto &t : threads)
-        {
-            t.join();
-        }
-
-        // --------------
-        // Calculate total time taken
-        float totalTimeMs = timer.tocMs();
-        float totalSleepTimeMs = kNumRecordsPerThread * kSleepDurationMs;
-        float totalRecordTimeMs = totalTimeMs - totalSleepTimeMs;
-        cout << "Total time without mutex: " << totalTimeMs << " ms" << endl;
-        cout << "Total record time without mutex: " << totalRecordTimeMs << " ms" << endl;
-        cout << "Average record time without mutex: " << totalRecordTimeMs / kNumRecordsPerThread << " ms" << endl;
-    }
+    cout << endl << endl;
+    cout << "Running recorder without mutex..." << endl;
+    cout << "-----------------------------------" << endl;
+    LatencyRecorderWithoutMutex recorderWithoutMutex(kMaxNumRecords);
+    runExperiment(recorderWithoutMutex);
 
     return 0;
 }
