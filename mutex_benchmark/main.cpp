@@ -1,9 +1,10 @@
 #include <iostream>
 #include <thread>
 #include <vector>
-#include <future>
-#include <random>
-#include <algorithm>
+#include <mutex>
+#include <atomic>
+#include <chrono>
+#include <numeric>
 
 using namespace std;
 
@@ -12,8 +13,8 @@ using namespace std;
 // -------------
 // Configuration
 constexpr int kMaxNumRecords = 1000000;
-constexpr int kNumThreads = 10;
-constexpr int kSleepDurationMs = 1;
+constexpr int kNumThreads = 64;
+constexpr int kSleepDurationMs = 0;
 constexpr int kNumRecordsPerThread = 10000;
 
 class LatencyRecorderBase
@@ -75,11 +76,11 @@ void runExperiment(LatencyRecorderBase &recorder)
                                     {
                                         std::this_thread::sleep_for(std::chrono::milliseconds(kSleepDurationMs));
                                     }
-                                    float latency = recordIdx;
+                                    float dummyLatency = recordIdx; // The value of latency doesn't really matter for this benchmark
 
                                     Timer timer;
                                     timer.tic();
-                                    recorder.record(latency);
+                                    recorder.record(dummyLatency);
                                     int64_t recordTimeMicrosec = timer.tocMicrosec();
                                     recordTimeMicrosecondSum[threadIdx] += recordTimeMicrosec;
                                  } });
