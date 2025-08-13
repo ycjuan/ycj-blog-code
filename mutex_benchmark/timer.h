@@ -10,10 +10,10 @@ public:
         start_ = std::chrono::high_resolution_clock::now();
     }
 
-    int64_t tocMicrosec()
+    int64_t tocNs()
     {
         auto stop = std::chrono::high_resolution_clock::now();
-        std::chrono::microseconds duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start_);
+        std::chrono::nanoseconds duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start_);
         return duration.count();
     }
 
