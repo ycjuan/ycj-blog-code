@@ -14,7 +14,7 @@ using namespace std;
 // Configuration
 constexpr int kMaxNumRecords = 1000000;
 constexpr int kNumThreads = 64;
-constexpr int kSleepDurationMs = 0;
+constexpr int kSleepDurationMs = 10;
 constexpr int kNumRecordsPerThread = 1000;
 
 class LatencyRecorderBase
@@ -65,10 +65,10 @@ void runExperiment(LatencyRecorderBase &recorder)
         // --------------
         // Create threads to record latencies
         vector<thread> threads;
-        vector<int64_t> recordTimeNsSum(kNumThreads, 0);
+        vector<double> recordTimeMicrosecondSum(kNumThreads, 0);
         for (int threadIdx = 0; threadIdx < kNumThreads; threadIdx++)
         {
-            threads.emplace_back([&recorder, &recordTimeNsSum, threadIdx]()
+            threads.emplace_back([&recorder, &recordTimeMicrosecondSum, threadIdx]()
                                  {
                                  for (int recordIdx = 0; recordIdx < kNumRecordsPerThread; recordIdx++)
                                  {
@@ -81,7 +81,7 @@ void runExperiment(LatencyRecorderBase &recorder)
                                     Timer timer;
                                     timer.tic();
                                     recorder.record(dummyLatency);
-                                    recordTimeNsSum[threadIdx] += timer.tocNs();
+                                    recordTimeMicrosecondSum[threadIdx] += timer.tocNs() / 1000.0;
                                  } });
         }
 
@@ -94,7 +94,7 @@ void runExperiment(LatencyRecorderBase &recorder)
 
         // --------------
         // Calculate total time taken
-        int64_t recordTimeMicrosecondTotal = accumulate(recordTimeNsSum.begin(), recordTimeNsSum.end(), 0) / 1000;
+        int64_t recordTimeMicrosecondTotal = accumulate(recordTimeMicrosecondSum.begin(), recordTimeMicrosecondSum.end(), 0);
         cout << "Total record time: " << recordTimeMicrosecondTotal << " microseconds" << endl;
         cout << "Average record time per transaction: " << (double)recordTimeMicrosecondTotal / (kNumThreads * kNumRecordsPerThread) << " microseconds" << endl;
 }
