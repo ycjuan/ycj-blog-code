@@ -12,9 +12,9 @@ using namespace std;
 // -------------
 // Configuration
 constexpr int kMaxNumRecords = 1000000;
-constexpr int kNumThreads = 10;
-constexpr int kSleepDurationMs = 0;
-constexpr int kNumRecordsPerThread = 10000;
+constexpr int kNumThreads = 48;
+constexpr int kSleepDurationMs = 10;
+constexpr int kNumRecordsPerThread = 1000;
 
 class LatencyRecorderBase
 {
