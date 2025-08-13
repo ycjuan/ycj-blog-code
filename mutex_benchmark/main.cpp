@@ -12,9 +12,9 @@ using namespace std;
 // -------------
 // Configuration
 constexpr int kMaxNumRecords = 1000000;
-constexpr int kNumThreads = 48;
-constexpr int kSleepDurationMs = 10;
-constexpr int kNumRecordsPerThread = 1000;
+constexpr int kNumThreads = 10;
+constexpr int kSleepDurationMs = 1;
+constexpr int kNumRecordsPerThread = 10000;
 
 class LatencyRecorderBase
 {
@@ -61,15 +61,13 @@ private:
 
 void runExperiment(LatencyRecorderBase &recorder)
 {
-        Timer timer;
-        timer.tic();
-
         // --------------
         // Create threads to record latencies
         vector<thread> threads;
+        vector<int64_t> recordTimeMicrosecondSum(kNumThreads, 0);
         for (int threadIdx = 0; threadIdx < kNumThreads; threadIdx++)
         {
-            threads.emplace_back([&recorder]()
+            threads.emplace_back([&recorder, &recordTimeMicrosecondSum, threadIdx]()
                                  {
                                  for (int recordIdx = 0; recordIdx < kNumRecordsPerThread; recordIdx++)
                                  {
@@ -78,7 +76,12 @@ void runExperiment(LatencyRecorderBase &recorder)
                                         std::this_thread::sleep_for(std::chrono::milliseconds(kSleepDurationMs));
                                     }
                                     float latency = recordIdx;
+
+                                    Timer timer;
+                                    timer.tic();
                                     recorder.record(latency);
+                                    int64_t recordTimeMicrosec = timer.tocMicrosec();
+                                    recordTimeMicrosecondSum[threadIdx] += recordTimeMicrosec;
                                  } });
         }
 
@@ -91,14 +94,9 @@ void runExperiment(LatencyRecorderBase &recorder)
 
         // --------------
         // Calculate total time taken
-        int64_t totalTimeMicrosec = timer.tocMicrosec();
-        int64_t totalSleepTimeMicrosec = kNumRecordsPerThread * kSleepDurationMs * 1000;
-        int64_t totalRecordTimeMicrosec = totalTimeMicrosec - totalSleepTimeMicrosec;
-        cout << "Total time: " << totalTimeMicrosec << " microseconds" << endl;
-        cout << "Total sleep time: " << totalSleepTimeMicrosec << " microseconds" << endl;
-        cout << "Total record time: " << totalRecordTimeMicrosec << " microseconds" << endl;
-        cout << "Average record time: " << (double)totalRecordTimeMicrosec / kNumRecordsPerThread << " microseconds" << endl;
-
+        int64_t recordTimeMicrosecondTotal = accumulate(recordTimeMicrosecondSum.begin(), recordTimeMicrosecondSum.end(), 0);
+        cout << "Total record time: " << recordTimeMicrosecondTotal << " microseconds" << endl;
+        cout << "Average record time per transaction: " << (double)recordTimeMicrosecondTotal / (kNumThreads * kNumRecordsPerThread) << " microseconds" << endl;
 }
 
 int main()
