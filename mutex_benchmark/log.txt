@@ -1,5 +1,4 @@
-
-➜  mutex_benchmark git:(mutex_benchmark) ./run.sh
+➜  mutex_benchmark git:(mutex_benchmark-2) ✗ ./run.sh
 g++ -o mutex_benchmark main.cpp -pthread -O3 -std=c++17
 Configuration:
 Max number of records: 1000000
@@ -9,17 +8,20 @@ Number of records per thread: 10000
 
 Running recorder with mutex...
 --------------------------------
-Total record time: 15376958 microseconds
-Average record time per transaction: 24.0265 microseconds
+Total record time: 15828177 microseconds
+Average record time per transaction: 24.7315 microseconds
 
 
 Running recorder without mutex...
 -----------------------------------
-Total record time: 1618354 microseconds
-Average record time per transaction: 2.52868 microseconds
-➜  mutex_benchmark git:(mutex_benchmark)
-➜  mutex_benchmark git:(mutex_benchmark)
-➜  mutex_benchmark git:(mutex_benchmark) ./run.sh
+Total record time: 1562965 microseconds
+Average record time per transaction: 2.44213 microseconds
+
+
+
+
+
+
 g++ -o mutex_benchmark main.cpp -pthread -O3 -std=c++17
 Configuration:
 Max number of records: 1000000
@@ -29,18 +31,25 @@ Number of records per thread: 10000
 
 Running recorder with mutex...
 --------------------------------
-Total record time: 557516 microseconds
-Average record time per transaction: 0.871119 microseconds
+Total record time: 1034760 microseconds
+Average record time per transaction: 1.61681 microseconds
 
 
 Running recorder without mutex...
 -----------------------------------
-Total record time: 758 microseconds
-Average record time per transaction: 0.00118438 microseconds
-➜  mutex_benchmark git:(mutex_benchmark) ✗
-➜  mutex_benchmark git:(mutex_benchmark) ✗
-➜  mutex_benchmark git:(mutex_benchmark) ✗
-➜  mutex_benchmark git:(mutex_benchmark) ✗ ./run.sh
+Total record time: 139639 microseconds
+Average record time per transaction: 0.218186 microseconds
+
+
+
+
+
+
+
+
+
+
+
 g++ -o mutex_benchmark main.cpp -pthread -O3 -std=c++17
 Configuration:
 Max number of records: 1000000
@@ -50,11 +59,12 @@ Number of records per thread: 1000
 
 Running recorder with mutex...
 --------------------------------
-Total record time: 97833 microseconds
-Average record time per transaction: 1.52864 microseconds
+Total record time: 100657 microseconds
+Average record time per transaction: 1.57277 microseconds
 
 
 Running recorder without mutex...
 -----------------------------------
-Total record time: 280 microseconds
-Average record time per transaction: 0.004375 microseconds
+Total record time: 15908 microseconds
+Average record time per transaction: 0.248562 microseconds
+

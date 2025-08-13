@@ -65,7 +65,7 @@ void runExperiment(LatencyRecorderBase &recorder)
         // --------------
         // Create threads to record latencies
         vector<thread> threads;
-        vector<int64_t> recordTimeMicrosecondSum(kNumThreads, 0);
+        vector<double> recordTimeMicrosecondSum(kNumThreads, 0);
         for (int threadIdx = 0; threadIdx < kNumThreads; threadIdx++)
         {
             threads.emplace_back([&recorder, &recordTimeMicrosecondSum, threadIdx]()
@@ -81,8 +81,7 @@ void runExperiment(LatencyRecorderBase &recorder)
                                     Timer timer;
                                     timer.tic();
                                     recorder.record(dummyLatency);
-                                    int64_t recordTimeMicrosec = timer.tocMicrosec();
-                                    recordTimeMicrosecondSum[threadIdx] += recordTimeMicrosec;
+                                    recordTimeMicrosecondSum[threadIdx] += timer.tocNs() / 1000.0;
                                  } });
         }
 
