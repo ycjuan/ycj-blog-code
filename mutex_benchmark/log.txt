@@ -1,68 +1,60 @@
 
-➜  mutex_benchmark git:(mutex_benchmark) ✗ ./run.sh
+➜  mutex_benchmark git:(mutex_benchmark) ./run.sh
 g++ -o mutex_benchmark main.cpp -pthread -O3 -std=c++17
 Configuration:
 Max number of records: 1000000
-Number of threads: 48
+Number of threads: 64
 Sleep duration (ms): 0
 Number of records per thread: 10000
 
 Running recorder with mutex...
 --------------------------------
-Total time: 44391 microseconds
-Total sleep time: 0 microseconds
-Total record time: 44391 microseconds
-Average record time: 4.4391 microseconds
+Total record time: 15376958 microseconds
+Average record time per transaction: 24.0265 microseconds
 
 
 Running recorder without mutex...
 -----------------------------------
-Total time: 24249 microseconds
-Total sleep time: 0 microseconds
-Total record time: 24249 microseconds
-Average record time: 2.4249 microseconds
-➜  mutex_benchmark git:(mutex_benchmark) ✗ ./run.sh
+Total record time: 1618354 microseconds
+Average record time per transaction: 2.52868 microseconds
+➜  mutex_benchmark git:(mutex_benchmark)
+➜  mutex_benchmark git:(mutex_benchmark)
+➜  mutex_benchmark git:(mutex_benchmark) ./run.sh
 g++ -o mutex_benchmark main.cpp -pthread -O3 -std=c++17
 Configuration:
 Max number of records: 1000000
-Number of threads: 48
+Number of threads: 64
 Sleep duration (ms): 1
 Number of records per thread: 10000
 
 Running recorder with mutex...
 --------------------------------
-Total time: 10632307 microseconds
-Total sleep time: 10000000 microseconds
-Total record time: 632307 microseconds
-Average record time: 63.2307 microseconds
+Total record time: 557516 microseconds
+Average record time per transaction: 0.871119 microseconds
 
 
 Running recorder without mutex...
 -----------------------------------
-Total time: 10624793 microseconds
-Total sleep time: 10000000 microseconds
-Total record time: 624793 microseconds
-Average record time: 62.4793 microseconds
+Total record time: 758 microseconds
+Average record time per transaction: 0.00118438 microseconds
+➜  mutex_benchmark git:(mutex_benchmark) ✗
+➜  mutex_benchmark git:(mutex_benchmark) ✗
+➜  mutex_benchmark git:(mutex_benchmark) ✗
 ➜  mutex_benchmark git:(mutex_benchmark) ✗ ./run.sh
 g++ -o mutex_benchmark main.cpp -pthread -O3 -std=c++17
 Configuration:
 Max number of records: 1000000
-Number of threads: 48
+Number of threads: 64
 Sleep duration (ms): 10
 Number of records per thread: 1000
 
 Running recorder with mutex...
 --------------------------------
-Total time: 10068060 microseconds
-Total sleep time: 10000000 microseconds
-Total record time: 68060 microseconds
-Average record time: 68.06 microseconds
+Total record time: 97833 microseconds
+Average record time per transaction: 1.52864 microseconds
 
 
 Running recorder without mutex...
 -----------------------------------
-Total time: 10066336 microseconds
-Total sleep time: 10000000 microseconds
-Total record time: 66336 microseconds
-Average record time: 66.336 microseconds
-
+Total record time: 280 microseconds
+Average record time per transaction: 0.004375 microseconds
