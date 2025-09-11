@@ -214,19 +214,18 @@ JNIEXPORT jlong JNICALL Java_com_jni_JniMain_c_1constructCore
     return (jlong)(new Core());
 }
 
-
 JNIEXPORT jobject JNICALL Java_com_jni_JniMain_c_1process
   (JNIEnv * jenv, jobject, jlong jlong_corePtr, jobject jobj_input)
 {
     {
         // -------------------
         // I'm piggybacking this code to check if the thread Id in JNI is the same as that in Java or not
-        cout << "C++ level Thread ID: " << std::this_thread::get_id() << endl;
-        cout << "OS-level Thread ID (report by C++): " << gettid() << endl;
+        cout << "C++ level thread Id: " << std::this_thread::get_id() << endl;
+        cout << "OS-level thread ID (reported by C++): " << gettid() << endl;
 
         std::thread asyncThread([]() {
-            cout << "[Async function] C++ level Thread ID: " << std::this_thread::get_id() << endl;
-            cout << "[Async function] OS-level Thread ID (report by C++): " << gettid() << endl;
+            cout << "[Async function] C++ level thread Id: " << std::this_thread::get_id() << endl;
+            cout << "[Async function] OS-level thread ID (reported by C++): " << gettid() << endl;
         });
         asyncThread.join();
     }

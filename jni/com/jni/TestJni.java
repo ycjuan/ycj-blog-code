@@ -54,15 +54,19 @@ public class TestJni {
             FunctionDescriptor.of(ValueLayout.JAVA_INT));
 
     // Java wrapper for calling gettid()
-    public static int gettid() throws Throwable {
-        return (int) GETTID.invokeExact();
+    public static int gettid() {
+        try {
+            return (int) GETTID.invokeExact();
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    public static void main(String[] args) throws Throwable {
+    public static void main(String[] args) {
 
         // Print thread ID info. Will compare with the info printed in C++ side.
-        System.out.println("JVM-level Thread ID: " + Thread.currentThread().getId());
-        System.out.println("OS-level Thread ID (report by Java): " + gettid());
+        System.out.println("JVM-level thread Id: " + Thread.currentThread().getId());
+        System.out.println("OS-level thread Id (report by Java): " + gettid());
 
         InputClass input = constructInput();
 
