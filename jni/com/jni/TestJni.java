@@ -1,6 +1,8 @@
 package com.jni;
 
 import java.lang.Math;
+import java.lang.foreign.*;
+import java.lang.invoke.MethodHandle;
 
 public class TestJni {
 
@@ -39,7 +41,32 @@ public class TestJni {
         System.out.println("outputFieldInner.outputFieldInner0D: " + output.outputFieldInner.outputFieldInner0D);
     }
 
+    // Helper to look up native symbols
+    public static MemorySegment lookup(String symbol) {
+        return Linker.nativeLinker().defaultLookup().find(symbol)
+                .or(() -> SymbolLookup.loaderLookup().find(symbol))
+                .orElseThrow();
+    }
+
+    // MethodHandle for the native gettid() function
+    private static final MethodHandle GETTID = Linker.nativeLinker().downcallHandle(
+            lookup("gettid"),
+            FunctionDescriptor.of(ValueLayout.JAVA_INT));
+
+    // Java wrapper for calling gettid()
+    public static int gettid() {
+        try {
+            return (int) GETTID.invokeExact();
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static void main(String[] args) {
+
+        // Print thread ID info. Will compare with the info printed in C++ side.
+        System.out.println("JVM-level thread Id: " + Thread.currentThread().getId());
+        System.out.println("OS-level thread Id (report by Java): " + gettid());
 
         InputClass input = constructInput();
 
