@@ -214,10 +214,18 @@ JNIEXPORT jlong JNICALL Java_com_jni_JniMain_c_1constructCore
     return (jlong)(new Core());
 }
 
+
 JNIEXPORT jobject JNICALL Java_com_jni_JniMain_c_1process
   (JNIEnv * jenv, jobject, jlong jlong_corePtr, jobject jobj_input)
 {
-    cout << "Thread ID (C++): " << gettid() << endl;
+    cout << "C++ level Thread ID: " << std::this_thread::get_id() << endl;
+    cout << "OS-level Thread ID (report by C++): " << gettid() << endl;
+
+    std::thread asyncThread([]() {
+        cout << "[Async function] C++ level Thread ID: " << std::this_thread::get_id() << endl;
+        cout << "[Async function] OS-level Thread ID (report by C++): " << gettid() << endl;
+    });
+    asyncThread.join();
 
     Core &core = *((Core*)jlong_corePtr);
     TimerRecord timerRecord;

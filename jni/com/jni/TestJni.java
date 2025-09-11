@@ -41,7 +41,6 @@ public class TestJni {
         System.out.println("outputFieldInner.outputFieldInner0D: " + output.outputFieldInner.outputFieldInner0D);
     }
 
-
     // Helper to look up native symbols
     public static MemorySegment lookup(String symbol) {
         return Linker.nativeLinker().defaultLookup().find(symbol)
@@ -61,8 +60,9 @@ public class TestJni {
 
     public static void main(String[] args) throws Throwable {
 
-        System.out.println("Thread ID (Java): " + gettid());
-
+        System.out.println("JVM-level Thread ID: " + Thread.currentThread().getId());
+        System.out.println("OS-level Thread ID (report by Java): " + gettid());
+    
         InputClass input = constructInput();
 
         JniMain jni = new JniMain();
