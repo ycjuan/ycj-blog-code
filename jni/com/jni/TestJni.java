@@ -60,9 +60,10 @@ public class TestJni {
 
     public static void main(String[] args) throws Throwable {
 
+        // Print thread ID info. Will compare with the info printed in C++ side.
         System.out.println("JVM-level Thread ID: " + Thread.currentThread().getId());
         System.out.println("OS-level Thread ID (report by Java): " + gettid());
-    
+
         InputClass input = constructInput();
 
         JniMain jni = new JniMain();
