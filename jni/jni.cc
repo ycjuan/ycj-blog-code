@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <iostream>
+#include <thread>
 
 using namespace std;
 
@@ -214,6 +215,8 @@ JNIEXPORT jlong JNICALL Java_com_jni_JniMain_c_1constructCore
 JNIEXPORT jobject JNICALL Java_com_jni_JniMain_c_1process
   (JNIEnv * jenv, jobject, jlong jlong_corePtr, jobject jobj_input)
 {
+    cout << "Thread ID (C++): " << std::this_thread::get_id() << endl;
+
     Core &core = *((Core*)jlong_corePtr);
     TimerRecord timerRecord;
 

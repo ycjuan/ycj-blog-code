@@ -1,6 +1,8 @@
 package com.jni;
 
 import java.lang.Math;
+import java.lang.foreign.*;
+import java.lang.invoke.MethodHandle;
 
 public class TestJni {
 
@@ -39,7 +41,27 @@ public class TestJni {
         System.out.println("outputFieldInner.outputFieldInner0D: " + output.outputFieldInner.outputFieldInner0D);
     }
 
-    public static void main(String[] args) {
+
+    // Helper to look up native symbols
+    public static MemorySegment lookup(String symbol) {
+        return Linker.nativeLinker().defaultLookup().find(symbol)
+                .or(() -> SymbolLookup.loaderLookup().find(symbol))
+                .orElseThrow();
+    }
+
+    // MethodHandle for the native gettid() function
+    private static final MethodHandle GETTID = Linker.nativeLinker().downcallHandle(
+            lookup("gettid"),
+            FunctionDescriptor.of(ValueLayout.JAVA_INT));
+
+    // Java wrapper for calling gettid()
+    public static int gettid() throws Throwable {
+        return (int) GETTID.invokeExact();
+    }
+
+    public static void main(String[] args) throws Throwable {
+
+        System.out.println("Thread ID (Java): " + gettid());
 
         InputClass input = constructInput();
 
