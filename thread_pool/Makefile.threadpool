@@ -1,0 +1,50 @@
+# Makefile for Thread Pool Examples
+# Usage: make -f Makefile.threadpool
+
+CXX = g++
+CXXFLAGS = -std=c++11 -Wall -Wextra -O2 -pthread
+TARGET = thread_pool_example
+HEADER = thread_pool.h
+SOURCE = thread_pool_example.cpp
+
+# Default target
+all: $(TARGET)
+
+# Build the example executable
+$(TARGET): $(SOURCE) $(HEADER)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(SOURCE)
+
+# Run the example
+run: $(TARGET)
+	./$(TARGET)
+
+# Clean up build artifacts
+clean:
+	rm -f $(TARGET)
+
+# Debug build
+debug: CXXFLAGS += -g -DDEBUG
+debug: $(TARGET)
+
+# Release build with optimizations
+release: CXXFLAGS += -O3 -DNDEBUG
+release: $(TARGET)
+
+# Check for common issues
+check:
+	@echo "Checking for common compilation issues..."
+	@echo "C++11 support: $(shell $(CXX) -std=c++11 -E -x c++ /dev/null >/dev/null 2>&1 && echo "OK" || echo "FAILED")"
+	@echo "Thread support: $(shell $(CXX) -pthread -E -x c++ /dev/null >/dev/null 2>&1 && echo "OK" || echo "FAILED")"
+
+# Help target
+help:
+	@echo "Available targets:"
+	@echo "  all      - Build the thread pool example (default)"
+	@echo "  run      - Build and run the example"
+	@echo "  clean    - Remove build artifacts"
+	@echo "  debug    - Build with debug symbols"
+	@echo "  release  - Build with full optimizations"
+	@echo "  check    - Check compiler capabilities"
+	@echo "  help     - Show this help message"
+
+.PHONY: all run clean debug release check help
