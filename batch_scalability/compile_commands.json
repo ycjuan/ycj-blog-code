@@ -1,0 +1,12 @@
+[
+  {
+    "directory": "/home/ec2-user/git/ycj-blog-code/batch_scalability",
+    "command": "nvcc -I/usr/local/cuda/include -Xcompiler -fopenmp -O3 -lcublas -c main.cu -o main.o",
+    "file": "main.cu"
+  },
+  {
+    "directory": "/home/ec2-user/git/ycj-blog-code/batch_scalability",
+    "command": "nvcc -I/usr/local/cuda/include -Xcompiler -fopenmp -O3 -lcublas -c data.cu -o data.o",
+    "file": "data.cu"
+  }
+]
