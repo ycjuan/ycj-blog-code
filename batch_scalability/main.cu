@@ -30,10 +30,12 @@ void compareResult(Data& data)
 
 void runExp(Data& data, std::function<void(Data&)> method, const std::string& methodName, int numTrials = 100)
 {
+    CHECK_CUDA(cudaMemset(data.d_rstDataGpu, 0, data.numReqs * data.numDocs * sizeof(float)));
     Timer timer;
-    timer.tic();
-    for (int t = 0; t < numTrials; t++)
+    for (int t = -3; t < numTrials; t++)
     {
+        if (t == 0)
+            timer.tic();
         method(data);
     }
     float timeMs = timer.tocMs() / numTrials;

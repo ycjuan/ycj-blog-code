@@ -5,6 +5,7 @@ namespace BatchScalability
 
 void methodCpu(Data& data)
 {
+    #pragma omp parallel for
     for (int reqIdx = 0; reqIdx < data.numReqs; reqIdx++)
     {
         for (int docIdx = 0; docIdx < data.numDocs; docIdx++)

@@ -35,7 +35,7 @@ __device__ __host__ inline uint64_t getMemAddrReq(int reqIdx, int embIdx, int nu
 
 __device__ __host__ inline uint64_t getMemAddrDoc(int docIdx, int embIdx, int numDocs, int numDims)
 {
-    return getMemAddrRowMajor(docIdx, embIdx, numDocs, numDims);
+    return getMemAddrColMajor(docIdx, embIdx, numDocs, numDims);
 }
 
 __device__ __host__ inline uint64_t getMemAddrRst(int reqIdx, int docIdx, int numReqs, int numDocs)
