@@ -47,7 +47,7 @@ void runExp(Data& data, std::function<void(Data&)> method, const std::string& me
 int main()
 {
     const int kNumReqs = 16;
-    const int kNumDocs = 1024 * 1024 / 16;
+    const int kNumDocs = 1024 * 1024;
     const int kEmbDim= 128;
     const int kNumTrials = 10;
 
@@ -56,9 +56,9 @@ int main()
     methodCpu(data);
 
     // Using function pointers with std::function
-    runExp(data, methodGpuNaive1, "GPU naive 1", kNumTrials);
-    runExp(data, methodGpuNaive2, "GPU naive 2", kNumTrials);
-    runExp(data, methodGpuNaive3, "GPU naive 3", kNumTrials);
+    runExp(data, methodGpu1, "GPU 1", kNumTrials);
+    runExp(data, methodGpu2, "GPU 2", kNumTrials);
+    runExp(data, methodGpu3, "GPU 3", kNumTrials);
 
     freeData(data);
 

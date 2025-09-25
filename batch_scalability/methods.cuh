@@ -6,10 +6,10 @@ namespace BatchScalability {
 
 void methodCpu(Data& data);
 
-void methodGpuNaive1(Data& data);
+void methodGpu1(Data& data);
 
-void methodGpuNaive2(Data& data);
+void methodGpu2(Data& data);
 
-void methodGpuNaive3(Data& data);
+void methodGpu3(Data& data);
 
 } // namespace BatchScalability

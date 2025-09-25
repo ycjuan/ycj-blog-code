@@ -4,7 +4,7 @@
 namespace BatchScalability
 {
 
-__global__ void kernelGpuNaive1(Data data)
+__global__ void kernelGpu1(Data data)
 {
     uint64_t threadId = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
     int reqIdx = threadId / data.numDocs;
@@ -22,16 +22,16 @@ __global__ void kernelGpuNaive1(Data data)
     }
 }
 
-void methodGpuNaive1(Data& data)
+void methodGpu1(Data& data)
 {
     uint64_t blockSize = kBlockSize;
     uint64_t gridSize = (data.numReqs * data.numDocs + blockSize - 1) / blockSize;
-    kernelGpuNaive1<<<gridSize, blockSize>>>(data);
+    kernelGpu1<<<gridSize, blockSize>>>(data);
     cudaDeviceSynchronize();
     CHECK_CUDA(cudaGetLastError());
 }
 
-__global__ void kernelGpuNaive2(Data data)
+__global__ void kernelGpu2(Data data)
 {
     int threadId = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
     int reqIdx = threadId % data.numReqs;
@@ -46,16 +46,16 @@ __global__ void kernelGpuNaive2(Data data)
     data.d_rstDataGpu[getMemAddrRst(reqIdx, docIdx, data.numReqs, data.numDocs)] = rst;
 }
 
-void methodGpuNaive2(Data& data)
+void methodGpu2(Data& data)
 {
     uint64_t blockSize = kBlockSize;
     uint64_t gridSize = (data.numReqs * data.numDocs + blockSize - 1) / blockSize;
-    kernelGpuNaive2<<<gridSize, blockSize>>>(data);
+    kernelGpu2<<<gridSize, blockSize>>>(data);
     cudaDeviceSynchronize();
     CHECK_CUDA(cudaGetLastError());
 }
 
-__global__ void kernelGpuNaive3(Data data)
+__global__ void kernelGpu3(Data data)
 {
     int docIdx = blockIdx.x * blockDim.x + threadIdx.x;
     int reqIdx = threadIdx.y;
@@ -69,11 +69,11 @@ __global__ void kernelGpuNaive3(Data data)
     data.d_rstDataGpu[getMemAddrRst(reqIdx, docIdx, data.numReqs, data.numDocs)] = rst;
 }
 
-void methodGpuNaive3(Data& data)
+void methodGpu3(Data& data)
 {
     dim3 blockSize(1024 / data.numReqs, data.numReqs);
     dim3 gridSize( (data.numDocs + blockSize.x - 1) / blockSize.x, 1);
-    kernelGpuNaive3<<<gridSize, blockSize>>>(data);
+    kernelGpu3<<<gridSize, blockSize>>>(data);
     cudaDeviceSynchronize();
     CHECK_CUDA(cudaGetLastError());
 }
