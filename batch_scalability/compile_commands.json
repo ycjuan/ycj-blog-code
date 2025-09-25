@@ -11,7 +11,7 @@
   },
   {
     "directory": "/home/ec2-user/git/ycj-blog-code/batch_scalability",
-    "command": "nvcc -I/usr/local/cuda/include -I/home/ec2-user/git/ycj-blog-code/batch_scalability -Xcompiler -fopenmp -O3 -lcublas -c method_gpu_naive.cu -o method_gpu_naive.o",
-    "file": "method_gpu_naive.cu"
+    "command": "nvcc -I/usr/local/cuda/include -I/home/ec2-user/git/ycj-blog-code/batch_scalability -Xcompiler -fopenmp -O3 -lcublas -c method_gpu.cu -o method_gpu.o",
+    "file": "method_gpu.cu"
   }
 ]
