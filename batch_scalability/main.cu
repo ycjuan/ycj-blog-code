@@ -4,6 +4,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <iostream>
+#include <functional>
 
 using namespace BatchScalability;
 
@@ -27,6 +28,20 @@ void compareResult(Data& data)
     std::cout << "All results are correct" << std::endl;
 }
 
+void runExp(Data& data, std::function<void(Data&)> method, const std::string& methodName, int numTrials = 100)
+{
+    Timer timer;
+    timer.tic();
+    for (int t = 0; t < numTrials; t++)
+    {
+        method(data);
+    }
+    float timeMs = timer.tocMs() / numTrials;
+    compareResult(data);
+    std::cout << methodName << " time: " << timeMs << " ms" << std::endl;
+}
+
+
 int main()
 {
     const int kNumReqs = 16;
@@ -38,18 +53,9 @@ int main()
 
     methodCpu(data);
 
-    {
-        Timer timer;
-        timer.tic();
-        for (int t = 0; t < kNumTrials; t++)
-        {
-            methodGpuNaive(data);
-        }
-        float timeMs = timer.tocMs() / kNumTrials;
-        std::cout << "GPU naive time: " << timeMs << " ms" << std::endl;
-    }
-
-    compareResult(data);
+    // Using function pointers with std::function
+    runExp(data, methodGpuNaive1, "GPU naive 1", kNumTrials);
+    runExp(data, methodGpuNaive2, "GPU naive 2", kNumTrials);
 
     freeData(data);
 
