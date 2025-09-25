@@ -1,6 +1,5 @@
 #include "data.cuh"
 #include "util.cuh"
-#include <random>
 
 namespace BatchScalability
 {
@@ -58,8 +57,8 @@ void methodGpuNaive2(Data& data)
 
 __global__ void kernelGpuNaive3(Data data)
 {
-    int reqIdx = threadIdx.x;
-    int docIdx = blockIdx.y * blockDim.x + threadIdx.y;
+    int docIdx = blockIdx.x * blockDim.x + threadIdx.x;
+    int reqIdx = threadIdx.y;
     double rst = 0;
     for (int embIdx = 0; embIdx < data.embDim; embIdx++)
     {
@@ -72,8 +71,8 @@ __global__ void kernelGpuNaive3(Data data)
 
 void methodGpuNaive3(Data& data)
 {
-    dim3 blockSize(data.numReqs, 1024 / data.numReqs);
-    dim3 gridSize(1, (data.numDocs + blockSize.y - 1) / blockSize.y);
+    dim3 blockSize(1024 / data.numReqs, data.numReqs);
+    dim3 gridSize( (data.numDocs + blockSize.x - 1) / blockSize.x, 1);
     kernelGpuNaive3<<<gridSize, blockSize>>>(data);
     cudaDeviceSynchronize();
     CHECK_CUDA(cudaGetLastError());
