@@ -1,10 +1,11 @@
-#ifndef BATCH_SCALABILITY_DATA_STRUCT_CUH
-#define BATCH_SCALABILITY_DATA_STRUCT_CUH
+#pragma once
 
 #include <cstdint>
 
 namespace BatchScalability
 {
+
+constexpr int kBlockSize = 256;
 
 struct Data
 {
@@ -47,5 +48,3 @@ Data genData(int numReqs, int numDocs, int embDim);
 void freeData(Data& data);
 
 } // namespace BatchScalability
-
-#endif

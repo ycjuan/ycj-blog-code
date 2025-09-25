@@ -1,5 +1,4 @@
-#ifndef BATCH_SCALABILITY_METHODS_CUH
-#define BATCH_SCALABILITY_METHODS_CUH
+#pragma once
 
 #include "data.cuh"
 
@@ -11,6 +10,6 @@ void methodGpuNaive1(Data& data);
 
 void methodGpuNaive2(Data& data);
 
-} // namespace BatchScalability
+void methodGpuNaive3(Data& data);
 
-#endif
+} // namespace BatchScalability

@@ -1,5 +1,4 @@
-#ifndef BATCH_SCALABILITY_UTIL_CUH
-#define BATCH_SCALABILITY_UTIL_CUH
+#pragma once
 
 #include <chrono>
 #include <stdexcept>
@@ -114,5 +113,3 @@ inline void printDeviceInfo()
 }
 
 } // namespace BatchScalibility
-
-#endif // UTIL_CUH

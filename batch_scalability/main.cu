@@ -56,6 +56,7 @@ int main()
     // Using function pointers with std::function
     runExp(data, methodGpuNaive1, "GPU naive 1", kNumTrials);
     runExp(data, methodGpuNaive2, "GPU naive 2", kNumTrials);
+    runExp(data, methodGpuNaive3, "GPU naive 3", kNumTrials);
 
     freeData(data);
 
