@@ -47,9 +47,9 @@ void runExp(Data& data, std::function<void(Data&)> method, const std::string& me
 int main()
 {
     const int kNumReqs = 32;
-    const int kNumDocs = 1024 * 1024;
+    const int kNumDocs = 1024 * 1024 / 16;
     const int kEmbDim= 128;
-    const int kNumTrials = 100;
+    const int kNumTrials = 10;
 
     Data data = genData(kNumReqs, kNumDocs, kEmbDim);
 
