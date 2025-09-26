@@ -109,6 +109,7 @@ inline void printDeviceInfo()
         cout << "  canMapHostMemory: " << (prop.canMapHostMemory ? "Yes" : "No") << endl;
         cout << "  sharedMemPerBlock: " << prop.sharedMemPerBlock / 1024 << " KB" << endl;
         cout << "  sharedMemPerMultiprocessor: " << prop.sharedMemPerMultiprocessor / 1024 << " KB" << endl;
+
     }
 }
 

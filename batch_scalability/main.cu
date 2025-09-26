@@ -46,9 +46,11 @@ void runExp(Data& data, std::function<void(Data&)> method, const std::string& me
 
 int main()
 {
-    const int kNumReqs = 16;
-    const int kNumDocs = 1024 * 1024;
-    const int kEmbDim= 128;
+    printDeviceInfo();
+
+    const int kNumReqs = 1;
+    const int kNumDocs = 1024 * 1024 / 16;
+    const int kEmbDim = 128;
     const int kNumTrials = 10;
 
     Data data = genData(kNumReqs, kNumDocs, kEmbDim);
@@ -59,6 +61,7 @@ int main()
     runExp(data, methodGpu1, "GPU 1", kNumTrials);
     runExp(data, methodGpu2, "GPU 2", kNumTrials);
     runExp(data, methodGpu3, "GPU 3", kNumTrials);
+    runExp(data, methodGpu4, "GPU 4", kNumTrials);
 
     freeData(data);
 

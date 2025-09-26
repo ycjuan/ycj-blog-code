@@ -78,4 +78,42 @@ void methodGpu3(Data& data)
     CHECK_CUDA(cudaGetLastError());
 }
 
+constexpr int kWarpSize = 32;
+constexpr int kLaneMask = kWarpSize - 1;
+
+__global__ void kernelGpu4(Data data)
+{
+    int start = (blockIdx.x * blockDim.x + threadIdx.x) / kWarpSize;
+    int increment = (gridDim.x * blockDim.x) / kWarpSize;
+    int lane = threadIdx.x & kLaneMask;
+    int reqIdx = 0;
+    for (int docIdx = start; docIdx < data.numDocs; docIdx += increment)
+    {
+        float rst = 0;
+        for (int embIdx = lane; embIdx < data.embDim; embIdx += kWarpSize)
+        {
+            float reqVal = data.d_reqData[getMemAddrReq(reqIdx, embIdx, data.numReqs, data.embDim)];
+            float docVal = data.d_docData[getMemAddrDoc(docIdx, embIdx, data.numDocs, data.embDim)];
+            rst += std::sqrt(reqVal * docVal);
+        }
+        for (int offset = 16; offset > 0;  offset >>= 1)
+        {
+            rst += __shfl_down_sync(0xFFFFFFFF, rst, offset);
+        }
+        if (lane == 0)
+        {
+            data.d_rstDataGpu[getMemAddrRst(reqIdx, docIdx, data.numReqs, data.numDocs)] = rst;
+        }
+    }
+}
+
+void methodGpu4(Data& data)
+{
+    uint64_t blockSize = 1024;
+    uint64_t gridSize = 116;
+    kernelGpu4<<<gridSize, blockSize>>>(data);
+    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaGetLastError());
+}
+
 } // namespace BatchScalability
