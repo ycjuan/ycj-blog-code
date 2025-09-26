@@ -72,7 +72,7 @@ __global__ void kernelGpu3(Data data)
 void methodGpu3(Data& data)
 {
     dim3 blockSize(1024 / data.numReqs, data.numReqs);
-    dim3 gridSize( (data.numDocs + blockSize.x - 1) / blockSize.x, 1);
+    dim3 gridSize((data.numDocs + blockSize.x - 1) / blockSize.x, 1);
     kernelGpu3<<<gridSize, blockSize>>>(data);
     cudaDeviceSynchronize();
     CHECK_CUDA(cudaGetLastError());
@@ -86,25 +86,28 @@ __global__ void kernelGpu4(Data data)
     int numThreads = gridDim.x * blockDim.x;
     int numWarps = numThreads / kWarpSize;
     int globalThreadIdx = blockIdx.x * blockDim.x + threadIdx.x;
-    int globalWarpIdx = globalThreadIdx / kWarpSize;
-    int lane = threadIdx.x & kLaneMask;
-    int reqIdx = 0;
-    for (int docIdx = globalWarpIdx; docIdx < data.numDocs; docIdx += numWarps)
+    int warpIdx = globalThreadIdx / kWarpSize;
+    int laneIdx = threadIdx.x & kLaneMask;
+
+    for (int docIdx = warpIdx; docIdx < data.numDocs; docIdx += numWarps)
     {
-        float rst = 0;
-        for (int embIdx = lane; embIdx < data.embDim; embIdx += kWarpSize)
+        for (int reqIdx = 0; reqIdx < data.numReqs; reqIdx++)
         {
-            float reqVal = data.d_reqData[getMemAddrReq(reqIdx, embIdx, data.numReqs, data.embDim)];
-            float docVal = data.d_docData[getMemAddrDoc(docIdx, embIdx, data.numDocs, data.embDim)];
-            rst += std::sqrt(reqVal * docVal);
-        }
-        for (int offset = 16; offset > 0;  offset >>= 1)
-        {
-            rst += __shfl_down_sync(0xFFFFFFFF, rst, offset);
-        }
-        if (lane == 0)
-        {
-            data.d_rstDataGpu[getMemAddrRst(reqIdx, docIdx, data.numReqs, data.numDocs)] = rst;
+            float rst = 0;
+            for (int embIdx = laneIdx; embIdx < data.embDim; embIdx += kWarpSize)
+            {
+                float reqVal = data.d_reqData[getMemAddrReq(reqIdx, embIdx, data.numReqs, data.embDim)];
+                float docVal = data.d_docData[getMemAddrDoc(docIdx, embIdx, data.numDocs, data.embDim)];
+                rst += std::sqrt(reqVal * docVal);
+            }
+            for (int offset = 16; offset > 0; offset >>= 1)
+            {
+                rst += __shfl_down_sync(0xFFFFFFFF, rst, offset);
+            }
+            if (laneIdx == 0)
+            {
+                data.d_rstDataGpu[getMemAddrRst(reqIdx, docIdx, data.numReqs, data.numDocs)] = rst;
+            }
         }
     }
 }

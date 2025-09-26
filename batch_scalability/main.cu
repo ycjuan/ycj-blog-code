@@ -48,8 +48,8 @@ int main()
 {
     printDeviceInfo();
 
-    const int kNumReqs = 1;
-    const int kNumDocs = 1024 * 1024 / 16;
+    const int kNumReqs = 16;
+    const int kNumDocs = 1024 * 1024;
     const int kEmbDim = 128;
     const int kNumTrials = 10;
 
