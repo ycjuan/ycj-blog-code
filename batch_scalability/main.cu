@@ -62,6 +62,7 @@ int main()
     runExp(data, methodGpu2, "GPU 2", kNumTrials);
     runExp(data, methodGpu3, "GPU 3", kNumTrials);
     runExp(data, methodGpu4, "GPU 4", kNumTrials);
+    runExp(data, methodGpu5, "GPU 5", kNumTrials);
 
     freeData(data);
 

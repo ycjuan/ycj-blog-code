@@ -14,4 +14,6 @@ void methodGpu3(Data& data);
 
 void methodGpu4(Data& data);
 
+void methodGpu5(Data& data);
+
 } // namespace BatchScalability

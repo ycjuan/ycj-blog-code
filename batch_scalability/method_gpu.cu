@@ -121,4 +121,43 @@ void methodGpu4(Data& data)
     CHECK_CUDA(cudaGetLastError());
 }
 
+__global__ void kernelGpu5(Data data)
+{
+    int numThreads = gridDim.x * blockDim.x;
+    int numWarps = numThreads / kWarpSize;
+    int globalThreadIdx = blockIdx.x * blockDim.x + threadIdx.x;
+    int warpIdx = globalThreadIdx / kWarpSize;
+    int laneIdx = threadIdx.x & kLaneMask;
+    int reqIdx = threadIdx.y;
+
+    for (int docIdx = warpIdx; docIdx < data.numDocs; docIdx += numWarps)
+    {
+
+        float rst = 0;
+        for (int embIdx = laneIdx; embIdx < data.embDim; embIdx += kWarpSize)
+        {
+            float reqVal = data.d_reqData[getMemAddrReq(reqIdx, embIdx, data.numReqs, data.embDim)];
+            float docVal = data.d_docData[getMemAddrDoc(docIdx, embIdx, data.numDocs, data.embDim)];
+            rst += std::sqrt(reqVal * docVal);
+        }
+        for (int offset = 16; offset > 0; offset >>= 1)
+        {
+            rst += __shfl_down_sync(0xFFFFFFFF, rst, offset);
+        }
+        if (laneIdx == 0)
+        {
+            data.d_rstDataGpu[getMemAddrRst(reqIdx, docIdx, data.numReqs, data.numDocs)] = rst;
+        }
+    }
+}
+
+void methodGpu5(Data& data)
+{
+    dim3 blockSize(1024 / data.numReqs, data.numReqs);
+    dim3 gridSize((data.numDocs + blockSize.x - 1) / blockSize.x, 1);
+    kernelGpu5<<<gridSize, blockSize>>>(data);
+    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaGetLastError());
+}
+
 } // namespace BatchScalability
