@@ -83,11 +83,13 @@ constexpr int kLaneMask = kWarpSize - 1;
 
 __global__ void kernelGpu4(Data data)
 {
-    int start = (blockIdx.x * blockDim.x + threadIdx.x) / kWarpSize;
-    int increment = (gridDim.x * blockDim.x) / kWarpSize;
+    int numThreads = gridDim.x * blockDim.x;
+    int numWarps = numThreads / kWarpSize;
+    int globalThreadIdx = blockIdx.x * blockDim.x + threadIdx.x;
+    int globalWarpIdx = globalThreadIdx / kWarpSize;
     int lane = threadIdx.x & kLaneMask;
     int reqIdx = 0;
-    for (int docIdx = start; docIdx < data.numDocs; docIdx += increment)
+    for (int docIdx = globalWarpIdx; docIdx < data.numDocs; docIdx += numWarps)
     {
         float rst = 0;
         for (int embIdx = lane; embIdx < data.embDim; embIdx += kWarpSize)
