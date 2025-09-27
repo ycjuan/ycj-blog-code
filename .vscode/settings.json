@@ -14,8 +14,7 @@
         "editorError.foreground": "#000000", // don't show squiggly line
         "editorError.border": "#000000", // don't show additional border under squiggly line
         "editorError.background": "#800080", // fuchsia background
-        "editor.wordHighlightTextBackground": "#20B2AA", // highlight same variable
-        "workbench.editor.enablePreview": false
+        "editor.wordHighlightTextBackground": "#20B2AA" // highlight same variable
     },
     "files.associations": {
         "stdexcept": "cpp",

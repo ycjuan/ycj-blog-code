@@ -1,0 +1,21 @@
+If:
+  PathMatch: .*\.(cu|cuh|cpp|hpp|c|h)$
+CompileFlags:
+  Compiler: /usr/local/cuda/bin/nvcc
+
+---
+
+CompileFlags:
+  Add:
+    - -xcuda
+    - --cuda-path=/usr/local/cuda
+    - -I/usr/local/cuda/include
+    #- -I/home/ec2-user/git/ycj-blog-code/**
+    
+  Remove:
+    # strip CUDA flags unknown to clang
+    - "-gencode*"
+    - "--generate-code*"
+    - "-forward-unknown-to-host-compiler"
+    - "-Xcompiler=-fPIC"
+    - "--default-stream"
