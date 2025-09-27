@@ -57,12 +57,12 @@ int main()
 
     methodCpu(data);
 
-    // Using function pointers with std::function
-    runExp(data, methodGpu1, "GPU 1", kNumTrials);
-    runExp(data, methodGpu2, "GPU 2", kNumTrials);
-    runExp(data, methodGpu3, "GPU 3", kNumTrials);
+    //runExp(data, methodGpu1, "GPU 1", kNumTrials);
+    //runExp(data, methodGpu2, "GPU 2", kNumTrials);
+    //runExp(data, methodGpu3, "GPU 3", kNumTrials);
     runExp(data, methodGpu4, "GPU 4", kNumTrials);
-    runExp(data, methodGpu5, "GPU 5", kNumTrials);
+    //runExp(data, methodGpu5, "GPU 5", kNumTrials);
+    runExp(data, methodGpu6, "GPU 6", kNumTrials);
 
     freeData(data);
 

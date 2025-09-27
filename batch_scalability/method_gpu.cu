@@ -132,7 +132,6 @@ __global__ void kernelGpu5(Data data)
 
     for (int docIdx = warpIdx; docIdx < data.numDocs; docIdx += numWarps)
     {
-
         float rst = 0;
         for (int embIdx = laneIdx; embIdx < data.embDim; embIdx += kWarpSize)
         {
@@ -159,5 +158,53 @@ void methodGpu5(Data& data)
     cudaDeviceSynchronize();
     CHECK_CUDA(cudaGetLastError());
 }
+
+__global__ void kernelGpu6(Data data)
+{
+    int numThreads = gridDim.x * blockDim.x;
+    int numWarps = numThreads / kWarpSize;
+    int globalThreadIdx = blockIdx.x * blockDim.x + threadIdx.x;
+    int localThreadIdx = threadIdx.x; // {0, ..., 1023}
+    int warpIdx = globalThreadIdx / kWarpSize;
+    int laneIdx = threadIdx.x & kLaneMask;
+
+    __shared__ float docValBuffer[1024 * 128 / 32];
+    for (int docIdx = warpIdx; docIdx < data.numDocs; docIdx += numWarps)
+    {
+        for (int embIdx = laneIdx; embIdx < data.embDim; embIdx += kWarpSize)
+        {
+            float docVal = data.d_docData[getMemAddrDoc(docIdx, embIdx, data.numDocs, data.embDim)];
+            docValBuffer[localThreadIdx * 4 + embIdx / 32] = docVal;
+        }
+        for (int reqIdx = 0; reqIdx < data.numReqs; reqIdx++)
+        {
+            float rst = 0;
+            for (int embIdx = laneIdx; embIdx < data.embDim; embIdx += kWarpSize)
+            {
+                float reqVal = data.d_reqData[getMemAddrReq(reqIdx, embIdx, data.numReqs, data.embDim)];
+                float docVal = docValBuffer[localThreadIdx * 4 + embIdx / 32];
+                rst += std::sqrt(reqVal * docVal);
+            }
+            for (int offset = 16; offset > 0; offset >>= 1)
+            {
+                rst += __shfl_down_sync(0xFFFFFFFF, rst, offset);
+            }
+            if (laneIdx == 0)
+            {
+                data.d_rstDataGpu[getMemAddrRst(reqIdx, docIdx, data.numReqs, data.numDocs)] = rst;
+            }
+        }
+    }
+}
+
+void methodGpu6(Data& data)
+{
+    uint64_t blockSize = 1024;
+    uint64_t gridSize = 116;
+    kernelGpu6<<<gridSize, blockSize>>>(data);
+    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaGetLastError());
+}
+
 
 } // namespace BatchScalability
