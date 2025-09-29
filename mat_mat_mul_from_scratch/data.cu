@@ -12,8 +12,8 @@ Data genData(int M, int N, int K)
     data.M = M;
     data.N = N;
     data.K = K;
-    CHECK_CUDA(cudaMallocManaged(&data.d_A, N * K * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_B, M * K * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_A, N * K * sizeof(T)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_B, M * K * sizeof(T)));
     CHECK_CUDA(cudaMallocHost(&data.h_C, N * M * sizeof(float)));
     CHECK_CUDA(cudaMallocManaged(&data.d_C, N * M * sizeof(float)));
 

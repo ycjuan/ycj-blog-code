@@ -4,7 +4,7 @@ CFLAGS       := -Xcompiler -fopenmp --gpu-architecture=sm_89 -O3 -lcublas
 
 all: mat_mat_mul_from_scratch
 
-mat_mat_mul_from_scratch: main.cu data.cu method_cpu.cu method_gpu.cu
+mat_mat_mul_from_scratch: main.cu data.cu method_cpu.cu method_cublus.cu
 	nvcc $(INC) -o $@ $^ $(CFLAGS)
 
 clean:

@@ -1,19 +1,23 @@
 #pragma once
 
 #include <cstdint>
+#include <cuda_bf16.h>
 
 namespace MatMatMulFromScratch
 {
 
 constexpr int kBlockSize = 256;
+typedef __nv_bfloat16 T;
+constexpr bool kAIsRowMajor = true;
+constexpr bool kBIsRowMajor = true;
 
 struct Data
 {
     int M;
     int N;
     int K;
-    float* d_A = nullptr;
-    float* d_B = nullptr;
+    T* d_A = nullptr;
+    T* d_B = nullptr;
     float* h_C = nullptr;
     float* d_C = nullptr;
 };
