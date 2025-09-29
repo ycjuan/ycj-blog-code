@@ -2,4 +2,4 @@
 
 rm -f mat_mat_mul_from_scratch
 make
-./mat_mat_mul_from_scratch
+#./mat_mat_mul_from_scratch

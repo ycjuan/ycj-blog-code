@@ -1,30 +1,31 @@
-#include <cuda_runtime.h>
 #include "data.cuh"
-#include <random>
 #include "util.cuh"
+#include <cuda_runtime.h>
+#include <random>
 
-namespace MatMatMulFromScratch {
+namespace MatMatMulFromScratch
+{
 
-Data genData(int numReqs, int numDocs, int embDim)
+Data genData(int M, int N, int K)
 {
     Data data;
-    data.numReqs = numReqs;
-    data.numDocs = numDocs;
-    data.embDim = embDim;
-    CHECK_CUDA(cudaMallocManaged(&data.d_docData, numDocs * embDim * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_reqData, numReqs * embDim * sizeof(float)));
-    CHECK_CUDA(cudaMallocHost(&data.h_rstDataCpu, numDocs * numReqs * sizeof(float) ));
-    CHECK_CUDA(cudaMallocManaged(&data.d_rstDataGpu, numDocs * numReqs * sizeof(float) ));
+    data.M = M;
+    data.N = N;
+    data.K = K;
+    CHECK_CUDA(cudaMallocManaged(&data.d_A, N * K * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_B, M * K * sizeof(float)));
+    CHECK_CUDA(cudaMallocHost(&data.h_C, N * M * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_C, N * M * sizeof(float)));
 
     std::default_random_engine generator;
     std::uniform_real_distribution<float> distribution(0.0, 1.0);
-    for (int i = 0; i < data.numDocs * data.embDim; i++)
+    for (int i = 0; i < data.N * data.K; i++)
     {
-        data.d_docData[i] = distribution(generator);
+        data.d_A[i] = distribution(generator);
     }
-    for (int i = 0; i < data.numReqs * data.embDim; i++)
+    for (int i = 0; i < data.M * data.K; i++)
     {
-        data.d_reqData[i] = distribution(generator);
+        data.d_B[i] = distribution(generator);
     }
 
     return data;
@@ -32,17 +33,21 @@ Data genData(int numReqs, int numDocs, int embDim)
 
 void freeData(Data& data)
 {
-    if (data.d_docData != nullptr) {
-        cudaFree(data.d_docData);
+    if (data.d_A != nullptr)
+    {
+        cudaFree(data.d_A);
     }
-    if (data.d_reqData != nullptr) {
-        cudaFree(data.d_reqData);
+    if (data.d_B != nullptr)
+    {
+        cudaFree(data.d_B);
     }
-    if (data.h_rstDataCpu != nullptr) {
-        cudaFreeHost(data.h_rstDataCpu);
+    if (data.h_C != nullptr)
+    {
+        cudaFreeHost(data.h_C);
     }
-    if (data.d_rstDataGpu != nullptr) {
-        cudaFree(data.d_rstDataGpu);
+    if (data.d_C != nullptr)
+    {
+        cudaFree(data.d_C);
     }
 }
 

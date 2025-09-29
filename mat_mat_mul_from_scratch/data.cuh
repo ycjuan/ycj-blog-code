@@ -9,13 +9,13 @@ constexpr int kBlockSize = 256;
 
 struct Data
 {
-    int numReqs;
-    int numDocs;
-    int embDim;
-    float* d_docData = nullptr;
-    float* d_reqData = nullptr;
-    float* h_rstDataCpu = nullptr;
-    float* d_rstDataGpu = nullptr;
+    int M;
+    int N;
+    int K;
+    float* d_A = nullptr;
+    float* d_B = nullptr;
+    float* h_C = nullptr;
+    float* d_C = nullptr;
 };
 
 __device__ __host__ inline uint64_t getMemAddrRowMajor(int rowIdx, int colIdx, int numRows, int numCols)
@@ -28,22 +28,22 @@ __device__ __host__ inline uint64_t getMemAddrColMajor(int rowIdx, int colIdx, i
     return (uint64_t)(colIdx * numRows + rowIdx);
 }
 
-__device__ __host__ inline uint64_t getMemAddrReq(int reqIdx, int embIdx, int numReqs, int numDims)
+__device__ __host__ inline uint64_t getMemAddrA(int m, int k, int M, int K)
 {
-    return getMemAddrRowMajor(reqIdx, embIdx, numReqs, numDims);
+    return getMemAddrRowMajor(m, k, M, K);
 }
 
-__device__ __host__ inline uint64_t getMemAddrDoc(int docIdx, int embIdx, int numDocs, int numDims)
+__device__ __host__ inline uint64_t getMemAddrB(int k, int n, int K, int N)
 {
-    return getMemAddrRowMajor(docIdx, embIdx, numDocs, numDims);
+    return getMemAddrRowMajor(k, n, K, N);
 }
 
-__device__ __host__ inline uint64_t getMemAddrRst(int reqIdx, int docIdx, int numReqs, int numDocs)
+__device__ __host__ inline uint64_t getMemAddrC(int m, int n, int M, int N)
 {
-    return getMemAddrRowMajor(reqIdx, docIdx, numReqs, numDocs);
+    return getMemAddrRowMajor(m, n, M, N);
 }
 
-Data genData(int numReqs, int numDocs, int embDim);
+Data genData(int M, int N, int K);
 
 void freeData(Data& data);
 

@@ -10,12 +10,12 @@ using namespace MatMatMulFromScratch;
 
 void compareResult(Data& data)
 {
-    for (int reqIdx = 0; reqIdx < data.numReqs; reqIdx++)
+    for (int reqIdx = 0; reqIdx < data.M; reqIdx++)
     {
-        for (int docIdx = 0; docIdx < data.numDocs; docIdx++)
+        for (int docIdx = 0; docIdx < data.N; docIdx++)
         {
-            float cpuVal = data.h_rstDataCpu[getMemAddrRst(reqIdx, docIdx, data.numReqs, data.numDocs)];
-            float gpuVal = data.d_rstDataGpu[getMemAddrRst(reqIdx, docIdx, data.numReqs, data.numDocs)];
+            float cpuVal = data.h_C[getMemAddrC(reqIdx, docIdx, data.M, data.N)];
+            float gpuVal = data.d_C[getMemAddrC(reqIdx, docIdx, data.M, data.N)];
             if (abs(cpuVal - gpuVal) / abs(gpuVal) > 1e-3)
             {
                 std::ostringstream oss;
@@ -30,7 +30,7 @@ void compareResult(Data& data)
 
 void runExp(Data& data, std::function<void(Data&)> method, const std::string& methodName, int numTrials = 100)
 {
-    CHECK_CUDA(cudaMemset(data.d_rstDataGpu, 0, data.numReqs * data.numDocs * sizeof(float)));
+    CHECK_CUDA(cudaMemset(data.d_C, 0, data.M * data.N * sizeof(float)));
     Timer timer;
     for (int t = -3; t < numTrials; t++)
     {
@@ -57,13 +57,8 @@ int main()
 
     methodCpu(data);
 
-    //runExp(data, methodGpu1, "GPU 1", kNumTrials);
-    //runExp(data, methodGpu2, "GPU 2", kNumTrials);
-    //runExp(data, methodGpu3, "GPU 3", kNumTrials);
-    runExp(data, methodGpu4, "GPU 4", kNumTrials);
-    //runExp(data, methodGpu5, "GPU 5", kNumTrials);
-    runExp(data, methodGpu6, "GPU 6", kNumTrials);
-
+    //runExp(data, methodCublas, "CUBLAS", kNumTrials);
+    
     freeData(data);
 
     return 0;
