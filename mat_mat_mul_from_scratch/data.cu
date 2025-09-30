@@ -12,18 +12,18 @@ Data genData(int M, int N, int K)
     data.M = M;
     data.N = N;
     data.K = K;
-    CHECK_CUDA(cudaMallocManaged(&data.d_A, N * K * sizeof(T)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_B, M * K * sizeof(T)));
-    CHECK_CUDA(cudaMallocHost(&data.h_C, N * M * sizeof(float)));
-    CHECK_CUDA(cudaMallocManaged(&data.d_C, N * M * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_A, M * K * sizeof(T)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_B, K * N * sizeof(T)));
+    CHECK_CUDA(cudaMallocHost(&data.h_C, M * N * sizeof(float)));
+    CHECK_CUDA(cudaMallocManaged(&data.d_C, M * N * sizeof(float)));
 
     std::default_random_engine generator;
     std::uniform_real_distribution<float> distribution(0.0, 1.0);
-    for (int i = 0; i < data.N * data.K; i++)
+    for (int i = 0; i < data.M * data.K; i++)
     {
         data.d_A[i] = distribution(generator);
     }
-    for (int i = 0; i < data.M * data.K; i++)
+    for (int i = 0; i < data.K * data.N; i++)
     {
         data.d_B[i] = distribution(generator);
     }

@@ -7,7 +7,7 @@ namespace MatMatMulFromScratch
 {
 
 constexpr int kBlockSize = 256;
-typedef __nv_bfloat16 T;
+typedef half T;
 constexpr bool kAIsRowMajor = true;
 constexpr bool kBIsRowMajor = true;
 
@@ -34,17 +34,17 @@ __device__ __host__ inline uint64_t getMemAddrColMajor(int rowIdx, int colIdx, i
 
 __device__ __host__ inline uint64_t getMemAddrA(int m, int k, int M, int K)
 {
-    return getMemAddrRowMajor(m, k, M, K);
+    return getMemAddrColMajor(m, k, M, K);
 }
 
 __device__ __host__ inline uint64_t getMemAddrB(int k, int n, int K, int N)
 {
-    return getMemAddrRowMajor(k, n, K, N);
+    return getMemAddrColMajor(k, n, K, N);
 }
 
 __device__ __host__ inline uint64_t getMemAddrC(int m, int n, int M, int N)
 {
-    return getMemAddrRowMajor(m, n, M, N);
+    return getMemAddrColMajor(m, n, M, N);
 }
 
 Data genData(int M, int N, int K);

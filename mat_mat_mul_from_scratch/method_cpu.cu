@@ -6,20 +6,18 @@ namespace MatMatMulFromScratch
 void methodCpu(Data& data)
 {
     #pragma omp parallel for
-    for (int reqIdx = 0; reqIdx < data.M; reqIdx++)
+    for (int m = 0; m < data.M; m++)
     {
-        for (int docIdx = 0; docIdx < data.N; docIdx++)
+        for (int n = 0; n < data.N; n++)
         {
-            double rst = 0;
-            for (int embIdx = 0; embIdx < data.K; embIdx++)
+            float rst = 0;
+            for (int k = 0; k < data.K; k++)
             {
-                float reqVal = data.d_B[getMemAddrA(reqIdx, embIdx, data.M, data.K)];
-                float docVal = data.d_A[getMemAddrB(docIdx, embIdx, data.N, data.K)];
-                T reqValCast = static_cast<T>(reqVal);
-                T docValCast = static_cast<T>(docVal);
-                rst += static_cast<float>(reqValCast) * static_cast<float>(docValCast);
+                T a = data.d_A[getMemAddrA(m, k, data.M, data.K)];
+                T b = data.d_B[getMemAddrB(k, n, data.K, data.N)];
+                rst += static_cast<float>(a) * static_cast<float>(b);
             }
-            data.h_C[getMemAddrC(reqIdx, docIdx, data.M, data.N)] = rst;
+            data.h_C[getMemAddrC(m, n, data.M, data.N)] = rst;
         }
     }
 }

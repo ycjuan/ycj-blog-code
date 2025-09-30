@@ -49,15 +49,17 @@ int main()
     printDeviceInfo();
 
     const int kNumReqs = 16;
-    const int kNumDocs = 1024 * 1024;
+    const int kNumDocs = 1024 * 1024 / 16;
     const int kEmbDim = 128;
     const int kNumTrials = 10;
 
     Data data = genData(kNumReqs, kNumDocs, kEmbDim);
 
+    std::cout << "DB1" << std::endl;
     methodCpu(data);
+    std::cout << "DB2" << std::endl;
 
-    //runExp(data, methodCublas, "CUBLAS", kNumTrials);
+    runExp(data, methodCublas, "CUBLAS", kNumTrials);
     
     freeData(data);
 
