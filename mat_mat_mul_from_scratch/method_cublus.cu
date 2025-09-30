@@ -24,29 +24,21 @@ void methodCublas(Data& data)
     float alpha = 1.0;
     float beta = 0.0;
 
-    int MATRIX_M = data.M;
-    int MATRIX_N = data.N;
-    int MATRIX_K = data.K;
-
-    T* a_fp16 = data.d_A;
-    T* b_fp16 = data.d_B;
-    float* c_cublas = data.d_C;
-
-    //cublasOperation_t trana = (kAIsRowMajor) ? CUBLAS_OP_N : CUBLAS_OP_T;
+    cublasOperation_t trana = (kAIsRowMajor) ? CUBLAS_OP_T : CUBLAS_OP_N;
     //cublasOperation_t tranb = (kBIsRowMajor) ? CUBLAS_OP_N : CUBLAS_OP_T;
-    //int lda = (kAIsRowMajor) ? data.M : data.K;
+    int lda = (kAIsRowMajor) ? data.K : data.M;
     //int ldb = (kBIsRowMajor) ? data.K : data.N;
-    //cudaDataType aType = (std::is_same<T, half>::value) ? CUDA_R_16F : CUDA_R_16BF;
-    //cudaDataType bType = (std::is_same<T, half>::value) ? CUDA_R_16F : CUDA_R_16BF;
+    cudaDataType aType = (std::is_same<T, half>::value) ? CUDA_R_16F : CUDA_R_16BF;
+    cudaDataType bType = (std::is_same<T, half>::value) ? CUDA_R_16F : CUDA_R_16BF;
     
-    cublasErrCheck(cublasGemmEx(cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, 
-        MATRIX_M, MATRIX_N, MATRIX_K, 
+    cublasErrCheck(cublasGemmEx(cublasHandle, trana, CUBLAS_OP_N, 
+        data.M, data.N, data.K, 
         &alpha,
-        a_fp16, CUDA_R_16F, MATRIX_M,
-        b_fp16, CUDA_R_16F, MATRIX_K,
+        data.d_A, aType, lda,
+        data.d_B, bType, data.K,
         &beta, 
-        c_cublas, CUDA_R_32F, MATRIX_M,
-        CUDA_R_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+        data.d_C, CUDA_R_32F, data.M,
+        CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
     cublasDestroy(cublasHandle);
 }

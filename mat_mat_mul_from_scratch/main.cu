@@ -55,9 +55,7 @@ int main()
 
     Data data = genData(kNumReqs, kNumDocs, kEmbDim);
 
-    std::cout << "DB1" << std::endl;
     methodCpu(data);
-    std::cout << "DB2" << std::endl;
 
     runExp(data, methodCublas, "CUBLAS", kNumTrials);
     

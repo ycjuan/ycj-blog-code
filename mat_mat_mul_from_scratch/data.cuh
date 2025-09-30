@@ -34,7 +34,14 @@ __device__ __host__ inline uint64_t getMemAddrColMajor(int rowIdx, int colIdx, i
 
 __device__ __host__ inline uint64_t getMemAddrA(int m, int k, int M, int K)
 {
-    return getMemAddrColMajor(m, k, M, K);
+    if constexpr (kAIsRowMajor)
+    {
+        return getMemAddrRowMajor(m, k, M, K);
+    }
+    else
+    {
+        return getMemAddrColMajor(m, k, M, K);
+    }
 }
 
 __device__ __host__ inline uint64_t getMemAddrB(int k, int n, int K, int N)
