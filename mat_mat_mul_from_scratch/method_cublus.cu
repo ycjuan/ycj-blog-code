@@ -24,18 +24,18 @@ void methodCublas(Data& data)
     float alpha = 1.0;
     float beta = 0.0;
 
-    cublasOperation_t trana = (kAIsRowMajor) ? CUBLAS_OP_T : CUBLAS_OP_N;
-    //cublasOperation_t tranb = (kBIsRowMajor) ? CUBLAS_OP_N : CUBLAS_OP_T;
+    cublasOperation_t transA = (kAIsRowMajor) ? CUBLAS_OP_T : CUBLAS_OP_N;
+    cublasOperation_t transB = (kBIsRowMajor) ? CUBLAS_OP_T : CUBLAS_OP_N;
     int lda = (kAIsRowMajor) ? data.K : data.M;
-    //int ldb = (kBIsRowMajor) ? data.K : data.N;
+    int ldb = (kBIsRowMajor) ? data.N : data.K;
     cudaDataType aType = (std::is_same<T, half>::value) ? CUDA_R_16F : CUDA_R_16BF;
     cudaDataType bType = (std::is_same<T, half>::value) ? CUDA_R_16F : CUDA_R_16BF;
     
-    cublasErrCheck(cublasGemmEx(cublasHandle, trana, CUBLAS_OP_N, 
+    cublasErrCheck(cublasGemmEx(cublasHandle, transA, transB, 
         data.M, data.N, data.K, 
         &alpha,
         data.d_A, aType, lda,
-        data.d_B, bType, data.K,
+        data.d_B, bType, ldb,
         &beta, 
         data.d_C, CUDA_R_32F, data.M,
         CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP));

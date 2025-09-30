@@ -9,7 +9,7 @@ namespace MatMatMulFromScratch
 constexpr int kBlockSize = 256;
 typedef half T;
 constexpr bool kAIsRowMajor = true;
-constexpr bool kBIsRowMajor = true;
+constexpr bool kBIsRowMajor = false;
 
 struct Data
 {
@@ -46,7 +46,14 @@ __device__ __host__ inline uint64_t getMemAddrA(int m, int k, int M, int K)
 
 __device__ __host__ inline uint64_t getMemAddrB(int k, int n, int K, int N)
 {
-    return getMemAddrColMajor(k, n, K, N);
+    if constexpr (kBIsRowMajor)
+    {
+        return getMemAddrRowMajor(k, n, K, N);
+    }
+    else
+    {
+        return getMemAddrColMajor(k, n, K, N);
+    }
 }
 
 __device__ __host__ inline uint64_t getMemAddrC(int m, int n, int M, int N)
