@@ -8,6 +8,12 @@
 
 using namespace MatMatMulFromScratch;
 
+const int kNumReqs = 16;
+const int kNumDocs = 1024 * 1024 / 16;
+const int kEmbDim = 128;
+const int kNumTrials = 10;
+const int kPerformCpu = true;
+
 void compareResult(Data& data)
 {
     for (int reqIdx = 0; reqIdx < data.M; reqIdx++)
@@ -39,6 +45,10 @@ void runExp(Data& data, std::function<void(Data&)> method, const std::string& me
         method(data);
     }
     float timeMs = timer.tocMs() / numTrials;
+    if (kPerformCpu)
+    {
+        methodCpu(data);
+    }
     compareResult(data);
     std::cout << methodName << " time: " << timeMs << " ms" << std::endl;
 }
@@ -48,14 +58,12 @@ int main()
 {
     printDeviceInfo();
 
-    const int kNumReqs = 16;
-    const int kNumDocs = 1024 * 1024 / 16;
-    const int kEmbDim = 128;
-    const int kNumTrials = 10;
-
     Data data = genData(kNumReqs, kNumDocs, kEmbDim);
 
-    methodCpu(data);
+    if (kPerformCpu)
+    {
+        methodCpu(data);
+    }
 
     runExp(data, methodCublas, "CUBLAS", kNumTrials);
     
