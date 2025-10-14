@@ -1,0 +1,17 @@
+[
+  {
+    "directory": "/home/ec2-user/git/ycj-blog-code/mat_mat_mul_from_scartch",
+    "command": "nvcc -I/usr/local/cuda/include -I/home/ec2-user/git/ycj-blog-code/mat_mat_mul_from_scartch -Xcompiler -fopenmp -O3 -lcublas -c main.cu -o main.o",
+    "file": "main.cu"
+  },
+  {
+    "directory": "/home/ec2-user/git/ycj-blog-code/mat_mat_mul_from_scartch",
+    "command": "nvcc -I/usr/local/cuda/include -I/home/ec2-user/git/ycj-blog-code/mat_mat_mul_from_scartch -Xcompiler -fopenmp -O3 -lcublas -c data.cu -o data.o",
+    "file": "data.cu"
+  },
+  {
+    "directory": "/home/ec2-user/git/ycj-blog-code/mat_mat_mul_from_scartch",
+    "command": "nvcc -I/usr/local/cuda/include -I/home/ec2-user/git/ycj-blog-code/mat_mat_mul_from_scartch -Xcompiler -fopenmp -O3 -lcublas -c method_gpu.cu -o method_gpu.o",
+    "file": "method_gpu.cu"
+  }
+]

@@ -1,2 +1,5 @@
 BasedOnStyle: WebKit
 BreakBeforeBraces: Allman
+ColumnLimit: 120
+BinPackParameters: false # Force only one parameter per line
+AlignAfterOpenBracket: Align # When there are multiple parameters in multiple lines, align the parameters
