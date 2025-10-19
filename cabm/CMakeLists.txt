@@ -52,3 +52,9 @@ target_compile_options(${LIB_NAME} PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:-O3>
     $<$<COMPILE_LANGUAGE:CXX>:-O3>
 )
+
+# Add executable
+add_executable(test1 test1.cu)
+
+# Link library
+target_link_libraries(test1 ${LIB_NAME})
