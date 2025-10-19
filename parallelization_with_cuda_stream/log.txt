@@ -1,0 +1,65 @@
+Consolidate compiler generated dependencies of target parallelization_with_cuda_stream
+[ 50%] Building CUDA object CMakeFiles/parallelization_with_cuda_stream.dir/main.cu.o
+[100%] Linking CUDA executable parallelization_with_cuda_stream
+[100%] Built target parallelization_with_cuda_stream
+Device 0: NVIDIA L4
+  Total global memory: 22574 MB
+  Multiprocessor count: 58
+  Max threads per block: 1024
+  Max threads dim: (1024, 1024, 64)
+  Max grid size: (2147483647, 65535, 65535)
+  Clock rate: 2040 MHz
+  Compute capability: 8.9
+  Memory clock rate: 6251 MHz
+  Memory bus width: 192 bits
+  L2 cache size: 49152 KB
+  concurrentKernels: Yes
+  asyncEngineCount: 2
+  streamPrioritiesSupported: Yes
+  unifiedAddressing: Yes
+  pageableMemoryAccess: Yes
+  canMapHostMemory: Yes
+  sharedMemPerBlock: 48 KB
+  sharedMemPerMultiprocessor: 100 KB
+kNumReqs: 32
+kNumDocs: 1000000
+kNumRepeats: 1000
+kNumTrials: 100
+kBlockSize: 1024
+Time taken for req by req: 3.88483 ms
+Time taken for parallel with cuda stream: 4.07065 ms
+➜  parallelization_with_cuda_stream git:(parallelization_with_cuda_stream) ✗ ./run.sh
+mkdir: cannot create directory ‘build’: File exists
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/ec2-user/git/ycj-blog-code/parallelization_with_cuda_stream/build
+Consolidate compiler generated dependencies of target parallelization_with_cuda_stream
+[ 50%] Building CUDA object CMakeFiles/parallelization_with_cuda_stream.dir/main.cu.o
+[100%] Linking CUDA executable parallelization_with_cuda_stream
+[100%] Built target parallelization_with_cuda_stream
+Device 0: NVIDIA L4
+  Total global memory: 22574 MB
+  Multiprocessor count: 58
+  Max threads per block: 1024
+  Max threads dim: (1024, 1024, 64)
+  Max grid size: (2147483647, 65535, 65535)
+  Clock rate: 2040 MHz
+  Compute capability: 8.9
+  Memory clock rate: 6251 MHz
+  Memory bus width: 192 bits
+  L2 cache size: 49152 KB
+  concurrentKernels: Yes
+  asyncEngineCount: 2
+  streamPrioritiesSupported: Yes
+  unifiedAddressing: Yes
+  pageableMemoryAccess: Yes
+  canMapHostMemory: Yes
+  sharedMemPerBlock: 48 KB
+  sharedMemPerMultiprocessor: 100 KB
+kNumReqs: 1024
+kNumDocs: 1000
+kNumRepeats: 1000
+kNumTrials: 100
+kBlockSize: 1024
+Time taken for req by req: 11.1337 ms
+Time taken for parallel with cuda stream: 3.16249 ms
