@@ -1,0 +1,21 @@
+Device 0: NVIDIA L4
+  Total global memory: 22574 MB
+  Multiprocessor count: 58
+  Max threads per block: 1024
+  Max threads dim: (1024, 1024, 64)
+  Max grid size: (2147483647, 65535, 65535)
+  Clock rate: 2040 MHz
+  Compute capability: 8.9
+  Memory clock rate: 6251 MHz
+  Memory bus width: 192 bits
+  L2 cache size: 49152 KB
+  concurrentKernels: Yes
+  asyncEngineCount: 2
+  streamPrioritiesSupported: Yes
+  unifiedAddressing: Yes
+  pageableMemoryAccess: Yes
+  canMapHostMemory: Yes
+  sharedMemPerBlock: 48 KB
+  sharedMemPerMultiprocessor: 100 KB
+Time taken for req by req: 3.99449 ms
+Time taken for parallel with cuda stream: 4.089 ms

@@ -5,8 +5,9 @@
 #include <cuda_runtime.h>
 
 constexpr int kNumReqs = 32;
-constexpr int kNumDocs = 32;
-constexpr int kNumTrials = 1000;
+constexpr int kNumDocs = 1000000;
+constexpr int kNumRepeats = 1000;
+constexpr int kNumTrials = 100;
 constexpr int kBlockSize = 1024;
 
 __global__ void dummyKernel(long *d_rst, int reqIdx)
@@ -15,8 +16,9 @@ __global__ void dummyKernel(long *d_rst, int reqIdx)
     if (docIdx < kNumDocs)
     {
         int rst = docIdx + reqIdx * kNumDocs;
-        for (int i = 0; i < kNumTrials; i++)
+        for (int i = 0; i < kNumRepeats; i++)
         {
+            // Some pseudo-random computation to avoid compiler optimization
             rst = (rst * 1103515245 + 12345) & 0x7fffffff;\
         }
         d_rst[docIdx + reqIdx * kNumDocs] = rst;
@@ -33,15 +35,19 @@ void runReqByReq()
     // ----------------
     // Run experiment
     Timer timer;
-    timer.tic();
-    for (int reqIdx = 0; reqIdx < kNumReqs; reqIdx++)
+    for (int t = -3; t < kNumTrials; t++)
     {
-        int gridSize = (int)ceil((double)(kNumDocs + 1) / kBlockSize);
-        dummyKernel<<<gridSize, kBlockSize>>>(d_rst, reqIdx);
-        CHECK_CUDA(cudaDeviceSynchronize());
-        CHECK_CUDA(cudaGetLastError());
+        if (t == 0)
+            timer.tic();
+        for (int reqIdx = 0; reqIdx < kNumReqs; reqIdx++)
+        {
+            int gridSize = (int)ceil((double)(kNumDocs + 1) / kBlockSize);
+            dummyKernel<<<gridSize, kBlockSize>>>(d_rst, reqIdx);
+            CHECK_CUDA(cudaDeviceSynchronize());
+            CHECK_CUDA(cudaGetLastError());
+        }
     }
-    float timeMs = timer.tocMs();
+    float timeMs = timer.tocMs() / kNumTrials;
     std::cout << "Time taken for req by req: " << timeMs << " ms" << std::endl;
 
     // ----------------
@@ -66,17 +72,22 @@ void runParallelWithCudaStream()
     // ----------------
     // Run experiment
     Timer timer;
-    timer.tic();
-    for (int reqIdx = 0; reqIdx < kNumReqs; reqIdx++)
-    {   
-        int gridSize = (int)ceil((double)(kNumDocs + 1) / kBlockSize);
-        dummyKernel<<<gridSize, kBlockSize, 0, streams[reqIdx]>>>(d_rst, reqIdx);
-    }
-    for (int i = 0; i < kNumReqs; i++)
+
+    for (int t = -3; t < kNumTrials; t++)
     {
-        CHECK_CUDA(cudaStreamSynchronize(streams[i]));
+        if (t == 0)
+            timer.tic();
+        for (int reqIdx = 0; reqIdx < kNumReqs; reqIdx++)
+        {   
+            int gridSize = (int)ceil((double)(kNumDocs + 1) / kBlockSize);
+            dummyKernel<<<gridSize, kBlockSize, 0, streams[reqIdx]>>>(d_rst, reqIdx);
+        }
+        for (int i = 0; i < kNumReqs; i++)
+        {
+            CHECK_CUDA(cudaStreamSynchronize(streams[i]));
+        }
     }
-    float timeMs = timer.tocMs();
+    float timeMs = timer.tocMs() / kNumTrials;
     std::cout << "Time taken for parallel with cuda stream: " << timeMs << " ms" << std::endl;
 
     // ----------------
