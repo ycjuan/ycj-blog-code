@@ -4,11 +4,20 @@
 #include <vector>
 #include <cuda_runtime.h>
 
-constexpr int kNumReqs = 32;
-constexpr int kNumDocs = 1000000;
+constexpr int kNumReqs = 1024;
+constexpr int kNumDocs = 1000;
 constexpr int kNumRepeats = 1000;
 constexpr int kNumTrials = 100;
 constexpr int kBlockSize = 1024;
+
+void printConfig()
+{
+    std::cout << "kNumReqs: " << kNumReqs << std::endl;
+    std::cout << "kNumDocs: " << kNumDocs << std::endl;
+    std::cout << "kNumRepeats: " << kNumRepeats << std::endl;
+    std::cout << "kNumTrials: " << kNumTrials << std::endl;
+    std::cout << "kBlockSize: " << kBlockSize << std::endl;
+}
 
 __global__ void dummyKernel(long *d_rst, int reqIdx)
 {
@@ -102,7 +111,9 @@ void runParallelWithCudaStream()
 int main()
 {
     printDeviceInfo();
-
+    
+    printConfig();
+    
     runReqByReq();
 
     runParallelWithCudaStream();
