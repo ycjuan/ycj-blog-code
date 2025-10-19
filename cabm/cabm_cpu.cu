@@ -1,62 +1,35 @@
-#include <iostream>
-#include <stack>
-#include <string>
-#include <vector>
 #include <cassert>
+#include <stack>
+#include <vector>
 
 #include "cabm.cuh"
 
-using namespace std;
-
-CabmOp::CabmOp() {}
-
-CabmOp::CabmOp(int clause, long attr, CabmOpType type) : clause(clause), attr(attr), type(type) {
-    if (type == CABM_OP_TYPE_ATTR_MATCH || type == CABM_OP_TYPE_ATTR_NEGATION)
-        isOperand = true;
-    else
-        isOperand = false;
-}
-
-CabmOp::CabmOp(CabmOpType type) : type(type) {
-    if (type == CABM_OP_TYPE_ATTR_MATCH || type == CABM_OP_TYPE_ATTR_NEGATION)
-        isOperand = true;
-    else
-        isOperand = false;
-}
-
-int priority(CabmOp op) 
+// The code here is modified from: Code source:
+// https://prepinsta.com/cpp-program/infix-to-postfix-conversion-using-stack/
+std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix)
 {
-    if (op.type == CABM_OP_TYPE_AND || op.type == CABM_OP_TYPE_OR)
-        return 1;
-
-    return 0;
-}
-
-// The code here is modified from: Code source: https://prepinsta.com/cpp-program/infix-to-postfix-conversion-using-stack/
-vector<CabmOp> infix2postfix(vector<CabmOp> infix)
-{
-    vector<CabmOp> postfix;
+    std::vector<CabmOp> postfix;
     // using inbuilt stack< > from C++ stack library
-    stack<CabmOp> s;
+    std::stack<CabmOp> s;
 
-    for (auto op : infix) 
+    for (auto op : infix)
     {
 
         // if operand add to the postfix expression
-        if (op.type == CABM_OP_TYPE_ATTR_MATCH || op.type == CABM_OP_TYPE_ATTR_NEGATION) 
+        if (op.isOperand())
         {
             postfix.push_back(op);
         }
         // if opening bracket then push the stack
-        else if (op.type == CABM_OP_TYPE_LEFT_PARENTHESIS) 
+        else if (op.isLeftParenthesis())
         {
             s.push(op);
         }
         // if closing bracket encounted then keep popping from stack until
         // closing a pair opening bracket is not encountered
-        else if (op.type == CABM_OP_TYPE_RIGHT_PARENTHESIS) 
+        else if (op.isRightParenthesis())
         {
-            while (s.top().type != CABM_OP_TYPE_LEFT_PARENTHESIS) 
+            while (!s.top().isLeftParenthesis())
             {
                 postfix.push_back(s.top());
                 s.pop();
@@ -65,14 +38,16 @@ vector<CabmOp> infix2postfix(vector<CabmOp> infix)
         }
         else
         {
-            while (!s.empty() && priority(op) <= priority(s.top())){
+            while (!s.empty() && op.getPriority() <= s.top().getPriority())
+            {
                 postfix.push_back(s.top());
                 s.pop();
             }
             s.push(op);
         }
     }
-    while (!s.empty()) {
+    while (!s.empty())
+    {
         postfix.push_back(s.top());
         s.pop();
     }
@@ -80,49 +55,66 @@ vector<CabmOp> infix2postfix(vector<CabmOp> infix)
     return postfix;
 }
 
-int evaluateOp(CabmOp &op, const vector<vector<long>> &docTbr2D) {
+int evaluateOp(CabmOp& op,
+               const std::vector<std::vector<long>>& reqTbr2D,
+               const std::vector<std::vector<long>>& docTbr2D)
+{
     int rst = 0;
-    for (auto docAttr : docTbr2D[op.clause]) {
-        if (op.attr == docAttr) {
-            rst = 1;
-            break;
+    const std::vector<long>& reqAttrs = reqTbr2D.at(op.getClause());
+    const std::vector<long>& docAttrs = docTbr2D.at(op.getClause());
+
+    // For CPU implementation, we will use this simple two-layer for loop.
+    for (auto reqAttr : reqAttrs)
+    {
+        for (auto docAttr : docAttrs)
+        {
+            if (reqAttr == docAttr)
+            {
+                rst = 1;
+                break;
+            }
         }
     }
-    if (op.type == CABM_OP_TYPE_ATTR_NEGATION)
-        rst = !rst;
+
     return rst;
 }
 
 // the code is modified from https://www.geeksforgeeks.org/evaluation-of-postfix-expression/
-bool evaluatePostfix(vector<CabmOp> postfix1D, const vector<vector<long>> &docTbr2D) {
+bool evaluatePostfix(std::vector<CabmOp> postfix1D,
+                     const std::vector<std::vector<long>>& reqTbr2D,
+                     const std::vector<std::vector<long>>& docTbr2D)
+{
 
     // Create a stack of capacity equal to expression size
-    stack<int> st;
+    std::stack<int> st;
 
     // Scan all characters one by one
-    for (auto op : postfix1D) {
+    for (auto op : postfix1D)
+    {
 
         // If the scanned character is an operand
         // (number here), push it to the stack.
-        if ( op.isOperand ) 
-            st.push( evaluateOp(op, docTbr2D) );
+        if (op.isOperand())
+            st.push(evaluateOp(op, reqTbr2D, docTbr2D));
 
         // If the scanned character is an operator,
         // pop two elements from stack apply the operator
-        else {
+        else
+        {
             int rstA = st.top();
             st.pop();
             int rstB = st.top();
             st.pop();
-            switch (op.type) {
-            case CABM_OP_TYPE_AND:
-                st.push( int( (bool)rstA & (bool)rstB ) );
+            switch (op.getType())
+            {
+            case CabmOpType::CABM_OP_TYPE_AND:
+                st.push(int((bool)rstA & (bool)rstB));
                 break;
-            case CABM_OP_TYPE_OR:
-                st.push( int( (bool)rstA & (bool)rstB ) );
+            case CabmOpType::CABM_OP_TYPE_OR:
+                st.push(int((bool)rstA & (bool)rstB));
                 break;
             default:
-                assert(false);
+                assert(false); // This should not happen
                 break;
             }
         }
@@ -130,25 +122,23 @@ bool evaluatePostfix(vector<CabmOp> postfix1D, const vector<vector<long>> &docTb
     return (bool)st.top();
 }
 
-vector<Msg> cabmCpu(const vector<CabmOp> &reqInfix1D, const vector<vector<vector<long>>> &docTbr3D, const vector<Msg> &msg1D) {
+std::vector<int>
+cabmCpu(const std::vector<CabmOp>& reqInfix1D, const std::vector<std::vector<long>>& reqTbr1D, const std::vector<std::vector<std::vector<long>>>& docTbr3D)
+{
 
-    vector<CabmOp> reqPostfix1D = infix2postfix(reqInfix1D);
+    std::vector<CabmOp> reqPostfix1D = infix2postfix(reqInfix1D);
     int numDocs = docTbr3D.size();
     int numClauses = docTbr3D[0].size();
 
-    vector<Msg> rst1D;
-    for (auto msg : msg1D) {
-        int i = msg.i;
+    std::vector<int> rst1D(numDocs);
+    for (int i = 0; i < numDocs; i++)
+    {
         assert(docTbr3D[i].size() == numClauses);
 
-        const vector<vector<long>> &docTbr2D = docTbr3D[i];
-        bool finalRst = evaluatePostfix(reqPostfix1D, docTbr2D);
-        if (finalRst) {
-            msg.score = 1.0;
-            rst1D.push_back(msg);
-        }
+        const std::vector<std::vector<long>>& docTbr2D = docTbr3D.at(i);
+        bool finalRst = evaluatePostfix(reqPostfix1D, reqTbr1D, docTbr2D);
+        rst1D.push_back(finalRst);
     }
-    
+
     return rst1D;
 }
-
