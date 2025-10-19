@@ -4,8 +4,6 @@
 #include <stdexcept>
 #include <iostream>
 
-namespace ParallelizationWithCudaStream {
-
 #define CHECK_CUDA(call)                                                                                                        \
     do {                                                                                                                        \
         cudaError_t status = call;                                                                                              \
@@ -112,5 +110,3 @@ inline void printDeviceInfo()
 
     }
 }
-
-} // namespace BatchScalibility
