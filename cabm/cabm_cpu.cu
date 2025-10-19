@@ -4,10 +4,7 @@
 #include <vector>
 #include <cassert>
 
-#ifndef CABM_H
-#define CABM_H
 #include "cabm.cuh"
-#endif
 
 using namespace std;
 

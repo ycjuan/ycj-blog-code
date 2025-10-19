@@ -12,10 +12,7 @@
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
 
-#ifndef CABM_H
-#define CABM_H
 #include "cabm.cuh"
-#endif
 
 #define CHECK_CUDA(func)                                 \
 {                                                        \
@@ -55,6 +52,7 @@ __device__ bool stackPop(uint64_t &bs, int &bsCount) {
     return tmp > 0L;
 }
 
+/*
 __device__ bool evaluateSingleOp(const CabmGpuParam &param, int i, const CabmOp &op) {
     int docOffsetBegin = param.d_docTbrOffsets[getMemAddrRowMajorDevice(i, op.clause, param.numDocs, param.numClauses+1)]; 
     int docOffsetEnd = param.d_docTbrOffsets[getMemAddrRowMajorDevice(i, op.clause+1, param.numDocs, param.numClauses+1)]; 
@@ -209,3 +207,4 @@ void cabmGpu(CabmGpuParam &param) {
     cudaEventDestroy(start);    
     cudaEventDestroy(stop);
 }
+*/

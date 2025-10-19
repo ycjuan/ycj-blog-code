@@ -1,3 +1,5 @@
+#pragma once
+
 #include <vector>
 
 struct Msg {
@@ -27,6 +29,7 @@ struct CabmOp {
     CabmOpType type;
 };
 
+/*
 struct CabmGpuParam {
     long      *d_docTbrAttr;
     int       *d_docTbrOffsets;
@@ -45,8 +48,9 @@ struct CabmGpuParam {
     long       offsetA;
     long       offsetB;
 };
+*/
 
 std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix);
 bool evaluatePostfix(std::vector<CabmOp> postfix1D, const std::vector<std::vector<long>> &docTbr2D);
 std::vector<Msg> cabmCpu(const std::vector<CabmOp> &reqInfix1D, const std::vector<std::vector<std::vector<long>>> &docTbr3D, const std::vector<Msg> &msg1D);
-void cabmGpu(CabmGpuParam &param);
+//void cabmGpu(CabmGpuParam &param);
