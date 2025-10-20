@@ -1,6 +1,8 @@
 #include <cassert>
+#include <cerrno>
 #include <stack>
 #include <vector>
+#include <stdexcept>
 
 #include "cabm.cuh"
 
@@ -141,4 +143,50 @@ cabmCpu(const std::vector<CabmOp>& reqInfix1D, const std::vector<std::vector<lon
     }
 
     return rst1D;
+}
+
+std::string cabmExprToString(const std::vector<CabmOp>& expr)
+{
+    std::string rst;
+    for (auto op : expr)
+    {
+        rst += op.toString() + " ";
+    }
+    rst.pop_back(); // remove the last space
+    return rst;
+}
+
+std::string CabmOp::toString() const
+{
+    if (isOperand())
+    {
+        std::string opTypeStr;
+        switch (type)
+        {
+            case CabmOpType::CABM_OP_TYPE_ATTR_MATCH:
+                opTypeStr = "MATCH";
+                break;
+            default:
+                throw std::invalid_argument("Invalid operand type (1)");
+        }
+        return "[F" + std::to_string(clause) + "-" + opTypeStr + "]";
+    }
+    else
+    {
+        switch (type)
+        {
+            case CabmOpType::CABM_OP_TYPE_AND:
+                return "AND";
+            case CabmOpType::CABM_OP_TYPE_OR:
+                return "OR";
+            case CabmOpType::CABM_OP_TYPE_LEFT_PARENTHESIS:
+                return "(";
+            case CabmOpType::CABM_OP_TYPE_RIGHT_PARENTHESIS:
+                return ")";
+            case CabmOpType::CABM_OP_TYPE_NOT:
+                return "NOT";
+            default:
+                throw std::invalid_argument("Invalid operator type (2)");
+        }
+    }
 }
