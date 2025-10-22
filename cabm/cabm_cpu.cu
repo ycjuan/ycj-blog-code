@@ -124,28 +124,6 @@ bool evaluatePostfix(std::vector<CabmOp> postfix1D,
     return (bool)st.top();
 }
 
-std::vector<int> cabmCpu(const std::vector<CabmOp>& reqInfix1D,
-                         const std::vector<std::vector<long>>& reqTbr1D,
-                         const std::vector<std::vector<std::vector<long>>>& docTbr3D)
-{
-
-    std::vector<CabmOp> reqPostfix1D = infix2postfix(reqInfix1D);
-    int numDocs = docTbr3D.size();
-    int numClauses = docTbr3D[0].size();
-
-    std::vector<int> rst1D(numDocs);
-    for (int i = 0; i < numDocs; i++)
-    {
-        assert(docTbr3D[i].size() == numClauses);
-
-        const std::vector<std::vector<long>>& docTbr2D = docTbr3D.at(i);
-        bool finalRst = evaluatePostfix(reqPostfix1D, reqTbr1D, docTbr2D);
-        rst1D.push_back(finalRst);
-    }
-
-    return rst1D;
-}
-
 std::string cabmExprToString(const std::vector<CabmOp>& expr)
 {
     std::string rst;
@@ -190,4 +168,20 @@ std::string CabmOp::toString() const
             throw std::invalid_argument("Invalid operator type (2)");
         }
     }
+}
+
+std::vector<int> cabmCpu(const std::vector<CabmOp>& infixExpr,
+                         const std::vector<std::vector<long>>& reqTbr2D,
+                         const std::vector<std::vector<std::vector<long>>>& docTbr3D)
+{
+    std::vector<CabmOp> postfixExpr = infix2postfix(infixExpr);
+    int numDocs = docTbr3D.size();
+
+    std::vector<int> results(numDocs);
+    for (int i = 0; i < numDocs; i++)
+    {
+        results.at(i) = evaluatePostfix(postfixExpr, reqTbr2D, docTbr3D.at(i));
+    }
+
+    return results;
 }
