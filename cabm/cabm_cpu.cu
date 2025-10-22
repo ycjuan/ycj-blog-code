@@ -3,6 +3,7 @@
 #include <stack>
 #include <vector>
 #include <stdexcept>
+#include <iostream>
 
 #include "cabm.cuh"
 
@@ -61,11 +62,11 @@ int evaluateOp(CabmOp& op,
                const std::vector<std::vector<long>>& reqTbr2D,
                const std::vector<std::vector<long>>& docTbr2D)
 {
-    int rst = 0;
     const std::vector<long>& reqAttrs = reqTbr2D.at(op.getClause());
     const std::vector<long>& docAttrs = docTbr2D.at(op.getClause());
 
     // For CPU implementation, we will use this simple two-layer for loop.
+    int rst = 0;
     for (auto reqAttr : reqAttrs)
     {
         for (auto docAttr : docAttrs)
@@ -77,6 +78,8 @@ int evaluateOp(CabmOp& op,
             }
         }
     }
+
+    //std::cout << "clause: " << op.getClause() << ", rst: " << rst << std::endl;
 
     return rst;
 }
@@ -93,12 +96,12 @@ bool evaluatePostfix(std::vector<CabmOp> postfix1D,
     // Scan all characters one by one
     for (auto op : postfix1D)
     {
-
         // If the scanned character is an operand
         // (number here), push it to the stack.
-        if (op.isOperand())
+        if (op.isOperand()) 
+        {
             st.push(evaluateOp(op, reqTbr2D, docTbr2D));
-
+        }
         // If the scanned character is an operator,
         // pop two elements from stack apply the operator
         else
@@ -113,13 +116,14 @@ bool evaluatePostfix(std::vector<CabmOp> postfix1D,
                 st.push(int((bool)rstA & (bool)rstB));
                 break;
             case CabmOpType::CABM_OP_TYPE_OR:
-                st.push(int((bool)rstA & (bool)rstB));
+                st.push(int((bool)rstA | (bool)rstB));
                 break;
             default:
                 assert(false); // This should not happen
                 break;
             }
         }
+
     }
     return (bool)st.top();
 }

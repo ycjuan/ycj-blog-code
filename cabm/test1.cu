@@ -34,6 +34,13 @@ void test1a()
     std::cout << "Postfix: " << cabmExprToString(postfix) << std::endl;
 
     assert(cabmExprToString(postfix) == "[F0-MATCH] [F1-MATCH] OR [F3-MATCH] [F4-MATCH] OR [F5-MATCH] AND AND");
+
+    {
+        std::vector<std::vector<long>> reqTbr2D = { {0}, {1}, {2}, {3}, {4}, {5} };
+        std::vector<std::vector<long>> docTbr2D = { {0}, {-1}, {-2}, {3}, {-4}, {5} };
+        bool rst = evaluatePostfix(postfix, reqTbr2D, docTbr2D);
+        assert(rst == true);
+    }
 }
 
 int main()

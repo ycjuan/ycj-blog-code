@@ -42,4 +42,6 @@ private:
 
 std::string cabmExprToString(const std::vector<CabmOp>& expr);
 std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix);
-bool evaluatePostfix(std::vector<CabmOp> postfix1D, const std::vector<std::vector<long>>& docTbr2D);
+bool evaluatePostfix(std::vector<CabmOp> postfix1D,
+                     const std::vector<std::vector<long>>& reqTbr2D,
+                     const std::vector<std::vector<long>>& docTbr2D);
