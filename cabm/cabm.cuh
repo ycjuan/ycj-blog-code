@@ -17,27 +17,30 @@ enum class CabmOpType
 class CabmOp
 {
 public:
-    CabmOp(int clause, CabmOpType type)
-        : clause(clause)
-        , type(type)
+    CabmOp(int reqFieldIdx, int docFieldIdx, CabmOpType type)
+        : m_reqFieldIdx(reqFieldIdx)
+        , m_docFieldIdx(docFieldIdx)
+        , m_opType(type)
     {
     }
     CabmOp(CabmOpType type)
-        : type(type)
+        : m_opType(type)
     {
     }
 
-    bool isOperand() const { return type > CabmOpType::CABM_OP_TYPE_NOOP; }
-    int getPriority() const { return static_cast<int>(type); }
-    int getClause() const { return clause; }
-    bool isLeftParenthesis() const { return type == CabmOpType::CABM_OP_TYPE_LEFT_PARENTHESIS; }
-    bool isRightParenthesis() const { return type == CabmOpType::CABM_OP_TYPE_RIGHT_PARENTHESIS; }
-    CabmOpType getType() const { return type; }
+    bool isOperand() const { return m_opType > CabmOpType::CABM_OP_TYPE_NOOP; }
+    int getPriority() const { return static_cast<int>(m_opType); }
+    int getReqFieldIdx() const { return m_reqFieldIdx; }
+    int getDocFieldIdx() const { return m_docFieldIdx; }
+    bool isLeftParenthesis() const { return m_opType == CabmOpType::CABM_OP_TYPE_LEFT_PARENTHESIS; }
+    bool isRightParenthesis() const { return m_opType == CabmOpType::CABM_OP_TYPE_RIGHT_PARENTHESIS; }
+    CabmOpType getType() const { return m_opType; }
     std::string toString() const;
 
 private:
-    const int clause = -1; // Only used when op type is CABM_OP_TYPE_ATTR
-    const CabmOpType type;
+    const int m_reqFieldIdx = -1; // Only used when op type is an operand
+    const int m_docFieldIdx = -1; // Only used when op type is an operand
+    const CabmOpType m_opType;
 };
 
 std::string cabmExprToString(const std::vector<CabmOp>& expr);

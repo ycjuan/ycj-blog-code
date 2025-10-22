@@ -9,19 +9,19 @@ void test1a()
     // infix = (F0 OR F1) AND ( (F3 OR F4) AND F5 )
     std::vector<CabmOp> infix = {
         CabmOp(CabmOpType::CABM_OP_TYPE_LEFT_PARENTHESIS),
-        CabmOp(0, CabmOpType::CABM_OP_TYPE_ATTR_MATCH),
+        CabmOp(0, 0, CabmOpType::CABM_OP_TYPE_ATTR_MATCH),
         CabmOp(CabmOpType::CABM_OP_TYPE_OR),
-        CabmOp(1, CabmOpType::CABM_OP_TYPE_ATTR_MATCH),
+        CabmOp(1, 1, CabmOpType::CABM_OP_TYPE_ATTR_MATCH),
         CabmOp(CabmOpType::CABM_OP_TYPE_RIGHT_PARENTHESIS),
         CabmOp(CabmOpType::CABM_OP_TYPE_AND),
         CabmOp(CabmOpType::CABM_OP_TYPE_LEFT_PARENTHESIS),
         CabmOp(CabmOpType::CABM_OP_TYPE_LEFT_PARENTHESIS),
-        CabmOp(3, CabmOpType::CABM_OP_TYPE_ATTR_MATCH),
+        CabmOp(3, 3, CabmOpType::CABM_OP_TYPE_ATTR_MATCH),
         CabmOp(CabmOpType::CABM_OP_TYPE_OR),
-        CabmOp(4, CabmOpType::CABM_OP_TYPE_ATTR_MATCH),
+        CabmOp(4, 4, CabmOpType::CABM_OP_TYPE_ATTR_MATCH),
         CabmOp(CabmOpType::CABM_OP_TYPE_RIGHT_PARENTHESIS),
         CabmOp(CabmOpType::CABM_OP_TYPE_AND),
-        CabmOp(5, CabmOpType::CABM_OP_TYPE_ATTR_MATCH),
+        CabmOp(5, 5, CabmOpType::CABM_OP_TYPE_ATTR_MATCH),
         CabmOp(CabmOpType::CABM_OP_TYPE_RIGHT_PARENTHESIS),
     };
 

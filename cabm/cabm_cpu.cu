@@ -62,8 +62,8 @@ int evaluateOp(CabmOp& op,
                const std::vector<std::vector<long>>& reqTbr2D,
                const std::vector<std::vector<long>>& docTbr2D)
 {
-    const std::vector<long>& reqAttrs = reqTbr2D.at(op.getClause());
-    const std::vector<long>& docAttrs = docTbr2D.at(op.getClause());
+    const std::vector<long>& reqAttrs = reqTbr2D.at(op.getReqFieldIdx());
+    const std::vector<long>& docAttrs = docTbr2D.at(op.getDocFieldIdx());
 
     // For CPU implementation, we will use this simple two-layer for loop.
     int rst = 0;
@@ -78,8 +78,6 @@ int evaluateOp(CabmOp& op,
             }
         }
     }
-
-    //std::cout << "clause: " << op.getClause() << ", rst: " << rst << std::endl;
 
     return rst;
 }
@@ -165,7 +163,7 @@ std::string CabmOp::toString() const
     if (isOperand())
     {
         std::string opTypeStr;
-        switch (type)
+        switch (m_opType)
         {
             case CabmOpType::CABM_OP_TYPE_ATTR_MATCH:
                 opTypeStr = "MATCH";
@@ -173,11 +171,11 @@ std::string CabmOp::toString() const
             default:
                 throw std::invalid_argument("Invalid operand type (1)");
         }
-        return "[F" + std::to_string(clause) + "-" + opTypeStr + "]";
+        return "[F" + std::to_string(m_reqFieldIdx) + "-" + opTypeStr + "]";
     }
     else
     {
-        switch (type)
+        switch (m_opType)
         {
             case CabmOpType::CABM_OP_TYPE_AND:
                 return "AND";
