@@ -5,13 +5,13 @@
 
 enum class CabmOpType
 {
-    CABM_OP_TYPE_LEFT_PARENTHESIS = 0,
-    CABM_OP_TYPE_RIGHT_PARENTHESIS = 1,
-    CABM_OP_TYPE_NOT = 2,
-    CABM_OP_TYPE_AND = 3,
-    CABM_OP_TYPE_OR = 4,
-    CABM_OP_TYPE_NOOP = 1000,
-    CABM_OP_TYPE_ATTR_MATCH = 1001,
+    OPERATOR_LEFT_PARENTHESIS = 0,
+    OPERATOR_RIGHT_PARENTHESIS = 1,
+    OPERATOR_NOT = 2,
+    OPERATOR_AND = 3,
+    OPERATOR_OR = 4,
+    NOOP = 1000, // This is used to determine if an op is an operator or an operand by checking "isOperand == Op > NOOP?"
+    OPERAND_MATCH = 1001,
 };
 
 class CabmOp
@@ -28,12 +28,12 @@ public:
     {
     }
 
-    bool isOperand() const { return m_opType > CabmOpType::CABM_OP_TYPE_NOOP; }
+    bool isOperand() const { return m_opType > CabmOpType::NOOP; }
     int getPriority() const { return static_cast<int>(m_opType); }
     int getReqFieldIdx() const { return m_reqFieldIdx; }
     int getDocFieldIdx() const { return m_docFieldIdx; }
-    bool isLeftParenthesis() const { return m_opType == CabmOpType::CABM_OP_TYPE_LEFT_PARENTHESIS; }
-    bool isRightParenthesis() const { return m_opType == CabmOpType::CABM_OP_TYPE_RIGHT_PARENTHESIS; }
+    bool isLeftParenthesis() const { return m_opType == CabmOpType::OPERATOR_LEFT_PARENTHESIS; }
+    bool isRightParenthesis() const { return m_opType == CabmOpType::OPERATOR_RIGHT_PARENTHESIS; }
     CabmOpType getType() const { return m_opType; }
     std::string toString() const;
 

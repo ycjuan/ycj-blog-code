@@ -109,10 +109,10 @@ bool evaluatePostfix(std::vector<CabmOp> postfix1D,
             st.pop();
             switch (op.getType())
             {
-            case CabmOpType::CABM_OP_TYPE_AND:
+            case CabmOpType::OPERATOR_AND:
                 st.push(int((bool)rstA & (bool)rstB));
                 break;
-            case CabmOpType::CABM_OP_TYPE_OR:
+            case CabmOpType::OPERATOR_OR:
                 st.push(int((bool)rstA | (bool)rstB));
                 break;
             default:
@@ -164,7 +164,7 @@ std::string CabmOp::toString() const
         std::string opTypeStr;
         switch (m_opType)
         {
-        case CabmOpType::CABM_OP_TYPE_ATTR_MATCH:
+        case CabmOpType::OPERAND_MATCH:
             opTypeStr = "MATCH";
             break;
         default:
@@ -176,15 +176,15 @@ std::string CabmOp::toString() const
     {
         switch (m_opType)
         {
-        case CabmOpType::CABM_OP_TYPE_AND:
+        case CabmOpType::OPERATOR_AND:
             return "AND";
-        case CabmOpType::CABM_OP_TYPE_OR:
+        case CabmOpType::OPERATOR_OR:
             return "OR";
-        case CabmOpType::CABM_OP_TYPE_LEFT_PARENTHESIS:
+        case CabmOpType::OPERATOR_LEFT_PARENTHESIS:
             return "(";
-        case CabmOpType::CABM_OP_TYPE_RIGHT_PARENTHESIS:
+        case CabmOpType::OPERATOR_RIGHT_PARENTHESIS:
             return ")";
-        case CabmOpType::CABM_OP_TYPE_NOT:
+        case CabmOpType::OPERATOR_NOT:
             return "NOT";
         default:
             throw std::invalid_argument("Invalid operator type (2)");
