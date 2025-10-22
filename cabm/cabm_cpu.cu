@@ -1,9 +1,8 @@
 #include <cassert>
 #include <cerrno>
 #include <stack>
-#include <vector>
 #include <stdexcept>
-#include <iostream>
+#include <vector>
 
 #include "cabm.cuh"
 
@@ -96,7 +95,7 @@ bool evaluatePostfix(std::vector<CabmOp> postfix1D,
     {
         // If the scanned character is an operand
         // (number here), push it to the stack.
-        if (op.isOperand()) 
+        if (op.isOperand())
         {
             st.push(evaluateOp(op, reqTbr2D, docTbr2D));
         }
@@ -121,13 +120,13 @@ bool evaluatePostfix(std::vector<CabmOp> postfix1D,
                 break;
             }
         }
-
     }
     return (bool)st.top();
 }
 
-std::vector<int>
-cabmCpu(const std::vector<CabmOp>& reqInfix1D, const std::vector<std::vector<long>>& reqTbr1D, const std::vector<std::vector<std::vector<long>>>& docTbr3D)
+std::vector<int> cabmCpu(const std::vector<CabmOp>& reqInfix1D,
+                         const std::vector<std::vector<long>>& reqTbr1D,
+                         const std::vector<std::vector<std::vector<long>>>& docTbr3D)
 {
 
     std::vector<CabmOp> reqPostfix1D = infix2postfix(reqInfix1D);
@@ -165,11 +164,11 @@ std::string CabmOp::toString() const
         std::string opTypeStr;
         switch (m_opType)
         {
-            case CabmOpType::CABM_OP_TYPE_ATTR_MATCH:
-                opTypeStr = "MATCH";
-                break;
-            default:
-                throw std::invalid_argument("Invalid operand type (1)");
+        case CabmOpType::CABM_OP_TYPE_ATTR_MATCH:
+            opTypeStr = "MATCH";
+            break;
+        default:
+            throw std::invalid_argument("Invalid operand type (1)");
         }
         return "[F" + std::to_string(m_reqFieldIdx) + "-" + opTypeStr + "]";
     }
@@ -177,18 +176,18 @@ std::string CabmOp::toString() const
     {
         switch (m_opType)
         {
-            case CabmOpType::CABM_OP_TYPE_AND:
-                return "AND";
-            case CabmOpType::CABM_OP_TYPE_OR:
-                return "OR";
-            case CabmOpType::CABM_OP_TYPE_LEFT_PARENTHESIS:
-                return "(";
-            case CabmOpType::CABM_OP_TYPE_RIGHT_PARENTHESIS:
-                return ")";
-            case CabmOpType::CABM_OP_TYPE_NOT:
-                return "NOT";
-            default:
-                throw std::invalid_argument("Invalid operator type (2)");
+        case CabmOpType::CABM_OP_TYPE_AND:
+            return "AND";
+        case CabmOpType::CABM_OP_TYPE_OR:
+            return "OR";
+        case CabmOpType::CABM_OP_TYPE_LEFT_PARENTHESIS:
+            return "(";
+        case CabmOpType::CABM_OP_TYPE_RIGHT_PARENTHESIS:
+            return ")";
+        case CabmOpType::CABM_OP_TYPE_NOT:
+            return "NOT";
+        default:
+            throw std::invalid_argument("Invalid operator type (2)");
         }
     }
 }
