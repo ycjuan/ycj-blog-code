@@ -16,7 +16,7 @@ void test1a()
         CabmOp(CabmOpType::OPERATOR_AND),
         CabmOp(CabmOpType::OPERATOR_LEFT_PARENTHESIS),
         CabmOp(CabmOpType::OPERATOR_LEFT_PARENTHESIS),
-        CabmOp(3, 3, CabmOpType::OPERAND_MATCH),
+        CabmOp(3, 3, CabmOpType::OPERAND_MATCH, true),
         CabmOp(CabmOpType::OPERATOR_OR),
         CabmOp(4, 4, CabmOpType::OPERAND_MATCH),
         CabmOp(CabmOpType::OPERATOR_RIGHT_PARENTHESIS),
@@ -28,16 +28,16 @@ void test1a()
     std::cout << "Infix: " << cabmExprToString(infix) << std::endl;
 
     assert(cabmExprToString(infix)
-           == "( [F0-MATCH] OR [F1-MATCH] ) AND ( ( [F3-MATCH] OR [F4-MATCH] ) AND [F5-MATCH] )");
+           == "( {R0 MATCH D0} OR {R1 MATCH D1} ) AND ( ( {NOT R3 MATCH D3} OR {R4 MATCH D4} ) AND {R5 MATCH D5} )");
 
     std::vector<CabmOp> postfix = infix2postfix(infix);
 
     std::cout << "Postfix: " << cabmExprToString(postfix) << std::endl;
 
-    assert(cabmExprToString(postfix) == "[F0-MATCH] [F1-MATCH] OR [F3-MATCH] [F4-MATCH] OR [F5-MATCH] AND AND");
+    assert(cabmExprToString(postfix) == "{R0 MATCH D0} {R1 MATCH D1} OR {NOT R3 MATCH D3} {R4 MATCH D4} OR {R5 MATCH D5} AND AND");
 
     {
-        std::vector<std::vector<long>> reqTbr2D = { { 0 }, { 1 }, { 2 }, { 3 }, { 4 }, { 5 } };
+        std::vector<std::vector<long>> reqTbr2D = { { 0 }, { 1 }, { 2 }, { -3 }, { 4 }, { 5 } };
         std::vector<std::vector<long>> docTbr2D = { { 0 }, { -1 }, { -2 }, { 3 }, { -4 }, { 5 } };
         bool rst = evaluatePostfix(postfix, reqTbr2D, docTbr2D);
         assert(rst == true);

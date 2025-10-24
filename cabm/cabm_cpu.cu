@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cerrno>
+#include <sstream>
 #include <stack>
 #include <stdexcept>
 #include <vector>
@@ -78,6 +79,11 @@ int evaluateOp(CabmOp& op,
         }
     }
 
+    if (op.isNegation())
+    {
+        rst = !rst;
+    }
+
     return rst;
 }
 
@@ -139,16 +145,25 @@ std::string CabmOp::toString() const
 {
     if (isOperand())
     {
-        std::string opTypeStr;
+        std::ostringstream oss;
+
+        oss << "{";
+        if (m_negation)
+        {
+            oss << "NOT ";
+        }
+        oss << "R" << m_reqFieldIdx << " ";
+
         switch (m_opType)
         {
         case CabmOpType::OPERAND_MATCH:
-            opTypeStr = "MATCH";
+            oss << "MATCH";
             break;
         default:
             throw std::invalid_argument("Invalid operand type (1)");
         }
-        return "[F" + std::to_string(m_reqFieldIdx) + "-" + opTypeStr + "]";
+        oss << " D" << m_docFieldIdx << "}";
+        return oss.str();
     }
     else
     {
@@ -162,8 +177,6 @@ std::string CabmOp::toString() const
             return "(";
         case CabmOpType::OPERATOR_RIGHT_PARENTHESIS:
             return ")";
-        case CabmOpType::OPERATOR_NOT:
-            return "NOT";
         default:
             throw std::invalid_argument("Invalid operator type (2)");
         }

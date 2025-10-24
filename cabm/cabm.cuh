@@ -7,9 +7,8 @@ enum class CabmOpType
 {
     OPERATOR_LEFT_PARENTHESIS = 0,
     OPERATOR_RIGHT_PARENTHESIS = 1,
-    OPERATOR_NOT = 2,
-    OPERATOR_AND = 3,
-    OPERATOR_OR = 4,
+    OPERATOR_AND = 2,
+    OPERATOR_OR = 3,
     NOOP = 1000, // This is used to determine if an op is an operator or an operand by checking "isOperand == Op > NOOP?"
     OPERAND_MATCH = 1001,
 };
@@ -17,10 +16,11 @@ enum class CabmOpType
 class CabmOp
 {
 public:
-    CabmOp(int reqFieldIdx, int docFieldIdx, CabmOpType type) // Constructor for operands
+    CabmOp(int reqFieldIdx, int docFieldIdx, CabmOpType type, bool negation = false) // Constructor for operands
         : m_reqFieldIdx(reqFieldIdx)
         , m_docFieldIdx(docFieldIdx)
         , m_opType(type)
+        , m_negation(negation)
     {
     }
     CabmOp(CabmOpType type) // Constructor for operators
@@ -41,6 +41,7 @@ public:
     bool isLeftParenthesis() const { return m_opType == CabmOpType::OPERATOR_LEFT_PARENTHESIS; }
     bool isRightParenthesis() const { return m_opType == CabmOpType::OPERATOR_RIGHT_PARENTHESIS; }
     bool isOperator() const { return m_opType <= CabmOpType::NOOP; }
+    bool isNegation() const { return m_negation; }
 
     // Convert to string
     std::string toString() const;
@@ -48,6 +49,7 @@ public:
 private:
     const int m_reqFieldIdx = -1; // Only used when op type is an operand
     const int m_docFieldIdx = -1; // Only used when op type is an operand
+    const bool m_negation = false; // Only used when op type is an operand
     const CabmOpType m_opType = CabmOpType::NOOP;
 };
 
