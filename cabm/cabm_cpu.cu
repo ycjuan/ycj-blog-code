@@ -237,17 +237,21 @@ std::string CabmOp::toString() const
     }
 }
 
-std::vector<int> cabmCpu(const std::vector<CabmOp>& infixExpr,
-                         const std::vector<std::vector<long>>& reqData2D,
-                         const std::vector<std::vector<std::vector<long>>>& docData3D)
+std::vector<ReqDocPair> cabmCpu(const std::vector<CabmOp>& infixExpr,
+                         const std::vector<std::vector<std::vector<long>>>& reqData3D,
+                         const std::vector<std::vector<std::vector<long>>>& docData3D,
+                         const std::vector<ReqDocPair>& reqDocPairs)
 {
     std::vector<CabmOp> postfixExpr = infix2postfix(infixExpr);
-    int numDocs = docData3D.size();
 
-    std::vector<int> results(numDocs);
-    for (int i = 0; i < numDocs; i++)
+    std::vector<ReqDocPair> results;
+    for (auto reqDocPair : reqDocPairs)
     {
-        results.at(i) = evaluatePostfix(postfixExpr, reqData2D, docData3D.at(i));
+        reqDocPair.score = evaluatePostfix(postfixExpr, reqData3D.at(reqDocPair.reqIdx), docData3D.at(reqDocPair.docIdx));
+        if (reqDocPair.score != 0)
+        {
+            results.push_back(reqDocPair);
+        }
     }
 
     return results;
