@@ -31,17 +31,18 @@ public:
     // Getters
     int getReqFieldIdx() const { return m_reqFieldIdx; }
     int getDocFieldIdx() const { return m_docFieldIdx; }
-    CabmOpType getType() const { return m_opType; }
+    CabmOpType getOpType() const { return m_opType; }
 
     // Priority is used when converting infix to postfix. e.g., (a OR b AND c) -> (b c AND a OR)
+    // Note if `priorityA < priorityB`, then `priorityA` has higher priority than `priorityB`
     int getPriority() const { return static_cast<int>(m_opType); }
 
-    // Some self-idenfitiers
+    // Some convenient self-identifiers
     bool isOperand() const { return m_opType > CabmOpType::NOOP; }
-    bool isLeftParenthesis() const { return m_opType == CabmOpType::OPERATOR_LEFT_PARENTHESIS; }
-    bool isRightParenthesis() const { return m_opType == CabmOpType::OPERATOR_RIGHT_PARENTHESIS; }
     bool isOperator() const { return m_opType <= CabmOpType::NOOP; }
     bool isNegation() const { return m_negation; }
+    bool isLeftParenthesis() const { return m_opType == CabmOpType::OPERATOR_LEFT_PARENTHESIS; }
+    bool isRightParenthesis() const { return m_opType == CabmOpType::OPERATOR_RIGHT_PARENTHESIS; }
 
     // Convert to string
     std::string toString() const;
@@ -58,9 +59,9 @@ std::string cabmExprToString(const std::vector<CabmOp>& expr);
 std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix);
 
 bool evaluatePostfix(std::vector<CabmOp> postfix1D,
-                     const std::vector<std::vector<long>>& reqTbr2D,
-                     const std::vector<std::vector<long>>& docTbr2D);
+                     const std::vector<std::vector<long>>& reqData2D,
+                     const std::vector<std::vector<long>>& docData2D);
 
 std::vector<int> cabmCpu(const std::vector<CabmOp>& infixExpr,
-                         const std::vector<std::vector<long>>& reqTbr2D,
-                         const std::vector<std::vector<std::vector<long>>>& docTbr3D);
+                         const std::vector<std::vector<long>>& reqData2D,
+                         const std::vector<std::vector<std::vector<long>>>& docData3D);

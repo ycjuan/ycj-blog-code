@@ -7,29 +7,26 @@
 
 #include "cabm.cuh"
 
-// The code here is modified from: Code source:
+// The code here is modified from:
 // https://prepinsta.com/cpp-program/infix-to-postfix-conversion-using-stack/
 std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix)
 {
     std::vector<CabmOp> postfix;
-    // using inbuilt stack< > from C++ stack library
     std::stack<CabmOp> s;
 
     for (auto op : infix)
     {
-
-        // if operand add to the postfix expression
+        // if it is an operand, we can directly add it to the postfix expression
         if (op.isOperand())
         {
             postfix.push_back(op);
         }
-        // if opening bracket then push the stack
+        // if it is a left parenthesis, we need to push it to the stack first
         else if (op.isLeftParenthesis())
         {
             s.push(op);
         }
-        // if closing bracket encounted then keep popping from stack until
-        // closing a pair opening bracket is not encountered
+        // when encountering a right parenthesis, pop the stack and push to postfix until we encounter a left parenthesis
         else if (op.isRightParenthesis())
         {
             while (!s.top().isLeftParenthesis())
@@ -39,9 +36,10 @@ std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix)
             }
             s.pop();
         }
+        // in this case, op is an operator. we keep popping the stack and push to postfix until we encounter a operator with higher priority
         else
         {
-            while (!s.empty() && op.getPriority() <= s.top().getPriority())
+            while (!s.empty() && s.top().getPriority() >= op.getPriority()) // `priorityA < priorityB` means `priorityA` has higher priority than `priorityB`
             {
                 postfix.push_back(s.top());
                 s.pop();
@@ -49,6 +47,7 @@ std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix)
             s.push(op);
         }
     }
+    // finally, pop all the remaining operators from the stack and push to postfix
     while (!s.empty())
     {
         postfix.push_back(s.top());
@@ -113,7 +112,7 @@ bool evaluatePostfix(std::vector<CabmOp> postfix1D,
             st.pop();
             int rstB = st.top();
             st.pop();
-            switch (op.getType())
+            switch (op.getOpType())
             {
             case CabmOpType::OPERATOR_AND:
                 st.push(int((bool)rstA & (bool)rstB));
