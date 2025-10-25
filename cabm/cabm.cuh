@@ -5,12 +5,11 @@
 
 enum class CabmOpType
 {
-    OPERATOR_LEFT_PARENTHESIS = 0,
-    OPERATOR_RIGHT_PARENTHESIS = 1,
+    LEFT_PARENTHESIS = 0,
+    RIGHT_PARENTHESIS = 1,
     OPERATOR_AND = 2,
     OPERATOR_OR = 3,
-    NOOP = 1000, // This is used to determine if an op is an operator or an operand by checking "isOperand == Op > NOOP?"
-    OPERAND_MATCH = 1001,
+    OPERAND_MATCH = 100,
 };
 
 class CabmOp
@@ -34,11 +33,11 @@ public:
     CabmOpType getOpType() const { return m_opType; }
 
     // Some convenient self-identifiers
-    bool isOperand() const { return m_opType > CabmOpType::NOOP; }
-    bool isOperator() const { return m_opType < CabmOpType::NOOP && m_opType > CabmOpType::OPERATOR_RIGHT_PARENTHESIS; }
+    bool isOperand() const { return m_opType >= CabmOpType::OPERAND_MATCH; }
+    bool isOperator() const { return m_opType < CabmOpType::OPERAND_MATCH && m_opType > CabmOpType::RIGHT_PARENTHESIS; }
     bool isNegation() const { return m_negation; }
-    bool isLeftParenthesis() const { return m_opType == CabmOpType::OPERATOR_LEFT_PARENTHESIS; }
-    bool isRightParenthesis() const { return m_opType == CabmOpType::OPERATOR_RIGHT_PARENTHESIS; }
+    bool isLeftParenthesis() const { return m_opType == CabmOpType::LEFT_PARENTHESIS; }
+    bool isRightParenthesis() const { return m_opType == CabmOpType::RIGHT_PARENTHESIS; }
 
     // Convert to string
     std::string toString() const;
@@ -47,7 +46,7 @@ private:
     const int m_reqFieldIdx = -1; // Only used when op type is an operand
     const int m_docFieldIdx = -1; // Only used when op type is an operand
     const bool m_negation = false; // Only used when op type is an operand
-    const CabmOpType m_opType = CabmOpType::NOOP;
+    const CabmOpType m_opType; // We do not assign a default value because this field is always assigned in the constructor.
 };
 
 std::string cabmExprToString(const std::vector<CabmOp>& expr);

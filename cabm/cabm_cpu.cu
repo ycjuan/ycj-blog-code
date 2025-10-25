@@ -63,7 +63,7 @@ std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix)
             }
             s.pop();
         }
-        // in this case, op is an operator. we keep popping the stack and push to postfix until we encounter a operator with higher priority
+        // in this case, op is an operator. we keep popping the stack and push to postfix until we encounter a non-operator
         else
         {
             while (!s.empty() && s.top().isOperator())
@@ -105,22 +105,26 @@ std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix)
 }
 
 int evaluateOp(CabmOp& op,
-               const std::vector<std::vector<long>>& reqTbr2D,
-               const std::vector<std::vector<long>>& docTbr2D)
+               const std::vector<std::vector<long>>& reqData2D,
+               const std::vector<std::vector<long>>& docData2D)
 {
-    const std::vector<long>& reqAttrs = reqTbr2D.at(op.getReqFieldIdx());
-    const std::vector<long>& docAttrs = docTbr2D.at(op.getDocFieldIdx());
+    const std::vector<long>& reqAttrs = reqData2D.at(op.getReqFieldIdx());
+    const std::vector<long>& docAttrs = docData2D.at(op.getDocFieldIdx());
 
-    // For CPU implementation, we will use this simple two-layer for loop.
     int rst = 0;
-    for (auto reqAttr : reqAttrs)
+    
+    // For CPU implementation, we will use this simple two-layer for loop.
+    if (op.getOpType() == CabmOpType::OPERAND_MATCH)
     {
-        for (auto docAttr : docAttrs)
+        for (auto reqAttr : reqAttrs)
         {
-            if (reqAttr == docAttr)
+            for (auto docAttr : docAttrs)
             {
-                rst = 1;
-                break;
+                if (reqAttr == docAttr)
+                {
+                    rst = 1;
+                    break;
+                }
             }
         }
     }
@@ -135,8 +139,8 @@ int evaluateOp(CabmOp& op,
 
 // the code is modified from https://www.geeksforgeeks.org/evaluation-of-postfix-expression/
 bool evaluatePostfix(std::vector<CabmOp> postfix1D,
-                     const std::vector<std::vector<long>>& reqTbr2D,
-                     const std::vector<std::vector<long>>& docTbr2D)
+                     const std::vector<std::vector<long>>& reqData2D,
+                     const std::vector<std::vector<long>>& docData2D)
 {
 
     // Create a stack of capacity equal to expression size
@@ -149,7 +153,7 @@ bool evaluatePostfix(std::vector<CabmOp> postfix1D,
         // (number here), push it to the stack.
         if (op.isOperand())
         {
-            st.push(evaluateOp(op, reqTbr2D, docTbr2D));
+            st.push(evaluateOp(op, reqData2D, docData2D));
         }
         // If the scanned character is an operator,
         // pop two elements from stack apply the operator
@@ -219,9 +223,9 @@ std::string CabmOp::toString() const
             return "AND";
         case CabmOpType::OPERATOR_OR:
             return "OR";
-        case CabmOpType::OPERATOR_LEFT_PARENTHESIS:
+        case CabmOpType::LEFT_PARENTHESIS:
             return "(";
-        case CabmOpType::OPERATOR_RIGHT_PARENTHESIS:
+        case CabmOpType::RIGHT_PARENTHESIS:
             return ")";
         default:
             throw std::invalid_argument("Invalid operator type (2)");
@@ -230,16 +234,16 @@ std::string CabmOp::toString() const
 }
 
 std::vector<int> cabmCpu(const std::vector<CabmOp>& infixExpr,
-                         const std::vector<std::vector<long>>& reqTbr2D,
-                         const std::vector<std::vector<std::vector<long>>>& docTbr3D)
+                         const std::vector<std::vector<long>>& reqData2D,
+                         const std::vector<std::vector<std::vector<long>>>& docData3D)
 {
     std::vector<CabmOp> postfixExpr = infix2postfix(infixExpr);
-    int numDocs = docTbr3D.size();
+    int numDocs = docData3D.size();
 
     std::vector<int> results(numDocs);
     for (int i = 0; i < numDocs; i++)
     {
-        results.at(i) = evaluatePostfix(postfixExpr, reqTbr2D, docTbr3D.at(i));
+        results.at(i) = evaluatePostfix(postfixExpr, reqData2D, docData3D.at(i));
     }
 
     return results;
