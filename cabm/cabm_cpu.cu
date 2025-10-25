@@ -128,6 +128,10 @@ int evaluateOp(CabmOp& op,
             }
         }
     }
+    else
+    {
+        throw std::invalid_argument("Invalid operator type: " + std::to_string(static_cast<int>(op.getOpType())));
+    }
 
     if (op.isNegation())
     {
