@@ -33,13 +33,9 @@ public:
     int getDocFieldIdx() const { return m_docFieldIdx; }
     CabmOpType getOpType() const { return m_opType; }
 
-    // Priority is used when converting infix to postfix. e.g., (a OR b AND c) -> (b c AND a OR)
-    // Note if `priorityA < priorityB`, then `priorityA` has higher priority than `priorityB`
-    int getPriority() const { return static_cast<int>(m_opType); }
-
     // Some convenient self-identifiers
     bool isOperand() const { return m_opType > CabmOpType::NOOP; }
-    bool isOperator() const { return m_opType <= CabmOpType::NOOP; }
+    bool isOperator() const { return m_opType < CabmOpType::NOOP && m_opType > CabmOpType::OPERATOR_RIGHT_PARENTHESIS; }
     bool isNegation() const { return m_negation; }
     bool isLeftParenthesis() const { return m_opType == CabmOpType::OPERATOR_LEFT_PARENTHESIS; }
     bool isRightParenthesis() const { return m_opType == CabmOpType::OPERATOR_RIGHT_PARENTHESIS; }

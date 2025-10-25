@@ -4,8 +4,11 @@
 #include <stack>
 #include <stdexcept>
 #include <vector>
+#include <iostream>
 
 #include "cabm.cuh"
+
+const bool g_kDebug = false;
 
 // The code here is modified from:
 // https://prepinsta.com/cpp-program/infix-to-postfix-conversion-using-stack/
@@ -16,14 +19,26 @@ std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix)
 
     for (auto op : infix)
     {
+        if (g_kDebug)
+        {
+            std::cout << "Processing op: " << op.toString() << std::endl;
+        }
         // if it is an operand, we can directly add it to the postfix expression
         if (op.isOperand())
         {
+            if (g_kDebug)
+            {
+                std::cout << "[1] Adding operand to postfix: " << op.toString() << std::endl;
+            }
             postfix.push_back(op);
         }
         // if it is a left parenthesis, we need to push it to the stack first
         else if (op.isLeftParenthesis())
         {
+            if (g_kDebug)
+            {
+                std::cout << "[2] Adding left parenthesis to stack: " << op.toString() << std::endl;
+            }
             s.push(op);
         }
         // when encountering a right parenthesis, pop the stack and push to postfix until we encounter a left parenthesis
@@ -31,18 +46,42 @@ std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix)
         {
             while (!s.top().isLeftParenthesis())
             {
+                if (g_kDebug)
+                {
+                    std::cout << "[3] Adding operator to postfix: " << s.top().toString() << std::endl;
+                }
                 postfix.push_back(s.top());
+                if (g_kDebug)
+                {
+                    std::cout << "[3] Popping from stack: " << s.top().toString() << std::endl;
+                }
                 s.pop();
+            }
+            if (g_kDebug)
+            {
+                std::cout << "[3] Popping left parenthesis from stack: " << s.top().toString() << std::endl;
             }
             s.pop();
         }
         // in this case, op is an operator. we keep popping the stack and push to postfix until we encounter a operator with higher priority
         else
         {
-            while (!s.empty() && s.top().getPriority() >= op.getPriority()) // `priorityA < priorityB` means `priorityA` has higher priority than `priorityB`
+            while (!s.empty() && s.top().isOperator())
             {
+                if (g_kDebug)
+                {
+                    std::cout << "[4] Adding operator to postfix: " << s.top().toString() << std::endl;
+                }
                 postfix.push_back(s.top());
+                if (g_kDebug)
+                {
+                    std::cout << "[4] Popping from stack: " << s.top().toString() << std::endl;
+                }
                 s.pop();
+            }
+            if (g_kDebug)
+            {
+                std::cout << "[4] Adding operator to stack: " << op.toString() << std::endl;
             }
             s.push(op);
         }
@@ -50,7 +89,15 @@ std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix)
     // finally, pop all the remaining operators from the stack and push to postfix
     while (!s.empty())
     {
+        if (g_kDebug)
+        {
+            std::cout << "[5] Adding operator to postfix: " << s.top().toString() << std::endl;
+        }
         postfix.push_back(s.top());
+        if (g_kDebug)
+        {
+            std::cout << "[5] Popping from stack: " << s.top().toString() << std::endl;
+        }
         s.pop();
     }
 
