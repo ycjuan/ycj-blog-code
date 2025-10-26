@@ -6,12 +6,14 @@
 #include "data_struct.cuh"
 #include "cabm.cuh"
 #include "macro.cuh"
+#include "util.cuh"
 
 void test3a()
 {
     const int kNumReqs = 1;
     const uint64_t kNumDocs = 10;
     const int kNumFields = 6;
+    const int kNumTrials = 100;
     const std::vector<int> kNumValsPerFieldMin = { 2, 2, 2, 2, 2, 2 };
     const std::vector<int> kNumValsPerFieldMax = { 10, 10, 10, 10, 10, 10 };
 
@@ -60,7 +62,17 @@ void test3a()
         param.reqAbmDataGpu = reqAbmDataGpu;
         param.docAbmDataGpu = docAbmDataGpu;
 
-        cabmGpu(param);
+        Timer timer;
+        for (int trial = -3; trial < kNumTrials; trial++)
+        {
+            if (trial == 0)
+            {
+                timer.tic();
+            }
+            cabmGpu(param);
+        }
+        float timeMs = timer.tocMs() / kNumTrials;
+        std::cout << "Time per trial: " << timeMs << " ms" << std::endl;
 
         std::vector<uint8_t> rstGpu(kNumReqs * kNumDocs);
         CHECK_CUDA(cudaMemcpy(rstGpu.data(), d_rst, kNumReqs * kNumDocs * sizeof(uint8_t), cudaMemcpyDeviceToHost));

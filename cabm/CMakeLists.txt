@@ -25,6 +25,7 @@ set(LIB_HEADER_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/cabm.cuh
     ${CMAKE_CURRENT_SOURCE_DIR}/data_struct.cuh
     ${CMAKE_CURRENT_SOURCE_DIR}/macro.cuh
+    ${CMAKE_CURRENT_SOURCE_DIR}/util.cuh
 )
 
 set(LIB_SOURCE_FILES
