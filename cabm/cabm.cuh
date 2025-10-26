@@ -48,8 +48,8 @@ private:
     const int m_reqFieldIdx = -1; // Only used when op type is an operand
     const int m_docFieldIdx = -1; // Only used when op type is an operand
     const bool m_negation = false; // Only used when op type is an operand
-    const CabmOpType
-        m_opType; // We do not assign a default value because this field is always assigned in the constructor.
+    const CabmOpType m_opType; // We do not assign a default value because
+                               // this field is always assigned in the constructor.
 };
 
 std::string cabmExprToString(const std::vector<CabmOp>& expr);
@@ -60,7 +60,6 @@ bool evaluatePostfix(std::vector<CabmOp> postfix1D,
                      const std::vector<std::vector<long>>& reqData2D,
                      const std::vector<std::vector<long>>& docData2D);
 
-std::vector<ReqDocPair> cabmCpu(const std::vector<CabmOp>& infixExpr,
-                                const std::vector<std::vector<std::vector<long>>>& reqData3D,
-                                const std::vector<std::vector<std::vector<long>>>& docData3D,
-                                const std::vector<ReqDocPair>& reqDocPairs);
+std::vector<std::vector<uint8_t>> cabmCpu(const std::vector<CabmOp>& infixExpr,
+                                          const std::vector<std::vector<std::vector<long>>>& reqData3D,
+                                          const std::vector<std::vector<std::vector<long>>>& docData3D);

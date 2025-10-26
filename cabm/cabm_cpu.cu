@@ -1,10 +1,10 @@
 #include <cassert>
 #include <cerrno>
+#include <iostream>
 #include <sstream>
 #include <stack>
 #include <stdexcept>
 #include <vector>
-#include <iostream>
 
 #include "cabm.cuh"
 
@@ -41,7 +41,8 @@ std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix)
             }
             s.push(op);
         }
-        // when encountering a right parenthesis, pop the stack and push to postfix until we encounter a left parenthesis
+        // when encountering a right parenthesis, pop the stack and push to postfix until we encounter a left
+        // parenthesis
         else if (op.isRightParenthesis())
         {
             while (!s.top().isLeftParenthesis())
@@ -63,7 +64,8 @@ std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix)
             }
             s.pop();
         }
-        // in this case, op is an operator. we keep popping the stack and push to postfix until we encounter a non-operator
+        // in this case, op is an operator. we keep popping the stack and push to postfix until we encounter a
+        // non-operator
         else
         {
             while (!s.empty() && s.top().isOperator())
@@ -112,7 +114,7 @@ int evaluateOp(CabmOp& op,
     const std::vector<long>& docAttrs = docData2D.at(op.getDocFieldIdx_dh());
 
     int rst = 0;
-    
+
     // For CPU implementation, we will use this simple two-layer for loop.
     if (op.getOpType() == CabmOpType::OPERAND_MATCH)
     {
@@ -237,22 +239,21 @@ std::string CabmOp::toString() const
     }
 }
 
-std::vector<ReqDocPair> cabmCpu(const std::vector<CabmOp>& infixExpr,
-                         const std::vector<std::vector<std::vector<long>>>& reqData3D,
-                         const std::vector<std::vector<std::vector<long>>>& docData3D,
-                         const std::vector<ReqDocPair>& reqDocPairs)
+std::vector<std::vector<uint8_t>> cabmCpu(const std::vector<CabmOp>& infixExpr,
+                                          const std::vector<std::vector<std::vector<long>>>& reqData3D,
+                                          const std::vector<std::vector<std::vector<long>>>& docData3D)
 {
     std::vector<CabmOp> postfixExpr = infix2postfix(infixExpr);
 
-    std::vector<ReqDocPair> results;
-    for (auto reqDocPair : reqDocPairs)
+    std::vector<std::vector<uint8_t>> rst2D;
+    rst2D.resize(reqData3D.size());
+    for (uint32_t reqIdx = 0; reqIdx < reqData3D.size(); reqIdx++)
     {
-        reqDocPair.score = evaluatePostfix(postfixExpr, reqData3D.at(reqDocPair.reqIdx), docData3D.at(reqDocPair.docIdx));
-        if (reqDocPair.score != 0)
+        rst2D.at(reqIdx).resize(docData3D.size());
+        for (uint32_t docIdx = 0; docIdx < docData3D.size(); docIdx++)
         {
-            results.push_back(reqDocPair);
+            rst2D.at(reqIdx).at(docIdx) = evaluatePostfix(postfixExpr, reqData3D.at(reqIdx), docData3D.at(docIdx));
         }
     }
-
-    return results;
+    return rst2D;
 }
