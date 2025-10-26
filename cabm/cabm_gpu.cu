@@ -1,40 +1,31 @@
 #include <cassert>
-#include <cmath>
 #include <cstdint>
-#include <functional>
-#include <iostream>
 #include <math.h>
-#include <numeric>
-#include <random>
-#include <stdexcept>
-#include <string>
 #include <thrust/copy.h>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
-#include <vector>
 
 #include "cabm.cuh"
+#include "common.cuh"
 
-constexpr uint32_t g_kMaxBitStackCount = 64; // We use uint64_t to store the bit stack, so the max number of elements is 64
+// We use uint64_t to store the bit stack, so the max number of elements is 64
+constexpr uint32_t g_kMaxBitStackCount = 64;
 
-__device__ void stackPushTrue(uint64_t& bitStack, uint8_t& bitStackCount)
+__device__ void stackPushTrue(uint64_t& bitStack, const uint8_t currBitStackIdx)
 {
-    uint64_t mask = 1L << bitStackCount;
+    uint64_t mask = 1L << currBitStackIdx;
     bitStack = bitStack | mask;
-    bitStackCount++;
 }
 
-__device__ void stackPushFalse(uint64_t& bitStack, uint8_t& bitStackCount)
+__device__ void stackPushFalse(uint64_t& bitStack, const uint8_t currBitStackIdx)
 {
-    uint64_t mask = ~(1L << bitStackCount);
+    uint64_t mask = ~(1L << currBitStackIdx);
     bitStack = bitStack & mask;
-    bitStackCount++;
 }
 
-__device__ bool stackPop(uint64_t& bitStack, uint8_t& bitStackCount)
+__device__ bool stackTop(const uint64_t bitStack, const uint8_t currBitStackIdx)
 {
-    bitStackCount--;
-    uint64_t mask = 1L << bitStackCount;
+    uint64_t mask = 1L << currBitStackIdx;
     uint64_t tmp = bitStack & mask;
     return tmp > 0L;
 }
@@ -74,24 +65,22 @@ __device__ bool matchOp(const AbmDataGpu& reqAbmDataGpu,
 __global__ void matchOpKernel(const AbmDataGpu& reqAbmDataGpu,
                               const AbmDataGpu& docAbmDataGpu,
                               const CabmOp& op,
-                              const ReqDocPair *d_reqDocPairs,    
-                              const uint64_t numReqDocPairs,
-                              uint64_t *d_bitStacks,
-                              uint8_t *d_bitStackCounts,
-                              const uint8_t maxBitStackCount)
+                              const uint64_t reqIdx,
+                              const uint64_t numDocs,
+                              uint64_t* d_bitStacks,
+                              uint8_t* d_bitStackCounts)
 {
-    uint64_t reqDocPairIdx = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
-    if (reqDocPairIdx < numReqDocPairs)
+    uint64_t docIdx = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
+    if (docIdx < numDocs)
     {
-        const ReqDocPair &reqDocPair = d_reqDocPairs[reqDocPairIdx];
-        bool rst = matchOp(reqAbmDataGpu, docAbmDataGpu, reqDocPair.reqIdx, reqDocPair.docIdx, op);
+        bool rst = matchOp(reqAbmDataGpu, docAbmDataGpu, reqIdx, docIdx, op);
         if (rst)
         {
-            stackPushTrue(d_bitStacks[reqDocPairIdx], d_bitStackCounts[reqDocPairIdx]);
+            stackPushTrue(d_bitStacks[docIdx], d_bitStackCounts[docIdx]);
         }
         else
         {
-            stackPushFalse(d_bitStacks[reqDocPairIdx], d_bitStackCounts[reqDocPairIdx]);
+            stackPushFalse(d_bitStacks[docIdx], d_bitStackCounts[docIdx]);
         }
     }
 }
@@ -106,66 +95,104 @@ __global__ void operatorAndKernel(const CabmOp* d_postfixOps,
     uint64_t docIdx = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (docIdx < numDocs)
     {
-        uint64_t &bitStack = d_bitStacks[docIdx];
-        uint8_t &bitStackCount = d_bitStackCounts[docIdx];
-        bool rst1 = stackPop(bitStack, bitStackCount);
-        bool rst2 = stackPop(bitStack, bitStackCount);
+        uint64_t& bitStack = d_bitStacks[docIdx];
+        uint8_t& bitStackCount = d_bitStackCounts[docIdx];
+        bool rst1 = stackTop(bitStack, bitStackCount);
+        bool rst2 = stackTop(bitStack, bitStackCount);
         bool rst = rst1 & rst2;
-        stackPushTrue(bitStack, bitStackCount);
+        if (rst)
+        {
+            stackPushTrue(bitStack, bitStackCount);
+        }
+        else
+        {
+            stackPushFalse(bitStack, bitStackCount);
+        }
     }
 }
 
 __global__ void operatorOrKernel(const CabmOp* d_postfixOps,
-                                  const uint32_t currOpIdx,
-                                  const uint64_t numPostfixOps,
-                                  uint64_t* d_bitStacks,
-                                  uint8_t* d_bitStackCounts,
-                                  const uint64_t numDocs)
+                                 const uint32_t currOpIdx,
+                                 const uint64_t numPostfixOps,
+                                 uint64_t* d_bitStacks,
+                                 const uint8_t currBitStackIdx,
+                                 const uint64_t numDocs)
 {
     uint64_t docIdx = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (docIdx < numDocs)
     {
-        uint64_t &bitStack = d_bitStacks[docIdx];
-        uint8_t &bitStackCount = d_bitStackCounts[docIdx];
-        bool rst1 = stackPop(bitStack, bitStackCount);
-        bool rst2 = stackPop(bitStack, bitStackCount);
+        uint64_t& bitStack = d_bitStacks[docIdx];
+        bool rst1 = stackTop(bitStack, currBitStackIdx);
+        bool rst2 = stackTop(bitStack, currBitStackIdx + 1);
         bool rst = rst1 | rst2;
-        stackPushTrue(bitStack, bitStackCount);
+        if (rst)
+        {
+            stackPushTrue(bitStack, currBitStackIdx);
+        }
+        else
+        {
+            stackPushFalse(bitStack, currBitStackIdx);
+        }
+    }
+}
+
+void cabmGpuOneReq(const AbmDataGpu& reqAbmDataGpu,
+                   const AbmDataGpu& docAbmDataGpu,
+                   const CabmOp* d_postfixOps,
+                   const uint32_t numPostfixOps,
+                   uint64_t* d_bitStacks,
+                   uint8_t* d_bitStackCounts,
+                   const uint64_t numDocs,
+                   const uint64_t reqIdx)
+{
+    const int kBlockSize = 1024;
+    const int kGridSize = (numDocs + kBlockSize - 1) / kBlockSize;
+    uint8_t currBitStackIdx = 0;
+    for (uint32_t opIdx = 0; opIdx < numPostfixOps; opIdx++)
+    {
+        const CabmOp& op = d_postfixOps[opIdx];
+        if (op.isOperand())
+        {
+            if (op.getOpType() == CabmOpType::OPERAND_MATCH)
+            {
+                matchOpKernel<<<kGridSize, kBlockSize>>>(reqAbmDataGpu, docAbmDataGpu, op, reqIdx, numDocs, d_bitStacks, d_bitStackCounts);
+            }
+            else
+            {
+                assert(false);
+            }
+            currBitStackIdx++;
+        }
+        else if (op.isOperator())
+        {
+            currBitStackIdx -= 2;
+            if (op.getOpType() == CabmOpType::OPERATOR_AND)
+            {
+                operatorAndKernel<<<kGridSize, kBlockSize>>>(d_postfixOps, opIdx, numPostfixOps, d_bitStacks, d_bitStackCounts, numDocs);
+            }
+            else if (op.getOpType() == CabmOpType::OPERATOR_OR)
+            {
+                operatorOrKernel<<<kGridSize, kBlockSize>>>(d_postfixOps, opIdx, numPostfixOps, d_bitStacks, currBitStackIdx, numDocs);
+            }
+            else
+            {
+                assert(false);
+            }    
+        }
+        CHECK_CUDA(cudaDeviceSynchronize())
+        CHECK_CUDA(cudaGetLastError())
     }
 }
 
 /*
-
-__global__ void cabmKernel(CabmGpuParam param) {
-
-    long m = (long)blockIdx.x*blockDim.x+threadIdx.x + param.offsetA;
-
-    if (m < param.msgSize) {
-        int i;
-        int r;
-        Msg msg;
-
-        if (param.d_msgInit != nullptr) {
-            i = m / param.numReqs;
-            r = m % param.numReqs;
-            msg = param.d_msgInit[i];
-            msg.i = i;
-            msg.r = r;
-        } else {
-            msg = param.d_msg[m];
-            i = msg.i;
-            r = msg.r;
-        }
-
-        bool finalRst;
-        if (msg.score != 0) {
-            uint64_t bs;
-            int bsCount = 0; // bsCount-1 indicate the current head
-            // bs stands for "bitStack". since we only need to store the "binary result" of each operand, we only need 1
-bit for each operand.
-            // here we use a 64-bit integer, so it can hold up to 64 elements in the stack
-            // "bsCount" is used to indicate how many element there are in the bit stack
-
+void cabmGpuOneReq(const AbmDataGpu& reqAbmDataGpu,
+                   const AbmDataGpu& docAbmDataGpu,
+                   const CabmOp* d_postfixOps,
+                   const uint32_t numPostfixOps,
+                   uint64_t* d_bitStacks,
+                   uint8_t* d_bitStackCounts,
+                   const uint64_t numDocs,
+                   const uint64_t reqIdx)
             for (int c = 0; c < param.reqPostfixExprLength; c++) {
                 CabmOp op = param.d_reqPostfixOp[c];
 

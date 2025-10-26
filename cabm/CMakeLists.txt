@@ -28,6 +28,7 @@ set(LIB_HEADER_FILES
 
 set(LIB_SOURCE_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/cabm_cpu.cu
+    ${CMAKE_CURRENT_SOURCE_DIR}/cabm_gpu.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/data_struct.cu
 )
 
