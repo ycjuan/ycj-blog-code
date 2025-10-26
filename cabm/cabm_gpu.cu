@@ -143,7 +143,6 @@ struct CabmGpuParam
     AbmDataGpu docAbmDataGpu;
     std::vector<CabmOp> postfixOps;
     uint64_t* d_bitStacks;
-    uint8_t* d_bitStackCounts;
     uint64_t numDocs;
     uint64_t numReqs;
     uint8_t* d_rst;
@@ -158,7 +157,6 @@ void cabmGpu(CabmGpuParam param)
     {
         uint8_t currBitStackIdx = 0;
         CHECK_CUDA(cudaMemset(param.d_bitStacks, 0, param.numDocs * sizeof(uint64_t)));
-        CHECK_CUDA(cudaMemset(param.d_bitStackCounts, 0, param.numDocs * sizeof(uint8_t)));
         for (const auto& op : param.postfixOps)
         {
             if (op.isOperand())
@@ -230,13 +228,10 @@ bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
     CHECK_CUDA(cudaMallocManaged(&d_rst, 1 * sizeof(uint8_t)));
     uint64_t* d_bitStacks;
     CHECK_CUDA(cudaMallocManaged(&d_bitStacks, 1 * sizeof(uint64_t)));
-    uint8_t* d_bitStackCounts;
-    CHECK_CUDA(cudaMallocManaged(&d_bitStackCounts, 1 * sizeof(uint8_t)));
 
     CabmGpuParam param;
     param.d_rst = d_rst;
     param.d_bitStacks = d_bitStacks;
-    param.d_bitStackCounts = d_bitStackCounts;
     param.numDocs = 1;
     param.numReqs = 1;
     param.postfixOps = postfix1D;
@@ -249,7 +244,6 @@ bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
 
     CHECK_CUDA(cudaFree(d_rst));
     CHECK_CUDA(cudaFree(d_bitStacks));
-    CHECK_CUDA(cudaFree(d_bitStackCounts));
 
     return rst;
 }
