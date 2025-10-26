@@ -37,10 +37,10 @@ __device__ bool matchOp(const AbmDataGpu& reqAbmDataGpu,
                         const int docIdx,
                         const CabmOp& op)
 {
-    int reqOffsetIter = reqAbmDataGpu.getOffset_d(reqIdx, op.getReqFieldIdx_dh());
-    int docOffsetIter = docAbmDataGpu.getOffset_d(docIdx, op.getDocFieldIdx_dh());
-    int reqOffsetEnd = reqAbmDataGpu.getOffset_d(reqIdx, op.getReqFieldIdx_dh() + 1);
-    int docOffsetEnd = docAbmDataGpu.getOffset_d(docIdx, op.getDocFieldIdx_dh() + 1);
+    int reqOffsetIter = reqAbmDataGpu.getOffset_d(reqIdx, op.getReqFieldIdx());
+    int docOffsetIter = docAbmDataGpu.getOffset_d(docIdx, op.getDocFieldIdx());
+    int reqOffsetEnd = reqAbmDataGpu.getOffset_d(reqIdx, op.getReqFieldIdx() + 1);
+    int docOffsetEnd = docAbmDataGpu.getOffset_d(docIdx, op.getDocFieldIdx() + 1);
 
     while (reqOffsetIter < reqOffsetEnd && docOffsetIter < docOffsetEnd)
     {
@@ -110,7 +110,7 @@ __global__ void operatorKernel(OperatorKernelParam param)
         uint8_t& bitStackCount = param.d_bitStackCounts[docIdx];
         bool rst1 = stackTop(bitStack, bitStackCount);
         bool rst2 = stackTop(bitStack, bitStackCount);
-        bool rst = (param.op.getOpType_dh() == CabmOpType::OPERATOR_AND) ? (rst1 & rst2) : (rst1 | rst2);
+        bool rst = (param.op.getOpType() == CabmOpType::OPERATOR_AND) ? (rst1 & rst2) : (rst1 | rst2);
         if (rst)
         {
             stackPushTrue(bitStack, bitStackCount);
@@ -179,7 +179,7 @@ void cabmGpuOneReq(const AbmDataGpu& reqAbmDataGpu,
             param.numDocs = numDocs;
             param.d_bitStacks = d_bitStacks;
             param.d_bitStackCounts = d_bitStackCounts;
-            if (op.getOpType_dh() == CabmOpType::OPERAND_MATCH)
+            if (op.getOpType() == CabmOpType::OPERAND_MATCH)
             {
                 matchOpKernel<<<kGridSize, kBlockSize>>>(param);
             }

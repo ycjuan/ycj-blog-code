@@ -14,7 +14,7 @@ struct CudaDeleter
     }
 };
 
-__device__ __host__ inline uint64_t getMemAddrRowMajorDevice(int row, int col, int numRows, int numCols)
+__device__ __host__ inline uint64_t getMemAddrRowMajor(int row, int col, int numRows, int numCols)
 {
     return (uint64_t)row * numCols + col;
 }
@@ -62,12 +62,12 @@ private:
 
     __device__ __host__ uint64_t getMemAddrData_dh(int row, int offset) const
     {
-        return getMemAddrRowMajorDevice(row, offset, m_numRows, m_maxNumValsPerRow);
+        return getMemAddrRowMajor(row, offset, m_numRows, m_maxNumValsPerRow);
     }
 
     __device__ __host__ uint64_t getMemAddrOffsets_dh(int row, int field) const
     {
-        return getMemAddrRowMajorDevice(row, field, m_numRows, m_numFields + 1);
+        return getMemAddrRowMajor(row, field, m_numRows, m_numFields + 1);
     }
 };
 
