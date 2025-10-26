@@ -122,31 +122,6 @@ __global__ void operatorKernel(OperatorKernelParam param)
     }
 }
 
-__global__ void operatorOrKernel(const CabmOp* d_postfixOps,
-                                 const uint32_t currOpIdx,
-                                 const uint64_t numPostfixOps,
-                                 uint64_t* d_bitStacks,
-                                 const uint8_t currBitStackIdx,
-                                 const uint64_t numDocs)
-{
-    uint64_t docIdx = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
-    if (docIdx < numDocs)
-    {
-        uint64_t& bitStack = d_bitStacks[docIdx];
-        bool rst1 = stackTop(bitStack, currBitStackIdx);
-        bool rst2 = stackTop(bitStack, currBitStackIdx + 1);
-        bool rst = rst1 | rst2;
-        if (rst)
-        {
-            stackPushTrue(bitStack, currBitStackIdx);
-        }
-        else
-        {
-            stackPushFalse(bitStack, currBitStackIdx);
-        }
-    }
-}
-
 __global__ void copyRstKernel(uint8_t* d_rst, uint64_t* d_bitStacks, uint64_t numDocs)
 {
     uint64_t docIdx = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
@@ -190,17 +165,17 @@ void cabmGpu(CabmGpuParam param)
                     throw std::runtime_error(oss.str());
                 }
 
-                OperandKernelParam param;
-                param.reqAbmDataGpu = param.reqAbmDataGpu;
-                param.docAbmDataGpu = param.docAbmDataGpu;
-                param.op = op;
-                param.reqIdx = reqIdx;
-                param.numDocs = param.numDocs;
-                param.d_bitStacks = param.d_bitStacks;
-                param.d_bitStackCounts = param.d_bitStackCounts;
+                OperandKernelParam operandKernelParam;
+                operandKernelParam.reqAbmDataGpu = param.reqAbmDataGpu;
+                operandKernelParam.docAbmDataGpu = param.docAbmDataGpu;
+                operandKernelParam.op = op;
+                operandKernelParam.reqIdx = reqIdx;
+                operandKernelParam.numDocs = param.numDocs;
+                operandKernelParam.d_bitStacks = param.d_bitStacks;
+                operandKernelParam.d_bitStackCounts = param.d_bitStackCounts;
                 if (op.getOpType() == CabmOpType::OPERAND_MATCH)
                 {
-                    matchOpKernel<<<kGridSize, kBlockSize>>>(param);
+                    matchOpKernel<<<kGridSize, kBlockSize>>>(operandKernelParam);
                 }
                 else
                 {
@@ -212,13 +187,12 @@ void cabmGpu(CabmGpuParam param)
             {
                 currBitStackIdx -= 2;
 
-                OperatorKernelParam param;
-                param.op = op;
-                param.numPostfixOps = param.numPostfixOps;
-                param.d_bitStacks = param.d_bitStacks;
-                param.d_bitStackCounts = param.d_bitStackCounts;
-                param.numDocs = param.numDocs;
-                operatorKernel<<<kGridSize, kBlockSize>>>(param);
+                OperatorKernelParam operatorKernelParam;
+                operatorKernelParam.op = op;
+                operatorKernelParam.d_bitStacks = param.d_bitStacks;
+                operatorKernelParam.d_bitStackCounts = param.d_bitStackCounts;
+                operatorKernelParam.numDocs = param.numDocs;
+                operatorKernel<<<kGridSize, kBlockSize>>>(operatorKernelParam);
             }
             CHECK_CUDA(cudaDeviceSynchronize())
             CHECK_CUDA(cudaGetLastError())
@@ -243,15 +217,15 @@ bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
 {
     AbmDataGpu reqAbmDataGpu;
     AbmDataGpu docAbmDataGpu;
-    reqAbmDataGpu.init({reqData2D});
-    docAbmDataGpu.init({docData2D});
+    reqAbmDataGpu.init({reqData2D}, true);
+    docAbmDataGpu.init({docData2D}, true);
 
     uint8_t* d_rst;
-    CHECK_CUDA(cudaMalloc(&d_rst, 1 * sizeof(uint8_t)));
+    CHECK_CUDA(cudaMallocManaged(&d_rst, 1 * sizeof(uint8_t)));
     uint64_t* d_bitStacks;
-    CHECK_CUDA(cudaMalloc(&d_bitStacks, 1 * sizeof(uint64_t)));
+    CHECK_CUDA(cudaMallocManaged(&d_bitStacks, 1 * sizeof(uint64_t)));
     uint8_t* d_bitStackCounts;
-    CHECK_CUDA(cudaMalloc(&d_bitStackCounts, 1 * sizeof(uint8_t)));
+    CHECK_CUDA(cudaMallocManaged(&d_bitStackCounts, 1 * sizeof(uint8_t)));
 
     CabmGpuParam param;
     param.d_rst = d_rst;
@@ -265,8 +239,11 @@ bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
 
     cabmGpu(param);
 
-    uint8_t rst;
-    CHECK_CUDA(cudaMemcpy(&rst, d_rst, 1 * sizeof(uint8_t), cudaMemcpyDeviceToHost));
+    uint8_t rst = d_rst[0];
+
+    CHECK_CUDA(cudaFree(d_rst));
+    CHECK_CUDA(cudaFree(d_bitStacks));
+    CHECK_CUDA(cudaFree(d_bitStackCounts));
 
     return rst;
 }
