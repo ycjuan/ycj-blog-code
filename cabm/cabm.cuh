@@ -60,6 +60,10 @@ bool evaluatePostfix(std::vector<CabmOp> postfix1D,
                      const std::vector<std::vector<long>>& reqData2D,
                      const std::vector<std::vector<long>>& docData2D);
 
+bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
+                               const std::vector<std::vector<long>>& reqData2D,
+                               const std::vector<std::vector<long>>& docData2D);
+
 std::vector<std::vector<uint8_t>> cabmCpu(const std::vector<CabmOp>& infixExpr,
                                           const std::vector<std::vector<std::vector<long>>>& reqData3D,
                                           const std::vector<std::vector<std::vector<long>>>& docData3D);

@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cstdint>
 #include <math.h>
+#include <ostream>
 #include <sstream>
 #include <thrust/copy.h>
 #include <thrust/execution_policy.h>
@@ -94,7 +95,6 @@ __global__ void matchOpKernel(OperandKernelParam param)
 struct OperatorKernelParam
 {
     CabmOp op;
-    uint32_t currOpIdx;
     uint64_t numPostfixOps;
     uint64_t* d_bitStacks;
     uint8_t* d_bitStackCounts;
@@ -147,16 +147,25 @@ __global__ void operatorOrKernel(const CabmOp* d_postfixOps,
     }
 }
 
+__global__ void copyRstKernel(uint8_t* d_rst, uint64_t* d_bitStacks, uint64_t numDocs)
+{
+    uint64_t docIdx = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
+    if (docIdx < numDocs)
+    {
+        d_rst[docIdx] = stackTop(d_bitStacks[docIdx], 0);
+    }
+}
+
 struct CabmGpuParam
 {
     AbmDataGpu reqAbmDataGpu;
     AbmDataGpu docAbmDataGpu;
-    CabmOp* d_postfixOps;
-    uint32_t numPostfixOps;
+    std::vector<CabmOp> postfixOps;
     uint64_t* d_bitStacks;
     uint8_t* d_bitStackCounts;
     uint64_t numDocs;
     uint64_t numReqs;
+    uint8_t* d_rst;
 };
 
 void cabmGpu(CabmGpuParam param)
@@ -167,9 +176,10 @@ void cabmGpu(CabmGpuParam param)
     for (uint32_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
     {
         uint8_t currBitStackIdx = 0;
-        for (uint32_t opIdx = 0; opIdx < param.numPostfixOps; opIdx++)
+        CHECK_CUDA(cudaMemset(param.d_bitStacks, 0, param.numDocs * sizeof(uint64_t)));
+        CHECK_CUDA(cudaMemset(param.d_bitStackCounts, 0, param.numDocs * sizeof(uint8_t)));
+        for (const auto& op : param.postfixOps)
         {
-            const CabmOp& op = param.d_postfixOps[opIdx];
             if (op.isOperand())
             {
                 if (currBitStackIdx >= g_kMaxBitStackCount)
@@ -204,7 +214,6 @@ void cabmGpu(CabmGpuParam param)
 
                 OperatorKernelParam param;
                 param.op = op;
-                param.currOpIdx = opIdx;
                 param.numPostfixOps = param.numPostfixOps;
                 param.d_bitStacks = param.d_bitStacks;
                 param.d_bitStackCounts = param.d_bitStackCounts;
@@ -214,5 +223,50 @@ void cabmGpu(CabmGpuParam param)
             CHECK_CUDA(cudaDeviceSynchronize())
             CHECK_CUDA(cudaGetLastError())
         }
+
+        if (currBitStackIdx != 0)
+        {
+            std::ostringstream oss;
+            oss << "currBitStackIdx is not 0: " << currBitStackIdx;
+            throw std::runtime_error(oss.str());
+        }
+
+        copyRstKernel<<<kGridSize, kBlockSize>>>(param.d_rst, param.d_bitStacks, param.numDocs);
+        CHECK_CUDA(cudaDeviceSynchronize())
+        CHECK_CUDA(cudaGetLastError())
     }
+}
+
+bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
+                               const std::vector<std::vector<long>>& reqData2D,
+                               const std::vector<std::vector<long>>& docData2D)
+{
+    AbmDataGpu reqAbmDataGpu;
+    AbmDataGpu docAbmDataGpu;
+    reqAbmDataGpu.init({reqData2D});
+    docAbmDataGpu.init({docData2D});
+
+    uint8_t* d_rst;
+    CHECK_CUDA(cudaMalloc(&d_rst, 1 * sizeof(uint8_t)));
+    uint64_t* d_bitStacks;
+    CHECK_CUDA(cudaMalloc(&d_bitStacks, 1 * sizeof(uint64_t)));
+    uint8_t* d_bitStackCounts;
+    CHECK_CUDA(cudaMalloc(&d_bitStackCounts, 1 * sizeof(uint8_t)));
+
+    CabmGpuParam param;
+    param.d_rst = d_rst;
+    param.d_bitStacks = d_bitStacks;
+    param.d_bitStackCounts = d_bitStackCounts;
+    param.numDocs = 1;
+    param.numReqs = 1;
+    param.postfixOps = postfix1D;
+    param.reqAbmDataGpu = reqAbmDataGpu;
+    param.docAbmDataGpu = docAbmDataGpu;
+
+    cabmGpu(param);
+
+    uint8_t rst;
+    CHECK_CUDA(cudaMemcpy(&rst, d_rst, 1 * sizeof(uint8_t), cudaMemcpyDeviceToHost));
+
+    return rst;
 }
