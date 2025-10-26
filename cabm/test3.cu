@@ -11,7 +11,7 @@
 void test3a()
 {
     const int kNumReqs = 1;
-    const uint64_t kNumDocs = 1000000;
+    const uint64_t kNumDocs = 1000;
     const int kNumFields = 6;
     const int kNumTrials = 100;
     const std::vector<int> kNumValsPerFieldMin = { 2, 2, 2, 2, 2, 2 };

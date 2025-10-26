@@ -107,17 +107,17 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<long>>> &data3D,
         for (int row = 0; row < m_numRows; row++)
         {
             int offset = 0;
-            hp_offsets[getMemAddrOffsets_dh(row, 0)] = offset;
+            hp_offsets[getMemAddrOffsets(row, 0)] = offset;
             for (int field = 0; field < m_numFields; field++)
             {
                 for (auto val : data3D.at(row).at(field))
                 {
-                    hp_data[getMemAddrData_dh(row, offset)] = val;
+                    hp_data[getMemAddrData(row, offset)] = val;
                     offset++;
                 }
-                hp_offsets[getMemAddrOffsets_dh(row, field+1)] = offset;
+                hp_offsets[getMemAddrOffsets(row, field+1)] = offset;
             }
-            hp_offsets[getMemAddrOffsets_dh(row, m_numFields)] = offset;
+            hp_offsets[getMemAddrOffsets(row, m_numFields)] = offset;
         }
 
         // -----------------

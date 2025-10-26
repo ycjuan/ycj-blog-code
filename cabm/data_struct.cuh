@@ -34,12 +34,12 @@ public:
     // Getters
     __device__ __host__ uint64_t getVal_d(int row, int offset) const
     {
-        return m_d_data[getMemAddrData_dh(row, offset)];
+        return m_d_data[getMemAddrData(row, offset)];
     }
 
     __device__ __host__ uint32_t getOffset_d(int row, int field) const
     {
-        return m_d_offsets[getMemAddrOffsets_dh(row, field)];
+        return m_d_offsets[getMemAddrOffsets(row, field)];
     }
 
 private:
@@ -60,12 +60,12 @@ private:
     uint32_t m_numFields = 0;
     uint32_t m_maxNumValsPerRow = 0;
 
-    __device__ __host__ uint64_t getMemAddrData_dh(int row, int offset) const
+    __device__ __host__ uint64_t getMemAddrData(int row, int offset) const
     {
         return getMemAddrRowMajor(row, offset, m_numRows, m_maxNumValsPerRow);
     }
 
-    __device__ __host__ uint64_t getMemAddrOffsets_dh(int row, int field) const
+    __device__ __host__ uint64_t getMemAddrOffsets(int row, int field) const
     {
         return getMemAddrRowMajor(row, field, m_numRows, m_numFields + 1);
     }
