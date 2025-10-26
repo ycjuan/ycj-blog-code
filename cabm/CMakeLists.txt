@@ -58,7 +58,9 @@ target_compile_options(${LIB_NAME} PRIVATE
 # Add executable
 add_executable(test1 test1.cu)
 add_executable(test2 test2.cu)
+add_executable(test3 test3.cu)
 
 # Link library
 target_link_libraries(test1 ${LIB_NAME})
 target_link_libraries(test2 ${LIB_NAME})
+target_link_libraries(test3 ${LIB_NAME})
