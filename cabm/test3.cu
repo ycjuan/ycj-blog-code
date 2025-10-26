@@ -79,6 +79,16 @@ void test3a()
 
         CHECK_CUDA(cudaFree(d_rst));
         CHECK_CUDA(cudaFree(d_bitStacks));
+
+        std::vector<std::vector<uint8_t>> rstGpu2D(kNumReqs, std::vector<uint8_t>(kNumDocs));
+        for (int reqIdx = 0; reqIdx < kNumReqs; reqIdx++)
+        {
+            for (int docIdx = 0; docIdx < kNumDocs; docIdx++)
+            {
+                rstGpu2D.at(reqIdx).at(docIdx) = rstGpu.at(reqIdx * kNumDocs + docIdx);
+            }
+        }
+        assert(rst2D == rstGpu2D);
     }
 }
 

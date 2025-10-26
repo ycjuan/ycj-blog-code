@@ -107,12 +107,12 @@ __global__ void operatorKernel(OperatorKernelParam param)
     }
 }
 
-__global__ void copyRstKernel(uint8_t* d_rst, uint64_t* d_bitStacks, uint64_t numDocs)
+__global__ void copyRstKernel(uint8_t* d_rst, uint64_t* d_bitStacks, uint64_t numDocs, int reqIdx)
 {
     uint64_t docIdx = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (docIdx < numDocs)
     {
-        d_rst[docIdx] = stackTop(d_bitStacks[docIdx], 0);
+        d_rst[reqIdx * numDocs + docIdx] = stackTop(d_bitStacks[docIdx], 0);
     }
 }
 
@@ -179,7 +179,7 @@ void cabmGpu(CabmGpuParam param)
             throw std::runtime_error(oss.str());
         }
 
-        copyRstKernel<<<kGridSize, kBlockSize>>>(param.d_rst, param.d_bitStacks, param.numDocs);
+        copyRstKernel<<<kGridSize, kBlockSize>>>(param.d_rst, param.d_bitStacks, param.numDocs, reqIdx);
         CHECK_CUDA(cudaDeviceSynchronize())
         CHECK_CUDA(cudaGetLastError())
     }
