@@ -6,7 +6,7 @@ set -e
 mkdir -p build
 cd build
 cmake ..
-make
+make -j 4
 ./test1
 ./test2
 ./test3
