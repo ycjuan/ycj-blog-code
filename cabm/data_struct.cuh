@@ -33,12 +33,12 @@ public:
 
     // -----------------------
     // Getters
-    __device__ __host__ uint64_t getVal_d(int row, int offset) const
+    __device__ __host__ long getVal(int row, int offset) const
     {
         return m_d_data[getMemAddrData(row, offset)];
     }
 
-    __device__ __host__ uint32_t getOffset_d(int row, int field) const
+    __device__ __host__ uint32_t getOffset(int row, int field) const
     {
         return m_d_offsets[getMemAddrOffsets(row, field)];
     }

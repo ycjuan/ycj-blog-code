@@ -32,16 +32,16 @@ __device__ bool matchOp(const AbmDataGpu& reqAbmDataGpu,
                         const int docIdx,
                         const CabmOp& op)
 {
-    int reqOffsetIter = reqAbmDataGpu.getOffset_d(reqIdx, op.getReqFieldIdx());
-    int docOffsetIter = docAbmDataGpu.getOffset_d(docIdx, op.getDocFieldIdx());
-    int reqOffsetEnd = reqAbmDataGpu.getOffset_d(reqIdx, op.getReqFieldIdx() + 1);
-    int docOffsetEnd = docAbmDataGpu.getOffset_d(docIdx, op.getDocFieldIdx() + 1);
+    int reqOffsetIter = reqAbmDataGpu.getOffset(reqIdx, op.getReqFieldIdx());
+    int docOffsetIter = docAbmDataGpu.getOffset(docIdx, op.getDocFieldIdx());
+    int reqOffsetEnd = reqAbmDataGpu.getOffset(reqIdx, op.getReqFieldIdx() + 1);
+    int docOffsetEnd = docAbmDataGpu.getOffset(docIdx, op.getDocFieldIdx() + 1);
 
     bool rst = false;
     while (reqOffsetIter < reqOffsetEnd && docOffsetIter < docOffsetEnd)
     {
-        long reqVal = reqAbmDataGpu.getVal_d(reqIdx, reqOffsetIter);
-        long docVal = docAbmDataGpu.getVal_d(docIdx, docOffsetIter);
+        long reqVal = reqAbmDataGpu.getVal(reqIdx, reqOffsetIter);
+        long docVal = docAbmDataGpu.getVal(docIdx, docOffsetIter);
         if (reqVal == docVal)
         {
             rst = true;

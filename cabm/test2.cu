@@ -17,8 +17,8 @@ void test2a()
         {
             for (uint32_t valOffset = 0; valOffset < data3D.at(row).at(field).size(); valOffset++)
             {
-                int fieldOffset = abmDataGpu.getOffset_d(row, field);
-                long val = abmDataGpu.getVal_d(row, fieldOffset + valOffset);
+                int fieldOffset = abmDataGpu.getOffset(row, field);
+                long val = abmDataGpu.getVal(row, fieldOffset + valOffset);
                 if (val != data3D.at(row).at(field).at(valOffset))
                 {
                     std::cout << "Error at (" << row << ", " << field << ", " << valOffset << "): " << val << " != " << data3D.at(row).at(field).at(valOffset) << std::endl;
