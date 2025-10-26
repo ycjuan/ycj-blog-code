@@ -37,30 +37,31 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<long>>> &data3D,
             maxNumValsPerRow = std::max(maxNumValsPerRow, numValsPerRow);
         }
         
-        // Use const_cast to modify the const meta data
-        const_cast<uint32_t&>(m_kMaxNumValsPerRow) = maxNumValsPerRow;    
-        const_cast<uint32_t&>(m_kNumRows) = numRows;
-        const_cast<uint32_t&>(m_kNumFields) = numFields;
-    }
-
-    {
-        const_cast<uint64_t&>(m_k_d_data_size) = m_kNumRows * m_kMaxNumValsPerRow;
-        const_cast<uint64_t&>(m_k_d_data_size_in_bytes) = m_k_d_data_size * sizeof(long);
-        const_cast<uint64_t&>(m_k_d_offsets_size) = m_kNumRows * (m_kNumFields + 1);
-        const_cast<uint64_t&>(m_k_d_offsets_size_in_bytes) = m_k_d_offsets_size * sizeof(uint32_t);
+        m_maxNumValsPerRow = maxNumValsPerRow;    
+        m_numRows = numRows;
+        m_numFields = numFields;
     }
 
     // -----------------
     // Malloc data
     {   
+        // -----------
+        // Calculate the size of the data
+        m_d_data_size = m_numRows * m_maxNumValsPerRow;
+        m_d_data_size_in_bytes = m_d_data_size * sizeof(long);
+        m_d_offsets_size = m_numRows * (m_numFields + 1);
+        m_d_offsets_size_in_bytes = m_d_offsets_size * sizeof(uint32_t);
+
+        // -----------
+        // Malloc data
         cudaError_t cudaError;
         if (useManagedMemory)
         {
-            cudaError = cudaMallocManaged(&m_d_data, m_k_d_data_size_in_bytes);
+            cudaError = cudaMallocManaged(&m_d_data, m_d_data_size_in_bytes);
         }
         else
         {
-            cudaError = cudaMalloc(&m_d_data, m_k_d_data_size_in_bytes);
+            cudaError = cudaMalloc(&m_d_data, m_d_data_size_in_bytes);
         }
         if (cudaError != cudaSuccess)
         {
@@ -69,11 +70,11 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<long>>> &data3D,
         
         if (useManagedMemory)
         {
-            cudaError = cudaMallocManaged(&m_d_offsets, m_k_d_offsets_size_in_bytes);
+            cudaError = cudaMallocManaged(&m_d_offsets, m_d_offsets_size_in_bytes);
         }
         else
         {
-            cudaError = cudaMalloc(&m_d_offsets, m_k_d_offsets_size_in_bytes);
+            cudaError = cudaMalloc(&m_d_offsets, m_d_offsets_size_in_bytes);
         }
         if (cudaError != cudaSuccess)
         {
@@ -88,13 +89,13 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<long>>> &data3D,
         // Malloc pinned memory
         // TODO: Release resource when there is an exception
         long *hp_data;
-        cudaError_t cudaError = cudaMallocHost(&hp_data, m_k_d_data_size_in_bytes);
+        cudaError_t cudaError = cudaMallocHost(&hp_data, m_d_data_size_in_bytes);
         if (cudaError != cudaSuccess)
         {
             throw std::runtime_error("cudaMallocHost failed (data): " + std::string(cudaGetErrorString(cudaError)));
         }
         uint32_t *hp_offsets;
-        cudaError = cudaMallocHost(&hp_offsets, m_k_d_offsets_size_in_bytes);
+        cudaError = cudaMallocHost(&hp_offsets, m_d_offsets_size_in_bytes);
         if (cudaError != cudaSuccess)
         {
             throw std::runtime_error("cudaMallocHost failed (offsets): " + std::string(cudaGetErrorString(cudaError)));
@@ -102,11 +103,11 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<long>>> &data3D,
 
         // -----------------
         // Fill the data in pinned memory
-        for (int row = 0; row < m_kNumRows; row++)
+        for (int row = 0; row < m_numRows; row++)
         {
             int offset = 0;
             hp_offsets[getMemAddrOffsets_dh(row, 0)] = offset;
-            for (int field = 0; field < m_kNumFields; field++)
+            for (int field = 0; field < m_numFields; field++)
             {
                 for (auto val : data3D.at(row).at(field))
                 {
@@ -115,17 +116,17 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<long>>> &data3D,
                 }
                 hp_offsets[getMemAddrOffsets_dh(row, field+1)] = offset;
             }
-            hp_offsets[getMemAddrOffsets_dh(row, m_kNumFields)] = offset;
+            hp_offsets[getMemAddrOffsets_dh(row, m_numFields)] = offset;
         }
 
         // -----------------
         // Copy data to device
-        cudaError = cudaMemcpy(m_d_data, hp_data, m_k_d_data_size_in_bytes, cudaMemcpyHostToDevice);
+        cudaError = cudaMemcpy(m_d_data, hp_data, m_d_data_size_in_bytes, cudaMemcpyHostToDevice);
         if (cudaError != cudaSuccess)
         {
             throw std::runtime_error("cudaMemcpy failed (data): " + std::string(cudaGetErrorString(cudaError)));
         }
-        cudaError = cudaMemcpy(m_d_offsets, hp_offsets, m_k_d_offsets_size_in_bytes, cudaMemcpyHostToDevice);
+        cudaError = cudaMemcpy(m_d_offsets, hp_offsets, m_d_offsets_size_in_bytes, cudaMemcpyHostToDevice);
         if (cudaError != cudaSuccess)
         {
             throw std::runtime_error("cudaMemcpy failed (offsets): " + std::string(cudaGetErrorString(cudaError)));
@@ -158,13 +159,13 @@ void AbmDataGpu::free()
         cudaFree(m_d_offsets);
         m_d_offsets = nullptr;
     }
-    const_cast<uint64_t&>(m_k_d_data_size) = 0;
-    const_cast<uint64_t&>(m_k_d_data_size_in_bytes) = 0;
-    const_cast<uint64_t&>(m_k_d_offsets_size) = 0;
-    const_cast<uint64_t&>(m_k_d_offsets_size_in_bytes) = 0;
-    const_cast<uint32_t&>(m_kNumRows) = 0;
-    const_cast<uint32_t&>(m_kNumFields) = 0;
-    const_cast<uint32_t&>(m_kMaxNumValsPerRow) = 0;
+    m_d_data_size = 0;
+    m_d_data_size_in_bytes = 0;
+    m_d_offsets_size = 0;
+    m_d_offsets_size_in_bytes = 0;
+    m_numRows = 0;
+    m_numFields = 0;
+    m_maxNumValsPerRow = 0;
 }
 
 std::vector<std::vector<std::vector<long>>>

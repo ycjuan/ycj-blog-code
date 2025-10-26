@@ -51,23 +51,23 @@ private:
     //   m_d_offsets: [0, 2, 5, 0, 3, 7]
     long *m_d_data = nullptr;
     uint32_t *m_d_offsets = nullptr;
-    uint64_t m_k_d_data_size = 0;
-    uint64_t m_k_d_offsets_size = 0;
-    uint64_t m_k_d_data_size_in_bytes = 0;
-    uint64_t m_k_d_offsets_size_in_bytes = 0;
+    uint64_t m_d_data_size = 0;
+    uint64_t m_d_offsets_size = 0;
+    uint64_t m_d_data_size_in_bytes = 0;
+    uint64_t m_d_offsets_size_in_bytes = 0;
 
-    uint32_t m_kNumRows = 0;
-    uint32_t m_kNumFields = 0;
-    uint32_t m_kMaxNumValsPerRow = 0;
+    uint32_t m_numRows = 0;
+    uint32_t m_numFields = 0;
+    uint32_t m_maxNumValsPerRow = 0;
 
     __device__ __host__ uint64_t getMemAddrData_dh(int row, int offset) const
     {
-        return getMemAddrRowMajorDevice(row, offset, m_kNumRows, m_kMaxNumValsPerRow);
+        return getMemAddrRowMajorDevice(row, offset, m_numRows, m_maxNumValsPerRow);
     }
 
     __device__ __host__ uint64_t getMemAddrOffsets_dh(int row, int field) const
     {
-        return getMemAddrRowMajorDevice(row, field, m_kNumRows, m_kNumFields + 1);
+        return getMemAddrRowMajorDevice(row, field, m_numRows, m_numFields + 1);
     }
 };
 
