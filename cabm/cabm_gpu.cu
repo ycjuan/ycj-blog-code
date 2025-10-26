@@ -12,16 +12,10 @@
 // We use uint64_t to store the bit stack, so the max number of elements is 64
 constexpr uint32_t g_kMaxBitStackCount = 64;
 
-__device__ void stackPushTrue(uint64_t& bitStack, const uint8_t bitStackIdx)
+__device__ void stackPush(uint64_t& bitStack, const uint8_t bitStackIdx, bool value)
 {
-    uint64_t mask = 1L << bitStackIdx;
-    bitStack = bitStack | mask;
-}
-
-__device__ void stackPushFalse(uint64_t& bitStack, const uint8_t bitStackIdx)
-{
-    uint64_t mask = ~(1L << bitStackIdx);
-    bitStack = bitStack & mask;
+    uint64_t mask = value? 1L << bitStackIdx : ~(1L << bitStackIdx);
+    bitStack = value? bitStack | mask : bitStack & mask;
 }
 
 __device__ bool stackTop(const uint64_t bitStack, const uint8_t bitStackIdx)
@@ -87,14 +81,7 @@ __global__ void matchOpKernel(OperandKernelParam param)
     if (docIdx < param.numDocs)
     {
         bool rst = matchOp(param.reqAbmDataGpu, param.docAbmDataGpu, param.reqIdx, docIdx, param.op);
-        if (rst)
-        {
-            stackPushTrue(param.d_bitStacks[docIdx], param.bitStackIdx);
-        }
-        else
-        {
-            stackPushFalse(param.d_bitStacks[docIdx], param.bitStackIdx);
-        }
+        stackPush(param.d_bitStacks[docIdx], param.bitStackIdx, rst);
     }
 }
 
@@ -116,14 +103,7 @@ __global__ void operatorKernel(OperatorKernelParam param)
         bool rst1 = stackTop(bitStack, param.bitStackIdx - 1);
         bool rst2 = stackTop(bitStack, param.bitStackIdx - 2);
         bool rst = (param.op.getOpType() == CabmOpType::OPERATOR_AND) ? (rst1 & rst2) : (rst1 | rst2);
-        if (rst)
-        {
-            stackPushTrue(bitStack, param.bitStackIdx - 2);
-        }
-        else
-        {
-            stackPushFalse(bitStack, param.bitStackIdx - 2);
-        }
+        stackPush(bitStack, param.bitStackIdx - 2, rst);
     }
 }
 
