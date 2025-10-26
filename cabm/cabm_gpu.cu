@@ -8,6 +8,7 @@
 
 #include "cabm.cuh"
 #include "macro.cuh"
+#include "util.cuh"
 
 // We use uint64_t to store the bit stack, so the max number of elements is 64
 constexpr uint32_t g_kMaxBitStackCount = 64;
@@ -116,8 +117,18 @@ __global__ void copyRstKernel(uint8_t* d_rst, uint64_t* d_bitStacks, uint64_t nu
     }
 }
 
-void cabmGpu(CabmGpuParam param)
+void cabmGpu(CabmGpuParam& param)
 {
+    // -----------------
+    // Reset time
+    param.timeMsOperandKernel = 0;
+    param.timeMsOperatorKernel = 0;
+    param.timeMsCopyRstKernel = 0;
+    param.timeMsTotal = 0;
+
+    Timer timerTotal;
+    timerTotal.tic();
+
     const int kBlockSize = 1024;
     const int kGridSize = (param.numDocs + kBlockSize - 1) / kBlockSize;
 
@@ -145,6 +156,9 @@ void cabmGpu(CabmGpuParam param)
                 operandKernelParam.numDocs = param.numDocs;
                 operandKernelParam.d_bitStacks = param.d_bitStacks;
                 operandKernelParam.bitStackIdx = currBitStackIdx;
+
+                Timer timerOperandKernel;
+                timerOperandKernel.tic();
                 if (op.getOpType() == CabmOpType::OPERAND_MATCH)
                 {
                     matchOpKernel<<<kGridSize, kBlockSize>>>(operandKernelParam);
@@ -155,6 +169,9 @@ void cabmGpu(CabmGpuParam param)
                     oss << "Invalid operator type: " << static_cast<int>(op.getOpType());
                     throw std::runtime_error(oss.str());
                 }
+                CHECK_CUDA(cudaDeviceSynchronize());
+                CHECK_CUDA(cudaGetLastError());
+                param.timeMsOperandKernel += timerOperandKernel.tocMs();
                 currBitStackIdx++; // We push 1, so the net effect is +1
             }
             else if (op.isOperator())
@@ -164,12 +181,16 @@ void cabmGpu(CabmGpuParam param)
                 operatorKernelParam.d_bitStacks = param.d_bitStacks;
                 operatorKernelParam.bitStackIdx = currBitStackIdx;
                 operatorKernelParam.numDocs = param.numDocs;
+
+                Timer timerOperatorKernel;
+                timerOperatorKernel.tic();
                 operatorKernel<<<kGridSize, kBlockSize>>>(operatorKernelParam);
+                CHECK_CUDA(cudaDeviceSynchronize());
+                CHECK_CUDA(cudaGetLastError());
+                param.timeMsOperatorKernel += timerOperatorKernel.tocMs();
 
                 currBitStackIdx--; // We pop 2 and push 1, so the net effect is -1
             }
-            CHECK_CUDA(cudaDeviceSynchronize())
-            CHECK_CUDA(cudaGetLastError())
         }
 
         if (currBitStackIdx != 1)
@@ -179,10 +200,15 @@ void cabmGpu(CabmGpuParam param)
             throw std::runtime_error(oss.str());
         }
 
+        Timer timerCopyRstKernel;
+        timerCopyRstKernel.tic();
         copyRstKernel<<<kGridSize, kBlockSize>>>(param.d_rst, param.d_bitStacks, param.numDocs, reqIdx);
         CHECK_CUDA(cudaDeviceSynchronize())
         CHECK_CUDA(cudaGetLastError())
+        param.timeMsCopyRstKernel += timerCopyRstKernel.tocMs();
     }
+
+    param.timeMsTotal = timerTotal.tocMs();
 }
 
 bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,

@@ -77,6 +77,10 @@ struct CabmGpuParam
     uint64_t numDocs;
     uint64_t numReqs;
     uint8_t* d_rst;
+    float timeMsOperandKernel = 0;
+    float timeMsOperatorKernel = 0;
+    float timeMsCopyRstKernel = 0;
+    float timeMsTotal = 0;
 };
 
-void cabmGpu(CabmGpuParam param);
+void cabmGpu(CabmGpuParam& param);

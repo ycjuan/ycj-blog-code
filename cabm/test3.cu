@@ -63,6 +63,11 @@ void test3a()
         param.docAbmDataGpu = docAbmDataGpu;
 
         Timer timer;
+        float timeMsOperandKernel = 0;
+        float timeMsOperatorKernel = 0;
+        float timeMsCopyRstKernel = 0;
+        float timeMsTotal = 0;
+        float timeMsTotalOuter = 0;
         for (int trial = -3; trial < kNumTrials; trial++)
         {
             if (trial == 0)
@@ -70,9 +75,24 @@ void test3a()
                 timer.tic();
             }
             cabmGpu(param);
+            if (trial >= 0)
+            {
+                timeMsOperandKernel += param.timeMsOperandKernel;
+                timeMsOperatorKernel += param.timeMsOperatorKernel;
+                timeMsCopyRstKernel += param.timeMsCopyRstKernel;
+                timeMsTotal += param.timeMsTotal;
+            }
         }
-        float timeMs = timer.tocMs() / kNumTrials;
-        std::cout << "Time per trial: " << timeMs << " ms" << std::endl;
+        timeMsTotalOuter = timer.tocMs() / kNumTrials;
+        timeMsOperandKernel /= kNumTrials;
+        timeMsOperatorKernel /= kNumTrials;
+        timeMsCopyRstKernel /= kNumTrials;
+        timeMsTotal /= kNumTrials;
+        std::cout << "Time total outer: " << timeMsTotalOuter << " ms" << std::endl;
+        std::cout << "Time total inner: " << timeMsTotal << " ms" << std::endl;
+        std::cout << "Time operand kernel: " << timeMsOperandKernel << " ms" << std::endl;
+        std::cout << "Time operator kernel: " << timeMsOperatorKernel << " ms" << std::endl;
+        std::cout << "Time copy rst kernel: " << timeMsCopyRstKernel << " ms" << std::endl;
 
         std::vector<uint8_t> rstGpu(kNumReqs * kNumDocs);
         CHECK_CUDA(cudaMemcpy(rstGpu.data(), d_rst, kNumReqs * kNumDocs * sizeof(uint8_t), cudaMemcpyDeviceToHost));
