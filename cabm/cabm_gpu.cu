@@ -147,178 +147,72 @@ __global__ void operatorOrKernel(const CabmOp* d_postfixOps,
     }
 }
 
-void cabmGpuOneReq(const AbmDataGpu& reqAbmDataGpu,
-                   const AbmDataGpu& docAbmDataGpu,
-                   const CabmOp* d_postfixOps,
-                   const uint32_t numPostfixOps,
-                   uint64_t* d_bitStacks,
-                   uint8_t* d_bitStackCounts,
-                   const uint64_t numDocs,
-                   const uint64_t reqIdx)
+struct CabmGpuParam
+{
+    AbmDataGpu reqAbmDataGpu;
+    AbmDataGpu docAbmDataGpu;
+    CabmOp* d_postfixOps;
+    uint32_t numPostfixOps;
+    uint64_t* d_bitStacks;
+    uint8_t* d_bitStackCounts;
+    uint64_t numDocs;
+    uint64_t numReqs;
+};
+
+void cabmGpu(CabmGpuParam param)
 {
     const int kBlockSize = 1024;
-    const int kGridSize = (numDocs + kBlockSize - 1) / kBlockSize;
-    uint8_t currBitStackIdx = 0;
-    for (uint32_t opIdx = 0; opIdx < numPostfixOps; opIdx++)
+    const int kGridSize = (param.numDocs + kBlockSize - 1) / kBlockSize;
+
+    for (uint32_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
     {
-        const CabmOp& op = d_postfixOps[opIdx];
-        if (op.isOperand())
+        uint8_t currBitStackIdx = 0;
+        for (uint32_t opIdx = 0; opIdx < param.numPostfixOps; opIdx++)
         {
-            if (currBitStackIdx >= g_kMaxBitStackCount)
+            const CabmOp& op = param.d_postfixOps[opIdx];
+            if (op.isOperand())
             {
-                std::ostringstream oss;
-                oss << "currBitStackIdx is greater than g_kMaxBitStackCount: " << currBitStackIdx << " >= " << g_kMaxBitStackCount;
-                throw std::runtime_error(oss.str());
-            }
+                if (currBitStackIdx >= g_kMaxBitStackCount)
+                {
+                    std::ostringstream oss;
+                    oss << "currBitStackIdx is greater than g_kMaxBitStackCount: " << currBitStackIdx
+                        << " >= " << g_kMaxBitStackCount;
+                    throw std::runtime_error(oss.str());
+                }
 
-            OperandKernelParam param;
-            param.reqAbmDataGpu = reqAbmDataGpu;
-            param.docAbmDataGpu = docAbmDataGpu;
-            param.op = op;
-            param.reqIdx = reqIdx;
-            param.numDocs = numDocs;
-            param.d_bitStacks = d_bitStacks;
-            param.d_bitStackCounts = d_bitStackCounts;
-            if (op.getOpType() == CabmOpType::OPERAND_MATCH)
+                OperandKernelParam param;
+                param.reqAbmDataGpu = param.reqAbmDataGpu;
+                param.docAbmDataGpu = param.docAbmDataGpu;
+                param.op = op;
+                param.reqIdx = reqIdx;
+                param.numDocs = param.numDocs;
+                param.d_bitStacks = param.d_bitStacks;
+                param.d_bitStackCounts = param.d_bitStackCounts;
+                if (op.getOpType() == CabmOpType::OPERAND_MATCH)
+                {
+                    matchOpKernel<<<kGridSize, kBlockSize>>>(param);
+                }
+                else
+                {
+                    assert(false);
+                }
+                currBitStackIdx++;
+            }
+            else if (op.isOperator())
             {
-                matchOpKernel<<<kGridSize, kBlockSize>>>(param);
+                currBitStackIdx -= 2;
+
+                OperatorKernelParam param;
+                param.op = op;
+                param.currOpIdx = opIdx;
+                param.numPostfixOps = param.numPostfixOps;
+                param.d_bitStacks = param.d_bitStacks;
+                param.d_bitStackCounts = param.d_bitStackCounts;
+                param.numDocs = param.numDocs;
+                operatorKernel<<<kGridSize, kBlockSize>>>(param);
             }
-            else
-            {
-                assert(false);
-            }
-            currBitStackIdx++;
-        }
-        else if (op.isOperator())
-        {
-            currBitStackIdx -= 2;
-
-            OperatorKernelParam param;
-            param.op = op;
-            param.currOpIdx = opIdx;
-            param.numPostfixOps = numPostfixOps;
-            param.d_bitStacks = d_bitStacks;
-            param.d_bitStackCounts = d_bitStackCounts;
-            param.numDocs = numDocs;
-            operatorKernel<<<kGridSize, kBlockSize>>>(param);
-        }
-        CHECK_CUDA(cudaDeviceSynchronize())
-        CHECK_CUDA(cudaGetLastError())
-    }
-}
-
-/*
-void cabmGpuOneReq(const AbmDataGpu& reqAbmDataGpu,
-                   const AbmDataGpu& docAbmDataGpu,
-                   const CabmOp* d_postfixOps,
-                   const uint32_t numPostfixOps,
-                   uint64_t* d_bitStacks,
-                   uint8_t* d_bitStackCounts,
-                   const uint64_t numDocs,
-                   const uint64_t reqIdx)
-            for (int c = 0; c < param.reqPostfixExprLength; c++) {
-                CabmOp op = param.d_reqPostfixOp[c];
-
-                if (op.isOperand) {
-                    bool rst = evaluateSingleOp(param, i, op);
-
-                    if (rst)
-                        stackPushTrue(bs, bsCount);
-                    else
-                        stackPushFalse(bs, bsCount);
-
-                } else {
-
-                    bool rst1 = stackPop(bs, bsCount);
-                    bool rst2 = stackPop(bs, bsCount);
-
-                    bool rst;
-                    if (op.type == CABM_OP_TYPE_AND)
-                        rst = rst1 & rst2;
-                    else if (op.type == CABM_OP_TYPE_OR)
-                        rst = rst1 | rst2;
-                    else
-                        assert(false);
-
-                    if (rst)
-                        stackPushTrue(bs, bsCount);
-                    else
-                        stackPushFalse(bs, bsCount);
-
-                } // end if (op.isOperand)
-
-            } // end for loop
-
-            finalRst = stackPop(bs, bsCount);
-
-        } else {
-
-            finalRst = false;
-
-        }
-
-        msg.score = finalRst? 1.0 : 0.0;
-        param.d_msgBuffer[m] = msg;
-    }
-}
-
-struct nonZeroPredicator {
-    __host__ __device__ bool operator()(const Msg x) {
-        return x.score != 0;
-    }
-};
-
-struct RowPredicator {
-  __host__ __device__ bool operator()(const Msg& a, const Msg& b) {
-      return a.i < b.i;
-  }
-};
-
-struct ScorePredicator {
-  __host__ __device__ bool operator()(const Msg& a, const Msg& b) {
-      return a.score > b.score;
-  }
-};
-
-void cabmGpu(CabmGpuParam &param) {
-
-    // Execute the kernel
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start);
-
-    if (param.k == 0) {
-        param.offsetA = 0;
-        int GRID_SIZE = max(1, (int)ceil((double)param.msgSize/BLOCK_SIZE));
-        cabmKernel<<<GRID_SIZE, BLOCK_SIZE>>>(param);
-        CHECK_CUDA(cudaDeviceSynchronize())
-        Msg* d_endPtr = thrust::copy_if(thrust::device, param.d_msgBuffer, param.d_msgBuffer + param.msgSize,
-param.d_msg, nonZeroPredicator()); param.msgSize = d_endPtr - param.d_msg; } else { int iterSize = max(16384, param.k);
-        int GRID_SIZE = max(1, (int)ceil((double)iterSize/BLOCK_SIZE));
-        param.offsetA = 0;
-        param.offsetB = 0;
-        while (true) {
-            //Msg *d_msgBegin = param.d_msg + param.offsetA;
-            //Msg *d_msgEnd   = param.d_msg + min(param.msgSize, param.offsetA + iterSize);
-            //thrust::stable_sort(thrust::device, d_msgBegin, d_msgEnd, RowPredicator());
-            cabmKernel<<<GRID_SIZE, BLOCK_SIZE>>>(param);
             CHECK_CUDA(cudaDeviceSynchronize())
-            Msg *d_msgBufferBegin = param.d_msgBuffer + param.offsetA;
-            Msg *d_msgBufferEnd   = param.d_msgBuffer + min(param.msgSize, param.offsetA + iterSize);
-            Msg *d_msg            = param.d_msg + param.offsetB;
-            Msg* d_endPtr = thrust::copy_if(thrust::device, d_msgBufferBegin, d_msgBufferEnd, d_msg,
-nonZeroPredicator()); param.offsetA += iterSize; param.offsetB += d_endPtr - d_msg; if (param.offsetA >= param.msgSize
-|| param.offsetB >= param.k) break;
+            CHECK_CUDA(cudaGetLastError())
         }
-        param.msgSize = param.offsetB;
-        //thrust::stable_sort(thrust::device, param.d_msg, param.d_msg + param.msgSize, ScorePredicator());
     }
-
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&(param.timeMs), start, stop);
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
 }
-*/
