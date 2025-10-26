@@ -17,6 +17,7 @@ enum class CabmOpType
 class CabmOp
 {
 public:
+    CabmOp() = default; // Default constructor
     CabmOp(int reqFieldIdx, int docFieldIdx, CabmOpType type, bool negation = false) // Constructor for operands
         : m_reqFieldIdx(reqFieldIdx)
         , m_docFieldIdx(docFieldIdx)
@@ -45,11 +46,10 @@ public:
     std::string toString() const;
 
 private:
-    const int m_reqFieldIdx = -1; // Only used when op type is an operand
-    const int m_docFieldIdx = -1; // Only used when op type is an operand
-    const bool m_negation = false; // Only used when op type is an operand
-    const CabmOpType m_opType; // We do not assign a default value because
-                               // this field is always assigned in the constructor.
+    int m_reqFieldIdx = -1; // Only used when op type is an operand
+    int m_docFieldIdx = -1; // Only used when op type is an operand
+    bool m_negation = false; // Only used when op type is an operand
+    CabmOpType m_opType; 
 };
 
 std::string cabmExprToString(const std::vector<CabmOp>& expr);

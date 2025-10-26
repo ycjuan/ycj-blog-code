@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cstdint>
 #include <math.h>
+#include <sstream>
 #include <thrust/copy.h>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
@@ -62,25 +63,30 @@ __device__ bool matchOp(const AbmDataGpu& reqAbmDataGpu,
     return false;
 }
 
-__global__ void matchOpKernel(const AbmDataGpu& reqAbmDataGpu,
-                              const AbmDataGpu& docAbmDataGpu,
-                              const CabmOp& op,
-                              const uint64_t reqIdx,
-                              const uint64_t numDocs,
-                              uint64_t* d_bitStacks,
-                              uint8_t* d_bitStackCounts)
+struct OperandKernelParam
+{
+    AbmDataGpu reqAbmDataGpu;
+    AbmDataGpu docAbmDataGpu;
+    CabmOp op;
+    uint64_t reqIdx;
+    uint64_t numDocs;
+    uint64_t* d_bitStacks;
+    uint8_t* d_bitStackCounts;
+};
+
+__global__ void matchOpKernel(OperandKernelParam param)
 {
     uint64_t docIdx = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
-    if (docIdx < numDocs)
+    if (docIdx < param.numDocs)
     {
-        bool rst = matchOp(reqAbmDataGpu, docAbmDataGpu, reqIdx, docIdx, op);
+        bool rst = matchOp(param.reqAbmDataGpu, param.docAbmDataGpu, param.reqIdx, docIdx, param.op);
         if (rst)
         {
-            stackPushTrue(d_bitStacks[docIdx], d_bitStackCounts[docIdx]);
+            stackPushTrue(param.d_bitStacks[docIdx], param.d_bitStackCounts[docIdx]);
         }
         else
         {
-            stackPushFalse(d_bitStacks[docIdx], d_bitStackCounts[docIdx]);
+            stackPushFalse(param.d_bitStacks[docIdx], param.d_bitStackCounts[docIdx]);
         }
     }
 }
@@ -153,9 +159,24 @@ void cabmGpuOneReq(const AbmDataGpu& reqAbmDataGpu,
         const CabmOp& op = d_postfixOps[opIdx];
         if (op.isOperand())
         {
+            if (currBitStackIdx >= g_kMaxBitStackCount)
+            {
+                std::ostringstream oss;
+                oss << "currBitStackIdx is greater than g_kMaxBitStackCount: " << currBitStackIdx << " >= " << g_kMaxBitStackCount;
+                throw std::runtime_error(oss.str());
+            }
+
+            OperandKernelParam param;
+            param.reqAbmDataGpu = reqAbmDataGpu;
+            param.docAbmDataGpu = docAbmDataGpu;
+            param.op = op;
+            param.reqIdx = reqIdx;
+            param.numDocs = numDocs;
+            param.d_bitStacks = d_bitStacks;
+            param.d_bitStackCounts = d_bitStackCounts;
             if (op.getOpType() == CabmOpType::OPERAND_MATCH)
             {
-                matchOpKernel<<<kGridSize, kBlockSize>>>(reqAbmDataGpu, docAbmDataGpu, op, reqIdx, numDocs, d_bitStacks, d_bitStackCounts);
+                matchOpKernel<<<kGridSize, kBlockSize>>>(param);
             }
             else
             {

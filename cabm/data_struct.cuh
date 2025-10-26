@@ -23,6 +23,9 @@ class AbmDataGpu
 {
 public:
 
+    AbmDataGpu() = default; // Default constructor
+    AbmDataGpu(const AbmDataGpu& other) = default; // Copy constructor
+
     void init(const std::vector<std::vector<std::vector<long>>> &data3D, bool useManagedMemory = false);
 
     void free();
@@ -48,14 +51,14 @@ private:
     //   m_d_offsets: [0, 2, 5, 0, 3, 7]
     long *m_d_data = nullptr;
     uint32_t *m_d_offsets = nullptr;
-    const uint64_t m_k_d_data_size = 0;
-    const uint64_t m_k_d_offsets_size = 0;
-    const uint64_t m_k_d_data_size_in_bytes = 0;
-    const uint64_t m_k_d_offsets_size_in_bytes = 0;
+    uint64_t m_k_d_data_size = 0;
+    uint64_t m_k_d_offsets_size = 0;
+    uint64_t m_k_d_data_size_in_bytes = 0;
+    uint64_t m_k_d_offsets_size_in_bytes = 0;
 
-    const uint32_t m_kNumRows = 0;
-    const uint32_t m_kNumFields = 0;
-    const uint32_t m_kMaxNumValsPerRow = 0;
+    uint32_t m_kNumRows = 0;
+    uint32_t m_kNumFields = 0;
+    uint32_t m_kMaxNumValsPerRow = 0;
 
     __device__ __host__ uint64_t getMemAddrData_dh(int row, int offset) const
     {
