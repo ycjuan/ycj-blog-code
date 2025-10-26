@@ -7,7 +7,7 @@
 #include <thrust/sort.h>
 
 #include "cabm.cuh"
-#include "common.cuh"
+#include "macro.cuh"
 
 // We use uint64_t to store the bit stack, so the max number of elements is 64
 constexpr uint32_t g_kMaxBitStackCount = 64;

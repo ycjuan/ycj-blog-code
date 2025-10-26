@@ -3,7 +3,6 @@
 #include <vector>
 
 #include "data_struct.cuh"
-#include "common.cuh"
 
 void test2a()
 {
@@ -22,7 +21,7 @@ void test2a()
                 long val = abmDataGpu.getVal_d(row, fieldOffset + valOffset);
                 if (val != data3D.at(row).at(field).at(valOffset))
                 {
-                    printf("Error at (%d, %d, %d): %ld != %ld\n", row, field, valOffset, val, data3D.at(row).at(field).at(valOffset));
+                    std::cout << "Error at (" << row << ", " << field << ", " << valOffset << "): " << val << " != " << data3D.at(row).at(field).at(valOffset) << std::endl;
                     assert(false);
                 }
             }

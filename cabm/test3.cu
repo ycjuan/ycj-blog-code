@@ -3,7 +3,6 @@
 #include <vector>
 
 #include "data_struct.cuh"
-#include "common.cuh"
 #include "cabm.cuh"
 
 void test3a()
