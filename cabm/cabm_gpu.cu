@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <iostream>
 #include <math.h>
@@ -14,25 +15,25 @@
 
 #include "cabm.cuh"
 
-__device__ void stackPushTrue(uint64_t& bs, int& bsCount)
+__device__ void stackPushTrue(uint64_t& bitStack, uint8_t& bitStackCount)
 {
-    uint64_t mask = 1L << bsCount;
-    bs = bs | mask;
-    bsCount++;
+    uint64_t mask = 1L << bitStackCount;
+    bitStack = bitStack | mask;
+    bitStackCount++;
 }
 
-__device__ void stackPushFalse(uint64_t& bs, int& bsCount)
+__device__ void stackPushFalse(uint64_t& bitStack, uint8_t& bitStackCount)
 {
-    uint64_t mask = ~(1L << bsCount);
-    bs = bs & mask;
-    bsCount++;
+    uint64_t mask = ~(1L << bitStackCount);
+    bitStack = bitStack & mask;
+    bitStackCount++;
 }
 
-__device__ bool stackPop(uint64_t& bs, int& bsCount)
+__device__ bool stackPop(uint64_t& bitStack, uint8_t& bitStackCount)
 {
-    bsCount--;
-    uint64_t mask = 1L << bsCount;
-    uint64_t tmp = bs & mask;
+    bitStackCount--;
+    uint64_t mask = 1L << bitStackCount;
+    uint64_t tmp = bitStack & mask;
     return tmp > 0L;
 }
 
@@ -55,7 +56,7 @@ __device__ bool matchOp(const AbmDataGpu& reqAbmDataGpu,
         {
             return true;
         }
-        if (reqVal < docVal)
+        else if (reqVal < docVal)
         {
             reqOffsetIter++;
         }
@@ -66,6 +67,31 @@ __device__ bool matchOp(const AbmDataGpu& reqAbmDataGpu,
     }
 
     return false;
+}
+
+__global__ void matchOpKernel(const AbmDataGpu& reqAbmDataGpu,
+                              const AbmDataGpu& docAbmDataGpu,
+                              const CabmOp& op,
+                              const ReqDocPair *d_reqDocPairs,    
+                              const uint64_t numReqDocPairs,
+                              uint64_t *d_bitStacks,
+                              uint8_t *d_bitStackCounts,
+                              const uint8_t maxBitStackCount)
+{
+    uint64_t reqDocPairIdx = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
+    if (reqDocPairIdx < numReqDocPairs)
+    {
+        const ReqDocPair &reqDocPair = d_reqDocPairs[reqDocPairIdx];
+        bool rst = matchOp(reqAbmDataGpu, docAbmDataGpu, reqDocPair.reqIdx, reqDocPair.docIdx, op);
+        if (rst)
+        {
+            stackPushTrue(d_bitStacks[reqDocPairIdx], d_bitStackCounts[reqDocPairIdx]);
+        }
+        else
+        {
+            stackPushFalse(d_bitStacks[reqDocPairIdx], d_bitStackCounts[reqDocPairIdx]);
+        }
+    }
 }
 
 /*
