@@ -1,4 +1,3 @@
-#include <cassert>
 #include <cstdint>
 #include <math.h>
 #include <ostream>
@@ -183,7 +182,9 @@ void cabmGpu(CabmGpuParam param)
                 }
                 else
                 {
-                    assert(false);
+                    std::ostringstream oss;
+                    oss << "Invalid operator type: " << static_cast<int>(op.getOpType());
+                    throw std::runtime_error(oss.str());
                 }
                 currBitStackIdx++; // We push 1, so the net effect is +1
             }
