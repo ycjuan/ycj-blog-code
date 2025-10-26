@@ -5,4 +5,5 @@ mkdir -p build
 cd build
 cmake ..
 make
-./test1
+#./test1
+./test2
