@@ -13,21 +13,21 @@
 // We use uint64_t to store the bit stack, so the max number of elements is 64
 constexpr uint32_t g_kMaxBitStackCount = 64;
 
-__device__ void stackPushTrue(uint64_t& bitStack, const uint8_t currBitStackIdx)
+__device__ void stackPushTrue(uint64_t& bitStack, const uint8_t bitStackIdx)
 {
-    uint64_t mask = 1L << currBitStackIdx;
+    uint64_t mask = 1L << bitStackIdx;
     bitStack = bitStack | mask;
 }
 
-__device__ void stackPushFalse(uint64_t& bitStack, const uint8_t currBitStackIdx)
+__device__ void stackPushFalse(uint64_t& bitStack, const uint8_t bitStackIdx)
 {
-    uint64_t mask = ~(1L << currBitStackIdx);
+    uint64_t mask = ~(1L << bitStackIdx);
     bitStack = bitStack & mask;
 }
 
-__device__ bool stackTop(const uint64_t bitStack, const uint8_t currBitStackIdx)
+__device__ bool stackTop(const uint64_t bitStack, const uint8_t bitStackIdx)
 {
-    uint64_t mask = 1L << currBitStackIdx;
+    uint64_t mask = 1L << bitStackIdx;
     uint64_t tmp = bitStack & mask;
     return tmp > 0L;
 }
@@ -72,7 +72,7 @@ struct OperandKernelParam
     uint64_t reqIdx;
     uint64_t numDocs;
     uint64_t* d_bitStacks;
-    uint8_t* d_bitStackCounts;
+    uint8_t bitStackIdx;
 };
 
 __global__ void matchOpKernel(OperandKernelParam param)
@@ -83,11 +83,11 @@ __global__ void matchOpKernel(OperandKernelParam param)
         bool rst = matchOp(param.reqAbmDataGpu, param.docAbmDataGpu, param.reqIdx, docIdx, param.op);
         if (rst)
         {
-            stackPushTrue(param.d_bitStacks[docIdx], param.d_bitStackCounts[docIdx]);
+            stackPushTrue(param.d_bitStacks[docIdx], param.bitStackIdx);
         }
         else
         {
-            stackPushFalse(param.d_bitStacks[docIdx], param.d_bitStackCounts[docIdx]);
+            stackPushFalse(param.d_bitStacks[docIdx], param.bitStackIdx);
         }
     }
 }
@@ -97,8 +97,8 @@ struct OperatorKernelParam
     CabmOp op;
     uint64_t numPostfixOps;
     uint64_t* d_bitStacks;
-    uint8_t* d_bitStackCounts;
     uint64_t numDocs;
+    uint8_t bitStackIdx;
 };
 
 __global__ void operatorKernel(OperatorKernelParam param)
@@ -107,17 +107,16 @@ __global__ void operatorKernel(OperatorKernelParam param)
     if (docIdx < param.numDocs)
     {
         uint64_t& bitStack = param.d_bitStacks[docIdx];
-        uint8_t& bitStackCount = param.d_bitStackCounts[docIdx];
-        bool rst1 = stackTop(bitStack, bitStackCount);
-        bool rst2 = stackTop(bitStack, bitStackCount);
+        bool rst1 = stackTop(bitStack, param.bitStackIdx - 1);
+        bool rst2 = stackTop(bitStack, param.bitStackIdx - 2);
         bool rst = (param.op.getOpType() == CabmOpType::OPERATOR_AND) ? (rst1 & rst2) : (rst1 | rst2);
         if (rst)
         {
-            stackPushTrue(bitStack, bitStackCount);
+            stackPushTrue(bitStack, param.bitStackIdx - 2);
         }
         else
         {
-            stackPushFalse(bitStack, bitStackCount);
+            stackPushFalse(bitStack, param.bitStackIdx - 2);
         }
     }
 }
@@ -160,7 +159,7 @@ void cabmGpu(CabmGpuParam param)
                 if (currBitStackIdx >= g_kMaxBitStackCount)
                 {
                     std::ostringstream oss;
-                    oss << "currBitStackIdx is greater than g_kMaxBitStackCount: " << currBitStackIdx
+                    oss << "currBitStackIdx is greater than g_kMaxBitStackCount: " << (int)currBitStackIdx
                         << " >= " << g_kMaxBitStackCount;
                     throw std::runtime_error(oss.str());
                 }
@@ -172,7 +171,7 @@ void cabmGpu(CabmGpuParam param)
                 operandKernelParam.reqIdx = reqIdx;
                 operandKernelParam.numDocs = param.numDocs;
                 operandKernelParam.d_bitStacks = param.d_bitStacks;
-                operandKernelParam.d_bitStackCounts = param.d_bitStackCounts;
+                operandKernelParam.bitStackIdx = currBitStackIdx;
                 if (op.getOpType() == CabmOpType::OPERAND_MATCH)
                 {
                     matchOpKernel<<<kGridSize, kBlockSize>>>(operandKernelParam);
@@ -181,27 +180,27 @@ void cabmGpu(CabmGpuParam param)
                 {
                     assert(false);
                 }
-                currBitStackIdx++;
+                currBitStackIdx++; // We push 1, so the net effect is +1
             }
             else if (op.isOperator())
             {
-                currBitStackIdx -= 2;
-
                 OperatorKernelParam operatorKernelParam;
                 operatorKernelParam.op = op;
                 operatorKernelParam.d_bitStacks = param.d_bitStacks;
-                operatorKernelParam.d_bitStackCounts = param.d_bitStackCounts;
+                operatorKernelParam.bitStackIdx = currBitStackIdx;
                 operatorKernelParam.numDocs = param.numDocs;
                 operatorKernel<<<kGridSize, kBlockSize>>>(operatorKernelParam);
+
+                currBitStackIdx--; // We pop 2 and push 1, so the net effect is -1
             }
             CHECK_CUDA(cudaDeviceSynchronize())
             CHECK_CUDA(cudaGetLastError())
         }
 
-        if (currBitStackIdx != 0)
+        if (currBitStackIdx != 1)
         {
             std::ostringstream oss;
-            oss << "currBitStackIdx is not 0: " << currBitStackIdx;
+            oss << "currBitStackIdx is not 1: " << (int)currBitStackIdx;
             throw std::runtime_error(oss.str());
         }
 
