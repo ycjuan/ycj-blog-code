@@ -38,7 +38,7 @@ public:
     // Some convenient self-identifiers
     bool isOperand() const { return m_opType >= CabmOpType::OPERAND_MATCH; }
     bool isOperator() const { return m_opType < CabmOpType::OPERAND_MATCH && m_opType > CabmOpType::RIGHT_PARENTHESIS; }
-    bool isNegation() const { return m_negation; }
+    __device__ __host__ bool isNegation() const { return m_negation; }
     bool isLeftParenthesis() const { return m_opType == CabmOpType::LEFT_PARENTHESIS; }
     bool isRightParenthesis() const { return m_opType == CabmOpType::RIGHT_PARENTHESIS; }
 

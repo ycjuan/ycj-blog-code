@@ -43,13 +43,15 @@ __device__ bool matchOp(const AbmDataGpu& reqAbmDataGpu,
     int reqOffsetEnd = reqAbmDataGpu.getOffset_d(reqIdx, op.getReqFieldIdx() + 1);
     int docOffsetEnd = docAbmDataGpu.getOffset_d(docIdx, op.getDocFieldIdx() + 1);
 
+    bool rst = false;
     while (reqOffsetIter < reqOffsetEnd && docOffsetIter < docOffsetEnd)
     {
         long reqVal = reqAbmDataGpu.getVal_d(reqIdx, reqOffsetIter);
         long docVal = docAbmDataGpu.getVal_d(docIdx, docOffsetIter);
         if (reqVal == docVal)
         {
-            return true;
+            rst = true;
+            break;
         }
         else if (reqVal < docVal)
         {
@@ -61,7 +63,12 @@ __device__ bool matchOp(const AbmDataGpu& reqAbmDataGpu,
         }
     }
 
-    return false;
+    if (op.isNegation())
+    {
+        rst = !rst;
+    }
+
+    return rst;
 }
 
 struct OperandKernelParam

@@ -124,7 +124,7 @@ void test1c()
 
 int main()
 {
-    //test1a();
+    test1a();
     test1b();
     test1c();
     return 0;
