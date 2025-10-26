@@ -1,5 +1,6 @@
 #include <stdexcept>
 #include <random>
+#include <algorithm>
 
 #include "data_struct.cuh"
 
@@ -202,6 +203,7 @@ genRandData3D(int numRows, int numFields, std::vector<int> numValsPerFieldMin, s
             {
                 data1D.push_back(valDist(generator));
             }
+            std::sort(data1D.begin(), data1D.end());
             data2D.push_back(data1D);
         }
         data3D.push_back(data2D);
