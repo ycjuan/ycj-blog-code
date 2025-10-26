@@ -136,17 +136,6 @@ __global__ void copyRstKernel(uint8_t* d_rst, uint64_t* d_bitStacks, uint64_t nu
     }
 }
 
-struct CabmGpuParam
-{
-    AbmDataGpu reqAbmDataGpu;
-    AbmDataGpu docAbmDataGpu;
-    std::vector<CabmOp> postfixOps;
-    uint64_t* d_bitStacks;
-    uint64_t numDocs;
-    uint64_t numReqs;
-    uint8_t* d_rst;
-};
-
 void cabmGpu(CabmGpuParam param)
 {
     const int kBlockSize = 1024;

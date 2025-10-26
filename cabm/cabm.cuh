@@ -67,3 +67,16 @@ bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
 std::vector<std::vector<uint8_t>> cabmCpu(const std::vector<CabmOp>& infixExpr,
                                           const std::vector<std::vector<std::vector<long>>>& reqData3D,
                                           const std::vector<std::vector<std::vector<long>>>& docData3D);
+
+struct CabmGpuParam
+{
+    AbmDataGpu reqAbmDataGpu;
+    AbmDataGpu docAbmDataGpu;
+    std::vector<CabmOp> postfixOps;
+    uint64_t* d_bitStacks;
+    uint64_t numDocs;
+    uint64_t numReqs;
+    uint8_t* d_rst;
+};
+
+void cabmGpu(CabmGpuParam param);

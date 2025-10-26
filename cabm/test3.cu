@@ -1,14 +1,16 @@
 #include <cassert>
+#include <cstdint>
 #include <iostream>
 #include <vector>
 
 #include "data_struct.cuh"
 #include "cabm.cuh"
+#include "macro.cuh"
 
 void test3a()
 {
     const int kNumReqs = 1;
-    const int kNumDocs = 10;
+    const uint64_t kNumDocs = 10;
     const int kNumFields = 6;
     const std::vector<int> kNumValsPerFieldMin = { 2, 2, 2, 2, 2, 2 };
     const std::vector<int> kNumValsPerFieldMax = { 10, 10, 10, 10, 10, 10 };
@@ -37,6 +39,35 @@ void test3a()
     std::vector<CabmOp> postfix = infix2postfix(infix);
 
     const auto rst2D = cabmCpu(infix, reqData3D, docData3D);
+
+    {
+        AbmDataGpu reqAbmDataGpu;
+        reqAbmDataGpu.init(reqData3D, true);
+        AbmDataGpu docAbmDataGpu;
+        docAbmDataGpu.init(docData3D, true);
+
+        uint8_t* d_rst;
+        CHECK_CUDA(cudaMalloc(&d_rst, kNumReqs * kNumDocs * sizeof(uint8_t)));
+        uint64_t* d_bitStacks;
+        CHECK_CUDA(cudaMalloc(&d_bitStacks, kNumDocs * sizeof(uint64_t)));
+
+        CabmGpuParam param;
+        param.d_rst = d_rst;
+        param.d_bitStacks = d_bitStacks;
+        param.numDocs = kNumDocs;
+        param.numReqs = kNumReqs;
+        param.postfixOps = postfix;
+        param.reqAbmDataGpu = reqAbmDataGpu;
+        param.docAbmDataGpu = docAbmDataGpu;
+
+        cabmGpu(param);
+
+        std::vector<uint8_t> rstGpu(kNumReqs * kNumDocs);
+        CHECK_CUDA(cudaMemcpy(rstGpu.data(), d_rst, kNumReqs * kNumDocs * sizeof(uint8_t), cudaMemcpyDeviceToHost));
+
+        CHECK_CUDA(cudaFree(d_rst));
+        CHECK_CUDA(cudaFree(d_bitStacks));
+    }
 }
 
 int main()
