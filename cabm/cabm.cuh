@@ -33,7 +33,7 @@ public:
     // Getters
     __device__ __host__ int getReqFieldIdx_dh() const { return m_reqFieldIdx; }
     __device__ __host__ int getDocFieldIdx_dh() const { return m_docFieldIdx; }
-    CabmOpType getOpType() const { return m_opType; }
+    __device__ __host__ CabmOpType getOpType_dh() const { return m_opType; }
 
     // Some convenient self-identifiers
     bool isOperand() const { return m_opType >= CabmOpType::OPERAND_MATCH; }

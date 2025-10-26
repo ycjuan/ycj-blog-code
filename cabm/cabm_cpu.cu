@@ -116,7 +116,7 @@ int evaluateOp(CabmOp& op,
     int rst = 0;
 
     // For CPU implementation, we will use this simple two-layer for loop.
-    if (op.getOpType() == CabmOpType::OPERAND_MATCH)
+    if (op.getOpType_dh() == CabmOpType::OPERAND_MATCH)
     {
         for (auto reqAttr : reqAttrs)
         {
@@ -132,7 +132,7 @@ int evaluateOp(CabmOp& op,
     }
     else
     {
-        throw std::invalid_argument("Invalid operator type: " + std::to_string(static_cast<int>(op.getOpType())));
+        throw std::invalid_argument("Invalid operator type: " + std::to_string(static_cast<int>(op.getOpType_dh())));
     }
 
     if (op.isNegation())
@@ -169,7 +169,7 @@ bool evaluatePostfix(std::vector<CabmOp> postfix1D,
             st.pop();
             int rstB = st.top();
             st.pop();
-            switch (op.getOpType())
+            switch (op.getOpType_dh())
             {
             case CabmOpType::OPERATOR_AND:
                 st.push(int((bool)rstA & (bool)rstB));

@@ -91,21 +91,26 @@ __global__ void matchOpKernel(OperandKernelParam param)
     }
 }
 
-__global__ void operatorAndKernel(const CabmOp* d_postfixOps,
-                                  const uint32_t currOpIdx,
-                                  const uint64_t numPostfixOps,
-                                  uint64_t* d_bitStacks,
-                                  uint8_t* d_bitStackCounts,
-                                  const uint64_t numDocs)
+struct OperatorKernelParam
+{
+    CabmOp op;
+    uint32_t currOpIdx;
+    uint64_t numPostfixOps;
+    uint64_t* d_bitStacks;
+    uint8_t* d_bitStackCounts;
+    uint64_t numDocs;
+};
+
+__global__ void operatorKernel(OperatorKernelParam param)
 {
     uint64_t docIdx = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
-    if (docIdx < numDocs)
+    if (docIdx < param.numDocs)
     {
-        uint64_t& bitStack = d_bitStacks[docIdx];
-        uint8_t& bitStackCount = d_bitStackCounts[docIdx];
+        uint64_t& bitStack = param.d_bitStacks[docIdx];
+        uint8_t& bitStackCount = param.d_bitStackCounts[docIdx];
         bool rst1 = stackTop(bitStack, bitStackCount);
         bool rst2 = stackTop(bitStack, bitStackCount);
-        bool rst = rst1 & rst2;
+        bool rst = (param.op.getOpType_dh() == CabmOpType::OPERATOR_AND) ? (rst1 & rst2) : (rst1 | rst2);
         if (rst)
         {
             stackPushTrue(bitStack, bitStackCount);
@@ -174,7 +179,7 @@ void cabmGpuOneReq(const AbmDataGpu& reqAbmDataGpu,
             param.numDocs = numDocs;
             param.d_bitStacks = d_bitStacks;
             param.d_bitStackCounts = d_bitStackCounts;
-            if (op.getOpType() == CabmOpType::OPERAND_MATCH)
+            if (op.getOpType_dh() == CabmOpType::OPERAND_MATCH)
             {
                 matchOpKernel<<<kGridSize, kBlockSize>>>(param);
             }
@@ -187,18 +192,15 @@ void cabmGpuOneReq(const AbmDataGpu& reqAbmDataGpu,
         else if (op.isOperator())
         {
             currBitStackIdx -= 2;
-            if (op.getOpType() == CabmOpType::OPERATOR_AND)
-            {
-                operatorAndKernel<<<kGridSize, kBlockSize>>>(d_postfixOps, opIdx, numPostfixOps, d_bitStacks, d_bitStackCounts, numDocs);
-            }
-            else if (op.getOpType() == CabmOpType::OPERATOR_OR)
-            {
-                operatorOrKernel<<<kGridSize, kBlockSize>>>(d_postfixOps, opIdx, numPostfixOps, d_bitStacks, currBitStackIdx, numDocs);
-            }
-            else
-            {
-                assert(false);
-            }    
+
+            OperatorKernelParam param;
+            param.op = op;
+            param.currOpIdx = opIdx;
+            param.numPostfixOps = numPostfixOps;
+            param.d_bitStacks = d_bitStacks;
+            param.d_bitStackCounts = d_bitStackCounts;
+            param.numDocs = numDocs;
+            operatorKernel<<<kGridSize, kBlockSize>>>(param);
         }
         CHECK_CUDA(cudaDeviceSynchronize())
         CHECK_CUDA(cudaGetLastError())
