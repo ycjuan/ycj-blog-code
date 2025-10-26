@@ -30,8 +30,8 @@ public:
     }
 
     // Getters
-    int getReqFieldIdx() const { return m_reqFieldIdx; }
-    int getDocFieldIdx() const { return m_docFieldIdx; }
+    __device__ __host__ int getReqFieldIdx_dh() const { return m_reqFieldIdx; }
+    __device__ __host__ int getDocFieldIdx_dh() const { return m_docFieldIdx; }
     CabmOpType getOpType() const { return m_opType; }
 
     // Some convenient self-identifiers

@@ -1,73 +1,74 @@
-#include <vector>
+#include <cassert>
 #include <cmath>
 #include <functional>
 #include <iostream>
+#include <math.h>
+#include <numeric>
 #include <random>
 #include <stdexcept>
 #include <string>
-#include <math.h>
-#include <cassert>
-#include <numeric>
 #include <thrust/copy.h>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
+#include <vector>
 
 #include "cabm.cuh"
 
-#define CHECK_CUDA(func)                                 \
-{                                                        \
-    cudaError_t status = (func);                         \
-    if (status != cudaSuccess) {                         \
-        std::string error = "CUDA API failed at line "   \
-            + std::to_string(__LINE__) + " with error: " \
-            + cudaGetErrorString(status) + "\n";         \
-        throw std::runtime_error(error);                 \
-    }                                                    \
-}
-
-using namespace std;
-    
-const int BLOCK_SIZE = 1024;
-
-__device__ long getMemAddrRowMajorDevice(int row, int col, int numRows, int numCols) {
-    return (long)row * numCols + col;
-}
-
-__device__ void stackPushTrue(uint64_t &bs, int &bsCount) {
+__device__ void stackPushTrue(uint64_t& bs, int& bsCount)
+{
     uint64_t mask = 1L << bsCount;
     bs = bs | mask;
     bsCount++;
 }
 
-__device__ void stackPushFalse(uint64_t &bs, int &bsCount) {
+__device__ void stackPushFalse(uint64_t& bs, int& bsCount)
+{
     uint64_t mask = ~(1L << bsCount);
     bs = bs & mask;
     bsCount++;
 }
 
-__device__ bool stackPop(uint64_t &bs, int &bsCount) {
+__device__ bool stackPop(uint64_t& bs, int& bsCount)
+{
     bsCount--;
     uint64_t mask = 1L << bsCount;
     uint64_t tmp = bs & mask;
     return tmp > 0L;
 }
 
-/*
-__device__ bool evaluateSingleOp(const CabmGpuParam &param, int i, const CabmOp &op) {
-    int docOffsetBegin = param.d_docTbrOffsets[getMemAddrRowMajorDevice(i, op.clause, param.numDocs, param.numClauses+1)]; 
-    int docOffsetEnd = param.d_docTbrOffsets[getMemAddrRowMajorDevice(i, op.clause+1, param.numDocs, param.numClauses+1)]; 
-    bool rst = false;
-    for (int j = docOffsetBegin; j < docOffsetEnd; j++) {
-        long doc_tbr = param.d_docTbrAttr[getMemAddrRowMajorDevice(i, j, param.numDocs, param.docMaxNumTbrAttr)];
-        if (doc_tbr == op.attr) {
-            rst = true;
-            break;
+__device__ bool matchOp(const AbmDataGpu& reqAbmDataGpu,
+                        const AbmDataGpu& docAbmDataGpu,
+                        const int reqIdx,
+                        const int docIdx,
+                        const CabmOp& op)
+{
+    int reqOffsetIter = reqAbmDataGpu.getOffset_d(reqIdx, op.getReqFieldIdx_dh());
+    int docOffsetIter = docAbmDataGpu.getOffset_d(docIdx, op.getDocFieldIdx_dh());
+    int reqOffsetEnd = reqAbmDataGpu.getOffset_d(reqIdx, op.getReqFieldIdx_dh() + 1);
+    int docOffsetEnd = docAbmDataGpu.getOffset_d(docIdx, op.getDocFieldIdx_dh() + 1);
+
+    while (reqOffsetIter < reqOffsetEnd && docOffsetIter < docOffsetEnd)
+    {
+        long reqVal = reqAbmDataGpu.getVal_d(reqIdx, reqOffsetIter);
+        long docVal = docAbmDataGpu.getVal_d(docIdx, docOffsetIter);
+        if (reqVal == docVal)
+        {
+            return true;
+        }
+        if (reqVal < docVal)
+        {
+            reqOffsetIter++;
+        }
+        else
+        {
+            docOffsetIter++;
         }
     }
-    if (op.type == CABM_OP_TYPE_ATTR_NEGATION)
-        rst = !rst;
-    return rst;
+
+    return false;
 }
+
+/*
 
 __global__ void cabmKernel(CabmGpuParam param) {
 
@@ -92,9 +93,10 @@ __global__ void cabmKernel(CabmGpuParam param) {
 
         bool finalRst;
         if (msg.score != 0) {
-            uint64_t bs; 
+            uint64_t bs;
             int bsCount = 0; // bsCount-1 indicate the current head
-            // bs stands for "bitStack". since we only need to store the "binary result" of each operand, we only need 1 bit for each operand.
+            // bs stands for "bitStack". since we only need to store the "binary result" of each operand, we only need 1
+bit for each operand.
             // here we use a 64-bit integer, so it can hold up to 64 elements in the stack
             // "bsCount" is used to indicate how many element there are in the bit stack
 
@@ -113,7 +115,7 @@ __global__ void cabmKernel(CabmGpuParam param) {
 
                     bool rst1 = stackPop(bs, bsCount);
                     bool rst2 = stackPop(bs, bsCount);
-                    
+
                     bool rst;
                     if (op.type == CABM_OP_TYPE_AND)
                         rst = rst1 & rst2;
@@ -166,7 +168,7 @@ void cabmGpu(CabmGpuParam &param) {
 
     // Execute the kernel
     cudaEvent_t start, stop;
-    cudaEventCreate(&start);    
+    cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventRecord(start);
 
@@ -175,10 +177,8 @@ void cabmGpu(CabmGpuParam &param) {
         int GRID_SIZE = max(1, (int)ceil((double)param.msgSize/BLOCK_SIZE));
         cabmKernel<<<GRID_SIZE, BLOCK_SIZE>>>(param);
         CHECK_CUDA(cudaDeviceSynchronize())
-        Msg* d_endPtr = thrust::copy_if(thrust::device, param.d_msgBuffer, param.d_msgBuffer + param.msgSize, param.d_msg, nonZeroPredicator());
-        param.msgSize = d_endPtr - param.d_msg;
-    } else {
-        int iterSize = max(16384, param.k);
+        Msg* d_endPtr = thrust::copy_if(thrust::device, param.d_msgBuffer, param.d_msgBuffer + param.msgSize,
+param.d_msg, nonZeroPredicator()); param.msgSize = d_endPtr - param.d_msg; } else { int iterSize = max(16384, param.k);
         int GRID_SIZE = max(1, (int)ceil((double)iterSize/BLOCK_SIZE));
         param.offsetA = 0;
         param.offsetB = 0;
@@ -191,11 +191,9 @@ void cabmGpu(CabmGpuParam &param) {
             Msg *d_msgBufferBegin = param.d_msgBuffer + param.offsetA;
             Msg *d_msgBufferEnd   = param.d_msgBuffer + min(param.msgSize, param.offsetA + iterSize);
             Msg *d_msg            = param.d_msg + param.offsetB;
-            Msg* d_endPtr = thrust::copy_if(thrust::device, d_msgBufferBegin, d_msgBufferEnd, d_msg, nonZeroPredicator());
-            param.offsetA += iterSize;
-            param.offsetB += d_endPtr - d_msg;
-            if (param.offsetA >= param.msgSize || param.offsetB >= param.k)
-                break;
+            Msg* d_endPtr = thrust::copy_if(thrust::device, d_msgBufferBegin, d_msgBufferEnd, d_msg,
+nonZeroPredicator()); param.offsetA += iterSize; param.offsetB += d_endPtr - d_msg; if (param.offsetA >= param.msgSize
+|| param.offsetB >= param.k) break;
         }
         param.msgSize = param.offsetB;
         //thrust::stable_sort(thrust::device, param.d_msg, param.d_msg + param.msgSize, ScorePredicator());
@@ -204,7 +202,7 @@ void cabmGpu(CabmGpuParam &param) {
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&(param.timeMs), start, stop);
-    cudaEventDestroy(start);    
+    cudaEventDestroy(start);
     cudaEventDestroy(stop);
 }
 */

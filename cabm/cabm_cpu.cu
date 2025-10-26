@@ -108,8 +108,8 @@ int evaluateOp(CabmOp& op,
                const std::vector<std::vector<long>>& reqData2D,
                const std::vector<std::vector<long>>& docData2D)
 {
-    const std::vector<long>& reqAttrs = reqData2D.at(op.getReqFieldIdx());
-    const std::vector<long>& docAttrs = docData2D.at(op.getDocFieldIdx());
+    const std::vector<long>& reqAttrs = reqData2D.at(op.getReqFieldIdx_dh());
+    const std::vector<long>& docAttrs = docData2D.at(op.getDocFieldIdx_dh());
 
     int rst = 0;
     
