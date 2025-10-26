@@ -15,6 +15,8 @@
 
 #include "cabm.cuh"
 
+constexpr uint32_t g_kMaxBitStackCount = 64; // We use uint64_t to store the bit stack, so the max number of elements is 64
+
 __device__ void stackPushTrue(uint64_t& bitStack, uint8_t& bitStackCount)
 {
     uint64_t mask = 1L << bitStackCount;
@@ -91,6 +93,44 @@ __global__ void matchOpKernel(const AbmDataGpu& reqAbmDataGpu,
         {
             stackPushFalse(d_bitStacks[reqDocPairIdx], d_bitStackCounts[reqDocPairIdx]);
         }
+    }
+}
+
+__global__ void operatorAndKernel(const CabmOp* d_postfixOps,
+                                  const uint32_t currOpIdx,
+                                  const uint64_t numPostfixOps,
+                                  uint64_t* d_bitStacks,
+                                  uint8_t* d_bitStackCounts,
+                                  const uint64_t numDocs)
+{
+    uint64_t docIdx = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
+    if (docIdx < numDocs)
+    {
+        uint64_t &bitStack = d_bitStacks[docIdx];
+        uint8_t &bitStackCount = d_bitStackCounts[docIdx];
+        bool rst1 = stackPop(bitStack, bitStackCount);
+        bool rst2 = stackPop(bitStack, bitStackCount);
+        bool rst = rst1 & rst2;
+        stackPushTrue(bitStack, bitStackCount);
+    }
+}
+
+__global__ void operatorOrKernel(const CabmOp* d_postfixOps,
+                                  const uint32_t currOpIdx,
+                                  const uint64_t numPostfixOps,
+                                  uint64_t* d_bitStacks,
+                                  uint8_t* d_bitStackCounts,
+                                  const uint64_t numDocs)
+{
+    uint64_t docIdx = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
+    if (docIdx < numDocs)
+    {
+        uint64_t &bitStack = d_bitStacks[docIdx];
+        uint8_t &bitStackCount = d_bitStackCounts[docIdx];
+        bool rst1 = stackPop(bitStack, bitStackCount);
+        bool rst2 = stackPop(bitStack, bitStackCount);
+        bool rst = rst1 | rst2;
+        stackPushTrue(bitStack, bitStackCount);
     }
 }
 
