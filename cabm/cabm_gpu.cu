@@ -47,21 +47,21 @@ __device__ bool matchOp(const AbmDataGpu& reqAbmDataGpu,
                         const int docIdx,
                         const CabmOp& op)
 {
-    // Get the offset iterators 
-    int reqOffsetIter = reqAbmDataGpu.getOffset(reqIdx, op.getReqFieldIdx());
-    int docOffsetIter = docAbmDataGpu.getOffset(docIdx, op.getDocFieldIdx());
+    // Init the value index
+    int reqValIdx = 0;
+    int docValIdx = 0;
 
-    // Get the end offset iterators
-    int reqOffsetEnd = reqAbmDataGpu.getOffset(reqIdx, op.getReqFieldIdx() + 1);
-    int docOffsetEnd = docAbmDataGpu.getOffset(docIdx, op.getDocFieldIdx() + 1);
+    // Get num values
+    int reqNumVals = reqAbmDataGpu.getNumVals(reqIdx);
+    int docNumVals = docAbmDataGpu.getNumVals(docIdx);
 
     bool rst = false;
     // We assume the req and doc data are sorted.
-    while (reqOffsetIter < reqOffsetEnd && docOffsetIter < docOffsetEnd) // While the iterators are not at the end
+    while (reqValIdx < reqNumVals && docValIdx < docNumVals) // While the iterators are not at the end
     {
         // Get the values
-        ABM_DATA_TYPE reqVal = reqAbmDataGpu.getVal(reqIdx, reqOffsetIter);
-        ABM_DATA_TYPE docVal = docAbmDataGpu.getVal(docIdx, docOffsetIter);
+        ABM_DATA_TYPE reqVal = reqAbmDataGpu.getVal(reqIdx, reqValIdx);
+        ABM_DATA_TYPE docVal = docAbmDataGpu.getVal(docIdx, docValIdx);
 
         // If the values are equal, we have a match, so we can break.
         if (reqVal == docVal)
@@ -71,11 +71,11 @@ __device__ bool matchOp(const AbmDataGpu& reqAbmDataGpu,
         }
         else if (reqVal < docVal) // If the req value is less than the doc value, we increment the req iterator.
         {
-            reqOffsetIter++;
+            reqValIdx++;
         }
         else // If the req value is greater than the doc value, we increment the doc iterator.
         {
-            docOffsetIter++;
+            docValIdx++;
         }
     }
 
@@ -182,8 +182,8 @@ void cabmGpu(CabmGpuParam& param)
                 // -----------------
                 // Create the operand kernel parameter
                 OperandKernelParam operandKernelParam;
-                operandKernelParam.reqAbmDataGpu = param.reqAbmDataGpu;
-                operandKernelParam.docAbmDataGpu = param.docAbmDataGpu;
+                operandKernelParam.reqAbmDataGpu = param.reqAbmDataGpuList.at(reqIdx);
+                operandKernelParam.docAbmDataGpu = param.docAbmDataGpuList.at(reqIdx);
                 operandKernelParam.op = op;
                 operandKernelParam.reqIdx = reqIdx;
                 operandKernelParam.numDocs = param.numDocs;
@@ -267,10 +267,15 @@ bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
                                const std::vector<std::vector<ABM_DATA_TYPE>>& reqData2D,
                                const std::vector<std::vector<ABM_DATA_TYPE>>& docData2D)
 {
-    AbmDataGpu reqAbmDataGpu;
-    AbmDataGpu docAbmDataGpu;
-    reqAbmDataGpu.init({reqData2D}, true);
-    docAbmDataGpu.init({docData2D}, true);
+    std::vector<AbmDataGpu> reqAbmDataGpuList;
+    std::vector<AbmDataGpu> docAbmDataGpuList;
+    for (int field = 0; field < reqData2D.size(); field++)
+    {
+        reqAbmDataGpuList.push_back(AbmDataGpu());
+        docAbmDataGpuList.push_back(AbmDataGpu());
+        reqAbmDataGpuList.at(field).init({reqData2D}, field, true);
+        docAbmDataGpuList.at(field).init({docData2D}, field, true);
+    }
 
     uint8_t* d_rst;
     CHECK_CUDA(cudaMallocManaged(&d_rst, 1 * sizeof(uint8_t)));
@@ -283,8 +288,8 @@ bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
     param.numDocs = 1;
     param.numReqs = 1;
     param.postfixOps = postfix1D;
-    param.reqAbmDataGpu = reqAbmDataGpu;
-    param.docAbmDataGpu = docAbmDataGpu;
+    param.reqAbmDataGpuList = reqAbmDataGpuList;
+    param.docAbmDataGpuList = docAbmDataGpuList;
 
     cabmGpu(param);
 

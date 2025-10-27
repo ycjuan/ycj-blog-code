@@ -70,8 +70,8 @@ std::vector<std::vector<uint8_t>> cabmCpu(const std::vector<CabmOp>& infixExpr,
 
 struct CabmGpuParam
 {
-    AbmDataGpu reqAbmDataGpu;
-    AbmDataGpu docAbmDataGpu;
+    std::vector<AbmDataGpu> reqAbmDataGpuList;
+    std::vector<AbmDataGpu> docAbmDataGpuList;
     std::vector<CabmOp> postfixOps;
     uint64_t* d_bitStacks;
     uint64_t numDocs;

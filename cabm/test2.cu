@@ -6,19 +6,35 @@
 
 void test2a()
 {
-    std::vector<std::vector<std::vector<ABM_DATA_TYPE>>> data3D = genRandData3D(10, 3, { 1, 2, 3 }, { 10, 20, 30 });
+    int numRows = 10;
+    int numFields = 3;
+    std::vector<int> numValsPerFieldMin = { 1, 2, 3 };
+    std::vector<int> numValsPerFieldMax = { 10, 20, 30 };
+    
+    const auto data3D = genRandData3D(numRows, numFields, numValsPerFieldMin, numValsPerFieldMax);
 
-    AbmDataGpu abmDataGpu;
-    abmDataGpu.init(data3D, true);
+    std::vector<AbmDataGpu> reqAbmDataGpuList;
+    std::vector<AbmDataGpu> docAbmDataGpuList;
+    for (int fieldIdx = 0; fieldIdx < numFields; fieldIdx++)
+    {
+        reqAbmDataGpuList.push_back(AbmDataGpu());
+        docAbmDataGpuList.push_back(AbmDataGpu());
+        reqAbmDataGpuList.at(fieldIdx).init(data3D, fieldIdx, true);
+        docAbmDataGpuList.at(fieldIdx).init(data3D, fieldIdx, true);
+    }
 
     for (uint32_t row = 0; row < data3D.size(); row++)
     {
         for (uint32_t field = 0; field < data3D.at(0).size(); field++)
         {
+            if (reqAbmDataGpuList.at(field).getNumVals(row) != data3D.at(row).at(field).size())
+            {
+                std::cout << "Error at (" << row << ", " << field << "): " << reqAbmDataGpuList.at(field).getNumVals(row) << " != " << data3D.at(row).at(field).size() << std::endl;
+                assert(false);
+            }
             for (uint32_t valOffset = 0; valOffset < data3D.at(row).at(field).size(); valOffset++)
             {
-                int fieldOffset = abmDataGpu.getOffset(row, field);
-                ABM_DATA_TYPE val = abmDataGpu.getVal(row, fieldOffset + valOffset);
+                ABM_DATA_TYPE val = reqAbmDataGpuList.at(field).getVal(row, valOffset);
                 if (val != data3D.at(row).at(field).at(valOffset))
                 {
                     std::cout << "Error at (" << row << ", " << field << ", " << valOffset << "): " << val << " != " << data3D.at(row).at(field).at(valOffset) << std::endl;
@@ -28,7 +44,11 @@ void test2a()
         }
     }
 
-    abmDataGpu.free();
+    for (int fieldIdx = 0; fieldIdx < numFields; fieldIdx++)
+    {
+        reqAbmDataGpuList.at(fieldIdx).free();
+        docAbmDataGpuList.at(fieldIdx).free();
+    }
 }
 
 int main()
