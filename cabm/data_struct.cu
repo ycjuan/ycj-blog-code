@@ -5,7 +5,7 @@
 #include "data_struct.cuh"
 
 void AbmDataGpuOneField::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>& data3D,
-                              int targetFieldIdx,
+                              int targetField,
                               bool useManagedMemory)
 {
     // -----------------
@@ -25,10 +25,12 @@ void AbmDataGpuOneField::init(const std::vector<std::vector<std::vector<ABM_DATA
         m_maxNumValsPerRow = 0;
         for (const auto& inputData2D : data3D)
         {
-            m_maxNumValsPerRow = std::max(m_maxNumValsPerRow, (uint32_t)inputData2D.at(targetFieldIdx).size());
-            data2D.push_back(inputData2D.at(targetFieldIdx));
+            const auto& inputData1D = inputData2D.at(targetField);
+            m_maxNumValsPerRow = std::max(m_maxNumValsPerRow, (uint32_t)inputData1D.size());
+            data2D.push_back(inputData1D);
         }
         m_maxNumValsPerRow++; // The first element is reserved for storing num vals per row
+                              // So we need one additional space
     }
 
     // -----------------
@@ -54,11 +56,6 @@ void AbmDataGpuOneField::init(const std::vector<std::vector<std::vector<ABM_DATA
         {
             throw std::runtime_error("cudaMalloc failed (data): " + std::string(cudaGetErrorString(cudaError)));
         }
-        
-        if (cudaError != cudaSuccess)
-        {
-            throw std::runtime_error("cudaMalloc failed (offsets): " + std::string(cudaGetErrorString(cudaError)));
-        }
     }
 
     // -----------------
@@ -78,7 +75,7 @@ void AbmDataGpuOneField::init(const std::vector<std::vector<std::vector<ABM_DATA
         // Fill the data in pinned memory
         for (int row = 0; row < m_numRows; row++)
         {
-            hp_data[getMemAddrSize(row)] = data2D.at(row).size();
+            hp_data[getMemAddrNumVals(row)] = data2D.at(row).size();
             for (int valIdx = 0; valIdx < data2D.at(row).size(); valIdx++)
             {
                 hp_data[getMemAddrVal(row, valIdx)] = data2D.at(row).at(valIdx);

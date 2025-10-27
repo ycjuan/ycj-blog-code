@@ -27,9 +27,9 @@ void test2a()
     {
         for (uint32_t field = 0; field < data3D.at(0).size(); field++)
         {
-            if (reqAbmDataGpuList.at(field).getOffset(row) != data3D.at(row).at(field).size())
+            if (reqAbmDataGpuList.at(field).getNumVals(row) != data3D.at(row).at(field).size())
             {
-                std::cout << "Error at (" << row << ", " << field << "): " << reqAbmDataGpuList.at(field).getOffset(row) << " != " << data3D.at(row).at(field).size() << std::endl;
+                std::cout << "Error at (" << row << ", " << field << "): " << reqAbmDataGpuList.at(field).getNumVals(row) << " != " << data3D.at(row).at(field).size() << std::endl;
                 assert(false);
             }
             for (uint32_t valOffset = 0; valOffset < data3D.at(row).at(field).size(); valOffset++)

@@ -52,8 +52,8 @@ __device__ bool matchOp(const AbmDataGpuOneField& reqAbmDataGpu,
     int docOffsetIter = 0;
 
     // Get the end offset iterators
-    int reqOffsetEnd = reqAbmDataGpu.getOffset(reqIdx);
-    int docOffsetEnd = docAbmDataGpu.getOffset(docIdx);
+    int reqOffsetEnd = reqAbmDataGpu.getNumVals(reqIdx);
+    int docOffsetEnd = docAbmDataGpu.getNumVals(docIdx);
 
     bool rst = false;
     // We assume the req and doc data are sorted.
