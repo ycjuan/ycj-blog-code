@@ -4,7 +4,7 @@
 
 #include "data_struct.cuh"
 
-void AbmDataGpu::init(const std::vector<std::vector<std::vector<long>>> &data3D, bool useManagedMemory)
+void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>> &data3D, bool useManagedMemory)
 {
     // -----------------
     // Check empty
@@ -49,7 +49,7 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<long>>> &data3D,
         // -----------
         // Calculate the size of the data
         m_d_data_size = m_numRows * m_maxNumValsPerRow;
-        m_d_data_size_in_bytes = m_d_data_size * sizeof(long);
+        m_d_data_size_in_bytes = m_d_data_size * sizeof(ABM_DATA_TYPE);
         m_d_offsets_size = m_numRows * (m_numFields + 1);
         m_d_offsets_size_in_bytes = m_d_offsets_size * sizeof(uint32_t);
 
@@ -89,7 +89,7 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<long>>> &data3D,
         // -----------------
         // Malloc pinned memory
         // TODO: Release resource when there is an exception
-        long *hp_data;
+        ABM_DATA_TYPE *hp_data;
         cudaError_t cudaError = cudaMallocHost(&hp_data, m_d_data_size_in_bytes);
         if (cudaError != cudaSuccess)
         {
@@ -169,7 +169,7 @@ void AbmDataGpu::free()
     m_maxNumValsPerRow = 0;
 }
 
-std::vector<std::vector<std::vector<long>>>
+std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
 genRandData3D(int numRows, int numFields, std::vector<int> numValsPerFieldMin, std::vector<int> numValsPerFieldMax)
 {
     // -----------------
@@ -186,17 +186,17 @@ genRandData3D(int numRows, int numFields, std::vector<int> numValsPerFieldMin, s
     // -----------------
     // Prepare random number generator
     std::default_random_engine generator;
-    std::uniform_int_distribution<long> valDist;
+    std::uniform_int_distribution<ABM_DATA_TYPE> valDist;
 
     // -----------------
     // Generate random data
-    std::vector<std::vector<std::vector<long>>> data3D;
+    std::vector<std::vector<std::vector<ABM_DATA_TYPE>>> data3D;
     for (int row = 0; row < numRows; row++)
     {
-        std::vector<std::vector<long>> data2D;
+        std::vector<std::vector<ABM_DATA_TYPE>> data2D;
         for (int field = 0; field < numFields; field++)
         {
-            std::vector<long> data1D;
+            std::vector<ABM_DATA_TYPE> data1D;
             std::uniform_int_distribution<int> numValsDist(numValsPerFieldMin.at(field), numValsPerFieldMax.at(field));
             int numVals = numValsDist(generator);
             for (int val = 0; val < numVals; val++)
