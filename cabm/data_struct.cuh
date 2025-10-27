@@ -58,5 +58,8 @@ private:
     }
 };
 
-std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
-genRandData3D(int numRows, int numFields, std::vector<int> numValsPerFieldMin, std::vector<int> numValsPerFieldMax);
+std::vector<std::vector<std::vector<ABM_DATA_TYPE>>> genRandData3D(int numRows,
+                                                                   int numFields,
+                                                                   std::vector<int> numValsPerFieldMin,
+                                                                   std::vector<int> numValsPerFieldMax,
+                                                                   std::vector<int> cardinalities);
