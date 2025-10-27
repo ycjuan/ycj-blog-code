@@ -43,10 +43,15 @@ void test3a()
     const auto rst2D = cabmCpu(infix, reqData3D, docData3D);
 
     {
-        AbmDataGpu reqAbmDataGpu;
-        reqAbmDataGpu.init(reqData3D, true);
-        AbmDataGpu docAbmDataGpu;
-        docAbmDataGpu.init(docData3D, true);
+        std::vector<AbmDataGpuOneField> reqAbmDataGpuList;
+        std::vector<AbmDataGpuOneField> docAbmDataGpuList;
+        for (int fieldIdx = 0; fieldIdx < kNumFields; fieldIdx++)
+        {
+            reqAbmDataGpuList.push_back(AbmDataGpuOneField());
+            docAbmDataGpuList.push_back(AbmDataGpuOneField());
+            reqAbmDataGpuList.at(fieldIdx).init({reqData3D}, fieldIdx, true);
+            docAbmDataGpuList.at(fieldIdx).init({docData3D}, fieldIdx, true);
+        }
 
         uint8_t* d_rst;
         CHECK_CUDA(cudaMalloc(&d_rst, kNumReqs * kNumDocs * sizeof(uint8_t)));
@@ -59,8 +64,8 @@ void test3a()
         param.numDocs = kNumDocs;
         param.numReqs = kNumReqs;
         param.postfixOps = postfix;
-        param.reqAbmDataGpu = reqAbmDataGpu;
-        param.docAbmDataGpu = docAbmDataGpu;
+        param.reqAbmDataGpuList = reqAbmDataGpuList;
+        param.docAbmDataGpuList = docAbmDataGpuList;
 
         Timer timer;
         float timeMsOperandKernel = 0;

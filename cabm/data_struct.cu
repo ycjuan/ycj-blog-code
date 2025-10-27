@@ -4,7 +4,9 @@
 
 #include "data_struct.cuh"
 
-void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>> &data3D, bool useManagedMemory)
+void AbmDataGpuOneField::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>& data3D,
+                              int targetFieldIdx,
+                              bool useManagedMemory)
 {
     // -----------------
     // Check empty
@@ -13,34 +15,20 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
         {
             throw std::runtime_error("data3D is empty");
         }
-    
+        m_numRows = data3D.size();
     }
 
     // -----------------
-    // Infer meta data
+    // Construct 2D data and infer meta data
+    std::vector<std::vector<ABM_DATA_TYPE>> data2D;
     {
-        int numRows = data3D.size();
-        int numFields = data3D.at(0).size();
-        int maxNumValsPerRow = 0;
-
-        for (const auto &data2D : data3D)
+        m_maxNumValsPerRow = 0;
+        for (const auto& inputData2D : data3D)
         {
-            if (data2D.size() != numFields)
-            {
-                throw std::runtime_error("data2D has different number of fields");
-            }
-
-            int numValsPerRow = 0;
-            for (const auto &data1D : data2D)
-            {
-                numValsPerRow += data1D.size();
-            }
-            maxNumValsPerRow = std::max(maxNumValsPerRow, numValsPerRow);
+            m_maxNumValsPerRow = std::max(m_maxNumValsPerRow, (uint32_t)inputData2D.at(targetFieldIdx).size());
+            data2D.push_back(inputData2D.at(targetFieldIdx));
         }
-        
-        m_maxNumValsPerRow = maxNumValsPerRow;    
-        m_numRows = numRows;
-        m_numFields = numFields;
+        m_maxNumValsPerRow++; // The first element is reserved for storing num vals per row
     }
 
     // -----------------
@@ -50,8 +38,6 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
         // Calculate the size of the data
         m_d_data_size = m_numRows * m_maxNumValsPerRow;
         m_d_data_size_in_bytes = m_d_data_size * sizeof(ABM_DATA_TYPE);
-        m_d_offsets_size = m_numRows * (m_numFields + 1);
-        m_d_offsets_size_in_bytes = m_d_offsets_size * sizeof(uint32_t);
 
         // -----------
         // Malloc data
@@ -69,14 +55,6 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
             throw std::runtime_error("cudaMalloc failed (data): " + std::string(cudaGetErrorString(cudaError)));
         }
         
-        if (useManagedMemory)
-        {
-            cudaError = cudaMallocManaged(&m_d_offsets, m_d_offsets_size_in_bytes);
-        }
-        else
-        {
-            cudaError = cudaMalloc(&m_d_offsets, m_d_offsets_size_in_bytes);
-        }
         if (cudaError != cudaSuccess)
         {
             throw std::runtime_error("cudaMalloc failed (offsets): " + std::string(cudaGetErrorString(cudaError)));
@@ -95,29 +73,16 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
         {
             throw std::runtime_error("cudaMallocHost failed (data): " + std::string(cudaGetErrorString(cudaError)));
         }
-        uint32_t *hp_offsets;
-        cudaError = cudaMallocHost(&hp_offsets, m_d_offsets_size_in_bytes);
-        if (cudaError != cudaSuccess)
-        {
-            throw std::runtime_error("cudaMallocHost failed (offsets): " + std::string(cudaGetErrorString(cudaError)));
-        }
 
         // -----------------
         // Fill the data in pinned memory
         for (int row = 0; row < m_numRows; row++)
         {
-            int offset = 0;
-            hp_offsets[getMemAddrOffsets(row, 0)] = offset;
-            for (int field = 0; field < m_numFields; field++)
+            hp_data[getMemAddrSize(row)] = data2D.at(row).size();
+            for (int valIdx = 0; valIdx < data2D.at(row).size(); valIdx++)
             {
-                for (auto val : data3D.at(row).at(field))
-                {
-                    hp_data[getMemAddrData(row, offset)] = val;
-                    offset++;
-                }
-                hp_offsets[getMemAddrOffsets(row, field+1)] = offset;
+                hp_data[getMemAddrVal(row, valIdx)] = data2D.at(row).at(valIdx);
             }
-            hp_offsets[getMemAddrOffsets(row, m_numFields)] = offset;
         }
 
         // -----------------
@@ -127,11 +92,6 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
         {
             throw std::runtime_error("cudaMemcpy failed (data): " + std::string(cudaGetErrorString(cudaError)));
         }
-        cudaError = cudaMemcpy(m_d_offsets, hp_offsets, m_d_offsets_size_in_bytes, cudaMemcpyHostToDevice);
-        if (cudaError != cudaSuccess)
-        {
-            throw std::runtime_error("cudaMemcpy failed (offsets): " + std::string(cudaGetErrorString(cudaError)));
-        }
 
         // -----------------
         // Free pinned memory
@@ -140,32 +100,19 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
         {
             throw std::runtime_error("cudaFreeHost failed (data): " + std::string(cudaGetErrorString(cudaError)));
         }
-        cudaError = cudaFreeHost(hp_offsets);
-        if (cudaError != cudaSuccess)
-        {
-            throw std::runtime_error("cudaFreeHost failed (offsets): " + std::string(cudaGetErrorString(cudaError)));
-        }
     }
 }
 
-void AbmDataGpu::free()
+void AbmDataGpuOneField::free()
 {
     if (m_d_data != nullptr)
     {
         cudaFree(m_d_data);
         m_d_data = nullptr;
     }
-    if (m_d_offsets != nullptr)
-    {
-        cudaFree(m_d_offsets);
-        m_d_offsets = nullptr;
-    }
     m_d_data_size = 0;
     m_d_data_size_in_bytes = 0;
-    m_d_offsets_size = 0;
-    m_d_offsets_size_in_bytes = 0;
     m_numRows = 0;
-    m_numFields = 0;
     m_maxNumValsPerRow = 0;
 }
 

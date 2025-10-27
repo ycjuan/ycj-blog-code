@@ -41,19 +41,19 @@ __device__ bool stackTop(const uint64_t bitStack, const uint8_t bitStackIdx)
     return tmp > 0L;
 }
 
-__device__ bool matchOp(const AbmDataGpu& reqAbmDataGpu,
-                        const AbmDataGpu& docAbmDataGpu,
+__device__ bool matchOp(const AbmDataGpuOneField& reqAbmDataGpu,
+                        const AbmDataGpuOneField& docAbmDataGpu,
                         const int reqIdx,
                         const int docIdx,
                         const CabmOp& op)
 {
     // Get the offset iterators 
-    int reqOffsetIter = reqAbmDataGpu.getOffset(reqIdx, op.getReqFieldIdx());
-    int docOffsetIter = docAbmDataGpu.getOffset(docIdx, op.getDocFieldIdx());
+    int reqOffsetIter = 0;
+    int docOffsetIter = 0;
 
     // Get the end offset iterators
-    int reqOffsetEnd = reqAbmDataGpu.getOffset(reqIdx, op.getReqFieldIdx() + 1);
-    int docOffsetEnd = docAbmDataGpu.getOffset(docIdx, op.getDocFieldIdx() + 1);
+    int reqOffsetEnd = reqAbmDataGpu.getOffset(reqIdx);
+    int docOffsetEnd = docAbmDataGpu.getOffset(docIdx);
 
     bool rst = false;
     // We assume the req and doc data are sorted.
@@ -89,8 +89,8 @@ __device__ bool matchOp(const AbmDataGpu& reqAbmDataGpu,
 
 struct OperandKernelParam
 {
-    AbmDataGpu reqAbmDataGpu;
-    AbmDataGpu docAbmDataGpu;
+    AbmDataGpuOneField reqAbmDataGpu;
+    AbmDataGpuOneField docAbmDataGpu;
     CabmOp op;
     uint64_t reqIdx;
     uint64_t numDocs;
@@ -182,8 +182,8 @@ void cabmGpu(CabmGpuParam& param)
                 // -----------------
                 // Create the operand kernel parameter
                 OperandKernelParam operandKernelParam;
-                operandKernelParam.reqAbmDataGpu = param.reqAbmDataGpu;
-                operandKernelParam.docAbmDataGpu = param.docAbmDataGpu;
+                operandKernelParam.reqAbmDataGpu = param.reqAbmDataGpuList.at(reqIdx);
+                operandKernelParam.docAbmDataGpu = param.docAbmDataGpuList.at(reqIdx);
                 operandKernelParam.op = op;
                 operandKernelParam.reqIdx = reqIdx;
                 operandKernelParam.numDocs = param.numDocs;
@@ -267,10 +267,15 @@ bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
                                const std::vector<std::vector<ABM_DATA_TYPE>>& reqData2D,
                                const std::vector<std::vector<ABM_DATA_TYPE>>& docData2D)
 {
-    AbmDataGpu reqAbmDataGpu;
-    AbmDataGpu docAbmDataGpu;
-    reqAbmDataGpu.init({reqData2D}, true);
-    docAbmDataGpu.init({docData2D}, true);
+    std::vector<AbmDataGpuOneField> reqAbmDataGpuList;
+    std::vector<AbmDataGpuOneField> docAbmDataGpuList;
+    for (int fieldIdx = 0; fieldIdx < reqData2D.size(); fieldIdx++)
+    {
+        reqAbmDataGpuList.push_back(AbmDataGpuOneField());
+        docAbmDataGpuList.push_back(AbmDataGpuOneField());
+        reqAbmDataGpuList.at(fieldIdx).init({reqData2D}, fieldIdx, true);
+        docAbmDataGpuList.at(fieldIdx).init({docData2D}, fieldIdx, true);
+    }
 
     uint8_t* d_rst;
     CHECK_CUDA(cudaMallocManaged(&d_rst, 1 * sizeof(uint8_t)));
@@ -283,8 +288,8 @@ bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
     param.numDocs = 1;
     param.numReqs = 1;
     param.postfixOps = postfix1D;
-    param.reqAbmDataGpu = reqAbmDataGpu;
-    param.docAbmDataGpu = docAbmDataGpu;
+    param.reqAbmDataGpuList = reqAbmDataGpuList;
+    param.docAbmDataGpuList = docAbmDataGpuList;
 
     cabmGpu(param);
 

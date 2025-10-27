@@ -21,11 +21,12 @@ __device__ __host__ inline uint64_t getMemAddr(int row, int col, int numRows, in
     //return (uint64_t)col * numRows + row;
 }
 
-class AbmDataGpu
+class AbmDataGpuOneField
 {
 public:
-
-    void init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>> &data3D, bool useManagedMemory = false);
+    void init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>& data3D,
+              int targetFieldIdx,
+              bool useManagedMemory = false);
 
     void free();
 
@@ -33,12 +34,12 @@ public:
     // Getters
     __device__ __host__ ABM_DATA_TYPE getVal(int row, int offset) const
     {
-        return m_d_data[getMemAddrData(row, offset)];
+        return m_d_data[getMemAddrVal(row, offset)];
     }
 
-    __device__ __host__ uint32_t getOffset(int row, int field) const
+    __device__ __host__ uint32_t getOffset(int row) const
     {
-        return m_d_offsets[getMemAddrOffsets(row, field)];
+        return m_d_data[getMemAddrSize(row)];
     }
 
 private:
@@ -49,24 +50,20 @@ private:
     //   m_d_data: [1, 2, 3, 4, 5, 0, 0, 11, 12, 13, 14, 15, 16, 17]
     //   m_d_offsets: [0, 2, 5, 0, 3, 7]
     ABM_DATA_TYPE *m_d_data = nullptr;
-    uint32_t *m_d_offsets = nullptr;
     uint64_t m_d_data_size = 0;
-    uint64_t m_d_offsets_size = 0;
     uint64_t m_d_data_size_in_bytes = 0;
-    uint64_t m_d_offsets_size_in_bytes = 0;
 
     uint32_t m_numRows = 0;
-    uint32_t m_numFields = 0;
     uint32_t m_maxNumValsPerRow = 0;
 
-    __device__ __host__ uint64_t getMemAddrData(int row, int offset) const
+    __device__ __host__ uint64_t getMemAddrVal(int row, int offset) const
     {
-        return getMemAddr(row, offset, m_numRows, m_maxNumValsPerRow);
+        return getMemAddr(row, offset + 1, m_numRows, m_maxNumValsPerRow);
     }
 
-    __device__ __host__ uint64_t getMemAddrOffsets(int row, int field) const
+    __device__ __host__ uint64_t getMemAddrSize(int row) const
     {
-        return getMemAddr(row, field, m_numRows, m_numFields + 1);
+        return getMemAddr(row, 0, m_numRows, m_maxNumValsPerRow);
     }
 };
 
