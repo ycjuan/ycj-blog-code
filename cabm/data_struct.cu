@@ -9,7 +9,7 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
                               bool useManagedMemory)
 {
     // -----------------
-    // Check empty
+    // Check empty and infer num rows
     {
         if (data3D.empty())
         {
@@ -19,7 +19,7 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
     }
 
     // -----------------
-    // Construct 2D data and infer meta data
+    // Construct 2D data and infer max num vals per row
     std::vector<std::vector<ABM_DATA_TYPE>> data2D;
     {
         m_maxNumValsPerRow = 0;
