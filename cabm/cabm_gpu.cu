@@ -47,21 +47,21 @@ __device__ bool matchOp(const AbmDataGpuOneField& reqAbmDataGpu,
                         const int docIdx,
                         const CabmOp& op)
 {
-    // Get the offset iterators 
-    int reqOffsetIter = 0;
-    int docOffsetIter = 0;
+    // Init the value index
+    int reqValIdx = 0;
+    int docValIdx = 0;
 
-    // Get the end offset iterators
-    int reqOffsetEnd = reqAbmDataGpu.getNumVals(reqIdx);
-    int docOffsetEnd = docAbmDataGpu.getNumVals(docIdx);
+    // Get num values
+    int reqNumVals = reqAbmDataGpu.getNumVals(reqIdx);
+    int docNumVals = docAbmDataGpu.getNumVals(docIdx);
 
     bool rst = false;
     // We assume the req and doc data are sorted.
-    while (reqOffsetIter < reqOffsetEnd && docOffsetIter < docOffsetEnd) // While the iterators are not at the end
+    while (reqValIdx < reqNumVals && docValIdx < docNumVals) // While the iterators are not at the end
     {
         // Get the values
-        ABM_DATA_TYPE reqVal = reqAbmDataGpu.getVal(reqIdx, reqOffsetIter);
-        ABM_DATA_TYPE docVal = docAbmDataGpu.getVal(docIdx, docOffsetIter);
+        ABM_DATA_TYPE reqVal = reqAbmDataGpu.getVal(reqIdx, reqValIdx);
+        ABM_DATA_TYPE docVal = docAbmDataGpu.getVal(docIdx, docValIdx);
 
         // If the values are equal, we have a match, so we can break.
         if (reqVal == docVal)
@@ -71,11 +71,11 @@ __device__ bool matchOp(const AbmDataGpuOneField& reqAbmDataGpu,
         }
         else if (reqVal < docVal) // If the req value is less than the doc value, we increment the req iterator.
         {
-            reqOffsetIter++;
+            reqValIdx++;
         }
         else // If the req value is greater than the doc value, we increment the doc iterator.
         {
-            docOffsetIter++;
+            docValIdx++;
         }
     }
 
@@ -269,12 +269,12 @@ bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
 {
     std::vector<AbmDataGpuOneField> reqAbmDataGpuList;
     std::vector<AbmDataGpuOneField> docAbmDataGpuList;
-    for (int fieldIdx = 0; fieldIdx < reqData2D.size(); fieldIdx++)
+    for (int field = 0; field < reqData2D.size(); field++)
     {
         reqAbmDataGpuList.push_back(AbmDataGpuOneField());
         docAbmDataGpuList.push_back(AbmDataGpuOneField());
-        reqAbmDataGpuList.at(fieldIdx).init({reqData2D}, fieldIdx, true);
-        docAbmDataGpuList.at(fieldIdx).init({docData2D}, fieldIdx, true);
+        reqAbmDataGpuList.at(field).init({reqData2D}, field, true);
+        docAbmDataGpuList.at(field).init({docData2D}, field, true);
     }
 
     uint8_t* d_rst;
