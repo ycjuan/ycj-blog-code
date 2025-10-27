@@ -6,7 +6,7 @@
 
 void test2a()
 {
-    std::vector<std::vector<std::vector<long>>> data3D = genRandData3D(10, 3, { 1, 2, 3 }, { 10, 20, 30 });
+    std::vector<std::vector<std::vector<ABM_DATA_TYPE>>> data3D = genRandData3D(10, 3, { 1, 2, 3 }, { 10, 20, 30 });
 
     AbmDataGpu abmDataGpu;
     abmDataGpu.init(data3D, true);
@@ -18,7 +18,7 @@ void test2a()
             for (uint32_t valOffset = 0; valOffset < data3D.at(row).at(field).size(); valOffset++)
             {
                 int fieldOffset = abmDataGpu.getOffset(row, field);
-                long val = abmDataGpu.getVal(row, fieldOffset + valOffset);
+                ABM_DATA_TYPE val = abmDataGpu.getVal(row, fieldOffset + valOffset);
                 if (val != data3D.at(row).at(field).at(valOffset))
                 {
                     std::cout << "Error at (" << row << ", " << field << ", " << valOffset << "): " << val << " != " << data3D.at(row).at(field).at(valOffset) << std::endl;

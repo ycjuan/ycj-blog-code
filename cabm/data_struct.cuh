@@ -1,8 +1,9 @@
 #pragma once
 
 #include <cstdint>
-#include <memory>
 #include <vector>
+
+typedef int64_t ABM_DATA_TYPE;
 
 template <typename T>
 struct CudaDeleter
@@ -27,13 +28,13 @@ public:
     AbmDataGpu() = default; // Default constructor
     AbmDataGpu(const AbmDataGpu& other) = default; // Copy constructor
 
-    void init(const std::vector<std::vector<std::vector<long>>> &data3D, bool useManagedMemory = false);
+    void init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>> &data3D, bool useManagedMemory = false);
 
     void free();
 
     // -----------------------
     // Getters
-    __device__ __host__ long getVal(int row, int offset) const
+    __device__ __host__ ABM_DATA_TYPE getVal(int row, int offset) const
     {
         return m_d_data[getMemAddrData(row, offset)];
     }
@@ -50,7 +51,7 @@ private:
     // Assuming numValPerRow is 7, it will be stored as:
     //   m_d_data: [1, 2, 3, 4, 5, 0, 0, 11, 12, 13, 14, 15, 16, 17]
     //   m_d_offsets: [0, 2, 5, 0, 3, 7]
-    long *m_d_data = nullptr;
+    ABM_DATA_TYPE *m_d_data = nullptr;
     uint32_t *m_d_offsets = nullptr;
     uint64_t m_d_data_size = 0;
     uint64_t m_d_offsets_size = 0;
@@ -72,5 +73,5 @@ private:
     }
 };
 
-std::vector<std::vector<std::vector<long>>>
+std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
 genRandData3D(int numRows, int numFields, std::vector<int> numValsPerFieldMin, std::vector<int> numValsPerFieldMax);

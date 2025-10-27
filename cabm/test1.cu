@@ -37,8 +37,8 @@ void test1a()
     assert(cabmExprToString(postfix) == "{R0 MATCH D0} {R1 MATCH D1} OR {NOT R3 MATCH D3} {R4 MATCH D4} OR {R5 MATCH D5} AND AND");
 
     {
-        std::vector<std::vector<long>> reqTbr2D = { { 0 }, { 1 }, { 2 }, { -3 }, { 4 }, { 5 } };
-        std::vector<std::vector<long>> docTbr2D = { { 0 }, { -1 }, { -2 }, { 3 }, { -4 }, { 5 } };
+        std::vector<std::vector<ABM_DATA_TYPE>> reqTbr2D = { { 0 }, { 1 }, { 2 }, { -3 }, { 4 }, { 5 } };
+        std::vector<std::vector<ABM_DATA_TYPE>> docTbr2D = { { 0 }, { -1 }, { -2 }, { 3 }, { -4 }, { 5 } };
         bool rst = evaluatePostfix(postfix, reqTbr2D, docTbr2D);
         assert(rst == true);
 
@@ -70,8 +70,8 @@ void test1b()
     assert(cabmExprToString(postfix) == "{R0 MATCH D0} {R1 MATCH D1} OR");
 
     {
-        std::vector<std::vector<long>> reqTbr2D = { { 0 }, { 1 } };
-        std::vector<std::vector<long>> docTbr2D = { { 0 }, { 1 } };
+        std::vector<std::vector<ABM_DATA_TYPE>> reqTbr2D = { { 0 }, { 1 } };
+        std::vector<std::vector<ABM_DATA_TYPE>> docTbr2D = { { 0 }, { 1 } };
         bool rst = evaluatePostfix(postfix, reqTbr2D, docTbr2D);
         assert(rst == true);
 
@@ -110,8 +110,8 @@ void test1c()
     assert(cabmExprToString(postfix) == "{R0 MATCH D0} {R1 MATCH D1} OR {NOT R3 MATCH D3} {R4 MATCH D4} OR AND");
 
     {
-        std::vector<std::vector<long>> reqTbr2D = { { 0 }, { 1 }, {2}, { -3 }, { 4 } };
-        std::vector<std::vector<long>> docTbr2D = { { 0 }, { -1 }, {2}, { 3 }, { -4 } };
+        std::vector<std::vector<ABM_DATA_TYPE>> reqTbr2D = { { 0 }, { 1 }, {2}, { -3 }, { 4 } };
+        std::vector<std::vector<ABM_DATA_TYPE>> docTbr2D = { { 0 }, { -1 }, {2}, { 3 }, { -4 } };
         bool rst = evaluatePostfix(postfix, reqTbr2D, docTbr2D);
         std::cout << "test1c, cpu rst: " << rst << std::endl;
         assert(rst == true);

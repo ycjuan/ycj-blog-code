@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "cabm.cuh"
+#include "data_struct.cuh"
 
 const bool g_kDebug = false;
 
@@ -107,11 +108,11 @@ std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix)
 }
 
 int evaluateOp(CabmOp& op,
-               const std::vector<std::vector<long>>& reqData2D,
-               const std::vector<std::vector<long>>& docData2D)
+               const std::vector<std::vector<ABM_DATA_TYPE>>& reqData2D,
+               const std::vector<std::vector<ABM_DATA_TYPE>>& docData2D)
 {
-    const std::vector<long>& reqAttrs = reqData2D.at(op.getReqFieldIdx());
-    const std::vector<long>& docAttrs = docData2D.at(op.getDocFieldIdx());
+    const std::vector<ABM_DATA_TYPE>& reqAttrs = reqData2D.at(op.getReqFieldIdx());
+    const std::vector<ABM_DATA_TYPE>& docAttrs = docData2D.at(op.getDocFieldIdx());
 
     int rst = 0;
 
@@ -145,8 +146,8 @@ int evaluateOp(CabmOp& op,
 
 // the code is modified from https://www.geeksforgeeks.org/evaluation-of-postfix-expression/
 bool evaluatePostfix(std::vector<CabmOp> postfix1D,
-                     const std::vector<std::vector<long>>& reqData2D,
-                     const std::vector<std::vector<long>>& docData2D)
+                     const std::vector<std::vector<ABM_DATA_TYPE>>& reqData2D,
+                     const std::vector<std::vector<ABM_DATA_TYPE>>& docData2D)
 {
 
     // Create a stack of capacity equal to expression size
@@ -240,8 +241,8 @@ std::string CabmOp::toString() const
 }
 
 std::vector<std::vector<uint8_t>> cabmCpu(const std::vector<CabmOp>& infixExpr,
-                                          const std::vector<std::vector<std::vector<long>>>& reqData3D,
-                                          const std::vector<std::vector<std::vector<long>>>& docData3D)
+                                          const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>& reqData3D,
+                                          const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>& docData3D)
 {
     std::vector<CabmOp> postfixExpr = infix2postfix(infixExpr);
 

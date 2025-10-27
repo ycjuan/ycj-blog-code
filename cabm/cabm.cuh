@@ -57,16 +57,16 @@ std::string cabmExprToString(const std::vector<CabmOp>& expr);
 std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix);
 
 bool evaluatePostfix(std::vector<CabmOp> postfix1D,
-                     const std::vector<std::vector<long>>& reqData2D,
-                     const std::vector<std::vector<long>>& docData2D);
+                     const std::vector<std::vector<ABM_DATA_TYPE>>& reqData2D,
+                     const std::vector<std::vector<ABM_DATA_TYPE>>& docData2D);
 
 bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
-                               const std::vector<std::vector<long>>& reqData2D,
-                               const std::vector<std::vector<long>>& docData2D);
+                               const std::vector<std::vector<ABM_DATA_TYPE>>& reqData2D,
+                               const std::vector<std::vector<ABM_DATA_TYPE>>& docData2D);
 
 std::vector<std::vector<uint8_t>> cabmCpu(const std::vector<CabmOp>& infixExpr,
-                                          const std::vector<std::vector<std::vector<long>>>& reqData3D,
-                                          const std::vector<std::vector<std::vector<long>>>& docData3D);
+                                          const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>& reqData3D,
+                                          const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>& docData3D);
 
 struct CabmGpuParam
 {

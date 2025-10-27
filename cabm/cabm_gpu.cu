@@ -60,8 +60,8 @@ __device__ bool matchOp(const AbmDataGpu& reqAbmDataGpu,
     while (reqOffsetIter < reqOffsetEnd && docOffsetIter < docOffsetEnd) // While the iterators are not at the end
     {
         // Get the values
-        long reqVal = reqAbmDataGpu.getVal(reqIdx, reqOffsetIter);
-        long docVal = docAbmDataGpu.getVal(docIdx, docOffsetIter);
+        ABM_DATA_TYPE reqVal = reqAbmDataGpu.getVal(reqIdx, reqOffsetIter);
+        ABM_DATA_TYPE docVal = docAbmDataGpu.getVal(docIdx, docOffsetIter);
 
         // If the values are equal, we have a match, so we can break.
         if (reqVal == docVal)
@@ -264,8 +264,8 @@ void cabmGpu(CabmGpuParam& param)
 }
 
 bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
-                               const std::vector<std::vector<long>>& reqData2D,
-                               const std::vector<std::vector<long>>& docData2D)
+                               const std::vector<std::vector<ABM_DATA_TYPE>>& reqData2D,
+                               const std::vector<std::vector<ABM_DATA_TYPE>>& docData2D)
 {
     AbmDataGpu reqAbmDataGpu;
     AbmDataGpu docAbmDataGpu;
