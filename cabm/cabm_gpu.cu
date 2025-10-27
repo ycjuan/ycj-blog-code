@@ -41,8 +41,8 @@ __device__ bool stackTop(const uint64_t bitStack, const uint8_t bitStackIdx)
     return tmp > 0L;
 }
 
-__device__ bool matchOp(const AbmDataGpuOneField& reqAbmDataGpu,
-                        const AbmDataGpuOneField& docAbmDataGpu,
+__device__ bool matchOp(const AbmDataGpu& reqAbmDataGpu,
+                        const AbmDataGpu& docAbmDataGpu,
                         const int reqIdx,
                         const int docIdx,
                         const CabmOp& op)
@@ -89,8 +89,8 @@ __device__ bool matchOp(const AbmDataGpuOneField& reqAbmDataGpu,
 
 struct OperandKernelParam
 {
-    AbmDataGpuOneField reqAbmDataGpu;
-    AbmDataGpuOneField docAbmDataGpu;
+    AbmDataGpu reqAbmDataGpu;
+    AbmDataGpu docAbmDataGpu;
     CabmOp op;
     uint64_t reqIdx;
     uint64_t numDocs;
@@ -267,12 +267,12 @@ bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
                                const std::vector<std::vector<ABM_DATA_TYPE>>& reqData2D,
                                const std::vector<std::vector<ABM_DATA_TYPE>>& docData2D)
 {
-    std::vector<AbmDataGpuOneField> reqAbmDataGpuList;
-    std::vector<AbmDataGpuOneField> docAbmDataGpuList;
+    std::vector<AbmDataGpu> reqAbmDataGpuList;
+    std::vector<AbmDataGpu> docAbmDataGpuList;
     for (int field = 0; field < reqData2D.size(); field++)
     {
-        reqAbmDataGpuList.push_back(AbmDataGpuOneField());
-        docAbmDataGpuList.push_back(AbmDataGpuOneField());
+        reqAbmDataGpuList.push_back(AbmDataGpu());
+        docAbmDataGpuList.push_back(AbmDataGpu());
         reqAbmDataGpuList.at(field).init({reqData2D}, field, true);
         docAbmDataGpuList.at(field).init({docData2D}, field, true);
     }

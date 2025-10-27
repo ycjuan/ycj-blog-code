@@ -13,12 +13,12 @@ void test2a()
     
     const auto data3D = genRandData3D(numRows, numFields, numValsPerFieldMin, numValsPerFieldMax);
 
-    std::vector<AbmDataGpuOneField> reqAbmDataGpuList;
-    std::vector<AbmDataGpuOneField> docAbmDataGpuList;
+    std::vector<AbmDataGpu> reqAbmDataGpuList;
+    std::vector<AbmDataGpu> docAbmDataGpuList;
     for (int fieldIdx = 0; fieldIdx < numFields; fieldIdx++)
     {
-        reqAbmDataGpuList.push_back(AbmDataGpuOneField());
-        docAbmDataGpuList.push_back(AbmDataGpuOneField());
+        reqAbmDataGpuList.push_back(AbmDataGpu());
+        docAbmDataGpuList.push_back(AbmDataGpu());
         reqAbmDataGpuList.at(fieldIdx).init(data3D, fieldIdx, true);
         docAbmDataGpuList.at(fieldIdx).init(data3D, fieldIdx, true);
     }

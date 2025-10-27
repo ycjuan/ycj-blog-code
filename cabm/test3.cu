@@ -43,12 +43,12 @@ void test3a()
     const auto rst2D = cabmCpu(infix, reqData3D, docData3D);
 
     {
-        std::vector<AbmDataGpuOneField> reqAbmDataGpuList;
-        std::vector<AbmDataGpuOneField> docAbmDataGpuList;
+        std::vector<AbmDataGpu> reqAbmDataGpuList;
+        std::vector<AbmDataGpu> docAbmDataGpuList;
         for (int fieldIdx = 0; fieldIdx < kNumFields; fieldIdx++)
         {
-            reqAbmDataGpuList.push_back(AbmDataGpuOneField());
-            docAbmDataGpuList.push_back(AbmDataGpuOneField());
+            reqAbmDataGpuList.push_back(AbmDataGpu());
+            docAbmDataGpuList.push_back(AbmDataGpu());
             reqAbmDataGpuList.at(fieldIdx).init({reqData3D}, fieldIdx, true);
             docAbmDataGpuList.at(fieldIdx).init({docData3D}, fieldIdx, true);
         }

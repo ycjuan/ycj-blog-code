@@ -11,7 +11,7 @@ __device__ __host__ inline uint64_t getMemAddr(int row, int col, int numRows, in
     //return (uint64_t)col * numRows + row; // col-major
 }
 
-class AbmDataGpuOneField
+class AbmDataGpu
 {
 public:
     void init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>& data3D,

@@ -4,7 +4,7 @@
 
 #include "data_struct.cuh"
 
-void AbmDataGpuOneField::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>& data3D,
+void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>& data3D,
                               int targetField,
                               bool useManagedMemory)
 {
@@ -87,7 +87,7 @@ void AbmDataGpuOneField::init(const std::vector<std::vector<std::vector<ABM_DATA
     }
 }
 
-void AbmDataGpuOneField::free()
+void AbmDataGpu::free()
 {
     if (m_d_data != nullptr)
     {
