@@ -11,12 +11,12 @@
 void test3a()
 {
     const int kNumReqs = 1;
-    const uint64_t kNumDocs = 1000;
+    const uint64_t kNumDocs = 1000000;
     const int kNumFields = 6;
     const int kNumTrials = 100;
-    const std::vector<int> kNumValsPerFieldMin = { 1, 1, 1, 1, 1, 1 };
-    const std::vector<int> kNumValsPerFieldMax = { 1, 1, 1, 1, 1, 1 };
-    const std::vector<int> kCardinalities = { 3, 3, 3, 3, 3, 3 };
+    const std::vector<int> kNumValsPerFieldMin = { 5, 5, 5, 5, 5, 5 };
+    const std::vector<int> kNumValsPerFieldMax = { 10, 10, 10, 10, 10, 10 };
+    const std::vector<int> kCardinalities = { 100, 100, 100, 100, 100, 100 };
 
     const auto reqData3D
         = genRandData3D(kNumReqs, kNumFields, kNumValsPerFieldMin, kNumValsPerFieldMax, kCardinalities);
@@ -145,6 +145,8 @@ void test3a()
             }
         }
         std::cout << "numCTGF: " << numCTGF << ", numCFGT: " << numCFGT << std::endl;
+        assert(numCTGF == 0 && numCFGT == 0);
+        std::cout << "All results are correct ^____^" << std::endl;
     }
 
     // ----------------
