@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <vector>
 
-typedef int64_t ABM_DATA_TYPE;
+typedef int32_t ABM_DATA_TYPE;
 
 template <typename T>
 struct CudaDeleter
@@ -24,9 +24,6 @@ __device__ __host__ inline uint64_t getMemAddr(int row, int col, int numRows, in
 class AbmDataGpu
 {
 public:
-
-    AbmDataGpu() = default; // Default constructor
-    AbmDataGpu(const AbmDataGpu& other) = default; // Copy constructor
 
     void init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>> &data3D, bool useManagedMemory = false);
 
