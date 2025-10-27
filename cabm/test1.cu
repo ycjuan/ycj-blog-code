@@ -39,11 +39,25 @@ void test1a()
     {
         std::vector<std::vector<ABM_DATA_TYPE>> reqTbr2D = { { 0 }, { 1 }, { 2 }, { -3 }, { 4 }, { 5 } };
         std::vector<std::vector<ABM_DATA_TYPE>> docTbr2D = { { 0 }, { -1 }, { -2 }, { 3 }, { -4 }, { 5 } };
-        bool rst = evaluatePostfix(postfix, reqTbr2D, docTbr2D);
-        assert(rst == true);
+        bool rstCpu = evaluatePostfix(postfix, reqTbr2D, docTbr2D);
+        std::cout << "test1a_1, cpu rst: " << rstCpu << std::endl;
+        assert(rstCpu == true);
 
         bool rstGpu = evaluatePostfixGpuWrapped(postfix, reqTbr2D, docTbr2D);
-        assert(rstGpu == rst);
+        std::cout << "test1a_1, gpu rst: " << rstGpu << std::endl;
+        assert(rstGpu == rstCpu);
+    }
+
+    {
+        std::vector<std::vector<ABM_DATA_TYPE>> reqTbr2D = { { 0 }, { 1 }, { 2 }, { -3 }, { 4 }, { -5 } };
+        std::vector<std::vector<ABM_DATA_TYPE>> docTbr2D = { { 0 }, { -1 }, { -2 }, { 3 }, { -4 }, { 5 } };
+        bool rstCpu = evaluatePostfix(postfix, reqTbr2D, docTbr2D);
+        std::cout << "test1a_2, cpu rst: " << rstCpu << std::endl;
+        assert(rstCpu == false);
+
+        bool rstGpu = evaluatePostfixGpuWrapped(postfix, reqTbr2D, docTbr2D);
+        std::cout << "test1a_2, gpu rst: " << rstGpu << std::endl;
+        assert(rstGpu == rstCpu);
     }
 }
 
@@ -112,13 +126,13 @@ void test1c()
     {
         std::vector<std::vector<ABM_DATA_TYPE>> reqTbr2D = { { 0 }, { 1 }, {2}, { -3 }, { 4 } };
         std::vector<std::vector<ABM_DATA_TYPE>> docTbr2D = { { 0 }, { -1 }, {2}, { 3 }, { -4 } };
-        bool rst = evaluatePostfix(postfix, reqTbr2D, docTbr2D);
-        std::cout << "test1c, cpu rst: " << rst << std::endl;
-        assert(rst == true);
+        bool rstCpu = evaluatePostfix(postfix, reqTbr2D, docTbr2D);
+        std::cout << "test1c, cpu rst: " << rstCpu << std::endl;
+        assert(rstCpu == true);
 
         bool rstGpu = evaluatePostfixGpuWrapped(postfix, reqTbr2D, docTbr2D);
         std::cout << "test1c, gpu rst: " << rstGpu << std::endl;
-        assert(rstGpu == rst);
+        assert(rstGpu == rstCpu);
     }
 }
 

@@ -16,9 +16,12 @@ void test3a()
     const int kNumTrials = 100;
     const std::vector<int> kNumValsPerFieldMin = { 2, 2, 2, 2, 2, 2 };
     const std::vector<int> kNumValsPerFieldMax = { 10, 10, 10, 10, 10, 10 };
+    const std::vector<int> kCardinalities = { 100, 100, 100, 100, 100, 100 };
 
-    const auto reqData3D = genRandData3D(kNumReqs, kNumFields, kNumValsPerFieldMin, kNumValsPerFieldMax);
-    const auto docData3D = genRandData3D(kNumDocs, kNumFields, kNumValsPerFieldMin, kNumValsPerFieldMax);
+    const auto reqData3D
+        = genRandData3D(kNumReqs, kNumFields, kNumValsPerFieldMin, kNumValsPerFieldMax, kCardinalities);
+    const auto docData3D
+        = genRandData3D(kNumDocs, kNumFields, kNumValsPerFieldMin, kNumValsPerFieldMax, kCardinalities);
 
     std::vector<CabmOp> infix = {
         CabmOp(CabmOpType::LEFT_PARENTHESIS),
@@ -42,6 +45,7 @@ void test3a()
 
     const auto rst2D = cabmCpu(infix, reqData3D, docData3D);
 
+    std::vector<std::vector<uint8_t>> rstGpu2D(kNumReqs, std::vector<uint8_t>(kNumDocs));
     {
         std::vector<AbmDataGpu> reqAbmDataGpuList;
         std::vector<AbmDataGpu> docAbmDataGpuList;
@@ -105,7 +109,6 @@ void test3a()
         CHECK_CUDA(cudaFree(d_rst));
         CHECK_CUDA(cudaFree(d_bitStacks));
 
-        std::vector<std::vector<uint8_t>> rstGpu2D(kNumReqs, std::vector<uint8_t>(kNumDocs));
         for (int reqIdx = 0; reqIdx < kNumReqs; reqIdx++)
         {
             for (int docIdx = 0; docIdx < kNumDocs; docIdx++)
@@ -113,7 +116,55 @@ void test3a()
                 rstGpu2D.at(reqIdx).at(docIdx) = rstGpu.at(reqIdx * kNumDocs + docIdx);
             }
         }
-        assert(rst2D == rstGpu2D);
+    }
+
+    // ----------------
+    // Compare rst2D and rstGpu2D
+    {
+        int numCTGF = 0;
+        int numCFGT = 0;
+        for (int reqIdx = 0; reqIdx < kNumReqs; reqIdx++)
+        {
+            for (int docIdx = 0; docIdx < kNumDocs; docIdx++)
+            {
+                int rstCpu = rst2D.at(reqIdx).at(docIdx);
+                int rstGpu = rstGpu2D.at(reqIdx).at(docIdx);
+                if (rstCpu != rstGpu)
+                {
+                    if (rstCpu == 1 && rstGpu == 0)
+                    {
+                        numCTGF++;
+                    }
+                    else
+                    {
+                        numCFGT++;
+                    }
+                    //std::cout << "Error at (" << reqIdx << ", " << docIdx << "): " << rstCpu << " != " << rstGpu << std::endl;
+                    //assert(false);
+                }
+            }
+        }
+        std::cout << "numCTGF: " << numCTGF << ", numCFGT: " << numCFGT << std::endl;
+        assert(numCTGF == 0 && numCFGT == 0);
+        std::cout << "All results are correct ^____^" << std::endl;
+    }
+
+    // ----------------
+    // Calculate pass rate
+    {
+        int numPass = 0;
+        for (int reqIdx = 0; reqIdx < kNumReqs; reqIdx++)
+        {
+            for (int docIdx = 0; docIdx < kNumDocs; docIdx++)
+            {
+                if (rst2D.at(reqIdx).at(docIdx) != 0)
+                {
+                    numPass++;
+                }
+            }
+        }
+        float passRate = (float)numPass / (kNumReqs * kNumDocs);
+        std::cout << "numPass: " << numPass << ", pass rate: " << passRate << std::endl;
     }
 }
 

@@ -27,7 +27,7 @@ public:
         return m_d_data[getMemAddrVal(row, valIdx)];
     }
 
-    __device__ __host__ uint32_t getNumVals(int row) const
+    __device__ __host__ ABM_DATA_TYPE getNumVals(int row) const
     {
         return m_d_data[getMemAddrNumVals(row)];
     }
@@ -58,5 +58,8 @@ private:
     }
 };
 
-std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
-genRandData3D(int numRows, int numFields, std::vector<int> numValsPerFieldMin, std::vector<int> numValsPerFieldMax);
+std::vector<std::vector<std::vector<ABM_DATA_TYPE>>> genRandData3D(int numRows,
+                                                                   int numFields,
+                                                                   std::vector<int> numValsPerFieldMin,
+                                                                   std::vector<int> numValsPerFieldMax,
+                                                                   std::vector<int> cardinalities);

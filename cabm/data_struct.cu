@@ -9,7 +9,7 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
                               bool useManagedMemory)
 {
     // -----------------
-    // Check empty
+    // Check empty and infer num rows
     {
         if (data3D.empty())
         {
@@ -19,7 +19,7 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
     }
 
     // -----------------
-    // Construct 2D data and infer meta data
+    // Construct 2D data and infer max num vals per row
     std::vector<std::vector<ABM_DATA_TYPE>> data2D;
     {
         m_maxNumValsPerRow = 0;
@@ -100,8 +100,11 @@ void AbmDataGpu::free()
     m_maxNumValsPerRow = 0;
 }
 
-std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
-genRandData3D(int numRows, int numFields, std::vector<int> numValsPerFieldMin, std::vector<int> numValsPerFieldMax)
+std::vector<std::vector<std::vector<ABM_DATA_TYPE>>> genRandData3D(int numRows,
+                                                                   int numFields,
+                                                                   std::vector<int> numValsPerFieldMin,
+                                                                   std::vector<int> numValsPerFieldMax,
+                                                                   std::vector<int> cardinalities)
 {
     // -----------------
     // Check input
@@ -132,7 +135,7 @@ genRandData3D(int numRows, int numFields, std::vector<int> numValsPerFieldMin, s
             int numVals = numValsDist(generator);
             for (int val = 0; val < numVals; val++)
             {
-                data1D.push_back(valDist(generator));
+                data1D.push_back(valDist(generator) % cardinalities.at(field));
             }
             std::sort(data1D.begin(), data1D.end());
             data2D.push_back(data1D);

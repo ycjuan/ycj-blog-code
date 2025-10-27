@@ -10,8 +10,9 @@ void test2a()
     int numFields = 3;
     std::vector<int> numValsPerFieldMin = { 1, 2, 3 };
     std::vector<int> numValsPerFieldMax = { 10, 20, 30 };
-    
-    const auto data3D = genRandData3D(numRows, numFields, numValsPerFieldMin, numValsPerFieldMax);
+    std::vector<int> cardinalities = { 100, 100, 100 };
+
+    const auto data3D = genRandData3D(numRows, numFields, numValsPerFieldMin, numValsPerFieldMax, cardinalities);
 
     std::vector<AbmDataGpu> reqAbmDataGpuList;
     std::vector<AbmDataGpu> docAbmDataGpuList;
