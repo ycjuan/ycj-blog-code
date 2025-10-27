@@ -182,8 +182,8 @@ void cabmGpu(CabmGpuParam& param)
                 // -----------------
                 // Create the operand kernel parameter
                 OperandKernelParam operandKernelParam;
-                operandKernelParam.reqAbmDataGpu = param.reqAbmDataGpuList.at(reqIdx);
-                operandKernelParam.docAbmDataGpu = param.docAbmDataGpuList.at(reqIdx);
+                operandKernelParam.reqAbmDataGpu = param.reqAbmDataGpuList.at(op.getReqFieldIdx());
+                operandKernelParam.docAbmDataGpu = param.docAbmDataGpuList.at(op.getDocFieldIdx());
                 operandKernelParam.op = op;
                 operandKernelParam.reqIdx = reqIdx;
                 operandKernelParam.numDocs = param.numDocs;
