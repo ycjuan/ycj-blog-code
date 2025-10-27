@@ -14,7 +14,7 @@ void test3a()
     const uint64_t kNumDocs = 1000000;
     const int kNumFields = 6;
     const int kNumTrials = 100;
-    const std::vector<int> kNumValsPerFieldMin = { 5, 5, 5, 5, 5, 5 };
+    const std::vector<int> kNumValsPerFieldMin = { 2, 2, 2, 2, 2, 2 };
     const std::vector<int> kNumValsPerFieldMax = { 10, 10, 10, 10, 10, 10 };
     const std::vector<int> kCardinalities = { 100, 100, 100, 100, 100, 100 };
 
