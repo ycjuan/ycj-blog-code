@@ -19,18 +19,22 @@ void test2a()
     {
         reqAbmDataGpuList.push_back(AbmDataGpuOneField());
         docAbmDataGpuList.push_back(AbmDataGpuOneField());
-        reqAbmDataGpuList.at(fieldIdx).init({data3D}, fieldIdx, true);
-        docAbmDataGpuList.at(fieldIdx).init({data3D}, fieldIdx, true);
+        reqAbmDataGpuList.at(fieldIdx).init(data3D, fieldIdx, true);
+        docAbmDataGpuList.at(fieldIdx).init(data3D, fieldIdx, true);
     }
 
     for (uint32_t row = 0; row < data3D.size(); row++)
     {
         for (uint32_t field = 0; field < data3D.at(0).size(); field++)
         {
+            if (reqAbmDataGpuList.at(field).getOffset(row) != data3D.at(row).at(field).size())
+            {
+                std::cout << "Error at (" << row << ", " << field << "): " << reqAbmDataGpuList.at(field).getOffset(row) << " != " << data3D.at(row).at(field).size() << std::endl;
+                assert(false);
+            }
             for (uint32_t valOffset = 0; valOffset < data3D.at(row).at(field).size(); valOffset++)
             {
-                int fieldOffset = reqAbmDataGpuList.at(field).getOffset(row);
-                ABM_DATA_TYPE val = reqAbmDataGpuList.at(field).getVal(row, fieldOffset + valOffset);
+                ABM_DATA_TYPE val = reqAbmDataGpuList.at(field).getVal(row, valOffset);
                 if (val != data3D.at(row).at(field).at(valOffset))
                 {
                     std::cout << "Error at (" << row << ", " << field << ", " << valOffset << "): " << val << " != " << data3D.at(row).at(field).at(valOffset) << std::endl;
