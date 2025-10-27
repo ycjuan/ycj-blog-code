@@ -38,7 +38,7 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
             maxNumValsPerRow = std::max(maxNumValsPerRow, numValsPerRow);
         }
         
-        m_maxNumValsPerRow = maxNumValsPerRow;    
+        m_maxNumValsPerRow = maxNumValsPerRow + numFields + 1;    
         m_numRows = numRows;
         m_numFields = numFields;
     }
@@ -50,8 +50,6 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
         // Calculate the size of the data
         m_d_data_size = m_numRows * m_maxNumValsPerRow;
         m_d_data_size_in_bytes = m_d_data_size * sizeof(ABM_DATA_TYPE);
-        m_d_offsets_size = m_numRows * (m_numFields + 1);
-        m_d_offsets_size_in_bytes = m_d_offsets_size * sizeof(uint32_t);
 
         // -----------
         // Malloc data
@@ -68,19 +66,6 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
         {
             throw std::runtime_error("cudaMalloc failed (data): " + std::string(cudaGetErrorString(cudaError)));
         }
-        
-        if (useManagedMemory)
-        {
-            cudaError = cudaMallocManaged(&m_d_offsets, m_d_offsets_size_in_bytes);
-        }
-        else
-        {
-            cudaError = cudaMalloc(&m_d_offsets, m_d_offsets_size_in_bytes);
-        }
-        if (cudaError != cudaSuccess)
-        {
-            throw std::runtime_error("cudaMalloc failed (offsets): " + std::string(cudaGetErrorString(cudaError)));
-        }
     }
 
     // -----------------
@@ -95,29 +80,23 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
         {
             throw std::runtime_error("cudaMallocHost failed (data): " + std::string(cudaGetErrorString(cudaError)));
         }
-        uint32_t *hp_offsets;
-        cudaError = cudaMallocHost(&hp_offsets, m_d_offsets_size_in_bytes);
-        if (cudaError != cudaSuccess)
-        {
-            throw std::runtime_error("cudaMallocHost failed (offsets): " + std::string(cudaGetErrorString(cudaError)));
-        }
 
         // -----------------
         // Fill the data in pinned memory
         for (int row = 0; row < m_numRows; row++)
         {
             int offset = 0;
-            hp_offsets[getMemAddrOffsets(row, 0)] = offset;
+            hp_data[getMemAddrOffset(row, 0)] = offset;
             for (int field = 0; field < m_numFields; field++)
             {
                 for (auto val : data3D.at(row).at(field))
                 {
-                    hp_data[getMemAddrData(row, offset)] = val;
+                    hp_data[getMemAddrVal(row, offset)] = val;
                     offset++;
                 }
-                hp_offsets[getMemAddrOffsets(row, field+1)] = offset;
+                hp_data[getMemAddrOffset(row, field+1)] = offset;
             }
-            hp_offsets[getMemAddrOffsets(row, m_numFields)] = offset;
+            hp_data[getMemAddrOffset(row, m_numFields)] = offset;
         }
 
         // -----------------
@@ -127,11 +106,6 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
         {
             throw std::runtime_error("cudaMemcpy failed (data): " + std::string(cudaGetErrorString(cudaError)));
         }
-        cudaError = cudaMemcpy(m_d_offsets, hp_offsets, m_d_offsets_size_in_bytes, cudaMemcpyHostToDevice);
-        if (cudaError != cudaSuccess)
-        {
-            throw std::runtime_error("cudaMemcpy failed (offsets): " + std::string(cudaGetErrorString(cudaError)));
-        }
 
         // -----------------
         // Free pinned memory
@@ -139,11 +113,6 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
         if (cudaError != cudaSuccess)
         {
             throw std::runtime_error("cudaFreeHost failed (data): " + std::string(cudaGetErrorString(cudaError)));
-        }
-        cudaError = cudaFreeHost(hp_offsets);
-        if (cudaError != cudaSuccess)
-        {
-            throw std::runtime_error("cudaFreeHost failed (offsets): " + std::string(cudaGetErrorString(cudaError)));
         }
     }
 }
@@ -155,15 +124,8 @@ void AbmDataGpu::free()
         cudaFree(m_d_data);
         m_d_data = nullptr;
     }
-    if (m_d_offsets != nullptr)
-    {
-        cudaFree(m_d_offsets);
-        m_d_offsets = nullptr;
-    }
     m_d_data_size = 0;
     m_d_data_size_in_bytes = 0;
-    m_d_offsets_size = 0;
-    m_d_offsets_size_in_bytes = 0;
     m_numRows = 0;
     m_numFields = 0;
     m_maxNumValsPerRow = 0;
