@@ -119,7 +119,7 @@ std::vector<std::vector<std::vector<ABM_DATA_TYPE>>> genRandData3D(int numRows,
 
     // -----------------
     // Prepare random number generator
-    std::default_random_engine generator;
+    std::default_random_engine generator(std::random_device{}());
     std::uniform_int_distribution<ABM_DATA_TYPE> valDist;
 
     // -----------------
