@@ -62,40 +62,27 @@ void AbmDataGpuOneField::init(const std::vector<std::vector<std::vector<ABM_DATA
     // Init data
     {
         // -----------------
-        // Malloc pinned memory
-        // TODO: Release resource when there is an exception
-        ABM_DATA_TYPE *hp_data;
-        cudaError_t cudaError = cudaMallocHost(&hp_data, m_d_data_size_in_bytes);
-        if (cudaError != cudaSuccess)
-        {
-            throw std::runtime_error("cudaMallocHost failed (data): " + std::string(cudaGetErrorString(cudaError)));
-        }
+        // Declare host corresponding array of m_d_data
+        std::vector<ABM_DATA_TYPE> v_data;
+        v_data.resize(m_d_data_size);
 
         // -----------------
         // Fill the data in pinned memory
         for (int row = 0; row < m_numRows; row++)
         {
-            hp_data[getMemAddrNumVals(row)] = data2D.at(row).size();
+            v_data.at(getMemAddrNumVals(row)) = data2D.at(row).size();
             for (int valIdx = 0; valIdx < data2D.at(row).size(); valIdx++)
             {
-                hp_data[getMemAddrVal(row, valIdx)] = data2D.at(row).at(valIdx);
+                v_data.at(getMemAddrVal(row, valIdx)) = data2D.at(row).at(valIdx);
             }
         }
 
         // -----------------
         // Copy data to device
-        cudaError = cudaMemcpy(m_d_data, hp_data, m_d_data_size_in_bytes, cudaMemcpyHostToDevice);
+        cudaError_t cudaError = cudaMemcpy(m_d_data, v_data.data(), m_d_data_size_in_bytes, cudaMemcpyHostToDevice);
         if (cudaError != cudaSuccess)
         {
             throw std::runtime_error("cudaMemcpy failed (data): " + std::string(cudaGetErrorString(cudaError)));
-        }
-
-        // -----------------
-        // Free pinned memory
-        cudaError = cudaFreeHost(hp_data);
-        if (cudaError != cudaSuccess)
-        {
-            throw std::runtime_error("cudaFreeHost failed (data): " + std::string(cudaGetErrorString(cudaError)));
         }
     }
 }
