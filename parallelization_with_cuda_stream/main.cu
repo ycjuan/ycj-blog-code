@@ -89,7 +89,7 @@ void runReqByReq(Config config, const std::vector<std::vector<long>>& cpuReferen
     CHECK_CUDA(cudaDeviceSynchronize());
     CHECK_CUDA(cudaGetLastError());
     float timeMs = timer.tocMs() / config.numTrials;
-    std::cout << "Time taken for req by req: " << timeMs << " ms" << std::endl;
+    std::cout << "Time taken with default stream: " << timeMs << " ms" << std::endl;
 
     // ----------------
     // Check correctness
@@ -194,7 +194,7 @@ int main()
         
     {
         Config config;
-        config.numReqs = 32;
+        config.numReqs = 10;
         config.numDocs = 1000;
         config.numRepeats = 100;
         config.numTrials = 10;
@@ -204,11 +204,11 @@ int main()
         runOneConfig(config);
     }
 
-    std::cout << "\n--------------------------------" << std::endl;
+    std::cout << "\n---------------TEST1-----------------" << std::endl;
 
     {
         Config config;
-        config.numReqs = 32;
+        config.numReqs = 100;
         config.numDocs = 1000000;
         config.numRepeats = 100;
         config.numTrials = 100;
@@ -217,11 +217,24 @@ int main()
         runOneConfig(config);
     }
 
-    std::cout << "\n--------------------------------" << std::endl;
+    std::cout << "\n---------------TEST2-----------------" << std::endl;
 
     {
         Config config;
-        config.numReqs = 16384;
+        config.numReqs = 10000;
+        config.numDocs = 1000;
+        config.numRepeats = 10;
+        config.numTrials = 100;
+        config.print();
+
+        runOneConfig(config);
+    }
+
+    std::cout << "\n---------------TEST3-----------------" << std::endl;
+
+    {
+        Config config;
+        config.numReqs = 10000;
         config.numDocs = 1000;
         config.numRepeats = 100;
         config.numTrials = 100;
@@ -230,13 +243,14 @@ int main()
         runOneConfig(config);
     }
 
-    std::cout << "\n--------------------------------" << std::endl;
+
+    std::cout << "\n---------------TEST4-----------------" << std::endl;
 
     {
         Config config;
-        config.numReqs = 16384;
-        config.numDocs = 1000;
-        config.numRepeats = 1000;
+        config.numReqs = 10000;
+        config.numDocs = 100;
+        config.numRepeats = 100;
         config.numTrials = 100;
         config.print();
 
