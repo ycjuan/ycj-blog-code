@@ -24,6 +24,15 @@ struct Config
     }
 };
 
+// Some pseudo-random computation to avoid compiler optimization
+__inline__ __device__ __host__ long pseudoRandom(long x)
+{
+    x = (x * 1103515245 + 12345) & 0x7fffffff;
+    x = (x >> 3) ^ (x << 7);
+    x = (x * 16807) % 2147483647;
+    return x;
+}
+
 std::vector<std::vector<long>> getCpuReference(Config config)
 {
     std::vector<std::vector<long>> rst2D(config.numReqs, std::vector<long>(config.numDocs));
@@ -35,9 +44,7 @@ std::vector<std::vector<long>> getCpuReference(Config config)
             long rst = docIdx + reqIdx * config.numDocs;
             for (int i = 0; i < config.numRepeats; i++)
             {
-                rst = (rst * 1103515245 + 12345) & 0x7fffffff;
-                rst = (rst >> 3) ^ (rst << 7);
-                rst = (rst * 16807) % 2147483647;
+                rst = pseudoRandom(rst);
             }
             rst2D[reqIdx][docIdx] = rst;
         }
@@ -53,10 +60,7 @@ __global__ void dummyKernel(long* d_rst, int reqIdx, int numDocs, int numRepeats
         long rst = docIdx + reqIdx * numDocs;
         for (int i = 0; i < numRepeats; i++)
         {
-            // Some pseudo-random computation to avoid compiler optimization
-            rst = (rst * 1103515245 + 12345) & 0x7fffffff;
-            rst = (rst >> 3) ^ (rst << 7);
-            rst = (rst * 16807) % 2147483647;            
+            rst = pseudoRandom(rst);
         }
         d_rst[docIdx + reqIdx * numDocs] = rst;
     }
@@ -201,12 +205,12 @@ int main()
     }
 
     std::cout << "\n--------------------------------" << std::endl;
-    
+
     {
         Config config;
         config.numReqs = 32;
         config.numDocs = 1000000;
-        config.numRepeats = 1000;
+        config.numRepeats = 100;
         config.numTrials = 100;
         config.print();
 
