@@ -1,9 +1,6 @@
-Consolidate compiler generated dependencies of target parallelization_with_cuda_stream
-[ 50%] Building CUDA object CMakeFiles/parallelization_with_cuda_stream.dir/main.cu.o
-[100%] Linking CUDA executable parallelization_with_cuda_stream
-[100%] Built target parallelization_with_cuda_stream
+
 Device 0: NVIDIA L4
-  Total global memory: 22574 MB
+  Total global memory: 22563 MB
   Multiprocessor count: 58
   Max threads per block: 1024
   Max threads dim: (1024, 1024, 64)
@@ -21,45 +18,97 @@ Device 0: NVIDIA L4
   canMapHostMemory: Yes
   sharedMemPerBlock: 48 KB
   sharedMemPerMultiprocessor: 100 KB
-kNumReqs: 32
-kNumDocs: 1000000
-kNumRepeats: 1000
-kNumTrials: 100
-kBlockSize: 1024
-Time taken for req by req: 3.88483 ms
-Time taken for parallel with cuda stream: 4.07065 ms
-➜  parallelization_with_cuda_stream git:(parallelization_with_cuda_stream) ✗ ./run.sh
-mkdir: cannot create directory ‘build’: File exists
--- Configuring done
--- Generating done
--- Build files have been written to: /home/ec2-user/git/ycj-blog-code/parallelization_with_cuda_stream/build
-Consolidate compiler generated dependencies of target parallelization_with_cuda_stream
-[ 50%] Building CUDA object CMakeFiles/parallelization_with_cuda_stream.dir/main.cu.o
-[100%] Linking CUDA executable parallelization_with_cuda_stream
-[100%] Built target parallelization_with_cuda_stream
-Device 0: NVIDIA L4
-  Total global memory: 22574 MB
-  Multiprocessor count: 58
-  Max threads per block: 1024
-  Max threads dim: (1024, 1024, 64)
-  Max grid size: (2147483647, 65535, 65535)
-  Clock rate: 2040 MHz
-  Compute capability: 8.9
-  Memory clock rate: 6251 MHz
-  Memory bus width: 192 bits
-  L2 cache size: 49152 KB
-  concurrentKernels: Yes
-  asyncEngineCount: 2
-  streamPrioritiesSupported: Yes
-  unifiedAddressing: Yes
-  pageableMemoryAccess: Yes
-  canMapHostMemory: Yes
-  sharedMemPerBlock: 48 KB
-  sharedMemPerMultiprocessor: 100 KB
-kNumReqs: 1024
-kNumDocs: 1000
-kNumRepeats: 1000
-kNumTrials: 100
-kBlockSize: 1024
-Time taken for req by req: 11.1337 ms
-Time taken for parallel with cuda stream: 3.16249 ms
+numReqs: 32
+numDocs: 1000
+numRepeats: 100
+numTrials: 10
+Time taken with default stream: 0.8985 ms
+All results are correct ^____^
+Time taken with 1 cuda streams: 0.7088 ms
+All results are correct ^____^
+Time taken with 2 cuda streams: 0.3589 ms
+All results are correct ^____^
+Time taken with 4 cuda streams: 0.1907 ms
+All results are correct ^____^
+Time taken with 8 cuda streams: 0.1087 ms
+All results are correct ^____^
+Time taken with 16 cuda streams: 0.0892 ms
+All results are correct ^____^
+Time taken with 32 cuda streams: 0.1034 ms
+All results are correct ^____^
+
+---------------TEST1-----------------
+numReqs: 32
+numDocs: 1000000
+numRepeats: 100
+numTrials: 100
+Time taken with default stream: 14.5943 ms
+Time taken with 1 cuda streams: 14.355 ms
+Time taken with 2 cuda streams: 14.5372 ms
+Time taken with 4 cuda streams: 14.5411 ms
+Time taken with 8 cuda streams: 14.611 ms
+Time taken with 16 cuda streams: 14.5492 ms
+Time taken with 32 cuda streams: 14.5392 ms
+
+---------------TEST2-----------------
+numReqs: 8192
+numDocs: 1000
+numRepeats: 10
+numTrials: 100
+Time taken with default stream: 29.8997 ms
+Time taken with 1 cuda streams: 29.8767 ms
+Time taken with 2 cuda streams: 15.2032 ms
+Time taken with 4 cuda streams: 15.2494 ms
+Time taken with 8 cuda streams: 15.1021 ms
+Time taken with 16 cuda streams: 16.2491 ms
+Time taken with 32 cuda streams: 16.1995 ms
+Time taken with 64 cuda streams: 16.2036 ms
+Time taken with 128 cuda streams: 16.2913 ms
+Time taken with 256 cuda streams: 16.4457 ms
+Time taken with 512 cuda streams: 16.5367 ms
+Time taken with 1024 cuda streams: 17.144 ms
+Time taken with 2048 cuda streams: 18.1963 ms
+Time taken with 4096 cuda streams: 20.5203 ms
+Time taken with 8192 cuda streams: 26.7572 ms
+
+---------------TEST3-----------------
+numReqs: 8192
+numDocs: 1000
+numRepeats: 100
+numTrials: 100
+Time taken with default stream: 180.409 ms
+Time taken with 1 cuda streams: 180.412 ms
+Time taken with 2 cuda streams: 90.3616 ms
+Time taken with 4 cuda streams: 46.786 ms
+Time taken with 8 cuda streams: 24.0271 ms
+Time taken with 16 cuda streams: 16.6314 ms
+Time taken with 32 cuda streams: 16.415 ms
+Time taken with 64 cuda streams: 16.3401 ms
+Time taken with 128 cuda streams: 16.3676 ms
+Time taken with 256 cuda streams: 16.4784 ms
+Time taken with 512 cuda streams: 16.7149 ms
+Time taken with 1024 cuda streams: 17.3016 ms
+Time taken with 2048 cuda streams: 18.3737 ms
+Time taken with 4096 cuda streams: 20.9143 ms
+Time taken with 8192 cuda streams: 26.7158 ms
+
+---------------TEST4-----------------
+numReqs: 8192
+numDocs: 100
+numRepeats: 100
+numTrials: 100
+Time taken with default stream: 59.4968 ms
+Time taken with 1 cuda streams: 58.84 ms
+Time taken with 2 cuda streams: 34.0557 ms
+Time taken with 4 cuda streams: 24.3125 ms
+Time taken with 8 cuda streams: 16.063 ms
+Time taken with 16 cuda streams: 16.4592 ms
+Time taken with 32 cuda streams: 16.2757 ms
+Time taken with 64 cuda streams: 16.3071 ms
+Time taken with 128 cuda streams: 16.339 ms
+Time taken with 256 cuda streams: 16.5345 ms
+Time taken with 512 cuda streams: 16.8096 ms
+Time taken with 1024 cuda streams: 17.2265 ms
+Time taken with 2048 cuda streams: 18.4187 ms
+Time taken with 4096 cuda streams: 20.7961 ms
+Time taken with 8192 cuda streams: 26.7663 ms
