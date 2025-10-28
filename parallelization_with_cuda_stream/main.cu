@@ -194,7 +194,7 @@ int main()
         
     {
         Config config;
-        config.numReqs = 10;
+        config.numReqs = 32;
         config.numDocs = 1000;
         config.numRepeats = 100;
         config.numTrials = 10;
@@ -208,7 +208,7 @@ int main()
 
     {
         Config config;
-        config.numReqs = 100;
+        config.numReqs = 32;
         config.numDocs = 1000000;
         config.numRepeats = 100;
         config.numTrials = 100;
@@ -221,7 +221,7 @@ int main()
 
     {
         Config config;
-        config.numReqs = 10000;
+        config.numReqs = 8192;
         config.numDocs = 1000;
         config.numRepeats = 10;
         config.numTrials = 100;
@@ -234,7 +234,7 @@ int main()
 
     {
         Config config;
-        config.numReqs = 10000;
+        config.numReqs = 8192;
         config.numDocs = 1000;
         config.numRepeats = 100;
         config.numTrials = 100;
@@ -248,7 +248,7 @@ int main()
 
     {
         Config config;
-        config.numReqs = 10000;
+        config.numReqs = 8192;
         config.numDocs = 100;
         config.numRepeats = 100;
         config.numTrials = 100;
