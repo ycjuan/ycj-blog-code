@@ -121,7 +121,7 @@ int main()
         Config config;
         config.numReqs = 32;
         config.numDocs = 1000000;
-        config.numRepeats = 10;
+        config.numRepeats = 1000;
         config.numTrials = 100;
 
         config.print();
