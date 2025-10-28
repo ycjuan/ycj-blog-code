@@ -11,6 +11,7 @@ struct Config
     int numDocs;
     int numRepeats;
     int numTrials;
+    bool runCpuVerification = false;
 
     const int kBlockSize = 1024;
 
@@ -88,22 +89,25 @@ void runReqByReq(Config config, const std::vector<std::vector<long>>& cpuReferen
 
     // ----------------
     // Check correctness
-    long *h_rst;
-    CHECK_CUDA(cudaMallocHost(&h_rst, config.numReqs * config.numDocs * sizeof(long)));
-    CHECK_CUDA(cudaMemcpy(h_rst, d_rst, config.numReqs * config.numDocs * sizeof(long), cudaMemcpyDeviceToHost));
-    for (int reqIdx = 0; reqIdx < config.numReqs; reqIdx++)
+    if (config.runCpuVerification)
     {
-        for (int docIdx = 0; docIdx < config.numDocs; docIdx++)
+        long* h_rst;
+        CHECK_CUDA(cudaMallocHost(&h_rst, config.numReqs * config.numDocs * sizeof(long)));
+        CHECK_CUDA(cudaMemcpy(h_rst, d_rst, config.numReqs * config.numDocs * sizeof(long), cudaMemcpyDeviceToHost));
+        for (int reqIdx = 0; reqIdx < config.numReqs; reqIdx++)
         {
-            assert(h_rst[reqIdx * config.numDocs + docIdx] == cpuReference[reqIdx][docIdx]);
+            for (int docIdx = 0; docIdx < config.numDocs; docIdx++)
+            {
+                assert(h_rst[reqIdx * config.numDocs + docIdx] == cpuReference[reqIdx][docIdx]);
+            }
         }
+        std::cout << "All results are correct ^____^" << std::endl;
+        CHECK_CUDA(cudaFreeHost(h_rst));
     }
-    std::cout << "All results are correct ^____^" << std::endl;
 
     // ----------------
     // Cleanup
     CHECK_CUDA(cudaFree(d_rst));
-    CHECK_CUDA(cudaFreeHost(h_rst));
 }
 
 void runParallelWithCudaStream(Config config, int numCudaStreams, const std::vector<std::vector<long>>& cpuReference)
@@ -144,27 +148,32 @@ void runParallelWithCudaStream(Config config, int numCudaStreams, const std::vec
 
     // ----------------
     // Check correctness
-    long *h_rst;
-    CHECK_CUDA(cudaMallocHost(&h_rst, config.numReqs * config.numDocs * sizeof(long)));
-    CHECK_CUDA(cudaMemcpy(h_rst, d_rst, config.numReqs * config.numDocs * sizeof(long), cudaMemcpyDeviceToHost));
-    for (int reqIdx = 0; reqIdx < config.numReqs; reqIdx++)
+    if (config.runCpuVerification)
     {
-        for (int docIdx = 0; docIdx < config.numDocs; docIdx++)
+        long* h_rst;
+        CHECK_CUDA(cudaMallocHost(&h_rst, config.numReqs * config.numDocs * sizeof(long)));
+        CHECK_CUDA(cudaMemcpy(h_rst, d_rst, config.numReqs * config.numDocs * sizeof(long), cudaMemcpyDeviceToHost));
+        for (int reqIdx = 0; reqIdx < config.numReqs; reqIdx++)
         {
-            assert(h_rst[reqIdx * config.numDocs + docIdx] == cpuReference[reqIdx][docIdx]);
+            for (int docIdx = 0; docIdx < config.numDocs; docIdx++)
+            {
+                assert(h_rst[reqIdx * config.numDocs + docIdx] == cpuReference[reqIdx][docIdx]);
+            }
         }
+        std::cout << "All results are correct ^____^" << std::endl;
+        CHECK_CUDA(cudaFreeHost(h_rst));
     }
-    std::cout << "All results are correct ^____^" << std::endl;
 
     // ----------------
     // Cleanup
     CHECK_CUDA(cudaFree(d_rst));
-    CHECK_CUDA(cudaFreeHost(h_rst));
 }
 
 void runOneConfig(Config config)
 {
-    const auto cpuReference = getCpuReference(config);
+    const auto cpuReference = config.runCpuVerification
+        ? getCpuReference(config)
+        : std::vector<std::vector<long>>(config.numReqs, std::vector<long>(config.numDocs, 0));
 
     runReqByReq(config, cpuReference);
 
@@ -178,6 +187,20 @@ void runOneConfig(Config config)
 int main()
 {
     printDeviceInfo();
+        
+    {
+        Config config;
+        config.numReqs = 32;
+        config.numDocs = 1000;
+        config.numRepeats = 100;
+        config.numTrials = 10;
+        config.runCpuVerification = true;
+        config.print();
+
+        runOneConfig(config);
+    }
+
+    std::cout << "\n--------------------------------" << std::endl;
     
     {
         Config config;
