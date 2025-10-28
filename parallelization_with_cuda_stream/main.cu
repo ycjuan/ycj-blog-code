@@ -23,22 +23,45 @@ struct Config
     }
 };
 
+std::vector<std::vector<long>> getCpuReference(Config config)
+{
+    std::vector<std::vector<long>> rst2D(config.numReqs, std::vector<long>(config.numDocs));
+    #pragma omp parallel for
+    for (int reqIdx = 0; reqIdx < config.numReqs; reqIdx++)
+    {
+        for (int docIdx = 0; docIdx < config.numDocs; docIdx++)
+        {
+            long rst = docIdx + reqIdx * config.numDocs;
+            for (int i = 0; i < config.numRepeats; i++)
+            {
+                rst = (rst * 1103515245 + 12345) & 0x7fffffff;
+                rst = (rst >> 3) ^ (rst << 7);
+                rst = (rst * 16807) % 2147483647;
+            }
+            rst2D[reqIdx][docIdx] = rst;
+        }
+    }
+    return rst2D;
+}
+
 __global__ void dummyKernel(long* d_rst, int reqIdx, int numDocs, int numRepeats)
 {
     int docIdx = threadIdx.x + blockIdx.x * blockDim.x;
     if (docIdx < numDocs)
     {
-        int rst = docIdx + reqIdx * numDocs;
+        long rst = docIdx + reqIdx * numDocs;
         for (int i = 0; i < numRepeats; i++)
         {
             // Some pseudo-random computation to avoid compiler optimization
             rst = (rst * 1103515245 + 12345) & 0x7fffffff;
+            rst = (rst >> 3) ^ (rst << 7);
+            rst = (rst * 16807) % 2147483647;            
         }
         d_rst[docIdx + reqIdx * numDocs] = rst;
     }
 }
 
-void runReqByReq(Config config)
+void runReqByReq(Config config, const std::vector<std::vector<long>>& cpuReference)
 {
     // ----------------
     // Preparation
@@ -64,11 +87,26 @@ void runReqByReq(Config config)
     std::cout << "Time taken for req by req: " << timeMs << " ms" << std::endl;
 
     // ----------------
+    // Check correctness
+    long *h_rst;
+    CHECK_CUDA(cudaMallocHost(&h_rst, config.numReqs * config.numDocs * sizeof(long)));
+    CHECK_CUDA(cudaMemcpy(h_rst, d_rst, config.numReqs * config.numDocs * sizeof(long), cudaMemcpyDeviceToHost));
+    for (int reqIdx = 0; reqIdx < config.numReqs; reqIdx++)
+    {
+        for (int docIdx = 0; docIdx < config.numDocs; docIdx++)
+        {
+            assert(h_rst[reqIdx * config.numDocs + docIdx] == cpuReference[reqIdx][docIdx]);
+        }
+    }
+    std::cout << "All results are correct ^____^" << std::endl;
+
+    // ----------------
     // Cleanup
     CHECK_CUDA(cudaFree(d_rst));
+    CHECK_CUDA(cudaFreeHost(h_rst));
 }
 
-void runParallelWithCudaStream(Config config, int numCudaStreams)
+void runParallelWithCudaStream(Config config, int numCudaStreams, const std::vector<std::vector<long>>& cpuReference)
 {
     // ----------------
     // Preparation
@@ -105,34 +143,51 @@ void runParallelWithCudaStream(Config config, int numCudaStreams)
     std::cout << "Time taken with " << numCudaStreams << " cuda streams: " << timeMs << " ms" << std::endl;
 
     // ----------------
+    // Check correctness
+    long *h_rst;
+    CHECK_CUDA(cudaMallocHost(&h_rst, config.numReqs * config.numDocs * sizeof(long)));
+    CHECK_CUDA(cudaMemcpy(h_rst, d_rst, config.numReqs * config.numDocs * sizeof(long), cudaMemcpyDeviceToHost));
+    for (int reqIdx = 0; reqIdx < config.numReqs; reqIdx++)
+    {
+        for (int docIdx = 0; docIdx < config.numDocs; docIdx++)
+        {
+            assert(h_rst[reqIdx * config.numDocs + docIdx] == cpuReference[reqIdx][docIdx]);
+        }
+    }
+    std::cout << "All results are correct ^____^" << std::endl;
+
+    // ----------------
     // Cleanup
     CHECK_CUDA(cudaFree(d_rst));
-    for (int i = 0; i < numCudaStreams; i++)
+    CHECK_CUDA(cudaFreeHost(h_rst));
+}
+
+void runOneConfig(Config config)
+{
+    const auto cpuReference = getCpuReference(config);
+
+    runReqByReq(config, cpuReference);
+
+    for (int numCudaStreams = 1; numCudaStreams <= config.numReqs; numCudaStreams *= 2)
     {
-        CHECK_CUDA(cudaStreamDestroy(streams[i]));
+        assert(config.numReqs % numCudaStreams == 0);
+        runParallelWithCudaStream(config, numCudaStreams, cpuReference);
     }
 }
 
 int main()
 {
     printDeviceInfo();
-
+    
     {
         Config config;
         config.numReqs = 32;
         config.numDocs = 1000000;
         config.numRepeats = 1000;
         config.numTrials = 100;
-
         config.print();
 
-        runReqByReq(config);
-
-        for (int numCudaStreams = 1; numCudaStreams <= config.numReqs; numCudaStreams *= 2)
-        {
-            assert(config.numReqs % numCudaStreams == 0);
-            runParallelWithCudaStream(config, numCudaStreams);
-        }
+        runOneConfig(config);
     }
 
     std::cout << "\n--------------------------------" << std::endl;
@@ -143,16 +198,9 @@ int main()
         config.numDocs = 1000;
         config.numRepeats = 100;
         config.numTrials = 100;
-
         config.print();
 
-        runReqByReq(config);
-
-        for (int numCudaStreams = 1; numCudaStreams <= config.numReqs; numCudaStreams *= 2)
-        {
-            assert(config.numReqs % numCudaStreams == 0);
-            runParallelWithCudaStream(config, numCudaStreams);
-        }
+        runOneConfig(config);
     }
 
     std::cout << "\n--------------------------------" << std::endl;
@@ -163,17 +211,8 @@ int main()
         config.numDocs = 1000;
         config.numRepeats = 1000;
         config.numTrials = 100;
-
         config.print();
 
-        runReqByReq(config);
-
-        for (int numCudaStreams = 1; numCudaStreams <= config.numReqs; numCudaStreams *= 2)
-        {
-            assert(config.numReqs % numCudaStreams == 0);
-            runParallelWithCudaStream(config, numCudaStreams);
-        }
+        runOneConfig(config);
     }
-
-    return 0;
 }

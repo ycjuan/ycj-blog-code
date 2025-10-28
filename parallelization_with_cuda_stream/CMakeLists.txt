@@ -27,10 +27,13 @@ target_include_directories(parallelization_with_cuda_stream PRIVATE ${CMAKE_CURR
 target_link_libraries(parallelization_with_cuda_stream 
     ${CUDA_LIBRARIES}
     cublas
+    gomp
 )
 
 # Compiler flags
 target_compile_options(parallelization_with_cuda_stream PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:-O3>
     $<$<COMPILE_LANGUAGE:CXX>:-O3>
+    $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
+    $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler -fopenmp>
 )
