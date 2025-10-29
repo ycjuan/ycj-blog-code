@@ -1,5 +1,4 @@
-#ifndef COMMON_CUH
-#define COMMON_CUH
+#pragma once
 
 struct Doc
 {
@@ -23,5 +22,3 @@ struct ScorePredicator
         return scoreComparator(a, b);
     }
 };
-
-#endif // COMMON_CUH

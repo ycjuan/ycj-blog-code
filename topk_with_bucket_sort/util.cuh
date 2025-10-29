@@ -1,5 +1,4 @@
-#ifndef UTIL_CUH
-#define UTIL_CUH
+#pragma once
 
 class CudaTimer
 {
@@ -13,5 +12,3 @@ private:
     cudaEvent_t start_;
     cudaEvent_t stop_;
 };
-
-#endif // UTIL_CUH

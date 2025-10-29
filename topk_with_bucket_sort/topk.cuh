@@ -1,5 +1,4 @@
-#ifndef TOPK_CUH
-#define TOPK_CUH
+#pragma once
 
 #include <vector>
 
@@ -64,5 +63,3 @@ private:
 
 std::vector<Doc> retrieveTopkGpuFullSort(Doc *d_doc, int numDocs, int numToRetrieve, float &timeMs);
 std::vector<Doc> retrieveTopkCpuFullSort(std::vector<Doc> &v_doc, int numToRetrieve, float &timeMs);
-
-#endif // TOPK_CUH
