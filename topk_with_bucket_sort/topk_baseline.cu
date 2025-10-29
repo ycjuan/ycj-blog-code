@@ -6,9 +6,7 @@
 #include "topk.cuh"
 #include "util.cuh"
 
-using namespace std;
-
-vector<Doc> retrieveTopkGpuFullSort(Doc *d_doc, int numDocs, int numToRetrieve, float &timeMs)
+std::vector<Doc> retrieveTopkGpuFullSort(Doc *d_doc, int numDocs, int numToRetrieve, float &timeMs)
 {
     Timer timer;
     timer.tic();
@@ -16,7 +14,7 @@ vector<Doc> retrieveTopkGpuFullSort(Doc *d_doc, int numDocs, int numToRetrieve, 
     cudaDeviceSynchronize();
     CHECK_CUDA(cudaGetLastError());
 
-    vector<Doc> v_topkDocs(numToRetrieve);
+    std::vector<Doc> v_topkDocs(numToRetrieve);
     CHECK_CUDA(cudaMemcpy(v_topkDocs.data(), d_doc, numToRetrieve * sizeof(Doc), cudaMemcpyDeviceToHost));
 
     timeMs = timer.tocMs();
@@ -24,15 +22,15 @@ vector<Doc> retrieveTopkGpuFullSort(Doc *d_doc, int numDocs, int numToRetrieve, 
     return v_topkDocs;
 }
 
-vector<Doc> retrieveTopkCpuFullSort(vector<Doc> &v_doc, int numToRetrieve, float &timeMs)
+std::vector<Doc> retrieveTopkCpuFullSort(std::vector<Doc> &v_doc, int numToRetrieve, float &timeMs)
 {
     Timer timer;
     timer.tic();
 
     stable_sort(v_doc.begin(), v_doc.end(), scoreComparator);
-    int numToCopy = min(numToRetrieve, (int)v_doc.size());
+    int numToCopy = std::min(numToRetrieve, (int)v_doc.size());
 
-    vector<Doc> v_topkDocs(v_doc.begin(), v_doc.begin() + numToCopy);
+    std::vector<Doc> v_topkDocs(v_doc.begin(), v_doc.begin() + numToCopy);
 
     timeMs = timer.tocMs();
 
