@@ -22,7 +22,7 @@ void runExp(int numDocs)
         v_doc[i].score = distribution(generator);
     }
 
-    TopkBucketSort retriever;
+    TopkBucketSort<Doc> retriever;
     retriever.init();
     Doc *d_doc = nullptr;
     Doc *d_buffer = nullptr;

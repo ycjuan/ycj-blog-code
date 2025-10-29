@@ -27,7 +27,6 @@ set(LIB_HEADER_FILES
 )
 
 set(LIB_SOURCE_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/topk_with_bucket_sort.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/topk_baseline.cu
 )
 
