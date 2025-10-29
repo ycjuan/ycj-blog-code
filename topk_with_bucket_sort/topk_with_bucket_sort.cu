@@ -1,19 +1,14 @@
 #include <vector>
 #include <cmath>
-#include <functional>
-#include <iostream>
-#include <random>
 #include <stdexcept>
 #include <string>
 #include <cassert>
-#include <numeric>
 #include <thrust/copy.h>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
 #include <string>
 
 #include "topk.cuh"
-#include "common.cuh"
 #include "util.cuh"
 
 using namespace std;
@@ -77,7 +72,7 @@ void TopkBucketSort::findLowestBucket(vector<int> &v_counter, int numToRetrieve,
 
 vector<Doc> TopkBucketSort::retrieveTopk(Doc *d_doc, Doc *d_buffer, int numDocs, int numToRetrieve, float &timeMs)
 {
-    CudaTimer timer;
+    Timer timer;
     timer.tic();
 
     int kBlockSize = 256;

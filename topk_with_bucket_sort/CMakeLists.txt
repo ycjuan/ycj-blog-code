@@ -24,13 +24,11 @@ find_package(CUDA REQUIRED)
 set(LIB_HEADER_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/util.cuh
     ${CMAKE_CURRENT_SOURCE_DIR}/topk.cuh
-    ${CMAKE_CURRENT_SOURCE_DIR}/common.cuh
 )
 
 set(LIB_SOURCE_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/topk_with_bucket_sort.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/topk_baseline.cu
-    ${CMAKE_CURRENT_SOURCE_DIR}/util.cu
 )
 
 add_library(${LIB_NAME} SHARED

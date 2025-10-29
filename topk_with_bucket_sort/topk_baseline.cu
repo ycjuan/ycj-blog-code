@@ -3,7 +3,6 @@
 #include <thrust/sort.h>
 #include <algorithm>
 
-#include "common.cuh"
 #include "topk.cuh"
 #include "util.cuh"
 
@@ -22,7 +21,7 @@ using namespace std;
 
 vector<Doc> retrieveTopkGpuFullSort(Doc *d_doc, int numDocs, int numToRetrieve, float &timeMs)
 {
-    CudaTimer timer;
+    Timer timer;
     timer.tic();
     thrust::stable_sort(thrust::device, d_doc, d_doc + numDocs, ScorePredicator());
     cudaDeviceSynchronize();
@@ -38,7 +37,7 @@ vector<Doc> retrieveTopkGpuFullSort(Doc *d_doc, int numDocs, int numToRetrieve, 
 
 vector<Doc> retrieveTopkCpuFullSort(vector<Doc> &v_doc, int numToRetrieve, float &timeMs)
 {
-    CudaTimer timer;
+    Timer timer;
     timer.tic();
 
     stable_sort(v_doc.begin(), v_doc.end(), scoreComparator);

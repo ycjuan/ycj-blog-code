@@ -3,7 +3,6 @@
 #include <stdexcept>
 #include <iostream>
 
-#include "common.cuh"
 #include "topk.cuh"
 
 using namespace std;
