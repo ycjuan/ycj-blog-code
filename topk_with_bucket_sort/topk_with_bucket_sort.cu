@@ -1,32 +1,12 @@
 #include <vector>
 #include <cmath>
-#include <functional>
-#include <iostream>
-#include <random>
-#include <stdexcept>
-#include <string>
 #include <cassert>
-#include <numeric>
 #include <thrust/copy.h>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
-#include <string>
 
 #include "topk.cuh"
-#include "common.cuh"
 #include "util.cuh"
-
-using namespace std;
-
-#define CHECK_CUDA(func)                                                                                                           \
-    {                                                                                                                              \
-        cudaError_t status = (func);                                                                                               \
-        if (status != cudaSuccess)                                                                                                 \
-        {                                                                                                                          \
-            string error = "[topk_with_bucket_sort.cu] CUDA API failed at line " + to_string(__LINE__) + " with error: " + cudaGetErrorString(status) + "\n"; \
-            throw runtime_error(error);                                                                                            \
-        }                                                                                                                          \
-    }
 
 void TopkBucketSort::init()
 {
@@ -51,7 +31,7 @@ __global__ void updateCounterKernel(Doc *d_doc, int numDocs, TopkBucketSort retr
     }
 }
 
-void TopkBucketSort::findLowestBucket(vector<int> &v_counter, int numToRetrieve, int &lowestBucket, int &numDocsGreaterThanLowestBucket)
+void TopkBucketSort::findLowestBucket(std::vector<int> &v_counter, int numToRetrieve, int &lowestBucket, int &numDocsGreaterThanLowestBucket)
 {
     lowestBucket = 0;
     numDocsGreaterThanLowestBucket = 0;
@@ -75,9 +55,9 @@ void TopkBucketSort::findLowestBucket(vector<int> &v_counter, int numToRetrieve,
     }
 }
 
-vector<Doc> TopkBucketSort::retrieveTopk(Doc *d_doc, Doc *d_buffer, int numDocs, int numToRetrieve, float &timeMs)
+std::vector<Doc> TopkBucketSort::retrieveTopk(Doc *d_doc, Doc *d_buffer, int numDocs, int numToRetrieve, float &timeMs)
 {
-    CudaTimer timer;
+    Timer timer;
     timer.tic();
 
     int kBlockSize = 256;
@@ -86,11 +66,11 @@ vector<Doc> TopkBucketSort::retrieveTopk(Doc *d_doc, Doc *d_buffer, int numDocs,
     // Step1 - Run kernel to update the counter
     CHECK_CUDA(cudaMemset(d_counter_, 0, kSize_byte_d_counter_))
     updateCounterKernel<<<gridSize, kBlockSize>>>(d_doc, numDocs, *this);
-    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaDeviceSynchronize());
     CHECK_CUDA(cudaGetLastError())
 
     // Step2 - Copy counter from GPU to CPU
-    vector<int> v_counter(kSize_d_counter_, 0);
+    std::vector<int> v_counter(kSize_d_counter_, 0);
     CHECK_CUDA(cudaMemcpy(v_counter.data(), d_counter_, kSize_byte_d_counter_, cudaMemcpyDeviceToHost))
 
     // Step3 - Find the lowest bucket
@@ -99,18 +79,18 @@ vector<Doc> TopkBucketSort::retrieveTopk(Doc *d_doc, Doc *d_buffer, int numDocs,
 
     // Step4 - Filter items that is larger than the lowest bucket
     Doc *d_endPtr = thrust::copy_if(thrust::device, d_doc, d_doc + numDocs, d_buffer, *this); // copy_if will call TopkBucketSort::operator()
-    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaDeviceSynchronize());
     CHECK_CUDA(cudaGetLastError())
     int numCopied = (d_endPtr - d_buffer);
     assert(numCopied == numDocsGreaterThanLowestBucket);
 
     // Step5 - Only sort the docs that are larger than the lowest bucket
     thrust::stable_sort(thrust::device, d_buffer, d_buffer + numCopied, ScorePredicator());
-    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaDeviceSynchronize());
     CHECK_CUDA(cudaGetLastError())
 
     // Step6 - copy back to CPU
-    vector<Doc> v_doc(numToRetrieve);
+    std::vector<Doc> v_doc(numToRetrieve);
     CHECK_CUDA(cudaMemcpy(v_doc.data(), d_buffer, sizeof(Doc) * numToRetrieve, cudaMemcpyDeviceToHost))
 
     timeMs = timer.tocMs();
