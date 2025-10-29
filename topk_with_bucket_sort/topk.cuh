@@ -6,23 +6,14 @@ struct Doc
 {
     int docId;
     float score;
-    bool operator==(const Doc &other) const
-    {
-        return docId == other.docId && score == other.score;
-    }
+    bool operator==(const Doc& other) const { return docId == other.docId && score == other.score; }
 };
 
-inline __device__ __host__ bool scoreComparator(const Doc &a, const Doc &b)
-{
-    return a.score > b.score;
-}
+inline __device__ __host__ bool scoreComparator(const Doc& a, const Doc& b) { return a.score > b.score; }
 
 struct ScorePredicator
 {
-    inline __host__ __device__ bool operator()(const Doc &a, const Doc &b)
-    {
-        return scoreComparator(a, b);
-    }
+    inline __host__ __device__ bool operator()(const Doc& a, const Doc& b) { return scoreComparator(a, b); }
 };
 
 class TopkBucketSort
@@ -32,12 +23,9 @@ public:
 
     void reset();
 
-    std::vector<Doc> retrieveTopk(Doc *d_doc, Doc *d_buffer, int numDocs, int numToRetrieve, float &timeMs);
+    std::vector<Doc> retrieveTopk(Doc* d_doc, Doc* d_buffer, int numDocs, int numToRetrieve, float& timeMs);
 
-    __device__ __host__ int getCounterIdx(int slot, int bucket)
-    {
-        return slot * kNumBuckets_ + bucket;
-    }
+    __device__ __host__ int getCounterIdx(int slot, int bucket) { return slot * kNumBuckets_ + bucket; }
 
     __device__ int bucketize(float score)
     {
@@ -55,7 +43,7 @@ public:
         atomicAdd(&d_counter_[counterIdx], 1);
     }
 
-    __device__ bool operator()(const Doc &doc)
+    __device__ bool operator()(const Doc& doc)
     {
         int bucket = bucketize(doc.score);
         return bucket >= lowestBucket_;
@@ -75,12 +63,15 @@ private:
     const int kSize_d_counter_ = kNumBuckets_ * kNumSlots_;
     const int kSize_byte_d_counter_ = kSize_d_counter_ * sizeof(int);
 
-    int *d_counter_ = nullptr;
-    int *h_counter_ = nullptr;
+    int* d_counter_ = nullptr;
+    int* h_counter_ = nullptr;
     int lowestBucket_ = 0;
 
-    void findLowestBucket(std::vector<int> &v_counter, int numToRetrieve, int &lowestBucket, int &numDocsGreaterThanLowestBucket);
+    void findLowestBucket(std::vector<int>& v_counter,
+                          int numToRetrieve,
+                          int& lowestBucket,
+                          int& numDocsGreaterThanLowestBucket);
 };
 
-std::vector<Doc> retrieveTopkGpuFullSort(Doc *d_doc, int numDocs, int numToRetrieve, float &timeMs);
-std::vector<Doc> retrieveTopkCpuFullSort(std::vector<Doc> &v_doc, int numToRetrieve, float &timeMs);
+std::vector<Doc> retrieveTopkGpuFullSort(Doc* d_doc, int numDocs, int numToRetrieve, float& timeMs);
+std::vector<Doc> retrieveTopkCpuFullSort(std::vector<Doc>& v_doc, int numToRetrieve, float& timeMs);

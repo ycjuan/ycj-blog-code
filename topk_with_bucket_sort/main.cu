@@ -4,18 +4,9 @@
 #include <iostream>
 
 #include "topk.cuh"
+#include "util.cuh"
 
 using namespace std;
-
-#define CHECK_CUDA(func)                                                                                                           \
-    {                                                                                                                              \
-        cudaError_t status = (func);                                                                                               \
-        if (status != cudaSuccess)                                                                                                 \
-        {                                                                                                                          \
-            string error = "[main.cu] CUDA API failed at line " + to_string(__LINE__) + " with error: " + cudaGetErrorString(status) + "\n"; \
-            throw runtime_error(error);                                                                                            \
-        }                                                                                                                          \
-    }
 
 int kNumToRetrieve = 1000;
 int kNumTrials = 10;
