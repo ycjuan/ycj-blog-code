@@ -6,18 +6,16 @@
 #include "topk.cuh"
 #include "util.cuh"
 
-using namespace std;
-
 int kNumToRetrieve = 1000;
 int kNumTrials = 10;
 
 void runExp(int numDocs)
 {
-    cout << "\n\nrunning exps with numDocs: " << numDocs << endl;
-    default_random_engine generator;
-    uniform_real_distribution<float> distribution(-1.0, 1.0);
+    std::cout << "\n\nrunning exps with numDocs: " << numDocs << std::endl;
+    std::default_random_engine generator;
+    std::uniform_real_distribution<float> distribution(-1.0, 1.0);
 
-    vector<Doc> v_doc(numDocs);
+    std::vector<Doc> v_doc(numDocs);
     for (int i = 0; i < numDocs; i++)
     {
         v_doc[i].docId = i;
@@ -40,19 +38,19 @@ void runExp(int numDocs)
         float timeMsGpuFullSort1 = 0;
         float timeMsCpuFullSort1 = 0;
         CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Doc), cudaMemcpyHostToDevice));
-        vector<Doc> v_topk_gpuBucketSort = retriever.retrieveTopk(d_doc, d_buffer, numDocs, kNumToRetrieve, timeMsGpuBucketSort1);
+        std::vector<Doc> v_topk_gpuBucketSort = retriever.retrieveTopk(d_doc, d_buffer, numDocs, kNumToRetrieve, timeMsGpuBucketSort1);
         CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Doc), cudaMemcpyHostToDevice));
-        vector<Doc> v_topk_gpuFullSort = retrieveTopkGpuFullSort(d_doc, numDocs, kNumToRetrieve, timeMsGpuFullSort1);
-        vector<Doc> v_doc_copy = v_doc;
-        vector<Doc> v_topk_cpuFullSort = retrieveTopkCpuFullSort(v_doc_copy, kNumToRetrieve, timeMsCpuFullSort1);
+        std::vector<Doc> v_topk_gpuFullSort = retrieveTopkGpuFullSort(d_doc, numDocs, kNumToRetrieve, timeMsGpuFullSort1);
+        std::vector<Doc> v_doc_copy = v_doc;
+        std::vector<Doc> v_topk_cpuFullSort = retrieveTopkCpuFullSort(v_doc_copy, kNumToRetrieve, timeMsCpuFullSort1);
 
         if (v_topk_gpuBucketSort != v_topk_gpuFullSort)
         {
-            throw runtime_error("Topk results from GPU bucket sort and GPU full sort do not match");
+            throw std::runtime_error("Topk results from GPU bucket sort and GPU full sort do not match");
         }
         if (v_topk_gpuBucketSort != v_topk_cpuFullSort)
         {
-            throw runtime_error("Topk results from GPU bucket sort and CPU full sort do not match");
+            throw std::runtime_error("Topk results from GPU bucket sort and CPU full sort do not match");
         }
 
         if (t >= 0)
@@ -67,9 +65,9 @@ void runExp(int numDocs)
     timeMsGpuFullSort /= kNumTrials;
     timeMsCpuFullSort /= kNumTrials;
 
-    cout << "timeMsGpuBucketSort: " << timeMsGpuBucketSort << " ms" << endl;
-    cout << "timeMsGpuFullSort: " << timeMsGpuFullSort << " ms" << endl;
-    cout << "timeMsCpuFullSort: " << timeMsCpuFullSort << " ms" << endl;
+    std::cout << "timeMsGpuBucketSort: " << timeMsGpuBucketSort << " ms" << std::endl;
+    std::cout << "timeMsGpuFullSort: " << timeMsGpuFullSort << " ms" << std::endl;
+    std::cout << "timeMsCpuFullSort: " << timeMsCpuFullSort << " ms" << std::endl;
 
     CHECK_CUDA(cudaFree(d_doc));
     CHECK_CUDA(cudaFree(d_buffer));
