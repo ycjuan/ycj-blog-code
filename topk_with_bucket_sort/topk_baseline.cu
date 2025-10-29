@@ -11,7 +11,7 @@ std::vector<Doc> retrieveTopkGpuFullSort(Doc *d_doc, int numDocs, int numToRetri
     Timer timer;
     timer.tic();
     thrust::stable_sort(thrust::device, d_doc, d_doc + numDocs, ScorePredicator());
-    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaDeviceSynchronize());
     CHECK_CUDA(cudaGetLastError());
 
     std::vector<Doc> v_topkDocs(numToRetrieve);

@@ -66,7 +66,7 @@ std::vector<Doc> TopkBucketSort::retrieveTopk(Doc *d_doc, Doc *d_buffer, int num
     // Step1 - Run kernel to update the counter
     CHECK_CUDA(cudaMemset(d_counter_, 0, kSize_byte_d_counter_))
     updateCounterKernel<<<gridSize, kBlockSize>>>(d_doc, numDocs, *this);
-    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaDeviceSynchronize());
     CHECK_CUDA(cudaGetLastError())
 
     // Step2 - Copy counter from GPU to CPU
@@ -79,14 +79,14 @@ std::vector<Doc> TopkBucketSort::retrieveTopk(Doc *d_doc, Doc *d_buffer, int num
 
     // Step4 - Filter items that is larger than the lowest bucket
     Doc *d_endPtr = thrust::copy_if(thrust::device, d_doc, d_doc + numDocs, d_buffer, *this); // copy_if will call TopkBucketSort::operator()
-    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaDeviceSynchronize());
     CHECK_CUDA(cudaGetLastError())
     int numCopied = (d_endPtr - d_buffer);
     assert(numCopied == numDocsGreaterThanLowestBucket);
 
     // Step5 - Only sort the docs that are larger than the lowest bucket
     thrust::stable_sort(thrust::device, d_buffer, d_buffer + numCopied, ScorePredicator());
-    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaDeviceSynchronize());
     CHECK_CUDA(cudaGetLastError())
 
     // Step6 - copy back to CPU
