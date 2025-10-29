@@ -12,6 +12,16 @@ struct ScorePredicator
     inline __host__ __device__ bool operator()(const Doc& a, const Doc& b) { return a.score > b.score; }
 };
 
+struct DocIdExtractor
+{
+    inline __host__ __device__ int operator()(const Doc& doc) { return doc.docId; }
+};
+
+struct ScoreExtractor
+{
+    inline __host__ __device__ float operator()(const Doc& doc) { return doc.score; }
+};
+
 int kNumToRetrieve = 1000;
 int kNumTrials = 10;
 
@@ -28,7 +38,7 @@ void runExp(int numDocs)
         v_doc[i].score = distribution(generator);
     }
 
-    TopkBucketSort<Doc, ScorePredicator> retriever;
+    TopkBucketSort<Doc, ScorePredicator, DocIdExtractor, ScoreExtractor> retriever;
     retriever.init();
     Doc *d_doc = nullptr;
     Doc *d_buffer = nullptr;

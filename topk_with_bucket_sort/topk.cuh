@@ -16,10 +16,11 @@ struct Doc
     bool operator==(const Doc& other) const { return docId == other.docId && score == other.score; }
 };
 
-template <typename T, class ScorePredicator> class TopkBucketSort; // forward declaration
 
-template <typename T, class ScorePredicator>
-__global__ void updateCounterKernel(T* d_doc, int numDocs, TopkBucketSort<T, ScorePredicator> retriever)
+template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor> class TopkBucketSort; // forward declaration
+
+template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor>
+__global__ void updateCounterKernel(T* d_doc, int numDocs, TopkBucketSort<T, ScorePredicator, DocIdExtractor, ScoreExtractor> retriever)
 {
     int docId = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -30,7 +31,7 @@ __global__ void updateCounterKernel(T* d_doc, int numDocs, TopkBucketSort<T, Sco
     }
 }
 
-template <typename T, class ScorePredicator> class TopkBucketSort
+template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor> class TopkBucketSort
 {
 public:
     void init()
@@ -105,8 +106,8 @@ public:
 
     __device__ void updateCounter(T doc)
     {
-        int slot = doc.docId % kNumSlots_;
-        int bucket = bucketize(doc.score);
+        int slot = DocIdExtractor()(doc) % kNumSlots_;
+        int bucket = bucketize(ScoreExtractor()(doc));
         int counterIdx = getCounterIdx(slot, bucket);
 
         atomicAdd(&d_counter_[counterIdx], 1);
