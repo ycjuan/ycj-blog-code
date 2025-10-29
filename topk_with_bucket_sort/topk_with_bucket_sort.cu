@@ -8,8 +8,6 @@
 #include "topk.cuh"
 #include "util.cuh"
 
-using namespace std;
-
 void TopkBucketSort::init()
 {
     CHECK_CUDA(cudaMalloc(&d_counter_, kNumBuckets_ * kNumSlots_ * sizeof(int)));
@@ -33,7 +31,7 @@ __global__ void updateCounterKernel(Doc *d_doc, int numDocs, TopkBucketSort retr
     }
 }
 
-void TopkBucketSort::findLowestBucket(vector<int> &v_counter, int numToRetrieve, int &lowestBucket, int &numDocsGreaterThanLowestBucket)
+void TopkBucketSort::findLowestBucket(std::vector<int> &v_counter, int numToRetrieve, int &lowestBucket, int &numDocsGreaterThanLowestBucket)
 {
     lowestBucket = 0;
     numDocsGreaterThanLowestBucket = 0;
@@ -57,7 +55,7 @@ void TopkBucketSort::findLowestBucket(vector<int> &v_counter, int numToRetrieve,
     }
 }
 
-vector<Doc> TopkBucketSort::retrieveTopk(Doc *d_doc, Doc *d_buffer, int numDocs, int numToRetrieve, float &timeMs)
+std::vector<Doc> TopkBucketSort::retrieveTopk(Doc *d_doc, Doc *d_buffer, int numDocs, int numToRetrieve, float &timeMs)
 {
     Timer timer;
     timer.tic();
@@ -72,7 +70,7 @@ vector<Doc> TopkBucketSort::retrieveTopk(Doc *d_doc, Doc *d_buffer, int numDocs,
     CHECK_CUDA(cudaGetLastError())
 
     // Step2 - Copy counter from GPU to CPU
-    vector<int> v_counter(kSize_d_counter_, 0);
+    std::vector<int> v_counter(kSize_d_counter_, 0);
     CHECK_CUDA(cudaMemcpy(v_counter.data(), d_counter_, kSize_byte_d_counter_, cudaMemcpyDeviceToHost))
 
     // Step3 - Find the lowest bucket
@@ -92,7 +90,7 @@ vector<Doc> TopkBucketSort::retrieveTopk(Doc *d_doc, Doc *d_buffer, int numDocs,
     CHECK_CUDA(cudaGetLastError())
 
     // Step6 - copy back to CPU
-    vector<Doc> v_doc(numToRetrieve);
+    std::vector<Doc> v_doc(numToRetrieve);
     CHECK_CUDA(cudaMemcpy(v_doc.data(), d_buffer, sizeof(Doc) * numToRetrieve, cudaMemcpyDeviceToHost))
 
     timeMs = timer.tocMs();
