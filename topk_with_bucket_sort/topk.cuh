@@ -16,17 +16,10 @@ struct Doc
     bool operator==(const Doc& other) const { return docId == other.docId && score == other.score; }
 };
 
-inline __device__ __host__ bool scoreComparator(const Doc& a, const Doc& b) { return a.score > b.score; }
+template <typename T, class ScorePredicator> class TopkBucketSort; // forward declaration
 
-struct ScorePredicator
-{
-    inline __host__ __device__ bool operator()(const Doc& a, const Doc& b) { return scoreComparator(a, b); }
-};
-
-template <typename T> class TopkBucketSort; // forward declaration
-
-template <typename T>
-__global__ void updateCounterKernel(T* d_doc, int numDocs, TopkBucketSort<T> retriever)
+template <typename T, class ScorePredicator>
+__global__ void updateCounterKernel(T* d_doc, int numDocs, TopkBucketSort<T, ScorePredicator> retriever)
 {
     int docId = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -37,7 +30,7 @@ __global__ void updateCounterKernel(T* d_doc, int numDocs, TopkBucketSort<T> ret
     }
 }
 
-template <typename T> class TopkBucketSort
+template <typename T, class ScorePredicator> class TopkBucketSort
 {
 public:
     void init()
@@ -170,6 +163,3 @@ private:
         }
     }
 };
-
-std::vector<Doc> retrieveTopkGpuFullSort(Doc* d_doc, int numDocs, int numToRetrieve, float& timeMs);
-std::vector<Doc> retrieveTopkCpuFullSort(std::vector<Doc>& v_doc, int numToRetrieve, float& timeMs);
