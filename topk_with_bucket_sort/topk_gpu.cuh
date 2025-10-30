@@ -9,14 +9,6 @@
 
 #include "util.cuh"
 
-struct Doc
-{
-    int docId;
-    float score;
-    bool operator==(const Doc& other) const { return docId == other.docId && score == other.score; }
-};
-
-
 template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor> class TopkBucketSort; // forward declaration
 
 template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor>
@@ -70,7 +62,7 @@ public:
         findLowestBucket(v_counter, numToRetrieve, lowestBucket_, numDocsGreaterThanLowestBucket);
     
         // Step4 - Filter items that is larger than the lowest bucket
-        Doc *d_endPtr = thrust::copy_if(thrust::device, d_doc, d_doc + numDocs, d_buffer, *this); // copy_if will call TopkBucketSort::operator()
+        T *d_endPtr = thrust::copy_if(thrust::device, d_doc, d_doc + numDocs, d_buffer, *this); // copy_if will call TopkBucketSort::operator()
         CHECK_CUDA(cudaDeviceSynchronize());
         CHECK_CUDA(cudaGetLastError())
         int numCopied = (d_endPtr - d_buffer);
@@ -87,8 +79,8 @@ public:
         CHECK_CUDA(cudaGetLastError())
     
         // Step6 - copy back to CPU
-        std::vector<Doc> v_doc(numToRetrieve);
-        CHECK_CUDA(cudaMemcpy(v_doc.data(), d_buffer, sizeof(Doc) * numToRetrieve, cudaMemcpyDeviceToHost))
+        std::vector<T> v_doc(numToRetrieve);
+        CHECK_CUDA(cudaMemcpy(v_doc.data(), d_buffer, sizeof(T) * numToRetrieve, cudaMemcpyDeviceToHost))
     
         timeMs = timer.tocMs();
     

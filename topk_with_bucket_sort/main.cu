@@ -7,6 +7,15 @@
 #include "topk_gpu.cuh"
 #include "util.cuh"
 
+
+struct Doc
+{
+    int docId;
+    float score;
+    bool operator==(const Doc& other) const { return docId == other.docId && score == other.score; }
+};
+
+
 struct ScorePredicator
 {
     inline __host__ __device__ bool operator()(const Doc& a, const Doc& b) { return a.score > b.score; }
