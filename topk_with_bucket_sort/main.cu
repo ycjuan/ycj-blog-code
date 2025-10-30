@@ -3,8 +3,8 @@
 #include <stdexcept>
 #include <iostream>
 
-#include "topk.cuh"
 #include "topk_cpu.cuh"
+#include "topk_gpu.cuh"
 #include "util.cuh"
 
 struct ScorePredicator

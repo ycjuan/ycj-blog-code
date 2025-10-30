@@ -23,8 +23,8 @@ find_package(CUDA REQUIRED)
 # Add library
 set(LIB_HEADER_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/util.cuh
-    ${CMAKE_CURRENT_SOURCE_DIR}/topk.cuh
     ${CMAKE_CURRENT_SOURCE_DIR}/topk_cpu.cuh
+    ${CMAKE_CURRENT_SOURCE_DIR}/topk_gpu.cuh
 )
 
 
