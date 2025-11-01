@@ -9,6 +9,68 @@
 
 #include "util.cuh"
 
+
+// Modified from https://github.com/NVIDIA/thrust/blob/main/examples/cuda/custom_temporary_allocation.cu
+struct StaticThrustAllocator
+{
+    typedef char value_type;
+
+    void malloc(size_t numBytes)
+    {
+        cudaError_t cudaError = cudaMalloc(&d_arr, numBytes);
+        if (cudaError != cudaSuccess)
+        {
+            std::ostringstream errorMsg;
+            errorMsg << "[StaticThrustAllocator::malloc] cudaMalloc error: " << cudaGetErrorString(cudaError)
+                     << ", numBytes = " << numBytes;
+            throw std::runtime_error(errorMsg.str());
+        }
+        numBytesAllocated = numBytes;
+    }
+
+    void free()
+    {
+        if (d_arr != nullptr)
+        {
+            cudaFree(d_arr);
+            d_arr = nullptr;
+            numBytesAllocated = 0;
+        }
+    }
+
+    char *allocate(std::ptrdiff_t numBytesAsked)
+    {
+        if (verbose)
+        {
+            std::cout << "[StaticThrustAllocator::allocate]: numBytesAsked = " << numBytesAsked
+                      << ", numBytesAllocated = " << numBytesAllocated << std::endl;
+        }
+
+        if (numBytesAsked > numBytesAllocated)
+        {
+            std::ostringstream errorMsg;
+            errorMsg << "[StaticThrustAllocator::allocate] numBytesAsked > numBytesAllocated: "
+                     << "numBytesAsked = " << numBytesAsked
+                     << ", numBytesAllocated = " << numBytesAllocated;
+            throw std::runtime_error(errorMsg.str());
+        }
+
+        return d_arr;
+    }
+
+    void deallocate(char *ptr, size_t)
+    {
+        // Do nothing
+    }
+
+    bool verbose = false;
+
+    char *d_arr = nullptr;
+
+    size_t numBytesAllocated = 0;
+};
+
+
 template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor> class TopkBucketSort; // forward declaration
 
 template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor>
@@ -26,16 +88,18 @@ __global__ void updateCounterKernel(T* d_doc, int numDocs, TopkBucketSort<T, Sco
 template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor> class TopkBucketSort
 {
 public:
-    void init()
+    void init(uint64_t maxNumDocs)
     {
         CHECK_CUDA(cudaMalloc(&d_counter_, kNumBuckets_ * kNumSlots_ * sizeof(int)));
         CHECK_CUDA(cudaMallocHost(&h_counter_, kNumBuckets_ * kNumSlots_ * sizeof(int)));
+        allocator_.malloc(maxNumDocs * sizeof(T));
     }
 
     void reset()
     {
         CHECK_CUDA(cudaFree(d_counter_));
         CHECK_CUDA(cudaFreeHost(h_counter_));
+        allocator_.free();
     }
 
     std::vector<T> retrieveTopk(T* d_doc, T* d_buffer, int numDocs, int numToRetrieve, float& timeMs)
@@ -61,7 +125,7 @@ public:
         findLowestBucket(v_counter, numToRetrieve, lowestBucket_, numDocsGreaterThanLowestBucket);
     
         // Step4 - Filter out items that is larger than the lowest bucket
-        T *d_endPtr = thrust::copy_if(thrust::device, d_doc, d_doc + numDocs, d_buffer, *this); // copy_if will call TopkBucketSort::operator()
+        T *d_endPtr = thrust::copy_if(thrust::cuda::par(allocator_), d_doc, d_doc + numDocs, d_buffer, *this); // copy_if will call TopkBucketSort::operator()
         CHECK_CUDA(cudaDeviceSynchronize());
         CHECK_CUDA(cudaGetLastError())
         int numCopied = (d_endPtr - d_buffer);
@@ -73,7 +137,7 @@ public:
         }
     
         // Step5 - Sort the docs that are larger than the lowest bucket
-        thrust::stable_sort(thrust::device, d_buffer, d_buffer + numCopied, ScorePredicator());
+        thrust::stable_sort(thrust::cuda::par(allocator_), d_buffer, d_buffer + numCopied, ScorePredicator());
         CHECK_CUDA(cudaDeviceSynchronize());
         CHECK_CUDA(cudaGetLastError())
     
@@ -132,6 +196,9 @@ private:
     int* d_counter_ = nullptr;
     int* h_counter_ = nullptr;
     int lowestBucket_ = 0;
+    
+    // Thrust allocator for static memory allocation
+    StaticThrustAllocator allocator_;
 
     void findLowestBucket(std::vector<int>& v_counter,
                           int numToRetrieve,
