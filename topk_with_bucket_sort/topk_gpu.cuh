@@ -216,7 +216,7 @@ private:
     void checkMinMaxScore(T* d_doc, uint32_t numDocs)
     {
         // --------------
-        // Step3 - Sample the scores
+        // Step1 - Sample the scores
         int kBlockSize = 256;
         int gridSize = (int)ceil((double)(numDocs + 1) / kBlockSize);
         int numToSample = std::min(numDocs, kNumDocsToSample_);
@@ -226,13 +226,15 @@ private:
         CHECK_CUDA(cudaGetLastError())
 
         // --------------
-        // Step4 - Sort the scores in GPU
+        // Step2 - Sort the scores in GPU
         thrust::sort(thrust::device, d_sampledScores_, d_sampledScores_ + kNumDocsToSample_, thrust::less<float>());
 
         // --------------
-        // Step5 - Copy the scores back to CPU
+        // Step3 - Copy the scores back to CPU
         CHECK_CUDA(cudaMemcpy(hp_sampledScores_, d_sampledScores_, kNumDocsToSample_ * sizeof(float), cudaMemcpyDeviceToHost));
 
+        // --------------
+        // Step4 - Calculate the min and max score
         minScore_ = hp_sampledScores_[(int)(kNumDocsToSample_ * minPercentile_)];
         maxScore_ = hp_sampledScores_[(int)(kNumDocsToSample_ * maxPercentile_)];
     }
