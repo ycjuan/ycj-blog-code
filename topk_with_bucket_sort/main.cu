@@ -3,8 +3,33 @@
 #include <stdexcept>
 #include <iostream>
 
-#include "topk.cuh"
+#include "topk_cpu.cuh"
+#include "topk_gpu.cuh"
 #include "util.cuh"
+
+
+struct Doc
+{
+    int docId;
+    float score;
+    bool operator==(const Doc& other) const { return docId == other.docId && score == other.score; }
+};
+
+
+struct ScorePredicator
+{
+    inline __host__ __device__ bool operator()(const Doc& a, const Doc& b) { return a.score > b.score; }
+};
+
+struct DocIdExtractor
+{
+    inline __host__ __device__ int operator()(const Doc& doc) { return doc.docId; }
+};
+
+struct ScoreExtractor
+{
+    inline __host__ __device__ float operator()(const Doc& doc) { return doc.score; }
+};
 
 int kNumToRetrieve = 1000;
 int kNumTrials = 10;
@@ -22,7 +47,7 @@ void runExp(int numDocs)
         v_doc[i].score = distribution(generator);
     }
 
-    TopkBucketSort retriever;
+    TopkBucketSort<Doc, ScorePredicator, DocIdExtractor, ScoreExtractor> retriever;
     retriever.init();
     Doc *d_doc = nullptr;
     Doc *d_buffer = nullptr;
@@ -40,9 +65,9 @@ void runExp(int numDocs)
         CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Doc), cudaMemcpyHostToDevice));
         std::vector<Doc> v_topk_gpuBucketSort = retriever.retrieveTopk(d_doc, d_buffer, numDocs, kNumToRetrieve, timeMsGpuBucketSort1);
         CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Doc), cudaMemcpyHostToDevice));
-        std::vector<Doc> v_topk_gpuFullSort = retrieveTopkGpuFullSort(d_doc, numDocs, kNumToRetrieve, timeMsGpuFullSort1);
+        std::vector<Doc> v_topk_gpuFullSort = retrieveTopkGpuFullSort<Doc, ScorePredicator>(d_doc, numDocs, kNumToRetrieve, timeMsGpuFullSort1);
         std::vector<Doc> v_doc_copy = v_doc;
-        std::vector<Doc> v_topk_cpuFullSort = retrieveTopkCpuFullSort(v_doc_copy, kNumToRetrieve, timeMsCpuFullSort1);
+        std::vector<Doc> v_topk_cpuFullSort = retrieveTopkCpuFullSort<Doc, ScorePredicator>(v_doc_copy, kNumToRetrieve, timeMsCpuFullSort1);
 
         if (v_topk_gpuBucketSort != v_topk_gpuFullSort)
         {
