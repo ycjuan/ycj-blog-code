@@ -25,12 +25,12 @@ __global__ void updateCounterKernel(T* d_doc, int numDocs, TopkBucketSort<T, Sco
 }
 
 template<typename T, class ScoreExtractor>
-__global__ void sampleRandomScoresKernel(T* d_doc, int numToSample, float* d_sampledScores, uint32_t* d_randomIndices)
+__global__ void sampleRandomScoresKernel(T* d_doc, uint32_t numToSample, float* d_sampledScores, uint32_t* d_randomIndices, uint32_t numDocs)
 {
     int docId = blockIdx.x * blockDim.x + threadIdx.x;
     if (docId < numToSample)
     {
-        d_sampledScores[docId] = ScoreExtractor()(d_doc[d_randomIndices[docId]]);
+        d_sampledScores[docId] = ScoreExtractor()(d_doc[d_randomIndices[docId] % numDocs]);
     }
 }
 
@@ -46,6 +46,13 @@ public:
         CHECK_CUDA(cudaMallocHost(&hp_randomIndices_, kNumDocsToSample_ * sizeof(uint32_t)));
         CHECK_CUDA(cudaMalloc(&d_sampledScores_, kNumDocsToSample_ * sizeof(float)));
         CHECK_CUDA(cudaMallocHost(&hp_sampledScores_, kNumDocsToSample_ * sizeof(float)));
+        std::default_random_engine generator;
+        std::uniform_int_distribution<uint32_t> distribution;
+        for (int i = 0; i < kNumDocsToSample_; i++)
+        {
+            hp_randomIndices_[i] = distribution(generator);
+        }
+        CHECK_CUDA(cudaMemcpy(d_randomIndices_, hp_randomIndices_, kNumDocsToSample_ * sizeof(uint32_t), cudaMemcpyHostToDevice));
     }
 
     void init(float minScore, float maxScore)
@@ -209,25 +216,12 @@ private:
     void checkMinMaxScore(T* d_doc, uint32_t numDocs)
     {
         // --------------
-        // Step1 - Sample some random indices
-        std::default_random_engine generator;
-        std::uniform_int_distribution<uint32_t> distribution(0, numDocs - 1);
-        for (int i = 0; i < kNumDocsToSample_; i++)
-        {
-            hp_randomIndices_[i] = distribution(generator);
-        }
-
-        // --------------
-        // Step2 - Copy the random indices to GPU
-        CHECK_CUDA(cudaMemcpy(d_randomIndices_, hp_randomIndices_, kNumDocsToSample_ * sizeof(uint32_t), cudaMemcpyHostToDevice));
-
-        // --------------
         // Step3 - Sample the scores
         int kBlockSize = 256;
         int gridSize = (int)ceil((double)(numDocs + 1) / kBlockSize);
         int numToSample = std::min(numDocs, kNumDocsToSample_);
         sampleRandomScoresKernel<T, ScoreExtractor>
-            <<<gridSize, kBlockSize>>>(d_doc, numToSample, d_sampledScores_, d_randomIndices_);
+            <<<gridSize, kBlockSize>>>(d_doc, numToSample, d_sampledScores_, d_randomIndices_, numDocs);
         CHECK_CUDA(cudaDeviceSynchronize());
         CHECK_CUDA(cudaGetLastError())
 
