@@ -28,7 +28,6 @@ template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreEx
 public:
     void init()
     {
-
         CHECK_CUDA(cudaMalloc(&d_counter_, kNumBuckets_ * kNumSlots_ * sizeof(int)));
         CHECK_CUDA(cudaMallocHost(&h_counter_, kNumBuckets_ * kNumSlots_ * sizeof(int)));
     }
@@ -47,7 +46,7 @@ public:
         int kBlockSize = 256;
         int gridSize = (int)ceil((double)(numDocs + 1) / kBlockSize);
     
-        // Step1 - Run kernel to update the counter
+        // Step1 - Run kernel to update the counter in each bucket
         CHECK_CUDA(cudaMemset(d_counter_, 0, kSize_byte_d_counter_))
         updateCounterKernel<<<gridSize, kBlockSize>>>(d_doc, numDocs, *this);
         CHECK_CUDA(cudaDeviceSynchronize());
@@ -57,11 +56,11 @@ public:
         std::vector<int> v_counter(kSize_d_counter_, 0);
         CHECK_CUDA(cudaMemcpy(v_counter.data(), d_counter_, kSize_byte_d_counter_, cudaMemcpyDeviceToHost))
     
-        // Step3 - Find the lowest bucket
+        // Step3 - Scan the bucket counter from high to low, and find the lowest bucket that has more docs than numToRetrieve
         int numDocsGreaterThanLowestBucket;
         findLowestBucket(v_counter, numToRetrieve, lowestBucket_, numDocsGreaterThanLowestBucket);
     
-        // Step4 - Filter items that is larger than the lowest bucket
+        // Step4 - Filter out items that is larger than the lowest bucket
         T *d_endPtr = thrust::copy_if(thrust::device, d_doc, d_doc + numDocs, d_buffer, *this); // copy_if will call TopkBucketSort::operator()
         CHECK_CUDA(cudaDeviceSynchronize());
         CHECK_CUDA(cudaGetLastError())
@@ -73,7 +72,7 @@ public:
             throw std::runtime_error(oss.str());
         }
     
-        // Step5 - Only sort the docs that are larger than the lowest bucket
+        // Step5 - Sort the docs that are larger than the lowest bucket
         thrust::stable_sort(thrust::device, d_buffer, d_buffer + numCopied, ScorePredicator());
         CHECK_CUDA(cudaDeviceSynchronize());
         CHECK_CUDA(cudaGetLastError())
@@ -87,8 +86,12 @@ public:
         return v_doc;
     }
 
+    // Note that each bucket has several slots, this is needed to avoid the contention of atomicAdd.
+    // After the kernel is done, we will sum the count of all slots into the first slot, and then the first slot will be
+    // the total count of the bucket.
     __device__ __host__ int getCounterIdx(int slot, int bucket) { return slot * kNumBuckets_ + bucket; }
 
+    // Convert the score to the bucket index.
     __device__ int bucketize(float score)
     {
         score = min(kMaxScore_, max(kMinScore_, score));
@@ -98,16 +101,17 @@ public:
 
     __device__ void updateCounter(T doc)
     {
-        int slot = DocIdExtractor()(doc) % kNumSlots_;
+        int slot = DocIdExtractor()(doc) % kNumSlots_; // randomly write into one of the slots. This is to avoid the contention of atomicAdd.
         int bucket = bucketize(ScoreExtractor()(doc));
         int counterIdx = getCounterIdx(slot, bucket);
 
         atomicAdd(&d_counter_[counterIdx], 1);
     }
 
+    // This function is used by thrust::copy_if in Step4.
     __device__ bool operator()(const T& doc)
     {
-        int bucket = bucketize(doc.score);
+        int bucket = bucketize(ScoreExtractor()(doc));
         return bucket >= lowestBucket_;
     }
 
@@ -116,7 +120,7 @@ private:
     const float kMaxScore_ = 1;
     const int kGranularity_ = 512;
     const int kNumBuckets_ = kGranularity_ + 1;
-    // For example, if you have kMinScore = -1.0, kMaxScore = 1.0, kGranularity = 2,
+    // For example, if we have kMinScore = -1.0, kMaxScore = 1.0, kGranularity = 2,
     // then you will have 3 buckets: [-1, 0, 1]
     const int kNumSlots_ = 16;
     // Each bucket has 16 slots. A GPU thread will randomly write into one of the thread,
