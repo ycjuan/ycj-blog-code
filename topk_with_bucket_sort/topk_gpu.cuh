@@ -27,19 +27,12 @@ __global__ void updateCounterKernel(T* d_doc, int numDocs, TopkBucketSort<T, Sco
 
 // This kernel is used to sample the scores from the docs.
 template<typename T, class ScoreExtractor>
-__global__ void sampleRandomScoresKernel(T* d_doc, uint32_t numToSample, float* d_sampledScores, uint32_t* d_randomIndices, uint32_t numDocs, bool doRandomSampling)
+__global__ void sampleRandomScoresKernel(T* d_doc, uint32_t numToSample, float* d_sampledScores, uint32_t* d_randomIndices, uint32_t numDocs)
 {
     int docIdx = blockIdx.x * blockDim.x + threadIdx.x;
     if (docIdx < numToSample)
     {
-        if (doRandomSampling)
-        {
-            d_sampledScores[docIdx] = ScoreExtractor()(d_doc[d_randomIndices[docIdx] % numDocs]);
-        }
-        else
-        {
-            d_sampledScores[docIdx] = ScoreExtractor()(d_doc[docIdx]);
-        }
+        d_sampledScores[docIdx] = ScoreExtractor()(d_doc[d_randomIndices[docIdx] % numDocs]);
     }
 }
 
@@ -233,11 +226,6 @@ public:
         shouldCheckMinMaxScore_ = true;
     }
 
-    void setDoRandomSampling(bool doRandomSampling)
-    {
-        doRandomSampling_ = doRandomSampling;
-    }
-
 private:
     const int kGranularity_ = 512;
     const int kNumBuckets_ = kGranularity_ + 1;
@@ -256,7 +244,6 @@ private:
     float maxScore_;
     bool shouldCheckMinMaxScore_ = true; // When this is set to true, the algorithm will run an additional step 
                                          // to sample some docs to get the min and max score.
-    bool doRandomSampling_ = true;
     const uint32_t kNumDocsToSample_ = 10000;
     uint32_t* d_randomIndices_ = nullptr;
     uint32_t* hp_randomIndices_ = nullptr;
@@ -308,7 +295,7 @@ private:
             int kBlockSize = 256;
             int gridSize = (int)ceil((double)(numDocs + 1) / kBlockSize);
             sampleRandomScoresKernel<T, ScoreExtractor>
-                <<<gridSize, kBlockSize>>>(d_doc, numToSample, d_sampledScores_, d_randomIndices_, numDocs, doRandomSampling_);
+                <<<gridSize, kBlockSize>>>(d_doc, numToSample, d_sampledScores_, d_randomIndices_, numDocs);
             CHECK_CUDA(cudaDeviceSynchronize());
             CHECK_CUDA(cudaGetLastError())
             float timeMsStep1 = timerStep1.tocMs();

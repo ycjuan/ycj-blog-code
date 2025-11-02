@@ -49,7 +49,6 @@ void runExp(int numDocs)
 
     TopkBucketSort<Doc, ScorePredicator, DocIdExtractor, ScoreExtractor> retriever;
     retriever.init();
-    retriever.setDoRandomSampling(true);
     Doc *d_doc = nullptr;
     Doc *d_buffer = nullptr;
     CHECK_CUDA(cudaMalloc(&d_doc, numDocs * sizeof(Doc)));
