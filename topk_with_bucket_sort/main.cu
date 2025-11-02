@@ -48,7 +48,7 @@ void runExp(int numDocs)
     }
 
     TopkBucketSort<Doc, ScorePredicator, DocIdExtractor, ScoreExtractor> retriever;
-    retriever.init();
+    retriever.init(-1, 1);
     Doc *d_doc = nullptr;
     Doc *d_buffer = nullptr;
     CHECK_CUDA(cudaMalloc(&d_doc, numDocs * sizeof(Doc)));
@@ -56,7 +56,9 @@ void runExp(int numDocs)
 
     double timeMsGpuBucketSort = 0;
     double timeMsGpuFullSort = 0;
-    double timeMsCpuFullSort = 0;
+    float timeMsCpuFullSort = 0;
+    std::vector<Doc> v_doc_copy = v_doc;
+    std::vector<Doc> v_topk_cpuFullSort = retrieveTopkCpuFullSort<Doc, ScorePredicator>(v_doc_copy, kNumToRetrieve, timeMsCpuFullSort);
     for (int t = -3; t < kNumTrials; t++)
     {
         float timeMsGpuBucketSort1 = 0;
@@ -66,8 +68,6 @@ void runExp(int numDocs)
         std::vector<Doc> v_topk_gpuBucketSort = retriever.retrieveTopk(d_doc, d_buffer, numDocs, kNumToRetrieve, timeMsGpuBucketSort1);
         CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Doc), cudaMemcpyHostToDevice));
         std::vector<Doc> v_topk_gpuFullSort = retrieveTopkGpuFullSort<Doc, ScorePredicator>(d_doc, numDocs, kNumToRetrieve, timeMsGpuFullSort1);
-        std::vector<Doc> v_doc_copy = v_doc;
-        std::vector<Doc> v_topk_cpuFullSort = retrieveTopkCpuFullSort<Doc, ScorePredicator>(v_doc_copy, kNumToRetrieve, timeMsCpuFullSort1);
 
         if (v_topk_gpuBucketSort != v_topk_gpuFullSort)
         {
@@ -88,7 +88,6 @@ void runExp(int numDocs)
 
     timeMsGpuBucketSort /= kNumTrials;
     timeMsGpuFullSort /= kNumTrials;
-    timeMsCpuFullSort /= kNumTrials;
 
     std::cout << "timeMsGpuBucketSort: " << timeMsGpuBucketSort << " ms" << std::endl;
     std::cout << "timeMsGpuFullSort: " << timeMsGpuFullSort << " ms" << std::endl;
