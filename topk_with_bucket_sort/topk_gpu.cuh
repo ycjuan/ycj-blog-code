@@ -92,50 +92,94 @@ public:
         int kBlockSize = 256;
         int gridSize = (int)ceil((double)(numDocs + 1) / kBlockSize);
 
+        // --------------
+        // Step1 (Optional) - Check the min and max score of the docs if those values are not set by the user.
         if (shouldCheckMinMaxScore_)
         {
-            Timer timer;
-            timer.tic();
+            Timer timerStep1;
+            timerStep1.tic();
             checkMinMaxScore(d_doc, numDocs);
-            float timeMsCheckMinMaxScore = timer.tocMs();
-            //std::cout << "Min score: " << minScore_ << ", Max score: " << maxScore_
-            //          << ", timeMsCheckMinMaxScore: " << timeMsCheckMinMaxScore << " ms" << std::endl;
+            float timeMsStep1 = timerStep1.tocMs();
+            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep1: " << timeMsStep1 << " ms" << std::endl;
         }
     
-        // Step1 - Run kernel to update the counter in each bucket
-        CHECK_CUDA(cudaMemset(d_counter_, 0, kSize_byte_d_counter_))
-        updateCounterKernel<<<gridSize, kBlockSize>>>(d_doc, numDocs, *this);
-        CHECK_CUDA(cudaDeviceSynchronize());
-        CHECK_CUDA(cudaGetLastError())
-    
-        // Step2 - Copy counter from GPU to CPU
-        std::vector<int> v_counter(kSize_d_counter_, 0);
-        CHECK_CUDA(cudaMemcpy(v_counter.data(), d_counter_, kSize_byte_d_counter_, cudaMemcpyDeviceToHost))
-    
-        // Step3 - Scan the bucket counter from high to low, and find the lowest bucket that has more docs than numToRetrieve
-        int numDocsGreaterThanLowestBucket;
-        findLowestBucket(v_counter, numToRetrieve, lowestBucket_, numDocsGreaterThanLowestBucket);
-    
-        // Step4 - Filter out items that is larger than the lowest bucket
-        T *d_endPtr = thrust::copy_if(thrust::device, d_doc, d_doc + numDocs, d_buffer, *this); // copy_if will call TopkBucketSort::operator()
-        CHECK_CUDA(cudaDeviceSynchronize());
-        CHECK_CUDA(cudaGetLastError())
-        int numCopied = (d_endPtr - d_buffer);
-        if (numCopied != numDocsGreaterThanLowestBucket)
+        // --------------
+        // Step2 - Run kernel to update the counter in each bucket
         {
-            std::ostringstream oss;
-            oss << "numCopied != numDocsGreaterThanLowestBucket: " << numCopied << " != " << numDocsGreaterThanLowestBucket;
-            throw std::runtime_error(oss.str());
+            Timer timerStep2;
+            timerStep2.tic();
+            CHECK_CUDA(cudaMemset(d_counter_, 0, kSize_byte_d_counter_))
+            updateCounterKernel<<<gridSize, kBlockSize>>>(d_doc, numDocs, *this);
+            CHECK_CUDA(cudaDeviceSynchronize());
+            CHECK_CUDA(cudaGetLastError());
+            float timeMsStep2 = timerStep2.tocMs();
+            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep2: " << timeMsStep2 << " ms" << std::endl;
         }
     
-        // Step5 - Sort the docs that are larger than the lowest bucket
-        thrust::stable_sort(thrust::device, d_buffer, d_buffer + numCopied, ScorePredicator());
-        CHECK_CUDA(cudaDeviceSynchronize());
-        CHECK_CUDA(cudaGetLastError())
+        // --------------
+        // Step3 - Copy counter from GPU to CPU
+        std::vector<int> v_counter(kSize_d_counter_, 0);
+        {
+            Timer timerStep3;
+            timerStep3.tic();
+            CHECK_CUDA(cudaMemcpy(v_counter.data(), d_counter_, kSize_byte_d_counter_, cudaMemcpyDeviceToHost))
+            float timeMsStep3 = timerStep3.tocMs();
+            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep3: " << timeMsStep3 << " ms" << std::endl;
+        }
+        
+        // --------------
+        // Step4 - Scan the bucket counter from high to low, and find the lowest bucket that has more docs than numToRetrieve
+        int numDocsGreaterThanLowestBucket;
+        {
+            Timer timerStep4;
+            timerStep4.tic();
+            findLowestBucket(v_counter, numToRetrieve, lowestBucket_, numDocsGreaterThanLowestBucket);
+            float timeMsStep4 = timerStep4.tocMs();
+            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep4: " << timeMsStep4 << " ms" << std::endl;
+        }
     
-        // Step6 - copy back to CPU
+        // --------------
+        // Step5 - Filter out items that is larger than the lowest bucket
+        int numCopied;
+        {
+            Timer timerStep5;
+            timerStep5.tic();
+            T *d_endPtr = thrust::copy_if(thrust::device, d_doc, d_doc + numDocs, d_buffer, *this); // copy_if will call TopkBucketSort::operator()
+            CHECK_CUDA(cudaDeviceSynchronize());
+            CHECK_CUDA(cudaGetLastError())
+            numCopied = (d_endPtr - d_buffer);
+            if (numCopied != numDocsGreaterThanLowestBucket)
+            {
+                std::ostringstream oss;
+                oss << "numCopied != numDocsGreaterThanLowestBucket: " << numCopied << " != " << numDocsGreaterThanLowestBucket;
+                throw std::runtime_error(oss.str());
+            }
+            float timeMsStep5 = timerStep5.tocMs();
+            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep5: " << timeMsStep5 << " ms" << std::endl;
+        }
+    
+        // --------------
+        // Step6 - Sort the docs that are larger than the lowest bucket
+        {
+            Timer timerStep6;
+            timerStep6.tic();
+            thrust::stable_sort(thrust::device, d_buffer, d_buffer + numCopied, ScorePredicator());
+            CHECK_CUDA(cudaDeviceSynchronize());
+            CHECK_CUDA(cudaGetLastError())
+            float timeMsStep6 = timerStep6.tocMs();
+            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep6: " << timeMsStep6 << " ms" << std::endl;
+        }
+
+        // --------------
+        // Step7 - copy back to CPU
         std::vector<T> v_doc(numToRetrieve);
-        CHECK_CUDA(cudaMemcpy(v_doc.data(), d_buffer, sizeof(T) * numToRetrieve, cudaMemcpyDeviceToHost))
+        {
+            Timer timerStep7;
+            timerStep7.tic();
+            CHECK_CUDA(cudaMemcpy(v_doc.data(), d_buffer, sizeof(T) * numToRetrieve, cudaMemcpyDeviceToHost))
+            float timeMsStep7 = timerStep7.tocMs();
+            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep7: " << timeMsStep7 << " ms" << std::endl;
+        }
     
         timeMs = timer.tocMs();
     
