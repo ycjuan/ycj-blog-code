@@ -88,7 +88,7 @@ public:
         CHECK_CUDA(cudaFreeHost(hp_sampledScores_));
     }
 
-    std::vector<T> retrieveTopk(T* d_doc, int numDocs, int numToRetrieve)
+    std::vector<T> retrieveTopk(T* d_doc, int numDocs, int numToRetrieve, cudaStream_t stream = nullptr)
     {
         int kBlockSize = 256;
         int gridSize = (int)ceil((double)(numDocs + 1) / kBlockSize);
@@ -99,7 +99,7 @@ public:
         {
             Timer timerStep1;
             timerStep1.tic();
-            checkMinMaxScore(d_doc, numDocs);
+            checkMinMaxScore(d_doc, numDocs, stream);
             float timeMsStep1 = timerStep1.tocMs();
             std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep1: " << timeMsStep1 << " ms" << std::endl;
         }
@@ -110,8 +110,8 @@ public:
             Timer timerStep2;
             timerStep2.tic();
             CHECK_CUDA(cudaMemset(d_counter_, 0, kSize_byte_d_counter_))
-            updateCounterKernel<<<gridSize, kBlockSize>>>(d_doc, numDocs, *this);
-            CHECK_CUDA(cudaDeviceSynchronize());
+            updateCounterKernel<<<gridSize, kBlockSize, 0, stream>>>(d_doc, numDocs, *this);
+            CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError());
             float timeMsStep2 = timerStep2.tocMs();
             std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep2: " << timeMsStep2 << " ms" << std::endl;
@@ -123,7 +123,9 @@ public:
         {
             Timer timerStep3;
             timerStep3.tic();
-            CHECK_CUDA(cudaMemcpy(v_counter.data(), d_counter_, kSize_byte_d_counter_, cudaMemcpyDeviceToHost))
+            CHECK_CUDA(cudaMemcpyAsync(v_counter.data(), d_counter_, kSize_byte_d_counter_, cudaMemcpyDeviceToHost, stream))
+            CHECK_CUDA(cudaStreamSynchronize(stream));
+            CHECK_CUDA(cudaGetLastError());
             float timeMsStep3 = timerStep3.tocMs();
             std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep3: " << timeMsStep3 << " ms" << std::endl;
         }
@@ -145,8 +147,8 @@ public:
         {
             Timer timerStep5;
             timerStep5.tic();
-            T *d_endPtr = thrust::copy_if(thrust::device, d_doc, d_doc + numDocs, d_buffer_, *this); // copy_if will call TopkBucketSort::operator()
-            CHECK_CUDA(cudaDeviceSynchronize());
+            T *d_endPtr = thrust::copy_if(thrust::device.on(stream), d_doc, d_doc + numDocs, d_buffer_, *this); // copy_if will call TopkBucketSort::operator()
+            CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError())
             numCopied = (d_endPtr - d_buffer_);
             if (numCopied != numDocsGreaterThanLowestBucket)
@@ -164,8 +166,8 @@ public:
         {
             Timer timerStep6;
             timerStep6.tic();
-            thrust::stable_sort(thrust::device, d_buffer_, d_buffer_ + numCopied, ScorePredicator());
-            CHECK_CUDA(cudaDeviceSynchronize());
+            thrust::stable_sort(thrust::device.on(stream), d_buffer_, d_buffer_ + numCopied, ScorePredicator());
+            CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError())
             float timeMsStep6 = timerStep6.tocMs();
             std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep6: " << timeMsStep6 << " ms" << std::endl;
@@ -177,7 +179,9 @@ public:
         {
             Timer timerStep7;
             timerStep7.tic();
-            CHECK_CUDA(cudaMemcpy(v_doc.data(), d_buffer_, sizeof(T) * numToRetrieve, cudaMemcpyDeviceToHost))
+            CHECK_CUDA(cudaMemcpy(v_doc.data(), d_buffer_, sizeof(T) * numToRetrieve, cudaMemcpyDeviceToHost));
+            CHECK_CUDA(cudaStreamSynchronize(stream));
+            CHECK_CUDA(cudaGetLastError());
             float timeMsStep7 = timerStep7.tocMs();
             std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep7: " << timeMsStep7 << " ms" << std::endl;
         }
@@ -289,7 +293,7 @@ private:
         }
     }
 
-    void checkMinMaxScore(T* d_doc, uint32_t numDocs)
+    void checkMinMaxScore(T* d_doc, uint32_t numDocs, cudaStream_t stream)
     {
         int numToSample = std::min(numDocs, kNumDocsToSample_);
 
@@ -301,8 +305,8 @@ private:
             int kBlockSize = 256;
             int gridSize = (int)ceil((double)(numDocs + 1) / kBlockSize);
             sampleRandomScoresKernel<T, ScoreExtractor>
-                <<<gridSize, kBlockSize>>>(d_doc, numToSample, d_sampledScores_, d_randomIndices_, numDocs);
-            CHECK_CUDA(cudaDeviceSynchronize());
+                <<<gridSize, kBlockSize, 0, stream>>>(d_doc, numToSample, d_sampledScores_, d_randomIndices_, numDocs);
+            CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError())
             float timeMsStep1 = timerStep1.tocMs();
             std::cout << "timeMsStep1: " << timeMsStep1 << " ms" << std::endl;    
@@ -313,7 +317,7 @@ private:
         {
             Timer timerStep2;
             timerStep2.tic();
-            thrust::sort(thrust::device, d_sampledScores_, d_sampledScores_ + kNumDocsToSample_, thrust::less<float>());
+            thrust::sort(thrust::device.on(stream), d_sampledScores_, d_sampledScores_ + kNumDocsToSample_, thrust::less<float>());
             float timeMsStep2 = timerStep2.tocMs();
             std::cout << "timeMsStep2: " << timeMsStep2 << " ms" << std::endl;
         }
@@ -324,8 +328,8 @@ private:
         {
             Timer timerStep3;
             timerStep3.tic();
-            updateMinMaxScoreKernel<<<1, 1>>>(d_sampledScores_, numToSample, minPercentile_, maxPercentile_);
-            CHECK_CUDA(cudaDeviceSynchronize());
+            updateMinMaxScoreKernel<<<1, 1, 0, stream>>>(d_sampledScores_, numToSample, minPercentile_, maxPercentile_);
+            CHECK_CUDA(cudaStreamSynchronize(stream));
             //CHECK_CUDA(cudaGetLastError())
             float timeMsStep3 = timerStep3.tocMs();
             std::cout << "timeMsStep3: " << timeMsStep3 << " ms" << std::endl;
