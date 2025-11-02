@@ -88,11 +88,8 @@ public:
         CHECK_CUDA(cudaFreeHost(hp_sampledScores_));
     }
 
-    std::vector<T> retrieveTopk(T* d_doc, int numDocs, int numToRetrieve, float& timeMs)
+    std::vector<T> retrieveTopk(T* d_doc, int numDocs, int numToRetrieve)
     {
-        Timer timer;
-        timer.tic();
-    
         int kBlockSize = 256;
         int gridSize = (int)ceil((double)(numDocs + 1) / kBlockSize);
 
@@ -184,8 +181,6 @@ public:
             float timeMsStep7 = timerStep7.tocMs();
             std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep7: " << timeMsStep7 << " ms" << std::endl;
         }
-    
-        timeMs = timer.tocMs();
     
         return v_doc;
     }
