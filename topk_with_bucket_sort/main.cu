@@ -48,7 +48,8 @@ void runExp(int numDocs)
     }
 
     TopkBucketSort<Doc, ScorePredicator, DocIdExtractor, ScoreExtractor> retriever;
-    retriever.init(-1, 1);
+    retriever.init();
+    retriever.setDoRandomSampling(true);
     Doc *d_doc = nullptr;
     Doc *d_buffer = nullptr;
     CHECK_CUDA(cudaMalloc(&d_doc, numDocs * sizeof(Doc)));
@@ -88,7 +89,6 @@ void runExp(int numDocs)
 
     timeMsGpuBucketSort /= kNumTrials;
     timeMsGpuFullSort /= kNumTrials;
-
     std::cout << "timeMsGpuBucketSort: " << timeMsGpuBucketSort << " ms" << std::endl;
     std::cout << "timeMsGpuFullSort: " << timeMsGpuFullSort << " ms" << std::endl;
     std::cout << "timeMsCpuFullSort: " << timeMsCpuFullSort << " ms" << std::endl;

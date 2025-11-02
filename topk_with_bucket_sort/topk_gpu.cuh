@@ -25,12 +25,19 @@ __global__ void updateCounterKernel(T* d_doc, int numDocs, TopkBucketSort<T, Sco
 }
 
 template<typename T, class ScoreExtractor>
-__global__ void sampleRandomScoresKernel(T* d_doc, uint32_t numToSample, float* d_sampledScores, uint32_t* d_randomIndices, uint32_t numDocs)
+__global__ void sampleRandomScoresKernel(T* d_doc, uint32_t numToSample, float* d_sampledScores, uint32_t* d_randomIndices, uint32_t numDocs, bool doRandomSampling)
 {
-    int docId = blockIdx.x * blockDim.x + threadIdx.x;
-    if (docId < numToSample)
+    int docIdx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (docIdx < numToSample)
     {
-        d_sampledScores[docId] = ScoreExtractor()(d_doc[d_randomIndices[docId] % numDocs]);
+        if (doRandomSampling)
+        {
+            d_sampledScores[docIdx] = ScoreExtractor()(d_doc[d_randomIndices[docIdx] % numDocs]);
+        }
+        else
+        {
+            d_sampledScores[docIdx] = ScoreExtractor()(d_doc[docIdx]);
+        }
     }
 }
 
@@ -52,7 +59,6 @@ template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreEx
 public:
     void init()
     {
-        shouldCheckMinMaxScore_ = true;
         CHECK_CUDA(cudaMalloc(&d_counter_, kNumBuckets_ * kNumSlots_ * sizeof(int)));
         CHECK_CUDA(cudaMallocHost(&hp_counter_, kNumBuckets_ * kNumSlots_ * sizeof(int)));
         CHECK_CUDA(cudaMalloc(&d_randomIndices_, kNumDocsToSample_ * sizeof(uint32_t)));
@@ -66,14 +72,6 @@ public:
             hp_randomIndices_[i] = distribution(generator);
         }
         CHECK_CUDA(cudaMemcpy(d_randomIndices_, hp_randomIndices_, kNumDocsToSample_ * sizeof(uint32_t), cudaMemcpyHostToDevice));
-    }
-
-    void init(float minScore, float maxScore)
-    {
-        minScore_ = minScore;
-        maxScore_ = maxScore;
-        init();
-        shouldCheckMinMaxScore_ = false; // Since the caller has already provided the min and max score, we don't need to check again.
     }
 
     void reset()
@@ -100,8 +98,8 @@ public:
             timer.tic();
             checkMinMaxScore(d_doc, numDocs);
             float timeMsCheckMinMaxScore = timer.tocMs();
-            std::cout << "Min score: " << minScore_ << ", Max score: " << maxScore_
-                      << ", timeMsCheckMinMaxScore: " << timeMsCheckMinMaxScore << " ms" << std::endl;
+            //std::cout << "Min score: " << minScore_ << ", Max score: " << maxScore_
+            //          << ", timeMsCheckMinMaxScore: " << timeMsCheckMinMaxScore << " ms" << std::endl;
         }
     
         // Step1 - Run kernel to update the counter in each bucket
@@ -173,6 +171,23 @@ public:
         return bucket >= lowestBucket_;
     }
 
+    void setMinMaxScore(float minScore, float maxScore)
+    {
+        minScore_ = minScore;
+        maxScore_ = maxScore;
+        shouldCheckMinMaxScore_ = false;
+    }
+
+    void unSetMinMaxScore()
+    {
+        shouldCheckMinMaxScore_ = true;
+    }
+
+    void setDoRandomSampling(bool doRandomSampling)
+    {
+        doRandomSampling_ = doRandomSampling;
+    }
+
 private:
     const int kGranularity_ = 512;
     const int kNumBuckets_ = kGranularity_ + 1;
@@ -186,11 +201,12 @@ private:
     const int kSize_byte_d_counter_ = kSize_d_counter_ * sizeof(int);
 
     // --------------
-    // Sampling related Min and max score of the docs
+    // Sampling related min and max score of the docs
     float minScore_ = -1;
     float maxScore_ = 1;
     bool shouldCheckMinMaxScore_ = true; // When this is set to true, the algorithm will run an additional step 
                                          // to sample some docs to get the min and max score.
+    bool doRandomSampling_ = true;
     const uint32_t kNumDocsToSample_ = 10000;
     uint32_t* d_randomIndices_ = nullptr;
     uint32_t* hp_randomIndices_ = nullptr;
@@ -232,29 +248,51 @@ private:
 
     void checkMinMaxScore(T* d_doc, uint32_t numDocs)
     {
+        int numToSample = std::min(numDocs, kNumDocsToSample_);
+
         // --------------
         // Step1 - Sample the scores
-        int kBlockSize = 256;
-        int gridSize = (int)ceil((double)(numDocs + 1) / kBlockSize);
-        int numToSample = std::min(numDocs, kNumDocsToSample_);
-        sampleRandomScoresKernel<T, ScoreExtractor>
-            <<<gridSize, kBlockSize>>>(d_doc, numToSample, d_sampledScores_, d_randomIndices_, numDocs);
-        CHECK_CUDA(cudaDeviceSynchronize());
-        CHECK_CUDA(cudaGetLastError())
+        {
+            Timer timerStep1;
+            timerStep1.tic();
+            int kBlockSize = 256;
+            int gridSize = (int)ceil((double)(numDocs + 1) / kBlockSize);
+            sampleRandomScoresKernel<T, ScoreExtractor>
+                <<<gridSize, kBlockSize>>>(d_doc, numToSample, d_sampledScores_, d_randomIndices_, numDocs, doRandomSampling_);
+            CHECK_CUDA(cudaDeviceSynchronize());
+            CHECK_CUDA(cudaGetLastError())
+            float timeMsStep1 = timerStep1.tocMs();
+            std::cout << "timeMsStep1: " << timeMsStep1 << " ms" << std::endl;    
+        }
 
         // --------------
         // Step2 - Sort the scores in GPU
-        thrust::sort(thrust::device, d_sampledScores_, d_sampledScores_ + kNumDocsToSample_, thrust::less<float>());
+        {
+            Timer timerStep2;
+            timerStep2.tic();
+            thrust::sort(thrust::device, d_sampledScores_, d_sampledScores_ + kNumDocsToSample_, thrust::less<float>());
+            float timeMsStep2 = timerStep2.tocMs();
+            std::cout << "timeMsStep2: " << timeMsStep2 << " ms" << std::endl;
+        }
+
 
         // --------------
         // Step3 - Update the min and max score
-        updateMinMaxScoreKernel<<<1, 1>>>(d_sampledScores_, numToSample, minPercentile_, maxPercentile_);
-        CHECK_CUDA(cudaDeviceSynchronize());
-        CHECK_CUDA(cudaGetLastError())
+        {
+            Timer timerStep3;
+            timerStep3.tic();
+            updateMinMaxScoreKernel<<<1, 1>>>(d_sampledScores_, numToSample, minPercentile_, maxPercentile_);
+            CHECK_CUDA(cudaDeviceSynchronize());
+            //CHECK_CUDA(cudaGetLastError())
+            float timeMsStep3 = timerStep3.tocMs();
+            std::cout << "timeMsStep3: " << timeMsStep3 << " ms" << std::endl;
+        }
 
         // --------------
         // Step4 - Update the min and max score in CPU
-        minScore_ = g_minScore;
-        maxScore_ = g_maxScore;
+        {
+            minScore_ = g_minScore;
+            maxScore_ = g_maxScore;
+        }
     }
 };
