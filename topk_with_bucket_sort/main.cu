@@ -7,14 +7,12 @@
 #include "topk_gpu.cuh"
 #include "util.cuh"
 
-
 struct Doc
 {
     int docId;
     float score;
     bool operator==(const Doc& other) const { return docId == other.docId && score == other.score; }
 };
-
 
 struct ScorePredicator
 {
@@ -37,9 +35,11 @@ int kNumTrials = 10;
 void runExp(int numDocs)
 {
     std::cout << "\n\nrunning exps with numDocs: " << numDocs << std::endl;
+
+    // --------------
+    // Generate random data
     std::default_random_engine generator;
     std::uniform_real_distribution<float> distribution(-1.0, 1.0);
-
     std::vector<Doc> v_doc(numDocs);
     for (int i = 0; i < numDocs; i++)
     {
@@ -47,54 +47,90 @@ void runExp(int numDocs)
         v_doc[i].score = distribution(generator);
     }
 
-    TopkBucketSort<Doc, ScorePredicator, DocIdExtractor, ScoreExtractor> retriever;
-    retriever.init();
+    // --------------
+    // Run CPU baseline
+    float timeMsCpuFullSort = 0;
+    std::vector<Doc> v_doc_copy = v_doc;
+    std::vector<Doc> v_topk_cpuFullSort = retrieveTopkCpuFullSort<Doc, ScorePredicator>(v_doc_copy, kNumToRetrieve, timeMsCpuFullSort);
+
+    // --------------
+    TopkBucketSort<Doc, ScorePredicator, DocIdExtractor, ScoreExtractor> topkRetriever;
+    topkRetriever.init();
     Doc *d_doc = nullptr;
     Doc *d_buffer = nullptr;
     CHECK_CUDA(cudaMalloc(&d_doc, numDocs * sizeof(Doc)));
     CHECK_CUDA(cudaMalloc(&d_buffer, numDocs * sizeof(Doc)));
 
-    double timeMsGpuBucketSort = 0;
     double timeMsGpuFullSort = 0;
-    float timeMsCpuFullSort = 0;
-    std::vector<Doc> v_doc_copy = v_doc;
-    std::vector<Doc> v_topk_cpuFullSort = retrieveTopkCpuFullSort<Doc, ScorePredicator>(v_doc_copy, kNumToRetrieve, timeMsCpuFullSort);
+    double timeMsGpuBucketSortWithSample = 0;
+    double timeMsGpuBucketSortWithoutSample = 0;
     for (int t = -3; t < kNumTrials; t++)
     {
-        float timeMsGpuBucketSort1 = 0;
-        float timeMsGpuFullSort1 = 0;
-        float timeMsCpuFullSort1 = 0;
-        CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Doc), cudaMemcpyHostToDevice));
-        std::vector<Doc> v_topk_gpuBucketSort = retriever.retrieveTopk(d_doc, d_buffer, numDocs, kNumToRetrieve, timeMsGpuBucketSort1);
-        CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Doc), cudaMemcpyHostToDevice));
-        std::vector<Doc> v_topk_gpuFullSort = retrieveTopkGpuFullSort<Doc, ScorePredicator>(d_doc, numDocs, kNumToRetrieve, timeMsGpuFullSort1);
+        // --------------
+        // Run GPU full sort
+        {
+            float timeMsGpuFullSort1 = 0;
+            CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Doc), cudaMemcpyHostToDevice));
+            std::vector<Doc> v_topk_gpuFullSort = retrieveTopkGpuFullSort<Doc, ScorePredicator>(d_doc, numDocs, kNumToRetrieve, timeMsGpuFullSort1);
+            if (t >= 0)
+            {
+                timeMsGpuFullSort += timeMsGpuFullSort1;
+            }
 
-        if (v_topk_gpuBucketSort != v_topk_gpuFullSort)
-        {
-            throw std::runtime_error("Topk results from GPU bucket sort and GPU full sort do not match");
-        }
-        if (v_topk_gpuBucketSort != v_topk_cpuFullSort)
-        {
-            throw std::runtime_error("Topk results from GPU bucket sort and CPU full sort do not match");
+            if (v_topk_cpuFullSort != v_topk_gpuFullSort)
+            {
+                throw std::runtime_error("Topk results from CPU full sort and GPU full sort do not match");
+            }    
         }
 
-        if (t >= 0)
+        // --------------
+        // Run GPU bucket sort with sample
         {
-            timeMsGpuBucketSort += timeMsGpuBucketSort1;
-            timeMsGpuFullSort += timeMsGpuFullSort1;
-            timeMsCpuFullSort += timeMsCpuFullSort1;
+            topkRetriever.unsetMinMaxScore();
+            float timeMsGpuBucketSortWithSample1 = 0;
+            CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Doc), cudaMemcpyHostToDevice));
+            std::vector<Doc> v_topk_gpuBucketSortWithSample = topkRetriever.retrieveTopk(d_doc, d_buffer, numDocs, kNumToRetrieve, timeMsGpuBucketSortWithSample1);
+            if (t >= 0)
+            {
+                timeMsGpuBucketSortWithSample += timeMsGpuBucketSortWithSample1;
+            }
+            
+            if (v_topk_gpuBucketSortWithSample != v_topk_cpuFullSort)
+            {
+                throw std::runtime_error("Topk results from GPU bucket sort with sample and CPU full sort do not match");
+            }
+        }
+
+        // --------------
+        // Run GPU bucket sort without sample
+        {
+            topkRetriever.setMinMaxScore(-1.0, 1.0);
+            float timeMsGpuBucketSortWithoutSample1 = 0;
+            CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Doc), cudaMemcpyHostToDevice));
+            std::vector<Doc> v_topk_gpuBucketSortWithoutSample = topkRetriever.retrieveTopk(d_doc, d_buffer, numDocs, kNumToRetrieve, timeMsGpuBucketSortWithoutSample1);
+            if (t >= 0)
+            {
+                timeMsGpuBucketSortWithoutSample += timeMsGpuBucketSortWithoutSample1;
+            }
+            
+            if (v_topk_gpuBucketSortWithoutSample != v_topk_cpuFullSort)
+            {
+                throw std::runtime_error("Topk results from GPU bucket sort without sample and CPU full sort do not match");
+            }
         }
     }
 
-    timeMsGpuBucketSort /= kNumTrials;
     timeMsGpuFullSort /= kNumTrials;
-    std::cout << "timeMsGpuBucketSort: " << timeMsGpuBucketSort << " ms" << std::endl;
-    std::cout << "timeMsGpuFullSort: " << timeMsGpuFullSort << " ms" << std::endl;
+    timeMsGpuBucketSortWithSample /= kNumTrials;
+    timeMsGpuBucketSortWithoutSample /= kNumTrials;
     std::cout << "timeMsCpuFullSort: " << timeMsCpuFullSort << " ms" << std::endl;
+    std::cout << "timeMsGpuFullSort: " << timeMsGpuFullSort << " ms" << std::endl;
+    std::cout << "timeMsGpuBucketSortWithSample: " << timeMsGpuBucketSortWithSample << " ms" << std::endl;
+    std::cout << "timeMsGpuBucketSortWithoutSample: " << timeMsGpuBucketSortWithoutSample << " ms" << std::endl;
 
     CHECK_CUDA(cudaFree(d_doc));
     CHECK_CUDA(cudaFree(d_buffer));
-    retriever.reset();
+    topkRetriever.reset();
 }
 
 int main()
