@@ -34,6 +34,19 @@ __global__ void sampleRandomScoresKernel(T* d_doc, uint32_t numToSample, float* 
     }
 }
 
+__managed__ __device__ float g_minScore;
+__managed__ __device__ float g_maxScore;
+
+__global__ void updateMinMaxScoreKernel(float *d_sampledScores, int numSamples, float minPercentile, float maxPercentile)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid == 0)
+    {
+        g_minScore = d_sampledScores[(int)(numSamples * minPercentile)];
+        g_maxScore = d_sampledScores[(int)(numSamples * maxPercentile)];
+    }
+}
+
 template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor> class TopkBucketSort
 {
 public:
@@ -177,8 +190,8 @@ private:
     const uint32_t kNumDocsToSample_ = 10000;
     uint32_t* d_randomIndices_ = nullptr;
     uint32_t* hp_randomIndices_ = nullptr;
-    float *d_sampledScores_ = nullptr;
-    float *hp_sampledScores_ = nullptr;
+    float* d_sampledScores_ = nullptr;
+    float* hp_sampledScores_ = nullptr;
     float maxPercentile_ = 0.99;
     float minPercentile_ = 0.01;
 
@@ -230,12 +243,14 @@ private:
         thrust::sort(thrust::device, d_sampledScores_, d_sampledScores_ + kNumDocsToSample_, thrust::less<float>());
 
         // --------------
-        // Step3 - Copy the scores back to CPU
-        CHECK_CUDA(cudaMemcpy(hp_sampledScores_, d_sampledScores_, kNumDocsToSample_ * sizeof(float), cudaMemcpyDeviceToHost));
+        // Step3 - Update the min and max score
+        updateMinMaxScoreKernel<<<1, 1>>>(d_sampledScores_, numToSample, minPercentile_, maxPercentile_);
+        CHECK_CUDA(cudaDeviceSynchronize());
+        CHECK_CUDA(cudaGetLastError())
 
         // --------------
-        // Step4 - Calculate the min and max score
-        minScore_ = hp_sampledScores_[(int)(kNumDocsToSample_ * minPercentile_)];
-        maxScore_ = hp_sampledScores_[(int)(kNumDocsToSample_ * maxPercentile_)];
+        // Step4 - Update the min and max score in CPU
+        minScore_ = g_minScore;
+        maxScore_ = g_maxScore;
     }
 };
