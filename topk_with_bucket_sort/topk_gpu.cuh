@@ -96,8 +96,12 @@ public:
 
         if (shouldCheckMinMaxScore_)
         {
+            Timer timer;
+            timer.tic();
             checkMinMaxScore(d_doc, numDocs);
-            //std::cout << "Min score: " << minScore_ << ", Max score: " << maxScore_ << std::endl;
+            float timeMsCheckMinMaxScore = timer.tocMs();
+            std::cout << "Min score: " << minScore_ << ", Max score: " << maxScore_
+                      << ", timeMsCheckMinMaxScore: " << timeMsCheckMinMaxScore << " ms" << std::endl;
         }
     
         // Step1 - Run kernel to update the counter in each bucket
