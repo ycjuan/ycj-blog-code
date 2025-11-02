@@ -12,6 +12,7 @@
 
 template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor> class TopkBucketSort; // forward declaration
 
+// This kernel is used to update the counter in each bucket.
 template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor>
 __global__ void updateCounterKernel(T* d_doc, int numDocs, TopkBucketSort<T, ScorePredicator, DocIdExtractor, ScoreExtractor> retriever)
 {
@@ -24,6 +25,7 @@ __global__ void updateCounterKernel(T* d_doc, int numDocs, TopkBucketSort<T, Sco
     }
 }
 
+// This kernel is used to sample the scores from the docs.
 template<typename T, class ScoreExtractor>
 __global__ void sampleRandomScoresKernel(T* d_doc, uint32_t numToSample, float* d_sampledScores, uint32_t* d_randomIndices, uint32_t numDocs, bool doRandomSampling)
 {
@@ -41,9 +43,9 @@ __global__ void sampleRandomScoresKernel(T* d_doc, uint32_t numToSample, float* 
     }
 }
 
+// This kernel is used to update the min and max score of the sampled scores.
 __managed__ __device__ float g_minScore;
 __managed__ __device__ float g_maxScore;
-
 __global__ void updateMinMaxScoreKernel(float *d_sampledScores, int numSamples, float minPercentile, float maxPercentile)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -65,6 +67,10 @@ public:
         CHECK_CUDA(cudaMallocHost(&hp_randomIndices_, kNumDocsToSample_ * sizeof(uint32_t)));
         CHECK_CUDA(cudaMalloc(&d_sampledScores_, kNumDocsToSample_ * sizeof(float)));
         CHECK_CUDA(cudaMallocHost(&hp_sampledScores_, kNumDocsToSample_ * sizeof(float)));
+
+        // Initialize the random indices.
+        // We do this in init time as it is expensive to generate random indices in runtime.
+        // In runtime, we will do `% numDocs` to get the final random index.
         std::default_random_engine generator;
         std::uniform_int_distribution<uint32_t> distribution;
         for (int i = 0; i < kNumDocsToSample_; i++)
@@ -222,7 +228,7 @@ public:
         shouldCheckMinMaxScore_ = false;
     }
 
-    void unSetMinMaxScore()
+    void unsetMinMaxScore()
     {
         shouldCheckMinMaxScore_ = true;
     }
@@ -240,14 +246,14 @@ private:
     const int kNumSlots_ = 16;
     // Each bucket has 16 slots. A GPU thread will randomly write into one of the thread,
     // and then the count will finally be accumulated to the first slot.
-    // The purpose of doing this is to minimize too much concurrent write to the same memory location with atomicAdd.
+    // The purpose of doing this is to minimize contention of atomicAdd.
     const int kSize_d_counter_ = kNumBuckets_ * kNumSlots_;
     const int kSize_byte_d_counter_ = kSize_d_counter_ * sizeof(int);
 
     // --------------
     // Sampling related min and max score of the docs
-    float minScore_ = -1;
-    float maxScore_ = 1;
+    float minScore_;
+    float maxScore_;
     bool shouldCheckMinMaxScore_ = true; // When this is set to true, the algorithm will run an additional step 
                                          // to sample some docs to get the min and max score.
     bool doRandomSampling_ = true;
