@@ -196,8 +196,8 @@ private:
     uint32_t* hp_randomIndices_ = nullptr;
     float* d_sampledScores_ = nullptr;
     float* hp_sampledScores_ = nullptr;
-    float maxPercentile_ = 0.99;
-    float minPercentile_ = 0.01;
+    float maxPercentile_ = 0.999;
+    float minPercentile_ = 0.001;
 
     int* d_counter_ = nullptr;
     int* hp_counter_ = nullptr;
