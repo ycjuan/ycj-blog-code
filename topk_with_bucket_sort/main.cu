@@ -55,11 +55,9 @@ void runExp(int numDocs)
 
     // --------------
     TopkBucketSort<Doc, ScorePredicator, DocIdExtractor, ScoreExtractor> topkRetriever;
-    topkRetriever.init();
+    topkRetriever.init(numDocs);
     Doc *d_doc = nullptr;
-    Doc *d_buffer = nullptr;
     CHECK_CUDA(cudaMalloc(&d_doc, numDocs * sizeof(Doc)));
-    CHECK_CUDA(cudaMalloc(&d_buffer, numDocs * sizeof(Doc)));
 
     double timeMsGpuFullSort = 0;
     double timeMsGpuBucketSortWithSample = 0;
@@ -89,7 +87,7 @@ void runExp(int numDocs)
             topkRetriever.unsetMinMaxScore();
             float timeMsGpuBucketSortWithSample1 = 0;
             CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Doc), cudaMemcpyHostToDevice));
-            std::vector<Doc> v_topk_gpuBucketSortWithSample = topkRetriever.retrieveTopk(d_doc, d_buffer, numDocs, kNumToRetrieve, timeMsGpuBucketSortWithSample1);
+            std::vector<Doc> v_topk_gpuBucketSortWithSample = topkRetriever.retrieveTopk(d_doc, numDocs, kNumToRetrieve, timeMsGpuBucketSortWithSample1);
             if (t >= 0)
             {
                 timeMsGpuBucketSortWithSample += timeMsGpuBucketSortWithSample1;
@@ -107,7 +105,7 @@ void runExp(int numDocs)
             topkRetriever.setMinMaxScore(-1.0, 1.0);
             float timeMsGpuBucketSortWithoutSample1 = 0;
             CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Doc), cudaMemcpyHostToDevice));
-            std::vector<Doc> v_topk_gpuBucketSortWithoutSample = topkRetriever.retrieveTopk(d_doc, d_buffer, numDocs, kNumToRetrieve, timeMsGpuBucketSortWithoutSample1);
+            std::vector<Doc> v_topk_gpuBucketSortWithoutSample = topkRetriever.retrieveTopk(d_doc, numDocs, kNumToRetrieve, timeMsGpuBucketSortWithoutSample1);
             if (t >= 0)
             {
                 timeMsGpuBucketSortWithoutSample += timeMsGpuBucketSortWithoutSample1;
@@ -129,7 +127,6 @@ void runExp(int numDocs)
     std::cout << "timeMsGpuBucketSortWithoutSample: " << timeMsGpuBucketSortWithoutSample << " ms" << std::endl;
 
     CHECK_CUDA(cudaFree(d_doc));
-    CHECK_CUDA(cudaFree(d_buffer));
     topkRetriever.reset();
 }
 

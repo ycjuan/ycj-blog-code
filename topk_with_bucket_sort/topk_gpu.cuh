@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <random>
 #include <vector>
 #include <thrust/copy.h>
@@ -52,8 +53,11 @@ __global__ void updateMinMaxScoreKernel(float *d_sampledScores, int numSamples, 
 template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor> class TopkBucketSort
 {
 public:
-    void init()
+    void init(uint64_t maxNumDocs)
     {
+        maxNumDocs_ = maxNumDocs;
+        size_byte_d_buffer_ = sizeof(T) * maxNumDocs;
+        CHECK_CUDA(cudaMalloc(&d_buffer_, size_byte_d_buffer_));
         CHECK_CUDA(cudaMalloc(&d_counter_, kNumBuckets_ * kNumSlots_ * sizeof(int)));
         CHECK_CUDA(cudaMallocHost(&hp_counter_, kNumBuckets_ * kNumSlots_ * sizeof(int)));
         CHECK_CUDA(cudaMalloc(&d_randomIndices_, kNumDocsToSample_ * sizeof(uint32_t)));
@@ -75,6 +79,7 @@ public:
 
     void reset()
     {
+        CHECK_CUDA(cudaFree(d_buffer_));
         CHECK_CUDA(cudaFree(d_counter_));
         CHECK_CUDA(cudaFreeHost(hp_counter_));
         CHECK_CUDA(cudaFree(d_randomIndices_));
@@ -83,7 +88,7 @@ public:
         CHECK_CUDA(cudaFreeHost(hp_sampledScores_));
     }
 
-    std::vector<T> retrieveTopk(T* d_doc, T* d_buffer, int numDocs, int numToRetrieve, float& timeMs)
+    std::vector<T> retrieveTopk(T* d_doc, int numDocs, int numToRetrieve, float& timeMs)
     {
         Timer timer;
         timer.tic();
@@ -143,10 +148,10 @@ public:
         {
             Timer timerStep5;
             timerStep5.tic();
-            T *d_endPtr = thrust::copy_if(thrust::device, d_doc, d_doc + numDocs, d_buffer, *this); // copy_if will call TopkBucketSort::operator()
+            T *d_endPtr = thrust::copy_if(thrust::device, d_doc, d_doc + numDocs, d_buffer_, *this); // copy_if will call TopkBucketSort::operator()
             CHECK_CUDA(cudaDeviceSynchronize());
             CHECK_CUDA(cudaGetLastError())
-            numCopied = (d_endPtr - d_buffer);
+            numCopied = (d_endPtr - d_buffer_);
             if (numCopied != numDocsGreaterThanLowestBucket)
             {
                 std::ostringstream oss;
@@ -162,7 +167,7 @@ public:
         {
             Timer timerStep6;
             timerStep6.tic();
-            thrust::stable_sort(thrust::device, d_buffer, d_buffer + numCopied, ScorePredicator());
+            thrust::stable_sort(thrust::device, d_buffer_, d_buffer_ + numCopied, ScorePredicator());
             CHECK_CUDA(cudaDeviceSynchronize());
             CHECK_CUDA(cudaGetLastError())
             float timeMsStep6 = timerStep6.tocMs();
@@ -175,7 +180,7 @@ public:
         {
             Timer timerStep7;
             timerStep7.tic();
-            CHECK_CUDA(cudaMemcpy(v_doc.data(), d_buffer, sizeof(T) * numToRetrieve, cudaMemcpyDeviceToHost))
+            CHECK_CUDA(cudaMemcpy(v_doc.data(), d_buffer_, sizeof(T) * numToRetrieve, cudaMemcpyDeviceToHost))
             float timeMsStep7 = timerStep7.tocMs();
             std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep7: " << timeMsStep7 << " ms" << std::endl;
         }
@@ -251,6 +256,12 @@ private:
     float* hp_sampledScores_ = nullptr;
     float maxPercentile_ = 0.999;
     float minPercentile_ = 0.001;
+
+    // ------------
+    // Max num docs and buffer size
+    T* d_buffer_ = nullptr;
+    int maxNumDocs_ = 0;
+    uint64_t size_byte_d_buffer_ = 0;
 
     int* d_counter_ = nullptr;
     int* hp_counter_ = nullptr;
