@@ -101,10 +101,6 @@ void runExp(int numDocs)
 int main()
 {
     runExp(1000000);
-    runExp(2000000);
-    runExp(4000000);
-    runExp(8000000);
-    runExp(16000000);
     runExp(32000000);
 
     return 0;
