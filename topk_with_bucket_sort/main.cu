@@ -1,7 +1,7 @@
-#include <random>
-#include <vector>
-#include <stdexcept>
 #include <iostream>
+#include <random>
+#include <stdexcept>
+#include <vector>
 
 #include "topk_cpu.cuh"
 #include "topk_gpu.cuh"
@@ -58,7 +58,7 @@ void runExp(int numDocs)
     // --------------
     TopkBucketSort<Doc, ScorePredicator, DocIdExtractor, ScoreExtractor> topkRetriever;
     topkRetriever.init(numDocs);
-    Doc *d_doc = nullptr;
+    Doc* d_doc = nullptr;
     CHECK_CUDA(cudaMalloc(&d_doc, numDocs * sizeof(Doc)));
 
     double timeMsGpuFullSort = 0;
@@ -77,7 +77,8 @@ void runExp(int numDocs)
             // Run GPU full sort
             Timer timerGpuFullSort;
             timerGpuFullSort.tic();
-            std::vector<Doc> v_topk_gpuFullSort = retrieveTopkGpuFullSort<Doc, ScorePredicator>(d_doc, numDocs, kNumToRetrieve);
+            std::vector<Doc> v_topk_gpuFullSort
+                = retrieveTopkGpuFullSort<Doc, ScorePredicator>(d_doc, numDocs, kNumToRetrieve);
             float timeMsGpuFullSort1 = timerGpuFullSort.tocMs();
             if (t >= 0)
             {
@@ -89,7 +90,7 @@ void runExp(int numDocs)
             if (v_topk_cpuFullSort != v_topk_gpuFullSort)
             {
                 throw std::runtime_error("Topk results from CPU full sort and GPU full sort do not match");
-            }    
+            }
         }
 
         // --------------
@@ -103,19 +104,22 @@ void runExp(int numDocs)
             // Run GPU bucket sort with sample
             Timer timerGpuBucketSortWithSample;
             timerGpuBucketSortWithSample.tic();
-            topkRetriever.unsetMinMaxScore(); // unset min and max score so that the algorithm will perform sampling to get the min and max score.
-            std::vector<Doc> v_topk_gpuBucketSortWithSample = topkRetriever.retrieveTopk(d_doc, numDocs, kNumToRetrieve);
+            topkRetriever.unsetMinMaxScore(); // unset min and max score so that the algorithm will perform sampling to
+                                              // get the min and max score.
+            std::vector<Doc> v_topk_gpuBucketSortWithSample
+                = topkRetriever.retrieveTopk(d_doc, numDocs, kNumToRetrieve);
             float timeMsGpuBucketSortWithSample1 = timerGpuBucketSortWithSample.tocMs();
             if (t >= 0)
             {
                 timeMsGpuBucketSortWithSample += timeMsGpuBucketSortWithSample1;
             }
-            
+
             // ---------
             // Compare results
             if (v_topk_gpuBucketSortWithSample != v_topk_cpuFullSort)
             {
-                throw std::runtime_error("Topk results from GPU bucket sort with sample and CPU full sort do not match");
+                throw std::runtime_error(
+                    "Topk results from GPU bucket sort with sample and CPU full sort do not match");
             }
         }
 
@@ -126,25 +130,32 @@ void runExp(int numDocs)
             // Copy data to GPU
             CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Doc), cudaMemcpyHostToDevice));
 
-
+            // ---------
+            // Run GPU bucket sort without sample
             Timer timerGpuBucketSortWithoutSample;
             timerGpuBucketSortWithoutSample.tic();
-            topkRetriever.setMinMaxScore(-1.0, 1.0); // set min and max score so that the algorithm will directly use the min and max score.
-                                                                        // (and the sampling step will be skipped)
-            std::vector<Doc> v_topk_gpuBucketSortWithoutSample = topkRetriever.retrieveTopk(d_doc, numDocs, kNumToRetrieve);
+            topkRetriever.setMinMaxScore(-1.0, 1.0); // set min and max score so that the algorithm will directly use
+                                                     // the min and max score. (and the sampling step will be skipped)
+            std::vector<Doc> v_topk_gpuBucketSortWithoutSample
+                = topkRetriever.retrieveTopk(d_doc, numDocs, kNumToRetrieve);
             float timeMsGpuBucketSortWithoutSample1 = timerGpuBucketSortWithoutSample.tocMs();
             if (t >= 0)
             {
                 timeMsGpuBucketSortWithoutSample += timeMsGpuBucketSortWithoutSample1;
             }
-            
+
+            // ---------
+            // Compare results
             if (v_topk_gpuBucketSortWithoutSample != v_topk_cpuFullSort)
             {
-                throw std::runtime_error("Topk results from GPU bucket sort without sample and CPU full sort do not match");
+                throw std::runtime_error(
+                    "Topk results from GPU bucket sort without sample and CPU full sort do not match");
             }
         }
     }
 
+    // --------------
+    // Print results
     timeMsGpuFullSort /= kNumTrials;
     timeMsGpuBucketSortWithSample /= kNumTrials;
     timeMsGpuBucketSortWithoutSample /= kNumTrials;
@@ -153,6 +164,8 @@ void runExp(int numDocs)
     std::cout << "timeMsGpuBucketSortWithSample: " << timeMsGpuBucketSortWithSample << " ms" << std::endl;
     std::cout << "timeMsGpuBucketSortWithoutSample: " << timeMsGpuBucketSortWithoutSample << " ms" << std::endl;
 
+    // --------------
+    // Cleanup
     CHECK_CUDA(cudaFree(d_doc));
     topkRetriever.reset();
 }

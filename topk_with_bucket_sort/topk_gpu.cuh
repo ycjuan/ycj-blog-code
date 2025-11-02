@@ -2,20 +2,22 @@
 
 #include <cstdint>
 #include <random>
-#include <vector>
+#include <sstream>
+#include <stdexcept>
 #include <thrust/copy.h>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
-#include <sstream>
-#include <stdexcept>
+#include <vector>
 
 #include "util.cuh"
 
-template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor> class TopkBucketSort; // forward declaration
+template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor>
+class TopkBucketSort; // forward declaration
 
 // This kernel is used to update the counter in each bucket.
 template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor>
-__global__ void updateCounterKernel(T* d_doc, int numDocs, TopkBucketSort<T, ScorePredicator, DocIdExtractor, ScoreExtractor> retriever)
+__global__ void
+updateCounterKernel(T* d_doc, int numDocs, TopkBucketSort<T, ScorePredicator, DocIdExtractor, ScoreExtractor> retriever)
 {
     int docId = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -27,8 +29,9 @@ __global__ void updateCounterKernel(T* d_doc, int numDocs, TopkBucketSort<T, Sco
 }
 
 // This kernel is used to sample the scores from the docs.
-template<typename T, class ScoreExtractor>
-__global__ void sampleRandomScoresKernel(T* d_doc, int numToSample, float* d_sampledScores, int* d_randomIndices, int numDocs)
+template <typename T, class ScoreExtractor>
+__global__ void
+sampleRandomScoresKernel(T* d_doc, int numToSample, float* d_sampledScores, int* d_randomIndices, int numDocs)
 {
     int docIdx = blockIdx.x * blockDim.x + threadIdx.x;
     if (docIdx < numToSample)
@@ -40,7 +43,8 @@ __global__ void sampleRandomScoresKernel(T* d_doc, int numToSample, float* d_sam
 // This kernel is used to update the min and max score of the sampled scores.
 __managed__ __device__ float g_minScore;
 __managed__ __device__ float g_maxScore;
-__global__ void updateMinMaxScoreKernel(float *d_sampledScores, int numSamples, float minPercentile, float maxPercentile)
+__global__ void
+updateMinMaxScoreKernel(float* d_sampledScores, int numSamples, float minPercentile, float maxPercentile)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid == 0)
@@ -74,7 +78,8 @@ public:
         {
             hp_randomIndices_[i] = distribution(generator);
         }
-        CHECK_CUDA(cudaMemcpy(d_randomIndices_, hp_randomIndices_, kNumDocsToSample_ * sizeof(int), cudaMemcpyHostToDevice));
+        CHECK_CUDA(
+            cudaMemcpy(d_randomIndices_, hp_randomIndices_, kNumDocsToSample_ * sizeof(int), cudaMemcpyHostToDevice));
     }
 
     void reset()
@@ -103,7 +108,7 @@ public:
             float timeMsStep1 = timerStep1.tocMs();
             std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep1: " << timeMsStep1 << " ms" << std::endl;
         }
-    
+
         // --------------
         // Step2 - Run kernel to update the counter in each bucket
         {
@@ -116,22 +121,24 @@ public:
             float timeMsStep2 = timerStep2.tocMs();
             std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep2: " << timeMsStep2 << " ms" << std::endl;
         }
-    
+
         // --------------
         // Step3 - Copy counter from GPU to CPU
         std::vector<int> v_counter(kSize_d_counter_, 0);
         {
             Timer timerStep3;
             timerStep3.tic();
-            CHECK_CUDA(cudaMemcpyAsync(v_counter.data(), d_counter_, kSize_byte_d_counter_, cudaMemcpyDeviceToHost, stream))
+            CHECK_CUDA(
+                cudaMemcpyAsync(v_counter.data(), d_counter_, kSize_byte_d_counter_, cudaMemcpyDeviceToHost, stream))
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError());
             float timeMsStep3 = timerStep3.tocMs();
             std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep3: " << timeMsStep3 << " ms" << std::endl;
         }
-        
+
         // --------------
-        // Step4 - Scan the bucket counter from high to low, and find the lowest bucket that has more docs than numToRetrieve
+        // Step4 - Scan the bucket counter from high to low, and find the lowest bucket that has more docs than
+        // numToRetrieve
         int numDocsGreaterThanLowestBucket;
         {
             Timer timerStep4;
@@ -140,27 +147,29 @@ public:
             float timeMsStep4 = timerStep4.tocMs();
             std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep4: " << timeMsStep4 << " ms" << std::endl;
         }
-    
+
         // --------------
         // Step5 - Filter out items that is larger than the lowest bucket
         int numCopied;
         {
             Timer timerStep5;
             timerStep5.tic();
-            T *d_endPtr = thrust::copy_if(thrust::device.on(stream), d_doc, d_doc + numDocs, d_buffer_, *this); // copy_if will call TopkBucketSort::operator()
+            T* d_endPtr = thrust::copy_if(thrust::device.on(stream), d_doc, d_doc + numDocs, d_buffer_,
+                                          *this); // copy_if will call TopkBucketSort::operator()
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError())
             numCopied = (d_endPtr - d_buffer_);
             if (numCopied != numDocsGreaterThanLowestBucket)
             {
                 std::ostringstream oss;
-                oss << "numCopied != numDocsGreaterThanLowestBucket: " << numCopied << " != " << numDocsGreaterThanLowestBucket;
+                oss << "numCopied != numDocsGreaterThanLowestBucket: " << numCopied
+                    << " != " << numDocsGreaterThanLowestBucket;
                 throw std::runtime_error(oss.str());
             }
             float timeMsStep5 = timerStep5.tocMs();
             std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep5: " << timeMsStep5 << " ms" << std::endl;
         }
-    
+
         // --------------
         // Step6 - Sort the docs that are larger than the lowest bucket
         {
@@ -185,7 +194,7 @@ public:
             float timeMsStep7 = timerStep7.tocMs();
             std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep7: " << timeMsStep7 << " ms" << std::endl;
         }
-    
+
         return v_doc;
     }
 
@@ -204,7 +213,8 @@ public:
 
     __device__ void updateCounter(T doc)
     {
-        int slot = DocIdExtractor()(doc) % kNumSlots_; // randomly write into one of the slots. This is to avoid the contention of atomicAdd.
+        int slot = DocIdExtractor()(doc)
+            % kNumSlots_; // randomly write into one of the slots. This is to avoid the contention of atomicAdd.
         int bucket = bucketize(ScoreExtractor()(doc));
         int counterIdx = getCounterIdx(slot, bucket);
 
@@ -225,10 +235,7 @@ public:
         shouldCheckMinMaxScore_ = false;
     }
 
-    void unsetMinMaxScore()
-    {
-        shouldCheckMinMaxScore_ = true;
-    }
+    void unsetMinMaxScore() { shouldCheckMinMaxScore_ = true; }
 
 private:
     const int kGranularity_ = 512;
@@ -246,7 +253,7 @@ private:
     // Sampling related min and max score of the docs
     float minScore_;
     float maxScore_;
-    bool shouldCheckMinMaxScore_ = true; // When this is set to true, the algorithm will run an additional step 
+    bool shouldCheckMinMaxScore_ = true; // When this is set to true, the algorithm will run an additional step
                                          // to sample some docs to get the min and max score.
     const int kNumDocsToSample_ = 10000;
     int* d_randomIndices_ = nullptr;
@@ -309,7 +316,7 @@ private:
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError())
             float timeMsStep1 = timerStep1.tocMs();
-            std::cout << "timeMsStep1: " << timeMsStep1 << " ms" << std::endl;    
+            std::cout << "timeMsStep1: " << timeMsStep1 << " ms" << std::endl;
         }
 
         // --------------
@@ -317,11 +324,11 @@ private:
         {
             Timer timerStep2;
             timerStep2.tic();
-            thrust::sort(thrust::device.on(stream), d_sampledScores_, d_sampledScores_ + kNumDocsToSample_, thrust::less<float>());
+            thrust::sort(thrust::device.on(stream), d_sampledScores_, d_sampledScores_ + kNumDocsToSample_,
+                         thrust::less<float>());
             float timeMsStep2 = timerStep2.tocMs();
             std::cout << "timeMsStep2: " << timeMsStep2 << " ms" << std::endl;
         }
-
 
         // --------------
         // Step3 - Update the min and max score
@@ -330,7 +337,7 @@ private:
             timerStep3.tic();
             updateMinMaxScoreKernel<<<1, 1, 0, stream>>>(d_sampledScores_, numToSample, minPercentile_, maxPercentile_);
             CHECK_CUDA(cudaStreamSynchronize(stream));
-            //CHECK_CUDA(cudaGetLastError())
+            CHECK_CUDA(cudaGetLastError())
             float timeMsStep3 = timerStep3.tocMs();
             std::cout << "timeMsStep3: " << timeMsStep3 << " ms" << std::endl;
         }
