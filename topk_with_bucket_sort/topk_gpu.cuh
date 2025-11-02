@@ -28,7 +28,7 @@ __global__ void updateCounterKernel(T* d_doc, int numDocs, TopkBucketSort<T, Sco
 
 // This kernel is used to sample the scores from the docs.
 template<typename T, class ScoreExtractor>
-__global__ void sampleRandomScoresKernel(T* d_doc, uint32_t numToSample, float* d_sampledScores, uint32_t* d_randomIndices, uint32_t numDocs)
+__global__ void sampleRandomScoresKernel(T* d_doc, int numToSample, float* d_sampledScores, int* d_randomIndices, int numDocs)
 {
     int docIdx = blockIdx.x * blockDim.x + threadIdx.x;
     if (docIdx < numToSample)
@@ -53,15 +53,15 @@ __global__ void updateMinMaxScoreKernel(float *d_sampledScores, int numSamples, 
 template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor> class TopkBucketSort
 {
 public:
-    void init(uint64_t maxNumDocs)
+    void init(size_t maxNumDocs)
     {
         maxNumDocs_ = maxNumDocs;
         size_byte_d_buffer_ = sizeof(T) * maxNumDocs;
         CHECK_CUDA(cudaMalloc(&d_buffer_, size_byte_d_buffer_));
         CHECK_CUDA(cudaMalloc(&d_counter_, kNumBuckets_ * kNumSlots_ * sizeof(int)));
         CHECK_CUDA(cudaMallocHost(&hp_counter_, kNumBuckets_ * kNumSlots_ * sizeof(int)));
-        CHECK_CUDA(cudaMalloc(&d_randomIndices_, kNumDocsToSample_ * sizeof(uint32_t)));
-        CHECK_CUDA(cudaMallocHost(&hp_randomIndices_, kNumDocsToSample_ * sizeof(uint32_t)));
+        CHECK_CUDA(cudaMalloc(&d_randomIndices_, kNumDocsToSample_ * sizeof(int)));
+        CHECK_CUDA(cudaMallocHost(&hp_randomIndices_, kNumDocsToSample_ * sizeof(int)));
         CHECK_CUDA(cudaMalloc(&d_sampledScores_, kNumDocsToSample_ * sizeof(float)));
         CHECK_CUDA(cudaMallocHost(&hp_sampledScores_, kNumDocsToSample_ * sizeof(float)));
 
@@ -69,12 +69,12 @@ public:
         // We do this in init time as it is expensive to generate random indices in runtime.
         // In runtime, we will do `% numDocs` to get the final random index.
         std::default_random_engine generator;
-        std::uniform_int_distribution<uint32_t> distribution;
+        std::uniform_int_distribution<int> distribution;
         for (int i = 0; i < kNumDocsToSample_; i++)
         {
             hp_randomIndices_[i] = distribution(generator);
         }
-        CHECK_CUDA(cudaMemcpy(d_randomIndices_, hp_randomIndices_, kNumDocsToSample_ * sizeof(uint32_t), cudaMemcpyHostToDevice));
+        CHECK_CUDA(cudaMemcpy(d_randomIndices_, hp_randomIndices_, kNumDocsToSample_ * sizeof(int), cudaMemcpyHostToDevice));
     }
 
     void reset()
@@ -248,9 +248,9 @@ private:
     float maxScore_;
     bool shouldCheckMinMaxScore_ = true; // When this is set to true, the algorithm will run an additional step 
                                          // to sample some docs to get the min and max score.
-    const uint32_t kNumDocsToSample_ = 10000;
-    uint32_t* d_randomIndices_ = nullptr;
-    uint32_t* hp_randomIndices_ = nullptr;
+    const int kNumDocsToSample_ = 10000;
+    int* d_randomIndices_ = nullptr;
+    int* hp_randomIndices_ = nullptr;
     float* d_sampledScores_ = nullptr;
     float* hp_sampledScores_ = nullptr;
     float maxPercentile_ = 0.999;
@@ -260,7 +260,7 @@ private:
     // Max num docs and buffer size
     T* d_buffer_ = nullptr;
     int maxNumDocs_ = 0;
-    uint64_t size_byte_d_buffer_ = 0;
+    size_t size_byte_d_buffer_ = 0;
 
     int* d_counter_ = nullptr;
     int* hp_counter_ = nullptr;
@@ -293,7 +293,7 @@ private:
         }
     }
 
-    void checkMinMaxScore(T* d_doc, uint32_t numDocs, cudaStream_t stream)
+    void checkMinMaxScore(T* d_doc, int numDocs, cudaStream_t stream)
     {
         int numToSample = std::min(numDocs, kNumDocsToSample_);
 
