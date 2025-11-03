@@ -106,7 +106,7 @@ public:
             timerStep1.tic();
             checkMinMaxScore(d_doc, numDocs, stream);
             float timeMsStep1 = timerStep1.tocMs();
-            //std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep1: " << timeMsStep1 << " ms" << std::endl;
+            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep1: " << timeMsStep1 << " ms" << std::endl;
         }
 
         // --------------
@@ -119,7 +119,7 @@ public:
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError());
             float timeMsStep2 = timerStep2.tocMs();
-            //std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep2: " << timeMsStep2 << " ms" << std::endl;
+            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep2: " << timeMsStep2 << " ms" << std::endl;
         }
 
         // --------------
@@ -133,7 +133,7 @@ public:
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError());
             float timeMsStep3 = timerStep3.tocMs();
-            //std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep3: " << timeMsStep3 << " ms" << std::endl;
+            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep3: " << timeMsStep3 << " ms" << std::endl;
         }
 
         // --------------
@@ -145,7 +145,7 @@ public:
             timerStep4.tic();
             findLowestBucket(v_counter, numToRetrieve, lowestBucket_, numDocsGreaterThanLowestBucket);
             float timeMsStep4 = timerStep4.tocMs();
-            //std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep4: " << timeMsStep4 << " ms" << std::endl;
+            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep4: " << timeMsStep4 << " ms" << std::endl;
         }
 
         // --------------
@@ -167,7 +167,7 @@ public:
                 throw std::runtime_error(oss.str());
             }
             float timeMsStep5 = timerStep5.tocMs();
-            //std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep5: " << timeMsStep5 << " ms" << std::endl;
+            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep5: " << timeMsStep5 << " ms" << std::endl;
         }
 
         // --------------
@@ -179,7 +179,7 @@ public:
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError())
             float timeMsStep6 = timerStep6.tocMs();
-            //std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep6: " << timeMsStep6 << " ms" << std::endl;
+            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep6: " << timeMsStep6 << " ms" << std::endl;
         }
 
         // --------------
@@ -192,7 +192,7 @@ public:
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError());
             float timeMsStep7 = timerStep7.tocMs();
-            //std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep7: " << timeMsStep7 << " ms" << std::endl;
+            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep7: " << timeMsStep7 << " ms" << std::endl;
         }
 
         return v_doc;
@@ -238,6 +238,9 @@ public:
     void unsetMinMaxScore() { shouldCheckMinMaxScore_ = true; }
 
 private:
+
+    // --------------
+    // Constant configurations
     const int kGranularity_ = 512;
     const int kNumBuckets_ = kGranularity_ + 1;
     // For example, if we have kMinScore = -1.0, kMaxScore = 1.0, kGranularity = 2,
@@ -248,30 +251,36 @@ private:
     // The purpose of doing this is to minimize contention of atomicAdd.
     const int kSize_d_counter_ = kNumBuckets_ * kNumSlots_;
     const int kSize_byte_d_counter_ = kSize_d_counter_ * sizeof(int);
-
-    // --------------
-    // Sampling related min and max score of the docs
-    float minScore_;
-    float maxScore_;
-    bool shouldCheckMinMaxScore_ = true; // When this is set to true, the algorithm will run an additional step
-                                         // to sample some docs to get the min and max score.
-    const int kNumDocsToSample_ = 10000;
-    int* d_randomIndices_ = nullptr;
-    int* hp_randomIndices_ = nullptr;
-    float* d_sampledScores_ = nullptr;
-    float* hp_sampledScores_ = nullptr;
-    float maxPercentile_ = 0.999;
-    float minPercentile_ = 0.001;
+    const int kNumDocsToSample_ = 10000; // Number of docs to sample to get the min and max score.
+    const float kMaxPercentile_ = 0.999; 
+    const float kMinPercentile_ = 0.001;
+    const bool kPrintSegmentTime_ = false;
 
     // ------------
-    // Max num docs and buffer size
-    T* d_buffer_ = nullptr;
+    // Max num docs and buffer array
+    T* d_buffer_ = nullptr; // This is needed for copy_if
     int maxNumDocs_ = 0;
     size_t size_byte_d_buffer_ = 0;
 
+    // --------------
+    // Bucket counter arrays
     int* d_counter_ = nullptr;
     int* hp_counter_ = nullptr;
     int lowestBucket_ = 0;
+
+    // --------------
+    // min and max score 
+    float minScore_;
+    float maxScore_;
+
+    // --------------
+    // Below are for step1 (Check min and max score by sampling some docs)
+    bool shouldCheckMinMaxScore_ = true; // When this is set to true, the algorithm will run an additional step
+                                         // to sample some docs to get the min and max score.
+    int* d_randomIndices_ = nullptr; // Random indices to sample the docs.
+    int* hp_randomIndices_ = nullptr;
+    float* d_sampledScores_ = nullptr; // Sampled scores from the docs.
+    float* hp_sampledScores_ = nullptr;
 
     void findLowestBucket(std::vector<int>& v_counter,
                           int numToRetrieve,
@@ -335,7 +344,7 @@ private:
         {
             Timer timerStep3;
             timerStep3.tic();
-            updateMinMaxScoreKernel<<<1, 1, 0, stream>>>(d_sampledScores_, numToSample, minPercentile_, maxPercentile_);
+            updateMinMaxScoreKernel<<<1, 1, 0, stream>>>(d_sampledScores_, numToSample, kMinPercentile_, kMaxPercentile_);
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError())
             float timeMsStep3 = timerStep3.tocMs();
