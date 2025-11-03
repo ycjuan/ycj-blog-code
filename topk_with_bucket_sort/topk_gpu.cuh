@@ -41,16 +41,14 @@ sampleRandomScoresKernel(T* d_doc, int numToSample, float* d_sampledScores, int*
 }
 
 // This kernel is used to update the min and max score of the sampled scores.
-__managed__ __device__ float g_minScore;
-__managed__ __device__ float g_maxScore;
 __global__ void
-updateMinMaxScoreKernel(float* d_sampledScores, int numSamples, float minPercentile, float maxPercentile)
+updateMinMaxScoreKernel(float* d_sampledScores, int numSamples, float minPercentile, float maxPercentile, float* hp_minMaxScore)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid == 0)
     {
-        g_minScore = d_sampledScores[(int)(numSamples * minPercentile)];
-        g_maxScore = d_sampledScores[(int)(numSamples * maxPercentile)];
+        hp_minMaxScore[0] = d_sampledScores[(int)(numSamples * minPercentile)];
+        hp_minMaxScore[1] = d_sampledScores[(int)(numSamples * maxPercentile)];
     }
 }
 
@@ -68,12 +66,13 @@ public:
         CHECK_CUDA(cudaMallocHost(&hp_randomIndices_, kNumDocsToSample_ * sizeof(int)));
         CHECK_CUDA(cudaMalloc(&d_sampledScores_, kNumDocsToSample_ * sizeof(float)));
         CHECK_CUDA(cudaMallocHost(&hp_sampledScores_, kNumDocsToSample_ * sizeof(float)));
+        CHECK_CUDA(cudaMallocHost(&hp_minMaxScore_, 2 * sizeof(float)));
 
         // Initialize the random indices.
         // We do this in init time as it is expensive to generate random indices in runtime.
         // In runtime, we will do `% numDocs` to get the final random index.
         std::default_random_engine generator;
-        std::uniform_int_distribution<int> distribution;
+        std::uniform_int_distribution<int> distribution(0, maxNumDocs_ - 1);
         for (int i = 0; i < kNumDocsToSample_; i++)
         {
             hp_randomIndices_[i] = distribution(generator);
@@ -91,6 +90,7 @@ public:
         CHECK_CUDA(cudaFreeHost(hp_randomIndices_));
         CHECK_CUDA(cudaFree(d_sampledScores_));
         CHECK_CUDA(cudaFreeHost(hp_sampledScores_));
+        CHECK_CUDA(cudaFreeHost(hp_minMaxScore_));
     }
 
     std::vector<T> retrieveTopk(T* d_doc, int numDocs, int numToRetrieve, cudaStream_t stream = nullptr)
@@ -293,6 +293,7 @@ private:
     // min and max score 
     float minScore_;
     float maxScore_;
+    float* hp_minMaxScore_ = nullptr;
 
     // --------------
     // Below are for step1 (Check min and max score by sampling some docs)
@@ -371,7 +372,7 @@ private:
         {
             Timer timerStep3;
             timerStep3.tic();
-            updateMinMaxScoreKernel<<<1, 1, 0, stream>>>(d_sampledScores_, numToSample, kMinPercentile_, kMaxPercentile_);
+            updateMinMaxScoreKernel<<<1, 1, 0, stream>>>(d_sampledScores_, numToSample, kMinPercentile_, kMaxPercentile_, hp_minMaxScore_);
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError())
             float timeMsStep3 = timerStep3.tocMs();
@@ -384,8 +385,8 @@ private:
         // --------------
         // Step4 - Update the min and max score in CPU
         {
-            minScore_ = g_minScore;
-            maxScore_ = g_maxScore;
+            minScore_ = hp_minMaxScore_[0];
+            maxScore_ = hp_minMaxScore_[1];
         }
     }
 };
