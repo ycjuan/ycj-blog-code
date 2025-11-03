@@ -1,12 +1,12 @@
 running exps with numDocs: 1000000
-timeMsCpuFullSort: 377.251 ms
-timeMsGpuFullSort: 0.4677 ms
-timeMsGpuBucketSortWithSample: 0.4581 ms
-timeMsGpuBucketSortWithoutSample: 0.2354 ms
+timeMsCpuFullSort: 385.441 ms
+timeMsGpuFullSort: 0.4631 ms
+timeMsGpuBucketSortWithSample: 0.3603 ms
+timeMsGpuBucketSortWithoutSample: 0.2353 ms
 
 
 running exps with numDocs: 32000000
-timeMsCpuFullSort: 14742 ms
-timeMsGpuFullSort: 34.3801 ms
-timeMsGpuBucketSortWithSample: 2.8391 ms
-timeMsGpuBucketSortWithoutSample: 2.4952 ms
+timeMsCpuFullSort: 15114 ms
+timeMsGpuFullSort: 34.3874 ms
+timeMsGpuBucketSortWithSample: 2.6869 ms
+timeMsGpuBucketSortWithoutSample: 2.4956 ms
