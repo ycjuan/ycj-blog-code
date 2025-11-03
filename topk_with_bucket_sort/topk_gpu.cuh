@@ -106,7 +106,10 @@ public:
             timerStep1.tic();
             checkMinMaxScore(d_doc, numDocs, stream);
             float timeMsStep1 = timerStep1.tocMs();
-            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep1: " << timeMsStep1 << " ms" << std::endl;
+            if (kPrintSegmentTime_)
+            {
+                std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep1: " << timeMsStep1 << " ms" << std::endl;
+            }
         }
 
         // --------------
@@ -119,7 +122,10 @@ public:
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError());
             float timeMsStep2 = timerStep2.tocMs();
-            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep2: " << timeMsStep2 << " ms" << std::endl;
+            if (kPrintSegmentTime_)
+            {
+                std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep2: " << timeMsStep2 << " ms" << std::endl;
+            }
         }
 
         // --------------
@@ -133,7 +139,10 @@ public:
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError());
             float timeMsStep3 = timerStep3.tocMs();
-            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep3: " << timeMsStep3 << " ms" << std::endl;
+            if (kPrintSegmentTime_)
+            {
+                std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep3: " << timeMsStep3 << " ms" << std::endl;
+            }
         }
 
         // --------------
@@ -145,7 +154,10 @@ public:
             timerStep4.tic();
             findLowestBucket(v_counter, numToRetrieve, lowestBucket_, numDocsGreaterThanLowestBucket);
             float timeMsStep4 = timerStep4.tocMs();
-            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep4: " << timeMsStep4 << " ms" << std::endl;
+            if (kPrintSegmentTime_)
+            {
+                std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep4: " << timeMsStep4 << " ms" << std::endl;
+            }
         }
 
         // --------------
@@ -167,7 +179,10 @@ public:
                 throw std::runtime_error(oss.str());
             }
             float timeMsStep5 = timerStep5.tocMs();
-            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep5: " << timeMsStep5 << " ms" << std::endl;
+            if (kPrintSegmentTime_)
+            {
+                std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep5: " << timeMsStep5 << " ms" << std::endl;
+            }
         }
 
         // --------------
@@ -179,7 +194,10 @@ public:
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError())
             float timeMsStep6 = timerStep6.tocMs();
-            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep6: " << timeMsStep6 << " ms" << std::endl;
+            if (kPrintSegmentTime_)
+            {
+                std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep6: " << timeMsStep6 << " ms" << std::endl;
+            }
         }
 
         // --------------
@@ -192,7 +210,10 @@ public:
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError());
             float timeMsStep7 = timerStep7.tocMs();
-            std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep7: " << timeMsStep7 << " ms" << std::endl;
+            if (kPrintSegmentTime_)
+            {
+                std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep7: " << timeMsStep7 << " ms" << std::endl;
+            }
         }
 
         return v_doc;
@@ -325,7 +346,10 @@ private:
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError())
             float timeMsStep1 = timerStep1.tocMs();
-            //std::cout << "[TopkBucketSort::checkMinMaxScore] timeMsStep1: " << timeMsStep1 << " ms" << std::endl;
+            if (kPrintSegmentTime_)
+            {
+                std::cout << "[TopkBucketSort::checkMinMaxScore] timeMsStep1: " << timeMsStep1 << " ms" << std::endl;
+            }
         }
 
         // --------------
@@ -336,7 +360,10 @@ private:
             thrust::sort(thrust::device.on(stream), d_sampledScores_, d_sampledScores_ + kNumDocsToSample_,
                          thrust::less<float>());
             float timeMsStep2 = timerStep2.tocMs();
-            //std::cout << "[TopkBucketSort::checkMinMaxScore] timeMsStep2: " << timeMsStep2 << " ms" << std::endl;
+            if (kPrintSegmentTime_)
+            {
+                std::cout << "[TopkBucketSort::checkMinMaxScore] timeMsStep2: " << timeMsStep2 << " ms" << std::endl;
+            }
         }
 
         // --------------
@@ -348,7 +375,10 @@ private:
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError())
             float timeMsStep3 = timerStep3.tocMs();
-            //std::cout << "[TopkBucketSort::checkMinMaxScore] timeMsStep3: " << timeMsStep3 << " ms" << std::endl;
+            if (kPrintSegmentTime_)
+            {
+                std::cout << "[TopkBucketSort::checkMinMaxScore] timeMsStep3: " << timeMsStep3 << " ms" << std::endl;
+            }
         }
 
         // --------------
