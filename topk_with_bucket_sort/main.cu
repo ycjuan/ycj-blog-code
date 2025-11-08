@@ -5,6 +5,7 @@
 
 #include "topk_cpu.cuh"
 #include "topk_gpu.cuh"
+#include "topk_gpu_sampling.cuh"
 #include "util.cuh"
 
 struct Doc
@@ -56,14 +57,22 @@ void runExp(int numDocs)
     float timeMsCpuFullSort = timerCpuFullSort.tocMs();
 
     // --------------
+    // Init bucket topk
     TopkBucketSort<Doc, ScorePredicator, DocIdExtractor, ScoreExtractor> topkRetriever;
     topkRetriever.init(numDocs);
     Doc* d_doc = nullptr;
     CHECK_CUDA(cudaMalloc(&d_doc, numDocs * sizeof(Doc)));
 
+    // --------------
+    // Init sampling topk
+    TopkSampling<Doc, ScorePredicator, DocIdExtractor, ScoreExtractor> topkSampler;
+    topkSampler.init(numDocs);
+
+    // --------------
     double timeMsGpuFullSort = 0;
     double timeMsGpuBucketSortWithSample = 0;
     double timeMsGpuBucketSortWithoutSample = 0;
+    double timeMsGpuSampling = 0;
     for (int t = -3; t < kNumTrials; t++)
     {
         // --------------
@@ -152,6 +161,32 @@ void runExp(int numDocs)
                     "Topk results from GPU bucket sort without sample and CPU full sort do not match");
             }
         }
+
+        // --------------
+        // Run GPU sampling topk
+        {
+            // ---------
+            // Copy data to GPU
+            CHECK_CUDA(cudaMemcpy(d_doc, v_doc.data(), numDocs * sizeof(Doc), cudaMemcpyHostToDevice));
+
+            // ---------
+            // Run GPU sampling topk
+            Timer timerGpuSampling;
+            timerGpuSampling.tic();
+            std::vector<Doc> v_topk_gpuSampling = topkSampler.retrieveTopk(d_doc, numDocs, kNumToRetrieve);
+            float timeMsGpuSampling1 = timerGpuSampling.tocMs();
+            if (t >= 0)
+            {
+                timeMsGpuSampling += timeMsGpuSampling1;
+            }
+
+            // ---------
+            // Compare results
+            if (v_topk_gpuSampling != v_topk_cpuFullSort)
+            {
+                throw std::runtime_error("Topk results from GPU sampling topk and CPU full sort do not match");
+            }
+        }
     }
 
     // --------------
@@ -159,10 +194,12 @@ void runExp(int numDocs)
     timeMsGpuFullSort /= kNumTrials;
     timeMsGpuBucketSortWithSample /= kNumTrials;
     timeMsGpuBucketSortWithoutSample /= kNumTrials;
+    timeMsGpuSampling /= kNumTrials;
     std::cout << "timeMsCpuFullSort: " << timeMsCpuFullSort << " ms" << std::endl;
     std::cout << "timeMsGpuFullSort: " << timeMsGpuFullSort << " ms" << std::endl;
     std::cout << "timeMsGpuBucketSortWithSample: " << timeMsGpuBucketSortWithSample << " ms" << std::endl;
     std::cout << "timeMsGpuBucketSortWithoutSample: " << timeMsGpuBucketSortWithoutSample << " ms" << std::endl;
+    std::cout << "timeMsGpuSampling: " << timeMsGpuSampling << " ms" << std::endl;
 
     // --------------
     // Cleanup
