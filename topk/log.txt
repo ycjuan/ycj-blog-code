@@ -1,0 +1,14 @@
+running exps with numDocs: 1000000
+timeMsCpuFullSort: 407.001 ms
+timeMsGpuFullSort: 0.4594 ms
+timeMsGpuBucketSortWithSample: 0.3599 ms
+timeMsGpuBucketSortWithoutSample: 0.2365 ms
+timeMsGpuSampling: 0.2895 ms
+
+
+running exps with numDocs: 32000000
+timeMsCpuFullSort: 15995.2 ms
+timeMsGpuFullSort: 34.4157 ms
+timeMsGpuBucketSortWithSample: 2.6943 ms
+timeMsGpuBucketSortWithoutSample: 2.496 ms
+timeMsGpuSampling: 1.368 ms

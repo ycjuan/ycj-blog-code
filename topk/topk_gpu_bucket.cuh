@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <random>
 #include <sstream>
 #include <stdexcept>
@@ -13,6 +12,9 @@
 
 template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor>
 class TopkBucketSort; // forward declaration
+
+namespace topk_gpu_bucket
+{
 
 // This kernel is used to update the counter in each bucket.
 template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor>
@@ -51,6 +53,8 @@ updateMinMaxScoreKernel(float* d_sampledScores, int numSamples, float minPercent
         hp_minMaxScore[1] = d_sampledScores[(int)(numSamples * maxPercentile)];
     }
 }
+
+} // namespace topk_gpu_bucket
 
 template <typename T, class ScorePredicator, class DocIdExtractor, class ScoreExtractor> class TopkBucketSort
 {
@@ -118,7 +122,8 @@ public:
             Timer timerStep2;
             timerStep2.tic();
             CHECK_CUDA(cudaMemset(d_counter_, 0, kSize_byte_d_counter_))
-            updateCounterKernel<<<gridSize, kBlockSize, 0, stream>>>(d_doc, numDocs, *this);
+            topk_gpu_bucket::updateCounterKernel<T, ScorePredicator, DocIdExtractor, ScoreExtractor>
+                <<<gridSize, kBlockSize, 0, stream>>>(d_doc, numDocs, *this);
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError());
             float timeMsStep2 = timerStep2.tocMs();
@@ -342,7 +347,7 @@ private:
             timerStep1.tic();
             int kBlockSize = 256;
             int gridSize = (int)ceil((double)(numDocs + 1) / kBlockSize);
-            sampleRandomScoresKernel<T, ScoreExtractor>
+            topk_gpu_bucket::sampleRandomScoresKernel<T, ScoreExtractor>
                 <<<gridSize, kBlockSize, 0, stream>>>(d_doc, numToSample, d_sampledScores_, d_randomIndices_, numDocs);
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError())
@@ -372,7 +377,7 @@ private:
         {
             Timer timerStep3;
             timerStep3.tic();
-            updateMinMaxScoreKernel<<<1, 1, 0, stream>>>(d_sampledScores_, numToSample, kMinPercentile_, kMaxPercentile_, hp_minMaxScore_);
+            topk_gpu_bucket::updateMinMaxScoreKernel<<<1, 1, 0, stream>>>(d_sampledScores_, numToSample, kMinPercentile_, kMaxPercentile_, hp_minMaxScore_);
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError())
             float timeMsStep3 = timerStep3.tocMs();
