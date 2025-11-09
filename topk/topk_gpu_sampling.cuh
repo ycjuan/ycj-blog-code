@@ -95,7 +95,7 @@ public:
             float timeMsStep1 = timerStep1.tocMs();
             if (kPrintSegmentTime_)
             {
-                std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep1: " << timeMsStep1 << " ms" << std::endl;
+                std::cout << "[TopkSampling::retrieveTopk] timeMsStep1: " << timeMsStep1 << " ms" << std::endl;
             }
         }
 
@@ -113,7 +113,7 @@ public:
             float timeMsStep2 = timerStep2.tocMs();
             if (kPrintSegmentTime_)
             {
-                std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep2: " << timeMsStep2 << " ms" << std::endl;
+                std::cout << "[TopkSampling::retrieveTopk] timeMsStep2: " << timeMsStep2 << " ms" << std::endl;
             }
         }
 
@@ -128,7 +128,7 @@ public:
             float timeMsStep3 = timerStep3.tocMs();
             if (kPrintSegmentTime_)
             {
-                std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep3: " << timeMsStep3 << " ms" << std::endl;
+                std::cout << "[TopkSampling::retrieveTopk] timeMsStep3: " << timeMsStep3 << " ms" << std::endl;
             }
         }
 
@@ -144,7 +144,7 @@ public:
             float timeMsStep4 = timerStep4.tocMs();
             if (kPrintSegmentTime_)
             {
-                std::cout << "[TopkBucketSort::retrieveTopk] timeMsStep4: " << timeMsStep4 << " ms" << std::endl;
+                std::cout << "[TopkSampling::retrieveTopk] timeMsStep4: " << timeMsStep4 << " ms" << std::endl;
             }
         }
 
