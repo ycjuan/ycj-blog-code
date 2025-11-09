@@ -58,15 +58,15 @@ void runExp(int numDocs)
 
     // --------------
     // Init bucket topk
-    TopkBucketSort<Doc, ScorePredicator, DocIdExtractor, ScoreExtractor> topkRetriever;
-    topkRetriever.init(numDocs);
+    TopkBucketSort<Doc, ScorePredicator, DocIdExtractor, ScoreExtractor> topkBasedOnBucket;
+    topkBasedOnBucket.init(numDocs);
     Doc* d_doc = nullptr;
     CHECK_CUDA(cudaMalloc(&d_doc, numDocs * sizeof(Doc)));
 
     // --------------
     // Init sampling topk
-    TopkSampling<Doc, ScorePredicator, DocIdExtractor, ScoreExtractor> topkSampler;
-    topkSampler.init(numDocs);
+    TopkSampling<Doc, ScorePredicator, DocIdExtractor, ScoreExtractor> topkBasedOnSampling;
+    topkBasedOnSampling.init(numDocs);
 
     // --------------
     double timeMsGpuFullSort = 0;
@@ -113,10 +113,10 @@ void runExp(int numDocs)
             // Run GPU bucket sort with sample
             Timer timerGpuBucketSortWithSample;
             timerGpuBucketSortWithSample.tic();
-            topkRetriever.unsetMinMaxScore(); // unset min and max score so that the algorithm will perform sampling to
+            topkBasedOnBucket.unsetMinMaxScore(); // unset min and max score so that the algorithm will perform sampling to
                                               // get the min and max score.
             std::vector<Doc> v_topk_gpuBucketSortWithSample
-                = topkRetriever.retrieveTopk(d_doc, numDocs, kNumToRetrieve);
+                = topkBasedOnBucket.retrieveTopk(d_doc, numDocs, kNumToRetrieve);
             float timeMsGpuBucketSortWithSample1 = timerGpuBucketSortWithSample.tocMs();
             if (t >= 0)
             {
@@ -143,10 +143,10 @@ void runExp(int numDocs)
             // Run GPU bucket sort without sample
             Timer timerGpuBucketSortWithoutSample;
             timerGpuBucketSortWithoutSample.tic();
-            topkRetriever.setMinMaxScore(-1.0, 1.0); // set min and max score so that the algorithm will directly use
+            topkBasedOnBucket.setMinMaxScore(-1.0, 1.0); // set min and max score so that the algorithm will directly use
                                                      // the min and max score. (and the sampling step will be skipped)
             std::vector<Doc> v_topk_gpuBucketSortWithoutSample
-                = topkRetriever.retrieveTopk(d_doc, numDocs, kNumToRetrieve);
+                = topkBasedOnBucket.retrieveTopk(d_doc, numDocs, kNumToRetrieve);
             float timeMsGpuBucketSortWithoutSample1 = timerGpuBucketSortWithoutSample.tocMs();
             if (t >= 0)
             {
@@ -173,7 +173,7 @@ void runExp(int numDocs)
             // Run GPU sampling topk
             Timer timerGpuSampling;
             timerGpuSampling.tic();
-            std::vector<Doc> v_topk_gpuSampling = topkSampler.retrieveTopk(d_doc, numDocs, kNumToRetrieve);
+            std::vector<Doc> v_topk_gpuSampling = topkBasedOnSampling.retrieveTopk(d_doc, numDocs, kNumToRetrieve);
             float timeMsGpuSampling1 = timerGpuSampling.tocMs();
             if (t >= 0)
             {
@@ -204,7 +204,7 @@ void runExp(int numDocs)
     // --------------
     // Cleanup
     CHECK_CUDA(cudaFree(d_doc));
-    topkRetriever.reset();
+    topkBasedOnBucket.reset();
 }
 
 int main()
