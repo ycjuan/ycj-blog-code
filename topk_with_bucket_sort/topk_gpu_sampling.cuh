@@ -63,27 +63,27 @@ public:
         size_byte_d_buffer_ = sizeof(T) * maxNumDocs;
         CHECK_CUDA(cudaMalloc(&d_buffer_, size_byte_d_buffer_));
         CHECK_CUDA(cudaMalloc(&d_randomIndices_, kNumDocsToSample_ * sizeof(int)));
+        CHECK_CUDA(cudaMalloc(&d_sampledScores_, kNumDocsToSample_ * sizeof(float)));
 
         // Initialize the random indices.
         // We do this in init time as it is expensive to generate random indices in runtime.
         // In runtime, we will do `% numDocs` to get the final random index.
         std::default_random_engine generator;
         std::uniform_int_distribution<int> distribution(0, maxNumDocs_ - 1);
+        std::vector<int> v_randomIndices(kNumDocsToSample_);
         for (int i = 0; i < kNumDocsToSample_; i++)
         {
-            hp_randomIndices_[i] = distribution(generator);
+            v_randomIndices[i] = distribution(generator);
         }
         CHECK_CUDA(
-            cudaMemcpy(d_randomIndices_, hp_randomIndices_, kNumDocsToSample_ * sizeof(int), cudaMemcpyHostToDevice));
+            cudaMemcpy(d_randomIndices_, v_randomIndices.data(), kNumDocsToSample_ * sizeof(int), cudaMemcpyHostToDevice));
     }
 
     void reset()
     {
         CHECK_CUDA(cudaFree(d_buffer_));
         CHECK_CUDA(cudaFree(d_randomIndices_));
-        CHECK_CUDA(cudaFreeHost(hp_randomIndices_));
         CHECK_CUDA(cudaFree(d_sampledScores_));
-        CHECK_CUDA(cudaFreeHost(hp_sampledScores_));
     }
 
     std::vector<T> retrieveTopk(T* d_doc, int numDocs, int numToRetrieve, cudaStream_t stream = nullptr)
@@ -157,7 +157,7 @@ private:
 
     const int kNumDocsToSample_ = 10000; // Number of docs to sample to get the min and max score.
     const float kOverSamplingRatio_ = 1.0f;
-    const bool kPrintSegmentTime_ = false;
+    const bool kPrintSegmentTime_ = true;
 
     // ------------
     // Max num docs and buffer array
@@ -168,9 +168,7 @@ private:
     // --------------
     // For sampling
     int* d_randomIndices_ = nullptr; // Random indices to sample the docs.
-    int* hp_randomIndices_ = nullptr;
     float* d_sampledScores_ = nullptr; // Sampled scores from the docs.
-    float* hp_sampledScores_ = nullptr;
     float h_scoreThreshold_ = 0.0f;
 
     void findThreshold(T* d_doc, int numDocs, int numToRetrieve, cudaStream_t stream)

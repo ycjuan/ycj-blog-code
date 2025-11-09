@@ -31,7 +31,7 @@ struct ScoreExtractor
 };
 
 int kNumToRetrieve = 1000;
-int kNumTrials = 10;
+int kNumTrials = 1;
 
 void runExp(int numDocs)
 {
