@@ -153,7 +153,7 @@ public:
 
 private:
 
-    const int kNumDocsToSample_ = 10000; // Number of docs to sample to get the min and max score.
+    const int kNumDocsToSample_ = 10000;
     const float kOverSamplingRatio_ = 1.0f;
     const bool kPrintSegmentTime_ = false;
 

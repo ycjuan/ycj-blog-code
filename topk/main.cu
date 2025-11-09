@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "topk_cpu.cuh"
-#include "topk_gpu.cuh"
+#include "topk_gpu_bucket.cuh"
 #include "topk_gpu_sampling.cuh"
 #include "util.cuh"
 
