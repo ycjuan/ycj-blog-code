@@ -12,6 +12,9 @@
 
 namespace topk_gpu_sampling
 {
+
+__device__ float d_scoreThreshold_ = 0.0f; // Threshold of the scores that will be enough to satisfy numToRetrieve
+
 // This kernel is used to sample the scores from the docs.
 template <typename T, class ScoreExtractor>
 __global__ void
@@ -25,12 +28,12 @@ sampleRandomScoresKernel(T* d_doc, int numToSample, float* d_sampledScores, int*
 }
 // This kernel is used to update the threshold of the sampled scores.
 __global__ void
-updateThresholdKernel(float* d_sampledScores, int targetSampleIdx, float* d_scoreThreshold)
+updateThresholdKernel(float* d_sampledScores, int targetSampleIdx)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid == 0)
     {
-        *d_scoreThreshold = d_sampledScores[targetSampleIdx];
+        d_scoreThreshold_ = d_sampledScores[targetSampleIdx];
     }
 }
 
@@ -85,8 +88,6 @@ public:
 
     std::vector<T> retrieveTopk(T* d_doc, int numDocs, int numToRetrieve, cudaStream_t stream = nullptr)
     {
-        constexpr int kBlockSize = 256;
-
         // --------------
         // Step1 - Find the threshold of the scores
         {
@@ -170,7 +171,6 @@ private:
     int* hp_randomIndices_ = nullptr;
     float* d_sampledScores_ = nullptr; // Sampled scores from the docs.
     float* hp_sampledScores_ = nullptr;
-    __device__ float d_scoreThreshold_ = 0.0f; // Threshold of the scores that will be enough to satisfy numToRetrieve
     float h_scoreThreshold_ = 0.0f;
 
     void findThreshold(T* d_doc, int numDocs, int numToRetrieve, cudaStream_t stream)
@@ -215,7 +215,7 @@ private:
             Timer timerStep3;
             timerStep3.tic();
             int targetSampleIdx = (int)(numToSample * (numToRetrieve / (float)numDocs) * (1.0 + kOverSamplingRatio_));
-            topk_gpu_sampling::updateThresholdKernel<<<1, 1, 0, stream>>>(d_sampledScores_, targetSampleIdx, &d_scoreThreshold_);
+            topk_gpu_sampling::updateThresholdKernel<<<1, 1, 0, stream>>>(d_sampledScores_, targetSampleIdx);
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError());
             float timeMsStep3 = timerStep3.tocMs();
@@ -230,7 +230,7 @@ private:
         {
             Timer timerStep4;
             timerStep4.tic();
-            CHECK_CUDA(cudaMemcpyAsync(&h_scoreThreshold_, &d_scoreThreshold_, sizeof(float), cudaMemcpyDeviceToHost, stream));
+            CHECK_CUDA(cudaMemcpyAsync(&h_scoreThreshold_, &topk_gpu_sampling::d_scoreThreshold_, sizeof(float), cudaMemcpyDeviceToHost, stream));
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError());
             float timeMsStep4 = timerStep4.tocMs();
