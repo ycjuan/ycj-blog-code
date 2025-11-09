@@ -199,7 +199,7 @@ private:
             Timer timerStep2;
             timerStep2.tic();
             thrust::sort(thrust::device.on(stream), d_sampledScores_, d_sampledScores_ + kNumDocsToSample_,
-                         thrust::less<float>());
+                         thrust::greater<float>());
             float timeMsStep2 = timerStep2.tocMs();
             if (kPrintSegmentTime_)
             {
@@ -228,7 +228,7 @@ private:
         {
             Timer timerStep4;
             timerStep4.tic();
-            CHECK_CUDA(cudaMemcpyAsync(&h_scoreThreshold_, &topk_gpu_sampling::d_scoreThreshold_, sizeof(float), cudaMemcpyDeviceToHost, stream));
+            CHECK_CUDA(cudaMemcpyFromSymbol(&h_scoreThreshold_, topk_gpu_sampling::d_scoreThreshold_, sizeof(float), 0, cudaMemcpyDeviceToHost));
             CHECK_CUDA(cudaStreamSynchronize(stream));
             CHECK_CUDA(cudaGetLastError());
             float timeMsStep4 = timerStep4.tocMs();
