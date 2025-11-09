@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 # Library name
-set(LIB_NAME topk_with_bucket_sort)
+set(LIB_NAME topk)
 
 # Export compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -60,10 +60,10 @@ target_compile_options(${LIB_NAME} PRIVATE
 )
 
 # Add executable
-add_executable(test_topk_with_bucket_sort main.cu)
+add_executable(test_topk main.cu)
 
 # Link library
-target_link_libraries(test_topk_with_bucket_sort ${LIB_NAME})
+target_link_libraries(test_topk ${LIB_NAME})
 
 # Set linker language to CUDA
 set_target_properties(${LIB_NAME} PROPERTIES LINKER_LANGUAGE CUDA)

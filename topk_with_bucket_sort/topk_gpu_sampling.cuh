@@ -1,8 +1,6 @@
 #pragma once
 
 #include <random>
-#include <sstream>
-#include <stdexcept>
 #include <thrust/copy.h>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
@@ -157,7 +155,7 @@ private:
 
     const int kNumDocsToSample_ = 10000; // Number of docs to sample to get the min and max score.
     const float kOverSamplingRatio_ = 1.0f;
-    const bool kPrintSegmentTime_ = true;
+    const bool kPrintSegmentTime_ = false;
 
     // ------------
     // Max num docs and buffer array
