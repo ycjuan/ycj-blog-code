@@ -38,68 +38,28 @@ struct ExpConfig
     }
 };
 
-void runExp(ExpConfig config)
+void runExp(ExpConfig config, ThreadPool& threadPool, bool useThreadPool)
 {
+    std::cout << "Running experiment with " << (useThreadPool ? "thread pool" : "std::async") << std::endl;
+    
     std::deque<std::future<long>> futures;
     auto startTimePoint = std::chrono::high_resolution_clock::now();
     for (int reqIdx = 0; reqIdx < config.numReqs; reqIdx++)
     {
         // -------------
         // Dispatch the request
-        futures.push_back(std::async(std::launch::async, [config, reqIdx]() {
-            return worker(config.numRepeats, reqIdx);
-        }));
-
-        // -------------
-        // Wait for the request to complete
-        while (!futures.empty() || futures.size() >= config.maxConcurrency)
+        if (useThreadPool)
         {
-            auto &future = futures.front();
-            if (future.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
-            {
-                future.get();
-                futures.pop_front();
-            }
-            else
-            {
-                if (futures.size() >= config.maxConcurrency)
-                {
-                    std::this_thread::sleep_for(std::chrono::microseconds(100));
-                    continue;
-                }
-                else
-                {
-                    break;
-                }
-            }
+            futures.push_back(threadPool.enqueue([config, reqIdx]() {
+                return worker(config.numRepeats, reqIdx);
+            }));
         }
-
-    }
-
-    for (auto &future : futures)
-    {
-        future.get();
-    }
-
-    auto endTimePoint = std::chrono::high_resolution_clock::now();
-    long durationMicroSec = std::chrono::duration_cast<std::chrono::microseconds>(endTimePoint - startTimePoint).count();
-    std::cout << "Duration: " << durationMicroSec << " microseconds" << std::endl;
-    std::cout << "QPS: " << config.numReqs * 1000000.0 / durationMicroSec << std::endl;
-    std::cout << "Avg latency: " << durationMicroSec * 1.0 / config.numReqs << " microseconds" << std::endl;
-
-}
-
-void runExpWithThreadPool(ExpConfig config)
-{
-    ThreadPool threadPool(config.maxConcurrency);
-    std::deque<std::future<long>> futures;
-    auto startTimePoint = std::chrono::high_resolution_clock::now();
-    for (int reqIdx = 0; reqIdx < config.numReqs; reqIdx++)
-    {
-        futures.push_back(threadPool.enqueue([config, reqIdx]() {
-            return worker(config.numRepeats, reqIdx);
-        }));
-
+        else
+        {
+            futures.push_back(std::async(std::launch::async, [config, reqIdx]() {
+                return worker(config.numRepeats, reqIdx);
+            }));
+        }
 
         // -------------
         // Wait for the request to complete
@@ -116,8 +76,10 @@ void runExpWithThreadPool(ExpConfig config)
                 break;
             }
         }
-
     }
+
+    // -------------
+    // Wait for all requests to complete
     for (auto &future : futures)
     {
         future.get();
@@ -128,34 +90,36 @@ void runExpWithThreadPool(ExpConfig config)
     std::cout << "Duration: " << durationMicroSec << " microseconds" << std::endl;
     std::cout << "QPS: " << config.numReqs * 1000000.0 / durationMicroSec << std::endl;
     std::cout << "Avg latency: " << durationMicroSec * 1.0 / config.numReqs << " microseconds" << std::endl;
+
 }
 
 int main()
 {
     ExpConfig config;
     config.maxConcurrency = 4;
+    ThreadPool threadPool(config.maxConcurrency);
     {
         config.numRepeats = 1000000;
         config.numReqs = 5000;
         config.print();
-        runExp(config);
-        runExpWithThreadPool(config);
+        runExp(config, threadPool, false);
+        runExp(config, threadPool, true);
     }
 
     {
         config.numRepeats /= 10;
         config.numReqs *= 10;
         config.print();
-        runExp(config);
-        runExpWithThreadPool(config);
+        runExp(config, threadPool, false);
+        runExp(config, threadPool, true);
     }
 
     {
         config.numRepeats /= 10;
         config.numReqs *= 10;
         config.print();
-        runExp(config);
-        runExpWithThreadPool(config);
+        runExp(config, threadPool, false);
+        runExp(config, threadPool, true);
     }
     return 0;
 }
