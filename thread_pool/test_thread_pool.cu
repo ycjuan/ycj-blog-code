@@ -108,13 +108,39 @@ void runExpWithThreadPool(ExpConfig config)
     int numReqs = config.targetQPS * config.durationSec;
 
     ThreadPool threadPool(config.maxConcurrency);
-    std::vector<std::future<long>> futures;
+    std::deque<std::future<long>> futures;
     auto startTimePoint = std::chrono::high_resolution_clock::now();
     for (int reqIdx = 0; reqIdx < numReqs; reqIdx++)
     {
         futures.push_back(threadPool.enqueue([config, reqIdx]() {
             return worker(config.numRepeats, reqIdx);
         }));
+
+
+        // -------------
+        // Wait for the request to complete
+        while (!futures.empty())
+        {
+            auto &future = futures.front();
+            if (future.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+            {
+                future.get();
+                futures.pop_front();
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        auto currentTimePoint = std::chrono::high_resolution_clock::now();
+        auto scheduledDispatchTimePoint = startTimePoint + std::chrono::microseconds(int64_t((int64_t)reqIdx * 1000000 / config.targetQPS));
+        auto timeToWait = scheduledDispatchTimePoint - currentTimePoint;
+        if (timeToWait > std::chrono::microseconds(0))
+        {
+            std::this_thread::sleep_for(timeToWait);
+        }
+        
     }
     for (auto &future : futures)
     {
@@ -131,9 +157,9 @@ void runExpWithThreadPool(ExpConfig config)
 int main()
 {
     ExpConfig config;
-    config.numRepeats = 100;
+    config.numRepeats = 100000;
     config.maxConcurrency = 10;
-    config.targetQPS = 100;
+    config.targetQPS = 1000;
     config.durationSec = 10;
     runExp(config);
     runExpWithThreadPool(config);
