@@ -5,6 +5,8 @@
 #include <deque>
 #include <thread>
 
+#include "thread_pool.cuh"
+
 long pseudoRandom(long x)
 {
     x = (x * 1103515245 + 12345) & 0x7fffffff;
@@ -100,6 +102,32 @@ void runExp(ExpConfig config)
     std::cout << "QPS: " << numReqs / durationSec << std::endl;
 
 }
+
+void runExpWithThreadPool(ExpConfig config)
+{
+    int numReqs = config.targetQPS * config.durationSec;
+
+    ThreadPool threadPool(config.maxConcurrency);
+    std::vector<std::future<long>> futures;
+    auto startTimePoint = std::chrono::high_resolution_clock::now();
+    for (int reqIdx = 0; reqIdx < numReqs; reqIdx++)
+    {
+        futures.push_back(threadPool.enqueue([config, reqIdx]() {
+            return worker(config.numRepeats, reqIdx);
+        }));
+    }
+    for (auto &future : futures)
+    {
+        future.get();
+    }
+
+    auto endTimePoint = std::chrono::high_resolution_clock::now();
+    double durationSec
+        = std::chrono::duration_cast<std::chrono::microseconds>(endTimePoint - startTimePoint).count() / 1000000.0;
+    std::cout << "Duration: " << durationSec << " seconds" << std::endl;
+    std::cout << "QPS: " << numReqs / durationSec << std::endl;
+}
+
 int main()
 {
     ExpConfig config;
@@ -108,5 +136,6 @@ int main()
     config.targetQPS = 100;
     config.durationSec = 10;
     runExp(config);
+    runExpWithThreadPool(config);
     return 0;
 }
