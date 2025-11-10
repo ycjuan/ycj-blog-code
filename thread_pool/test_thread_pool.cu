@@ -2,7 +2,7 @@
 #include <iostream>
 #include <future>
 #include <deque>
-#include <thread>
+#include <cassert>
 
 #include "thread_pool.cuh"
 
@@ -38,11 +38,12 @@ struct ExpConfig
     }
 };
 
-void runExp(ExpConfig config, ThreadPool& threadPool, bool useThreadPool)
+std::vector<long> runExp(ExpConfig config, ThreadPool& threadPool, bool useThreadPool)
 {
     std::cout << "Running experiment with " << (useThreadPool ? "thread pool" : "std::async") << std::endl;
-    
+
     std::deque<std::future<long>> futures;
+    std::vector<long> results;
     auto startTimePoint = std::chrono::high_resolution_clock::now();
     for (int reqIdx = 0; reqIdx < config.numReqs; reqIdx++)
     {
@@ -68,7 +69,7 @@ void runExp(ExpConfig config, ThreadPool& threadPool, bool useThreadPool)
             auto &future = futures.front();
             if (future.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
             {
-                future.get();
+                results.push_back(future.get());
                 futures.pop_front();
             }
             else
@@ -82,15 +83,18 @@ void runExp(ExpConfig config, ThreadPool& threadPool, bool useThreadPool)
     // Wait for all requests to complete
     for (auto &future : futures)
     {
-        future.get();
+        results.push_back(future.get());
     }
 
+    // -------------
+    // Print benchmark results
     auto endTimePoint = std::chrono::high_resolution_clock::now();
     long durationMicroSec = std::chrono::duration_cast<std::chrono::microseconds>(endTimePoint - startTimePoint).count();
     std::cout << "Duration: " << durationMicroSec << " microseconds" << std::endl;
     std::cout << "QPS: " << config.numReqs * 1000000.0 / durationMicroSec << std::endl;
     std::cout << "Avg latency: " << durationMicroSec * 1.0 / config.numReqs << " microseconds" << std::endl;
 
+    return results;
 }
 
 int main()
@@ -102,24 +106,27 @@ int main()
         config.numRepeats = 1000000;
         config.numReqs = 5000;
         config.print();
-        runExp(config, threadPool, false);
-        runExp(config, threadPool, true);
+        auto result1 = runExp(config, threadPool, false);
+        auto result2 = runExp(config, threadPool, true);
+        assert(result1 == result2);
     }
 
     {
         config.numRepeats /= 10;
         config.numReqs *= 10;
         config.print();
-        runExp(config, threadPool, false);
-        runExp(config, threadPool, true);
+        auto result1 = runExp(config, threadPool, false);
+        auto result2 = runExp(config, threadPool, true);
+        assert(result1 == result2);
     }
 
     {
         config.numRepeats /= 10;
         config.numReqs *= 10;
         config.print();
-        runExp(config, threadPool, false);
-        runExp(config, threadPool, true);
+        auto result1 = runExp(config, threadPool, false);
+        auto result2 = runExp(config, threadPool, true);
+        assert(result1 == result2);
     }
     return 0;
 }
