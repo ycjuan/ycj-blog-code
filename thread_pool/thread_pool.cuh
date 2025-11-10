@@ -8,8 +8,8 @@
 #include <mutex>
 #include <condition_variable>
 
-// Code here is suggested by Google AI overview
-// I believe it is sourced from https://github.com/progschj/ThreadPool/blob/master/ThreadPool.h
+// Code here is suggested by Google AI Overview when i searched for "c++ thread pool return future"
+// I believe AI learned this from https://github.com/progschj/ThreadPool/blob/master/ThreadPool.h
 
 class ThreadPool {
 public:
