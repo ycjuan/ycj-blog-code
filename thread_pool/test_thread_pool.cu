@@ -32,7 +32,7 @@ struct ExpConfig
 
     void print()
     {
-        std::cout << "numRepeats: " << numRepeats << std::endl;
+        std::cout << "\n\nnumRepeats: " << numRepeats << std::endl;
         std::cout << "maxConcurrency: " << maxConcurrency << std::endl;
         std::cout << "numReqs: " << numReqs << std::endl;
     }
@@ -40,8 +40,6 @@ struct ExpConfig
 
 void runExp(ExpConfig config)
 {
-    config.print();
-
     std::deque<std::future<long>> futures;
     auto startTimePoint = std::chrono::high_resolution_clock::now();
     for (int reqIdx = 0; reqIdx < config.numReqs; reqIdx++)
@@ -84,10 +82,10 @@ void runExp(ExpConfig config)
     }
 
     auto endTimePoint = std::chrono::high_resolution_clock::now();
-    double durationSec
-        = std::chrono::duration_cast<std::chrono::microseconds>(endTimePoint - startTimePoint).count() / 1000000.0;
-    std::cout << "Duration: " << durationSec << " seconds" << std::endl;
-    std::cout << "QPS: " << config.numReqs / durationSec << std::endl;
+    long durationMicroSec = std::chrono::duration_cast<std::chrono::microseconds>(endTimePoint - startTimePoint).count();
+    std::cout << "Duration: " << durationMicroSec << " microseconds" << std::endl;
+    std::cout << "QPS: " << config.numReqs * 1000000.0 / durationMicroSec << std::endl;
+    std::cout << "Avg latency: " << durationMicroSec * 1.0 / config.numReqs << " microseconds" << std::endl;
 
 }
 
@@ -126,19 +124,38 @@ void runExpWithThreadPool(ExpConfig config)
     }
 
     auto endTimePoint = std::chrono::high_resolution_clock::now();
-    double durationSec
-        = std::chrono::duration_cast<std::chrono::microseconds>(endTimePoint - startTimePoint).count() / 1000000.0;
-    std::cout << "Duration: " << durationSec << " seconds" << std::endl;
-    std::cout << "QPS: " << config.numReqs / durationSec << std::endl;
+    long durationMicroSec = std::chrono::duration_cast<std::chrono::microseconds>(endTimePoint - startTimePoint).count();
+    std::cout << "Duration: " << durationMicroSec << " microseconds" << std::endl;
+    std::cout << "QPS: " << config.numReqs * 1000000.0 / durationMicroSec << std::endl;
+    std::cout << "Avg latency: " << durationMicroSec * 1.0 / config.numReqs << " microseconds" << std::endl;
 }
 
 int main()
 {
     ExpConfig config;
-    config.numRepeats = 100000;
-    config.maxConcurrency = 10;
-    config.numReqs = 10000;
-    runExp(config);
-    runExpWithThreadPool(config);
+    config.maxConcurrency = 4;
+    {
+        config.numRepeats = 1000000;
+        config.numReqs = 5000;
+        config.print();
+        runExp(config);
+        runExpWithThreadPool(config);
+    }
+
+    {
+        config.numRepeats /= 10;
+        config.numReqs *= 10;
+        config.print();
+        runExp(config);
+        runExpWithThreadPool(config);
+    }
+
+    {
+        config.numRepeats /= 10;
+        config.numReqs *= 10;
+        config.print();
+        runExp(config);
+        runExpWithThreadPool(config);
+    }
     return 0;
 }
