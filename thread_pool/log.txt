@@ -3,31 +3,37 @@
 numRepeats: 1000000
 maxConcurrency: 4
 numReqs: 5000
-Duration: 9654017 microseconds
-QPS: 517.919
-Avg latency: 1930.8 microseconds
-Duration: 9192788 microseconds
-QPS: 543.905
-Avg latency: 1838.56 microseconds
+Running experiment with std::async
+Duration: 9369912 microseconds
+QPS: 533.623
+Avg latency: 1873.98 microseconds
+Running experiment with thread pool
+Duration: 9231142 microseconds
+QPS: 541.645
+Avg latency: 1846.23 microseconds
 
 
 numRepeats: 100000
 maxConcurrency: 4
 numReqs: 50000
-Duration: 10940761 microseconds
-QPS: 4570.07
-Avg latency: 218.815 microseconds
-Duration: 9206080 microseconds
-QPS: 5431.19
-Avg latency: 184.122 microseconds
+Running experiment with std::async
+Duration: 11167521 microseconds
+QPS: 4477.27
+Avg latency: 223.35 microseconds
+Running experiment with thread pool
+Duration: 9322140 microseconds
+QPS: 5363.58
+Avg latency: 186.443 microseconds
 
 
 numRepeats: 10000
 maxConcurrency: 4
 numReqs: 500000
-Duration: 25082764 microseconds
-QPS: 19934
-Avg latency: 50.1655 microseconds
-Duration: 10133241 microseconds
-QPS: 49342.6
-Avg latency: 20.2665 microseconds
+Running experiment with std::async
+Duration: 19074733 microseconds
+QPS: 26212.7
+Avg latency: 38.1495 microseconds
+Running experiment with thread pool
+Duration: 10149037 microseconds
+QPS: 49265.8
+Avg latency: 20.2981 microseconds
