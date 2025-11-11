@@ -96,6 +96,8 @@ struct OperandKernelParam
     uint64_t numDocs;
     uint64_t* d_bitStacks;
     uint8_t bitStackIdx;
+    uint8_t* d_canEarlyStop;
+    bool earlyStopValue;
 };
 
 __global__ void matchOpKernel(OperandKernelParam param)
@@ -103,7 +105,8 @@ __global__ void matchOpKernel(OperandKernelParam param)
     uint64_t docIdx = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (docIdx < param.numDocs)
     {
-        bool rst = matchOp(param.reqAbmDataGpu, param.docAbmDataGpu, param.reqIdx, docIdx, param.op);
+        bool canEarlyStop = static_cast<bool>(param.d_canEarlyStop[docIdx]);
+        bool rst = canEarlyStop ? param.earlyStopValue : matchOp(param.reqAbmDataGpu, param.docAbmDataGpu, param.reqIdx, docIdx, param.op);
         stackPush(param.d_bitStacks[docIdx], param.bitStackIdx, rst);
     }
 }
@@ -115,6 +118,9 @@ struct OperatorKernelParam
     uint64_t* d_bitStacks;
     uint64_t numDocs;
     uint8_t bitStackIdx;
+    uint8_t* d_canEarlyStop;
+    bool canEarlyStopIfTrue;
+    bool canEarlyStopIfFalse;
 };
 
 __global__ void operatorKernel(OperatorKernelParam param)
@@ -127,6 +133,14 @@ __global__ void operatorKernel(OperatorKernelParam param)
         bool rst2 = stackTop(bitStack, param.bitStackIdx - 2); // Get the second of second operand
         bool rst = (param.op.getOpType() == CabmOpType::OPERATOR_AND) ? (rst1 & rst2) : (rst1 | rst2); // Apply the operator
         stackPush(bitStack, param.bitStackIdx - 2, rst); // Push the result to the bit stack
+        if (param.canEarlyStopIfTrue && rst)
+        {
+            param.d_canEarlyStop[docIdx] = 1;
+        }
+        if (param.canEarlyStopIfFalse && !rst)
+        {
+            param.d_canEarlyStop[docIdx] = 1;
+        }
     }
 }
 
@@ -164,9 +178,17 @@ void cabmGpu(CabmGpuParam& param)
         // Initialize the bit stack index and set the bit stack to 0
         uint8_t currBitStackIdx = 0;
         CHECK_CUDA(cudaMemset(param.d_bitStacks, 0, param.numDocs * sizeof(uint64_t)));
-        
-        for (const auto& op : param.postfixOps)
+        CHECK_CUDA(cudaMemset(param.d_canEarlyStop, 0, param.numDocs * sizeof(uint8_t)));
+
+        // -----------------
+        // Early stop conditions
+        bool canEarlyStopIfTrue = false;
+        bool canEarlyStopIfFalse = false;
+        bool earlyStopValue;
+
+        for (int opIdx = 0; opIdx < param.postfixOps.size(); opIdx++)
         {
+            const auto& op = param.postfixOps[opIdx];
             if (op.isOperand())
             {
                 // -----------------
@@ -189,6 +211,8 @@ void cabmGpu(CabmGpuParam& param)
                 operandKernelParam.numDocs = param.numDocs;
                 operandKernelParam.d_bitStacks = param.d_bitStacks;
                 operandKernelParam.bitStackIdx = currBitStackIdx;
+                operandKernelParam.d_canEarlyStop = param.d_canEarlyStop;
+                operandKernelParam.earlyStopValue = earlyStopValue;
 
                 // -----------------
                 // Launch the operand kernel
@@ -216,12 +240,34 @@ void cabmGpu(CabmGpuParam& param)
             else if (op.isOperator())
             {
                 // -----------------
+                // Check early stop condition
+                if (param.enableEarlyStop)
+                {
+                    auto subPostfixOps = std::vector<CabmOp>(param.postfixOps.begin() + opIdx, param.postfixOps.end());
+                    canEarlyStopIfTrue = canEarlyStop(true, subPostfixOps);
+                    canEarlyStopIfFalse = canEarlyStop(false, subPostfixOps);
+                    // It is not possible to have both true and false can early stop.
+                    assert(!(canEarlyStopIfTrue && canEarlyStopIfFalse));
+                    if (canEarlyStopIfTrue)
+                    {
+                        earlyStopValue = true;
+                    }
+                    else if (canEarlyStopIfFalse)
+                    {
+                        earlyStopValue = false;
+                    }
+                }
+
+                // -----------------
                 // Create the operator kernel parameter
                 OperatorKernelParam operatorKernelParam;
                 operatorKernelParam.op = op;
                 operatorKernelParam.d_bitStacks = param.d_bitStacks;
                 operatorKernelParam.bitStackIdx = currBitStackIdx;
                 operatorKernelParam.numDocs = param.numDocs;
+                operatorKernelParam.d_canEarlyStop = param.d_canEarlyStop;
+                operatorKernelParam.canEarlyStopIfTrue = canEarlyStopIfTrue;
+                operatorKernelParam.canEarlyStopIfFalse = canEarlyStopIfFalse;
 
                 // -----------------
                 // Launch the operator kernel

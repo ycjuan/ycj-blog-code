@@ -77,10 +77,14 @@ struct CabmGpuParam
     uint64_t numDocs;
     uint64_t numReqs;
     uint8_t* d_rst;
+    uint8_t* d_canEarlyStop;
     float timeMsOperandKernel = 0;
     float timeMsOperatorKernel = 0;
     float timeMsCopyRstKernel = 0;
     float timeMsTotal = 0;
+    bool enableEarlyStop = false;
 };
 
 void cabmGpu(CabmGpuParam& param);
+
+bool canEarlyStop(bool stackTop, std::vector<CabmOp> postfix1D);

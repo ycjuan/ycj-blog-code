@@ -163,3 +163,43 @@ std::string CabmOp::toString() const
         }
     }
 }
+
+bool canEarlyStop(bool stackTop, std::vector<CabmOp> postfix1D)
+{
+    // Create a stack of capacity equal to expression size
+    std::stack<int> st;
+    st.push(stackTop);
+
+    // Scan all characters one by one
+    for (auto op : postfix1D)
+    {
+        // If the scanned character is an operand
+        // (number here), push it to the stack.
+        if (op.isOperand())
+        {
+            st.push(!stackTop);
+        }
+        // If the scanned character is an operator,
+        // pop two elements from stack apply the operator
+        else
+        {
+            int rstA = st.top();
+            st.pop();
+            int rstB = st.top();
+            st.pop();
+            switch (op.getOpType())
+            {
+            case CabmOpType::OPERATOR_AND:
+                st.push(int((bool)rstA & (bool)rstB));
+                break;
+            case CabmOpType::OPERATOR_OR:
+                st.push(int((bool)rstA | (bool)rstB));
+                break;
+            default:
+                assert(false); // This should not happen
+                break;
+            }
+        }
+    }
+    return stackTop == (bool)st.top();
+}
