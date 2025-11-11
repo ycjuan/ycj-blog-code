@@ -241,9 +241,9 @@ void cabmGpu(CabmGpuParam& param)
             {
                 // -----------------
                 // Check early stop condition
-                if (param.enableEarlyStop)
+                if (param.enableEarlyStop && opIdx < param.postfixOps.size() - 1)
                 {
-                    auto subPostfixOps = std::vector<CabmOp>(param.postfixOps.begin() + opIdx, param.postfixOps.end());
+                    auto subPostfixOps = std::vector<CabmOp>(param.postfixOps.begin() + opIdx + 1, param.postfixOps.end());
                     canEarlyStopIfTrue = canEarlyStop(true, subPostfixOps);
                     canEarlyStopIfFalse = canEarlyStop(false, subPostfixOps);
                     // It is not possible to have both true and false can early stop.

@@ -183,10 +183,17 @@ bool canEarlyStop(bool stackTop, std::vector<CabmOp> postfix1D)
         // pop two elements from stack apply the operator
         else
         {
-            int rstA = st.top();
-            st.pop();
-            int rstB = st.top();
-            st.pop();
+
+            int rstA = st.empty() ? !stackTop : st.top();
+            if (!st.empty()) 
+            {
+                st.pop();
+            }
+            int rstB = st.empty() ? !stackTop : st.top();
+            if (!st.empty()) 
+            {
+                st.pop();
+            }
             switch (op.getOpType())
             {
             case CabmOpType::OPERATOR_AND:

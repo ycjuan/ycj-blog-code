@@ -61,6 +61,8 @@ void test3a()
         CHECK_CUDA(cudaMalloc(&d_rst, kNumReqs * kNumDocs * sizeof(uint8_t)));
         uint64_t* d_bitStacks;
         CHECK_CUDA(cudaMalloc(&d_bitStacks, kNumDocs * sizeof(uint64_t)));
+        uint8_t* d_canEarlyStop;
+        CHECK_CUDA(cudaMalloc(&d_canEarlyStop, kNumDocs * sizeof(uint8_t)));
 
         CabmGpuParam param;
         param.d_rst = d_rst;
@@ -70,6 +72,8 @@ void test3a()
         param.postfixOps = postfix;
         param.reqAbmDataGpuList = reqAbmDataGpuList;
         param.docAbmDataGpuList = docAbmDataGpuList;
+        param.d_canEarlyStop = d_canEarlyStop;
+        param.enableEarlyStop = true;
 
         Timer timer;
         float timeMsOperandKernel = 0;
@@ -108,7 +112,7 @@ void test3a()
 
         CHECK_CUDA(cudaFree(d_rst));
         CHECK_CUDA(cudaFree(d_bitStacks));
-
+        CHECK_CUDA(cudaFree(d_canEarlyStop));
         for (int reqIdx = 0; reqIdx < kNumReqs; reqIdx++)
         {
             for (int docIdx = 0; docIdx < kNumDocs; docIdx++)
