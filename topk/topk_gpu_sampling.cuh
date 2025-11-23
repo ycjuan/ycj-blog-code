@@ -179,7 +179,7 @@ private:
             Timer timerStep1;
             timerStep1.tic();
             int kBlockSize = 256;
-            int gridSize = (int)ceil((double)(numDocs + 1) / kBlockSize);
+            int gridSize = (numToSample + kBlockSize - 1) / kBlockSize;
             topk_gpu_sampling::sampleRandomScoresKernel<T, ScoreExtractor>
                 <<<gridSize, kBlockSize, 0, stream>>>(d_doc, numToSample, d_sampledScores_, d_randomIndices_, numDocs);
             CHECK_CUDA(cudaStreamSynchronize(stream));
