@@ -23,16 +23,19 @@ find_package(CUDA REQUIRED)
 # Add library
 set(LIB_HEADER_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/util.cuh
+    ${CMAKE_CURRENT_SOURCE_DIR}/data.cuh
+    ${CMAKE_CURRENT_SOURCE_DIR}/methods.cuh
 )
 
 
-#set(LIB_SOURCE_FILES
-#    
-#)
+set(LIB_SOURCE_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/data.cu
+    ${CMAKE_CURRENT_SOURCE_DIR}/methods.cu
+)
 
 add_library(${LIB_NAME} SHARED
     ${LIB_HEADER_FILES}
-    #${LIB_SOURCE_FILES}
+    ${LIB_SOURCE_FILES}
 )
 
 # Set CUDA architecture
