@@ -59,7 +59,7 @@ __global__ void resQuantKernel(Data data, RQ_T* p_residual)
         EMB_T delta = data.d_centroidEmb[deltaMemAddr];
         RQ_T rq = p_residual[rqMemAddr];
 
-        EMB_T residual = retriveQuantRes(data.config.numBitsPerDim, kBitsPerInt, delta, rq, embIdx);
+        EMB_T residual = 0;//retriveQuantRes(data.config.numBitsPerDim, kBitsPerInt, delta, rq, embIdx);
 
         EMB_T rst = centroid + residual;
 
