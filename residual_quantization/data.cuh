@@ -71,18 +71,22 @@ void printBits(T value, std::string name)
 
 inline void quantize(int numBitsPerDim, int numBitsPerInt, float stdDev, float residual, RQ_T& rq, int embIdx)
 {
-    int embsPerInt = numBitsPerInt / numBitsPerDim;
-    int bitOffset = (embIdx % embsPerInt) * numBitsPerDim;
-    RQ_T mask = (RQ_T(1) << numBitsPerDim) - 1;
+    const int embsPerInt = numBitsPerInt / numBitsPerDim;
+    const int bitOffset = (embIdx % embsPerInt) * numBitsPerDim;
+    const int fullRange = (1 << numBitsPerDim);
+    const int halfRange = (fullRange >> 1);
+
     int quantizedResidual = residual > 0 ? (int)(std::ceil(residual / stdDev))
                                          : (int)(std::floor(residual / stdDev));
-    quantizedResidual = std::max(quantizedResidual, -(1 << (numBitsPerDim - 1)));
-    quantizedResidual = std::min(quantizedResidual, (1 << (numBitsPerDim - 1)));
-    quantizedResidual += (1 << (numBitsPerDim - 1));
-    if (quantizedResidual > (1 << (numBitsPerDim - 1)))
+    quantizedResidual = std::max(quantizedResidual, -halfRange);
+    quantizedResidual = std::min(quantizedResidual, halfRange);
+    quantizedResidual += halfRange;
+    if (quantizedResidual > halfRange)
     {
         quantizedResidual--;
     }
+
+    RQ_T mask = static_cast<RQ_T>(fullRange) - 1;
     mask &= quantizedResidual;
     mask <<= bitOffset;
     rq |= mask;
@@ -90,21 +94,23 @@ inline void quantize(int numBitsPerDim, int numBitsPerInt, float stdDev, float r
 
 inline __device__ __host__ float dequantize(int numBitsPerDim, int numBitsPerInt, float stdDev, RQ_T rq, int embIdx)
 {
-    int embsPerInt = numBitsPerInt / numBitsPerDim;
-    int bitOffset = (embIdx % embsPerInt) * numBitsPerDim;
-    RQ_T mask = (RQ_T(1) << numBitsPerDim) - 1;
+    const int embsPerInt = numBitsPerInt / numBitsPerDim;
+    const int bitOffset = (embIdx % embsPerInt) * numBitsPerDim;
+    const int fullRange = (1 << numBitsPerDim);
+    const int halfRange = (fullRange >> 1);
 
+    RQ_T mask = static_cast<RQ_T>(fullRange) - 1;
     mask <<= bitOffset;
-    RQ_T quantizedResidual_ = rq & mask;
-    quantizedResidual_ >>= bitOffset;
-    int quantizedResidual = static_cast<int>(quantizedResidual_);
+    mask &= rq;
+    mask >>= bitOffset;
+    int quantizedResidual = static_cast<int>(mask);
 
-    if (quantizedResidual >= (1 << (numBitsPerDim - 1)))
+    if (quantizedResidual >= halfRange)
     {
         quantizedResidual++;
     }
 
-    quantizedResidual -= (1 << (numBitsPerDim - 1));
+    quantizedResidual -= halfRange;
 
     return quantizedResidual * stdDev;
 }
