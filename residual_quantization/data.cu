@@ -68,8 +68,9 @@ Data genData(Config config)
                 for (int embIdx = 0; embIdx < config.embDim; embIdx++)
                 {
                     auto centroid = data.h_centroidEmb[getMemAddr(centroidIdx, embIdx * 2, config.numCentroids, config.embDim * 2)];
-                    auto residual = (EMB_T)(norm_distributions[omp_get_thread_num()](generators[omp_get_thread_num()]));
-                    data.h_emb[getMemAddr(docIdx, embIdx, config.numDocs, config.embDim)] = centroid + residual;
+                    auto residual = norm_distributions[omp_get_thread_num()](generators[omp_get_thread_num()]);
+                    float emb = static_cast<float>(centroid) + residual; // We use float here because some compilers can't perform the addition of BF16 in CPU
+                    data.h_emb[getMemAddr(docIdx, embIdx, config.numDocs, config.embDim)] = static_cast<EMB_T>(emb);
                     auto rqIdx = getRqIdx(embIdx, config.numBitsPerDim, kBitsPerInt);
                     auto rqMemAddr = getMemAddr(docIdx, rqIdx, config.numDocs, config.getRqDim());
                     quantize(config.numBitsPerDim, kBitsPerInt, config.stdDev, residual, data.h_residual[rqMemAddr], embIdx);
