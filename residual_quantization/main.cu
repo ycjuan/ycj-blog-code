@@ -3,14 +3,15 @@
 #include <stdexcept>
 #include <vector>
 
-#include "util.cuh"
-#include "methods.cuh"
 #include "data.cuh"
+#include "methods.cuh"
+#include "util.cuh"
 
 std::vector<EMB_T> copyResults(Data data)
 {
     std::vector<EMB_T> rst(data.config.numToScore * data.config.embDim);
-    CHECK_CUDA(cudaMemcpy(rst.data(), data.d_rst, data.config.numToScore * data.config.embDim * sizeof(EMB_T), cudaMemcpyDeviceToHost));
+    CHECK_CUDA(cudaMemcpy(rst.data(), data.d_rst, data.config.numToScore * data.config.embDim * sizeof(EMB_T),
+                          cudaMemcpyDeviceToHost));
     return rst;
 }
 
@@ -58,15 +59,25 @@ int main()
     Data data = genData(config);
     methodReference(data);
     std::vector<EMB_T> rstReference = copyResults(data);
-    methodBaseline(data);
-    std::vector<EMB_T> rstBaseline = copyResults(data);
+
+    methodBaseline(data, true);
+    std::vector<EMB_T> rstBaselineHost = copyResults(data);
+    methodBaseline(data, false);
+    std::vector<EMB_T> rstBaselineDevice = copyResults(data);
+
+    methodResQuant(data, true);
+    std::vector<EMB_T> rstResQuantHost = copyResults(data);
     methodResQuant(data, false);
-    std::vector<EMB_T> rstResQuant = copyResults(data);
+    std::vector<EMB_T> rstResQuantDevice = copyResults(data);
 
     float rmseReference = computeRMSE(rstReference, rstReference, config.numToScore, config.embDim);
-    float rmseBaseline = computeRMSE(rstBaseline, rstReference, config.numToScore, config.embDim);
-    float rmseResQuant = computeRMSE(rstResQuant, rstReference, config.numToScore, config.embDim);
-    std::cout << "rmseReference = " << rmseReference << ", rmseBaseline = " << rmseBaseline << ", rmseResQuant = " << rmseResQuant << std::endl;
+    float rmseBaselineHost = computeRMSE(rstBaselineHost, rstReference, config.numToScore, config.embDim);
+    float rmseBaselineDevice = computeRMSE(rstBaselineDevice, rstReference, config.numToScore, config.embDim);
+    float rmseResQuantHost = computeRMSE(rstResQuantHost, rstReference, config.numToScore, config.embDim);
+    float rmseResQuantDevice = computeRMSE(rstResQuantDevice, rstReference, config.numToScore, config.embDim);
+    std::cout << "rmseReference = " << rmseReference << ",rmseBaselineHost = " << rmseBaselineHost
+              << ", rmseBaselineDevice = " << rmseBaselineDevice << ", rmseResQuantHost = " << rmseResQuantHost
+              << ", rmseResQuantDevice = " << rmseResQuantDevice << std::endl;
 
     return 0;
 }

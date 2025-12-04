@@ -19,7 +19,7 @@ void methodReference(Data data)
     CHECK_CUDA(cudaMemcpy(data.d_rst, v_rst.data(), data.config.numToScore * data.config.embDim * sizeof(EMB_T), cudaMemcpyHostToDevice));
 }
 
-__global__ void baselineKernel(Data data)
+__global__ void baselineKernel(Data data, EMB_T* p_emb)
 {
     int tidx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
     int toBeScoredIdx = tidx / data.config.embDim;
@@ -29,13 +29,14 @@ __global__ void baselineKernel(Data data)
     {
         size_t srcMemAddr = getMemAddr(docIdx, embIdx, data.config.numDocs, data.config.embDim);
         size_t dstMemAddr = getMemAddr(toBeScoredIdx, embIdx, data.config.numToScore, data.config.embDim);
-        data.d_rst[dstMemAddr] = data.d_emb[srcMemAddr];
+        data.d_rst[dstMemAddr] = p_emb[srcMemAddr];
     }
 }
 
-void methodBaseline(Data data)
+void methodBaseline(Data data, bool copyEmbFromHost)
 {
-    baselineKernel<<<data.config.numToScore * data.config.embDim / 1024, 1024>>>(data);
+    EMB_T* p_emb = (copyEmbFromHost) ? data.h_emb : data.d_emb;
+    baselineKernel<<<data.config.numToScore * data.config.embDim / 1024, 1024>>>(data, p_emb);
     CHECK_CUDA(cudaGetLastError());
     CHECK_CUDA(cudaDeviceSynchronize());
 }
@@ -52,14 +53,14 @@ __global__ void resQuantKernel(Data data, RQ_T* p_residual)
         int centroidIdx = data.h_centroidIdx[docIdx];
 
         size_t centroidMemAddr = getMemAddr(centroidIdx, embIdx, data.config.numCentroids, data.config.embDim * 2);
-        size_t deltaMemAddr = getMemAddr(centroidIdx, embIdx + data.config.embDim, data.config.numCentroids, data.config.embDim * 2);
+        size_t stdDevMemAddr = getMemAddr(centroidIdx, embIdx + data.config.embDim, data.config.numCentroids, data.config.embDim * 2);
         size_t rqMemAddr = getMemAddr(docIdx, rqIdx, data.config.numDocs, data.config.getRqDim());
 
         EMB_T centroid = data.d_centroidEmb[centroidMemAddr];
-        EMB_T delta = data.d_centroidEmb[deltaMemAddr];
+        EMB_T stdDev = data.d_centroidEmb[stdDevMemAddr];
         RQ_T rq = p_residual[rqMemAddr];
 
-        EMB_T residual = 0;//retriveQuantRes(data.config.numBitsPerDim, kBitsPerInt, delta, rq, embIdx);
+        EMB_T residual = dequantize(data.config.numBitsPerDim, kBitsPerInt, data.config.stdDev, rq, embIdx);
 
         EMB_T rst = centroid + residual;
 

@@ -39,7 +39,7 @@ struct Data
 
     EMB_T* h_emb; // numDocs x embDim
     EMB_T* d_emb;
-    EMB_T* h_centroidEmb; // numCentroids x embDim x 2 (the first half is the embedding, and the second half is the delta)
+    EMB_T* h_centroidEmb; // numCentroids x embDim x 2 (the first half is the embedding, and the second half is the stdDev)
     EMB_T* d_centroidEmb;
     int* h_centroidIdx; // numDocs
     int* d_centroidIdx; // numDocs
