@@ -54,7 +54,7 @@ Data genData(Config config);
 
 inline __device__ __host__ size_t getMemAddr(size_t i, size_t j, size_t M, size_t N)
 {
-    return (size_t)j * M + i;
+    return (size_t)i * N + j;
 }
 
 
