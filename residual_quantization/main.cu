@@ -47,7 +47,7 @@ float computeRMSE(std::vector<EMB_T> rstA, std::vector<EMB_T> rstB, int numToSco
 int main()
 {
     Config config;
-    config.numDocs = 1000000;
+    config.numDocs = 100000;
     config.numToScore = 10000;
     config.embDim = 256;
     config.numBitsPerDim = 2;
