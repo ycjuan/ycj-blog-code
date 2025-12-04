@@ -52,7 +52,7 @@ int main()
     config.embDim = 256;
     config.numBitsPerDim = 2;
     config.numCentroids = 10000;
-    config.stdDev = 1.0f;
+    config.stdDev = 0.1f;
     config.debugMode = false;
     config.validate();
 

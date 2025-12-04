@@ -34,12 +34,12 @@ Data genData(Config config)
         {
             std::cout << "Generating centroid embeddings" << std::endl;
             std::default_random_engine generator;
-            std::uniform_real_distribution<float> distribution(0.0, 1.0);
+            std::uniform_real_distribution<float> distribution(-1.0, 1.0);
             for (int centroidIdx = 0; centroidIdx < config.numCentroids; centroidIdx++) 
             {
                 for (int embIdx = 0; embIdx < config.embDim; embIdx++)
                 {
-                    const auto addr = getMemAddr(centroidIdx, embIdx * 2, config.numCentroids, config.embDim * 2);
+                    const auto addr = getMemAddr(centroidIdx, embIdx * 2, config.numCentroids, config.embDim * 2);                    
                     data.h_centroidEmb[addr] = (EMB_T)distribution(generator);
                     data.h_centroidEmb[addr + 1] = (EMB_T)config.stdDev;
                 }
