@@ -1,7 +1,7 @@
 #include <iostream>
-#include <random>
 #include <stdexcept>
 #include <vector>
+#include <functional>
 
 #include "data.cuh"
 #include "methods.cuh"
@@ -44,8 +44,30 @@ float computeRMSE(std::vector<EMB_T> rstA, std::vector<EMB_T> rstB, int numToSco
     return sum / numToScore;
 }
 
+void runExp(Data data, Method method, const std::string& methodName, int numTrials = 10)
+{
+    Timer timer;
+    for (int t = -3; t < numTrials; t++)
+    {
+        if (t == 0)
+        {
+            timer.tic();
+        }
+        runMethod(data, method);
+    }
+    float timeMs = timer.tocMs() / numTrials;
+    timeMs /= numTrials;
+    std::cout << methodName << " time: " << timeMs << " ms" << std::endl;
+
+    std::vector<EMB_T> rst = copyResults(data);
+    float rmse = computeRMSE(rst, rst, data.config.numToScore, data.config.embDim);
+    std::cout << methodName << " RMSE: " << rmse << std::endl;
+}
+
 int main()
 {
+    int kNumTrials = 10;
+
     Config config;
     config.numDocs = 100000;
     config.numToScore = 10000;
@@ -57,27 +79,12 @@ int main()
     config.validate();
 
     Data data = genData(config);
-    methodReference(data);
-    std::vector<EMB_T> rstReference = copyResults(data);
 
-    methodBaseline(data, true);
-    std::vector<EMB_T> rstBaselineHost = copyResults(data);
-    methodBaseline(data, false);
-    std::vector<EMB_T> rstBaselineDevice = copyResults(data);
-
-    methodResQuant(data, true);
-    std::vector<EMB_T> rstResQuantHost = copyResults(data);
-    methodResQuant(data, false);
-    std::vector<EMB_T> rstResQuantDevice = copyResults(data);
-
-    float rmseReference = computeRMSE(rstReference, rstReference, config.numToScore, config.embDim);
-    float rmseBaselineHost = computeRMSE(rstBaselineHost, rstReference, config.numToScore, config.embDim);
-    float rmseBaselineDevice = computeRMSE(rstBaselineDevice, rstReference, config.numToScore, config.embDim);
-    float rmseResQuantHost = computeRMSE(rstResQuantHost, rstReference, config.numToScore, config.embDim);
-    float rmseResQuantDevice = computeRMSE(rstResQuantDevice, rstReference, config.numToScore, config.embDim);
-    std::cout << "rmseReference = " << rmseReference << ",rmseBaselineHost = " << rmseBaselineHost
-              << ", rmseBaselineDevice = " << rmseBaselineDevice << ", rmseResQuantHost = " << rmseResQuantHost
-              << ", rmseResQuantDevice = " << rmseResQuantDevice << std::endl;
+    runExp(data, Method::REFERENCE, "Reference", kNumTrials);
+    runExp(data, Method::BASELINE_H2D, "Baseline H2D", kNumTrials);
+    runExp(data, Method::BASELINE_D2D, "Baseline D2D", kNumTrials);
+    runExp(data, Method::RES_QUANT_H2D, "Residual Quant H2D", kNumTrials);
+    runExp(data, Method::RES_QUANT_D2D, "Residual Quant D2D", kNumTrials);
 
     return 0;
 }

@@ -1,6 +1,7 @@
 #include <vector>
 #include "data.cuh"
 #include "util.cuh"
+#include "methods.cuh"
 
 void methodReference(Data data)
 {
@@ -76,4 +77,28 @@ void methodResQuant(Data data, bool copyResidualFromHost)
     resQuantKernel<<<gridSize, 1024>>>(data, p_residual);
     CHECK_CUDA(cudaGetLastError());
     CHECK_CUDA(cudaDeviceSynchronize());
+}
+
+void runMethod(Data data, Method method)
+{
+    switch (method)
+    {
+        case Method::REFERENCE:
+            methodReference(data);
+            break;
+        case Method::BASELINE_H2D:
+            methodBaseline(data, true);
+            break;
+        case Method::BASELINE_D2D:
+            methodBaseline(data, false);
+            break;
+        case Method::RES_QUANT_H2D:
+            methodResQuant(data, true);
+            break;
+        case Method::RES_QUANT_D2D:
+            methodResQuant(data, false);
+            break;
+        default:
+            throw std::runtime_error("Invalid method");
+    }
 }
