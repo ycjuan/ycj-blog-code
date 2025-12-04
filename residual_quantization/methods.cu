@@ -24,7 +24,7 @@ __global__ void baselineKernel(Data data, EMB_T* p_emb)
     int tidx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
     int toBeScoredIdx = tidx / data.config.embDim;
     int embIdx = tidx % data.config.embDim;
-    int docIdx = data.h_docIdxToScore[toBeScoredIdx];
+    int docIdx = data.d_docIdxToScore[toBeScoredIdx];
     if (toBeScoredIdx < data.config.numToScore)
     {
         size_t srcMemAddr = getMemAddr(docIdx, embIdx, data.config.numDocs, data.config.embDim);
@@ -50,8 +50,8 @@ __global__ void resQuantKernel(Data data, RQ_T* p_residual)
     int rqIdx = getRqIdx(embIdx, data.config.numBitsPerDim, kBitsPerInt);
     if (toBeScoredIdx < data.config.numToScore)
     {
-        int docIdx = data.h_docIdxToScore[toBeScoredIdx];
-        int centroidIdx = data.h_centroidIdx[docIdx];
+        int docIdx = data.d_docIdxToScore[toBeScoredIdx];
+        int centroidIdx = data.d_centroidIdx[docIdx];
 
         size_t centroidMemAddr = getMemAddr(centroidIdx, embIdx * 2, data.config.numCentroids, data.config.embDim * 2);
         size_t rqMemAddr = getMemAddr(docIdx, rqIdx, data.config.numDocs, data.config.getRqDim());
