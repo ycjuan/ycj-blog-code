@@ -71,57 +71,40 @@ void printBits(T value, std::string name)
 
 inline void quantize(int numBitsPerDim, int numBitsPerInt, float stdDev, float residual, RQ_T& rq, int embIdx)
 {
-    std::cout << "========== quantize ==========" << std::endl;
-
     int embsPerInt = numBitsPerInt / numBitsPerDim;
     int bitOffset = (embIdx % embsPerInt) * numBitsPerDim;
-    std::cout << "bitOffset = " << bitOffset << std::endl;
     RQ_T mask = (RQ_T(1) << numBitsPerDim) - 1;
-    printBits(mask, "mask (0)");
     int quantizedResidual = residual > 0 ? (int)(std::ceil(residual / stdDev))
                                          : (int)(std::floor(residual / stdDev));
-    std::cout << "quantizedResidual (0) = " << quantizedResidual << std::endl;
     quantizedResidual = std::max(quantizedResidual, -(1 << (numBitsPerDim - 1)));
     quantizedResidual = std::min(quantizedResidual, (1 << (numBitsPerDim - 1)));
-    std::cout << "quantizedResidual (1) = " << quantizedResidual << std::endl;
     quantizedResidual += (1 << (numBitsPerDim - 1));
-    std::cout << "quantizedResidual (2) = " << quantizedResidual << std::endl;
     if (quantizedResidual > (1 << (numBitsPerDim - 1)))
     {
         quantizedResidual--;
     }
-    std::cout << "quantizedResidual (3) = " << quantizedResidual << std::endl;
     mask &= quantizedResidual;
-    printBits(mask, "mask (1)");
     mask <<= bitOffset;
-    printBits(mask, "mask (2)");
-    printBits(rq, "rq (0)");
     rq |= mask;
-    std::cout << "rq = " << rq << std::endl;
-    printBits(rq, "rq (1)");
 }
 
-inline __host__ float retriveQuantRes(int numBitsPerDim, int numBitsPerInt, float stdDev, RQ_T rq, int embIdx)
+inline __device__ __host__ float dequantize(int numBitsPerDim, int numBitsPerInt, float stdDev, RQ_T rq, int embIdx)
 {
-    std::cout << "========== dequantize ==========" << std::endl;
     int embsPerInt = numBitsPerInt / numBitsPerDim;
     int bitOffset = (embIdx % embsPerInt) * numBitsPerDim;
     RQ_T mask = (RQ_T(1) << numBitsPerDim) - 1;
-    std::cout << "embsPerInt = " << embsPerInt << std::endl;
-    std::cout << "bitOffset = " << bitOffset << std::endl;
-    printBits(mask, "mask (0)");
 
     mask <<= bitOffset;
     RQ_T quantizedResidual_ = rq & mask;
     quantizedResidual_ >>= bitOffset;
     int quantizedResidual = static_cast<int>(quantizedResidual_);
-    std::cout << "quantizedResidual (0) = " << quantizedResidual << std::endl;
+
     if (quantizedResidual >= (1 << (numBitsPerDim - 1)))
     {
         quantizedResidual++;
     }
-    std::cout << "quantizedResidual (1) = " << quantizedResidual << std::endl;
+
     quantizedResidual -= (1 << (numBitsPerDim - 1));
-    std::cout << "quantizedResidual (2) = " << quantizedResidual << std::endl;
+
     return quantizedResidual * stdDev;
 }

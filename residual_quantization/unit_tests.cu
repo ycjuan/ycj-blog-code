@@ -22,7 +22,7 @@ void testQuantize()
             for (int embIdx = 0; embIdx < numBitsPerInt / numBitsPerDim; embIdx++)
             {
                 quantize(numBitsPerDim, numBitsPerInt, stdDev, residual, rq, embIdx);
-                float quantizedResidual = retriveQuantRes(numBitsPerDim, numBitsPerInt, stdDev, rq, embIdx);
+                float quantizedResidual = dequantize(numBitsPerDim, numBitsPerInt, stdDev, rq, embIdx);
                 if (quantizedResidual != recoveredResiduals[i])
                 {
                     std::ostringstream oss;
