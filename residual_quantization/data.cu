@@ -1,5 +1,6 @@
 #include "data.cuh"
 #include "util.cuh"
+#include <omp.h>
 #include <cuda_runtime.h>
 #include <random>
 #include <algorithm>
@@ -50,8 +51,16 @@ Data genData(Config config)
         // Generate document embeddings
         {
             std::cout << "Generating document embeddings" << std::endl;
-            std::default_random_engine generator;
-            std::normal_distribution<float> norm_distribution(0.0, config.stdDev);
+            int numThreads = omp_get_max_threads();
+            std::vector<std::default_random_engine> generators(numThreads);
+            std::vector<std::normal_distribution<float>> norm_distributions(numThreads);
+            for (int t = 0; t < numThreads; t++)
+            {
+                generators[t] = std::default_random_engine(t);
+                norm_distributions[t] = std::normal_distribution<float>(0.0, config.stdDev);
+            }
+
+            #pragma omp parallel for num_threads(numThreads) schedule(static)
             for (size_t docIdx = 0; docIdx < config.numDocs; docIdx++) 
             {
                 int centroidIdx = docIdx % config.numCentroids;
@@ -59,7 +68,7 @@ Data genData(Config config)
                 for (int embIdx = 0; embIdx < config.embDim; embIdx++)
                 {
                     auto centroid = data.h_centroidEmb[getMemAddr(centroidIdx, embIdx * 2, config.numCentroids, config.embDim * 2)];
-                    auto residual = (EMB_T)(norm_distribution(generator));
+                    auto residual = (EMB_T)(norm_distributions[omp_get_thread_num()](generators[omp_get_thread_num()]));
                     data.h_emb[getMemAddr(docIdx, embIdx, config.numDocs, config.embDim)] = centroid + residual;
                     auto rqIdx = getRqIdx(embIdx, config.numBitsPerDim, kBitsPerInt);
                     auto rqMemAddr = getMemAddr(docIdx, rqIdx, config.numDocs, config.getRqDim());

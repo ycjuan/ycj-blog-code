@@ -69,9 +69,9 @@ int main()
     int kNumTrials = 10;
 
     Config config;
-    config.numDocs = 100000;
+    config.numDocs = 1000000;
     config.numToScore = 10000;
-    config.embDim = 256;
+    config.embDim = 4096;
     config.numBitsPerDim = 2;
     config.numCentroids = 10000;
     config.stdDev = 0.1f;
