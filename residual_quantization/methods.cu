@@ -36,7 +36,8 @@ __global__ void baselineKernel(Data data, EMB_T* p_emb)
 void methodBaseline(Data data, bool copyEmbFromHost)
 {
     EMB_T* p_emb = (copyEmbFromHost) ? data.h_emb : data.d_emb;
-    baselineKernel<<<data.config.numToScore * data.config.embDim / 1024, 1024>>>(data, p_emb);
+    size_t gridSize = (data.config.numToScore * data.config.embDim + 1023) / 1024;
+    baselineKernel<<<gridSize, 1024>>>(data, p_emb);
     CHECK_CUDA(cudaGetLastError());
     CHECK_CUDA(cudaDeviceSynchronize());
 }
@@ -52,15 +53,14 @@ __global__ void resQuantKernel(Data data, RQ_T* p_residual)
         int docIdx = data.h_docIdxToScore[toBeScoredIdx];
         int centroidIdx = data.h_centroidIdx[docIdx];
 
-        size_t centroidMemAddr = getMemAddr(centroidIdx, embIdx, data.config.numCentroids, data.config.embDim * 2);
-        size_t stdDevMemAddr = getMemAddr(centroidIdx, embIdx + data.config.embDim, data.config.numCentroids, data.config.embDim * 2);
+        size_t centroidMemAddr = getMemAddr(centroidIdx, embIdx * 2, data.config.numCentroids, data.config.embDim * 2);
         size_t rqMemAddr = getMemAddr(docIdx, rqIdx, data.config.numDocs, data.config.getRqDim());
 
         EMB_T centroid = data.d_centroidEmb[centroidMemAddr];
-        EMB_T stdDev = data.d_centroidEmb[stdDevMemAddr];
+        EMB_T stdDev = data.d_centroidEmb[centroidMemAddr + 1];
         RQ_T rq = p_residual[rqMemAddr];
 
-        EMB_T residual = dequantize(data.config.numBitsPerDim, kBitsPerInt, data.config.stdDev, rq, embIdx);
+        EMB_T residual = dequantize(data.config.numBitsPerDim, kBitsPerInt, stdDev, rq, embIdx);
 
         EMB_T rst = centroid + residual;
 
@@ -72,7 +72,8 @@ __global__ void resQuantKernel(Data data, RQ_T* p_residual)
 void methodResQuant(Data data, bool copyResidualFromHost)
 {
     RQ_T* p_residual = (copyResidualFromHost) ? data.h_residual : data.d_residual;
-    resQuantKernel<<<data.config.numToScore * data.config.embDim / 1024, 1024>>>(data, p_residual);
+    size_t gridSize = (data.config.numToScore * data.config.embDim + 1023) / 1024;
+    resQuantKernel<<<gridSize, 1024>>>(data, p_residual);
     CHECK_CUDA(cudaGetLastError());
     CHECK_CUDA(cudaDeviceSynchronize());
 }

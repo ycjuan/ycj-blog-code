@@ -37,11 +37,11 @@ Data genData(Config config)
             std::uniform_real_distribution<float> distribution(0.0, 1.0);
             for (int centroidIdx = 0; centroidIdx < config.numCentroids; centroidIdx++) 
             {
-                for (int embIdx = 0; embIdx < config.embDim * 2; embIdx+=2)
+                for (int embIdx = 0; embIdx < config.embDim; embIdx++)
                 {
-                    const auto addr = getMemAddr(centroidIdx, embIdx, config.numCentroids, config.embDim * 2);
+                    const auto addr = getMemAddr(centroidIdx, embIdx * 2, config.numCentroids, config.embDim * 2);
                     data.h_centroidEmb[addr] = (EMB_T)distribution(generator);
-                    data.h_centroidEmb[addr+1] = (EMB_T)config.stdDev;
+                    data.h_centroidEmb[addr + 1] = (EMB_T)config.stdDev;
                 }
             }
         }
@@ -58,9 +58,9 @@ Data genData(Config config)
                 data.h_centroidIdx[docIdx] = centroidIdx;
                 for (int embIdx = 0; embIdx < config.embDim; embIdx++)
                 {
-                    auto centroid = data.h_centroidEmb[getMemAddr(centroidIdx, embIdx, config.numCentroids, config.embDim * 2)];
+                    auto centroid = data.h_centroidEmb[getMemAddr(centroidIdx, embIdx * 2, config.numCentroids, config.embDim * 2)];
                     auto residual = (EMB_T)(norm_distribution(generator));
-                    data.h_emb[docIdx * config.embDim + embIdx] = centroid + residual;
+                    data.h_emb[getMemAddr(docIdx, embIdx, config.numDocs, config.embDim)] = centroid + residual;
                     auto rqIdx = getRqIdx(embIdx, config.numBitsPerDim, kBitsPerInt);
                     auto rqMemAddr = getMemAddr(docIdx, rqIdx, config.numDocs, config.getRqDim());
                     quantize(config.numBitsPerDim, kBitsPerInt, config.stdDev, residual, data.h_residual[rqMemAddr], embIdx);
@@ -91,9 +91,10 @@ Data genData(Config config)
     {
         std::cout << "Copying data to device" << std::endl;
         CHECK_CUDA(cudaMemcpy(data.d_emb, data.h_emb, config.numDocs * config.embDim * sizeof(EMB_T), cudaMemcpyHostToDevice));
-        CHECK_CUDA(cudaMemcpy(data.d_centroidEmb, data.h_centroidEmb, config.numCentroids * config.embDim * sizeof(EMB_T), cudaMemcpyHostToDevice));
+        CHECK_CUDA(cudaMemcpy(data.d_centroidEmb, data.h_centroidEmb, config.numCentroids * config.embDim * 2* sizeof(EMB_T), cudaMemcpyHostToDevice));
         CHECK_CUDA(cudaMemcpy(data.d_centroidIdx, data.h_centroidIdx, config.numDocs * sizeof(int), cudaMemcpyHostToDevice));
         CHECK_CUDA(cudaMemcpy(data.d_residual, data.h_residual, config.numDocs * config.getRqDim() * sizeof(RQ_T), cudaMemcpyHostToDevice));
+        CHECK_CUDA(cudaMemcpy(data.d_docIdxToScore, data.h_docIdxToScore, config.numToScore * sizeof(int), cudaMemcpyHostToDevice));
     }
 
     return data;
