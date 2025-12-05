@@ -1,0 +1,10 @@
+testQuantize passed
+Allocating memory for data
+Generating centroid embeddings
+Generating document embeddings
+Generating document indices to score
+Copying data to device
+Baseline H2D RMSE: 0, time: 6.44951 ms
+Baseline D2D RMSE: 0, time: 0.87944 ms
+Residual Quant H2D RMSE: 0.106931, time: 1.41881 ms
+Residual Quant D2D RMSE: 0.106931, time: 1.10912 ms
