@@ -1,7 +1,6 @@
 #include <iostream>
 #include <stdexcept>
 #include <vector>
-#include <functional>
 
 #include "data.cuh"
 #include "methods.cuh"
@@ -23,6 +22,7 @@ float computeRMSE(std::vector<EMB_T> rstA, std::vector<EMB_T> rstB, int numToSco
     }
 
     double sum = 0;
+    #pragma omp parallel for reduction(+:sum)
     for (int i = 0; i < numToScore; i++)
     {
         double diffSum = 0;
@@ -44,8 +44,10 @@ float computeRMSE(std::vector<EMB_T> rstA, std::vector<EMB_T> rstB, int numToSco
     return sum / numToScore;
 }
 
-void runExp(Data data, Method method, const std::string& methodName, int numTrials = 10)
+void runExp(Data data, Method method, const std::string& methodName, std::vector<EMB_T> rstRef, int numTrials = 10)
 {
+    CHECK_CUDA(cudaMemset(data.d_rst, 0, data.config.numToScore * data.config.embDim * sizeof(EMB_T)));
+
     Timer timer;
     for (int t = -3; t < numTrials; t++)
     {
@@ -60,7 +62,7 @@ void runExp(Data data, Method method, const std::string& methodName, int numTria
     std::cout << methodName << " time: " << timeMs << " ms" << std::endl;
 
     std::vector<EMB_T> rst = copyResults(data);
-    float rmse = computeRMSE(rst, rst, data.config.numToScore, data.config.embDim);
+    float rmse = computeRMSE(rstRef, rst, data.config.numToScore, data.config.embDim);
     std::cout << methodName << " RMSE: " << rmse << std::endl;
 }
 
@@ -80,11 +82,13 @@ int main()
 
     Data data = genData(config);
 
-    runExp(data, Method::REFERENCE, "Reference", kNumTrials);
-    runExp(data, Method::BASELINE_H2D, "Baseline H2D", kNumTrials);
-    runExp(data, Method::BASELINE_D2D, "Baseline D2D", kNumTrials);
-    runExp(data, Method::RES_QUANT_H2D, "Residual Quant H2D", kNumTrials);
-    runExp(data, Method::RES_QUANT_D2D, "Residual Quant D2D", kNumTrials);
+    runMethod(data, Method::REFERENCE);
+    std::vector<EMB_T> rstRef = copyResults(data);
+    runExp(data, Method::REFERENCE, "Reference", rstRef, kNumTrials);
+    runExp(data, Method::BASELINE_H2D, "Baseline H2D", rstRef, kNumTrials);
+    runExp(data, Method::BASELINE_D2D, "Baseline D2D", rstRef, kNumTrials);
+    runExp(data, Method::RES_QUANT_H2D, "Residual Quant H2D", rstRef, kNumTrials);
+    runExp(data, Method::RES_QUANT_D2D, "Residual Quant D2D", rstRef, kNumTrials);
 
     return 0;
 }
