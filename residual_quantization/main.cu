@@ -14,7 +14,7 @@ std::vector<EMB_T> copyResults(Data data)
     return rst;
 }
 
-float computeRMSE(std::vector<EMB_T> rstA, std::vector<EMB_T> rstB, int numToScore, int embDim)
+float computeRMSE(const std::vector<EMB_T>& rstA, const std::vector<EMB_T>& rstB, int numToScore, int embDim)
 {
     if (rstA.size() != rstB.size())
     {
@@ -46,8 +46,12 @@ float computeRMSE(std::vector<EMB_T> rstA, std::vector<EMB_T> rstB, int numToSco
 
 void runExp(Data data, Method method, const std::string& methodName, std::vector<EMB_T> rstRef, int numTrials = 10)
 {
+    // -------------
+    // First, clear the result
     CHECK_CUDA(cudaMemset(data.d_rst, 0, data.config.numToScore * data.config.embDim * sizeof(EMB_T)));
 
+    // -------------
+    // Run the method
     Timer timer;
     for (int t = -3; t < numTrials; t++)
     {
@@ -59,17 +63,22 @@ void runExp(Data data, Method method, const std::string& methodName, std::vector
     }
     float timeMs = timer.tocMs() / numTrials;
     timeMs /= numTrials;
-    std::cout << methodName << " time: " << timeMs << " ms" << std::endl;
 
+    // -------------
+    // Copy the result back to Host and compute the RMSE
     std::vector<EMB_T> rst = copyResults(data);
     float rmse = computeRMSE(rstRef, rst, data.config.numToScore, data.config.embDim);
-    std::cout << methodName << " RMSE: " << rmse << std::endl;
+    std::cout << methodName << " RMSE: " << rmse << ", time: " << timeMs << " ms" << std::endl;
 }
 
 int main()
 {
-    int kNumTrials = 10;
+    // -------------
+    // Experiment settings
+    const int kNumTrials = 10;
 
+    // -------------
+    // Residual Quantization config
     Config config;
     config.numDocs = 1000000;
     config.numToScore = 10000;
@@ -80,11 +89,17 @@ int main()
     config.debugMode = false;
     config.validate();
 
+    // -------------
+    // Generate data
     Data data = genData(config);
 
+    // -------------
+    // Run the reference method
     runMethod(data, Method::REFERENCE);
     std::vector<EMB_T> rstRef = copyResults(data);
-    runExp(data, Method::REFERENCE, "Reference", rstRef, kNumTrials);
+
+    // -------------
+    // Run the experiments
     runExp(data, Method::BASELINE_H2D, "Baseline H2D", rstRef, kNumTrials);
     runExp(data, Method::BASELINE_D2D, "Baseline D2D", rstRef, kNumTrials);
     runExp(data, Method::RES_QUANT_H2D, "Residual Quant H2D", rstRef, kNumTrials);

@@ -41,11 +41,11 @@ struct Data
     EMB_T* d_emb;
     EMB_T* h_centroidEmb; // numCentroids x embDim x 2 (the first half is the embedding, and the second half is the stdDev)
     EMB_T* d_centroidEmb;
-    int* h_centroidIdx; // numDocs
-    int* d_centroidIdx; // numDocs
+    int* h_centroidIdx; // numDocs x 1
+    int* d_centroidIdx;
     RQ_T* h_residual; // numDocs x embDim x numBitsPerDim / sizeof(RQ_T)
     RQ_T* d_residual;
-    int* h_docIdxToScore; // numToScore
+    int* h_docIdxToScore; // numToScore x 1
     int* d_docIdxToScore;
     EMB_T* d_rst; // numToScore x embDim
 };
@@ -54,15 +54,25 @@ Data genData(Config config);
 
 inline __device__ __host__ size_t getMemAddr(size_t i, size_t j, size_t M, size_t N)
 {
+    // For this experiment, I will just fix row-major. 
+    // I didn't compare the performance of row-major and col-major.
     return (size_t)i * N + j;
-}
 
+    // VERY IMPORTANT: if somehow you want to try col-major, you need to remove code like below in several places:
+    //   EMB_T centroid = data.d_centroidEmb[centroidMemAddr];
+    //   EMB_T stdDev = data.d_centroidEmb[centroidMemAddr + 1];
+    // Such logic is only correct for row-major.
+}
 
 inline __device__ __host__ int getRqIdx(int embIdx, int numBitsPerDim, int numBitsPerInt)
 {
-    return embIdx / (numBitsPerInt / numBitsPerDim);
+    // For example, if we have numBitsPerInt = 64, numBitsPerDim = 2, each uint64_t can represent 32 quantized embedding residuals.
+    // So for example if your embDim is 128, [0, 31] will be stored at 0th uint64_t, [32, 63] will be stored at 1th uint64_t, etc.
+    int numEmbsPerInt = numBitsPerInt / numBitsPerDim;
+    return embIdx / numEmbsPerInt;
 }
 
+// This function is used to print for example `int x = 9` as `00000000000000000000000000001001`
 template <typename T>
 void printBits(T value, std::string name)
 {
