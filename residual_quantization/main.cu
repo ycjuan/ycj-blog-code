@@ -62,7 +62,6 @@ void runExp(Data data, Method method, const std::string& methodName, std::vector
         runMethod(data, method);
     }
     float timeMs = timer.tocMs() / numTrials;
-    timeMs /= numTrials;
 
     // -------------
     // Copy the result back to Host and compute the RMSE
