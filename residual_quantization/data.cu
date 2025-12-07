@@ -82,13 +82,15 @@ Data genData(Config config)
         // Generate document indices to score
         {
             std::cout << "Generating document indices to score" << std::endl;
-            std::vector<int> docIdxToScore(config.numToScore);
-            for (int i = 0; i < config.numToScore; i++)
+            std::vector<int> docIdxToScore(config.numDocs);
+            for (int i = 0; i < config.numDocs; i++)
             {
                 docIdxToScore[i] = i;
             }
             std::default_random_engine generator;
             std::shuffle(docIdxToScore.begin(), docIdxToScore.end(), generator);
+            docIdxToScore.resize(config.numToScore);
+            std::sort(docIdxToScore.begin(), docIdxToScore.end());
             for (int i = 0; i < config.numToScore; i++)
             {
                 data.h_docIdxToScore[i] = docIdxToScore[i];
