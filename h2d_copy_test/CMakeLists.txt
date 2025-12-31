@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 # Library name
-set(LIB_NAME residual_quantization)
+set(LIB_NAME h2d_copy_test)
 
 # Export compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -23,19 +23,17 @@ find_package(CUDA REQUIRED)
 # Add library
 set(LIB_HEADER_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/util.cuh
-    ${CMAKE_CURRENT_SOURCE_DIR}/data.cuh
-    ${CMAKE_CURRENT_SOURCE_DIR}/methods.cuh
 )
 
 
-set(LIB_SOURCE_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/data.cu
-    ${CMAKE_CURRENT_SOURCE_DIR}/methods.cu
-)
+#set(LIB_SOURCE_FILES
+#    ${CMAKE_CURRENT_SOURCE_DIR}/data.cu
+#    ${CMAKE_CURRENT_SOURCE_DIR}/methods.cu
+#)
 
 add_library(${LIB_NAME} SHARED
     ${LIB_HEADER_FILES}
-    ${LIB_SOURCE_FILES}
+    #${LIB_SOURCE_FILES}
 )
 
 # Set CUDA architecture
@@ -61,7 +59,7 @@ target_compile_options(${LIB_NAME} PRIVATE
 
 # Add executable
 add_executable(test_${LIB_NAME} main.cu)
-add_executable(test_${LIB_NAME}_unit_tests unit_tests.cu)
+
 
 # Link library
 target_link_libraries(test_${LIB_NAME} ${LIB_NAME})
