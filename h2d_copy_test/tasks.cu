@@ -38,6 +38,8 @@ BaseRunner::BaseRunner(uint64_t m, uint64_t n, uint64_t k)
 
     randomizeDeviceMatrix(m_d_A, m_m, m_k);
     randomizeDeviceMatrix(m_d_B, m_k, m_n);
+
+    CHECK_CUDA(cudaStreamCreate(&m_stream));
 }
 
 BaseRunner::~BaseRunner()
@@ -46,6 +48,7 @@ BaseRunner::~BaseRunner()
     cudaFree(m_d_A);
     cudaFree(m_d_B);
     cudaFree(m_d_C);
+    cudaStreamDestroy(m_stream);
 }
 
 __global__ void matMatMulKernel(float* d_C, __nv_bfloat16* d_A, __nv_bfloat16* d_B, int m, int n, int k)
@@ -70,8 +73,8 @@ void CudaCoreMatMatMulRunner::run()
     std::cout << "CudaCoreMatMatMulRunner::run()" << std::endl;
     dim3 blockDim(16, 16);
     dim3 gridDim((m_m + blockDim.x - 1) / blockDim.x, (m_n + blockDim.y - 1) / blockDim.y);
-    matMatMulKernel<<<gridDim, blockDim>>>(m_d_C, m_d_A, m_d_B, m_m, m_n, m_k);
-    CHECK_CUDA(cudaDeviceSynchronize());
+    matMatMulKernel<<<gridDim, blockDim, 0, m_stream>>>(m_d_C, m_d_A, m_d_B, m_m, m_n, m_k);
+    CHECK_CUDA(cudaStreamSynchronize(m_stream));
     CHECK_CUDA(cudaGetLastError());
 }
 
@@ -82,6 +85,7 @@ void TensorCoreMatMatMulRunner::run()
     // Prepare CUBLAS handle
     cublasHandle_t handle;
     CHECK_CUBLAS(cublasCreate(&handle));
+    CHECK_CUBLAS(cublasSetStream(handle, m_stream));
 
     const float alpha = 1.0f;
     const float beta = 0.0f;
@@ -112,7 +116,7 @@ void TensorCoreMatMatMulRunner::run()
         std::cerr << "cublasGemmEx failed with status " << status << std::endl;
     }
 
-    cublasDestroy(handle);
+    CHECK_CUBLAS(cublasDestroy(handle));
 }
 
 H2DMemcpyRunner::H2DMemcpyRunner(int m, int n, int k)
@@ -127,7 +131,7 @@ H2DMemcpyRunner::H2DMemcpyRunner(int m, int n, int k)
 void H2DMemcpyRunner::run()
 {
     std::cout << "H2DMemcpyRunner::run()" << std::endl;
-    CHECK_CUDA(cudaMemcpy(m_d_A, m_h_A, m_m * m_k * sizeof(__nv_bfloat16), cudaMemcpyHostToDevice));
-    CHECK_CUDA(cudaDeviceSynchronize());
+    CHECK_CUDA(cudaMemcpyAsync(m_d_A, m_h_A, m_m * m_k * sizeof(__nv_bfloat16), cudaMemcpyHostToDevice, m_stream));
+    CHECK_CUDA(cudaStreamSynchronize(m_stream));
     CHECK_CUDA(cudaGetLastError());
 }

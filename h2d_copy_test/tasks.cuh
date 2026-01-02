@@ -18,6 +18,7 @@ protected:
     __nv_bfloat16* m_d_A;
     __nv_bfloat16* m_d_B;
     float* m_d_C;
+    cudaStream_t m_stream;
 };
 
 class CudaCoreMatMatMulRunner : public BaseRunner
