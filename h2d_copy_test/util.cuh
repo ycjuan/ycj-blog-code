@@ -9,8 +9,19 @@
         cudaError_t status = (func);                                                                                   \
         if (status != cudaSuccess)                                                                                     \
         {                                                                                                              \
-            std::string error = "[topk_baseline.cu] CUDA API failed at line " + std::to_string(__LINE__)               \
+            std::string error = "[util.cuh] CUDA API failed at line " + std::to_string(__LINE__)                       \
                 + " with error: " + cudaGetErrorString(status) + "\n";                                                 \
+            throw std::runtime_error(error);                                                                           \
+        }                                                                                                              \
+    }
+
+#define CHECK_CUBLAS(func)                                                                                             \
+    {                                                                                                                  \
+        cublasStatus_t status = (func);                                                                                \
+        if (status != CUBLAS_STATUS_SUCCESS)                                                                           \
+        {                                                                                                              \
+            std::string error = "[util.cuh] CUBLAS API failed at line " + std::to_string(__LINE__)                     \
+                + " with error: " + std::to_string(status) + "\n";                                               \
             throw std::runtime_error(error);                                                                           \
         }                                                                                                              \
     }

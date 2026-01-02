@@ -7,13 +7,18 @@
 
 int main()
 {
-    //printDeviceInfo();
+    constexpr int m = 1024 * 1024;
+    constexpr int n = 64;
+    constexpr int k = 256;
 
-    CudaCoreMatMatMulRunner runner(1024, 1024, 1024);
+    CudaCoreMatMatMulRunner runner(m, n, k);
     runner.run();
 
-    TensorCoreMatMatMulRunner tensorCoreRunner(1024, 1024, 1024);
+    TensorCoreMatMatMulRunner tensorCoreRunner(m, n, k);
     tensorCoreRunner.run();
+
+    H2DMemcpyRunner h2dMemcpyRunner(m, n, k);
+    h2dMemcpyRunner.run();
 
     return 0;
 }
