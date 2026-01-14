@@ -39,7 +39,7 @@ add_library(${LIB_NAME} SHARED
 )
 
 # Set CUDA architecture
-set_property(TARGET ${LIB_NAME} PROPERTY CUDA_ARCHITECTURES 89)
+set_property(TARGET ${LIB_NAME} PROPERTY CUDA_ARCHITECTURES 80)
 
 # Include directories
 target_include_directories(${LIB_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -47,7 +47,7 @@ target_include_directories(${LIB_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # Link CUDA libraries
 target_link_libraries(${LIB_NAME} 
     ${CUDA_LIBRARIES}
-    cublas
+    #cublas
     gomp
 )
 
