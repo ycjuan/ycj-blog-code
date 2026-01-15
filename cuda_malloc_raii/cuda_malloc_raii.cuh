@@ -44,7 +44,7 @@ public:
     __device__ __host__ uint64_t getElementSize() const { return sizeof(T); }
     __device__ __host__ uint64_t getArraySize() const { return m_size; }
     __device__ __host__ uint64_t getArraySizeInBytes() const { return m_size * sizeof(T); }
-    __device__ __host__ std::string getName() const { return m_name; }
+    __host__ std::string getName() const { return m_name; }
 
 protected: // Making the constructor protected will make this class non-instantiable to the users
     CudaArray(uint64_t size, std::string name)
@@ -100,6 +100,10 @@ public:
             std::ostringstream oss;
             oss << "Failed to allocate host memory for " << this->m_name << ": " << cudaGetErrorString(cudaError);
             throw std::runtime_error(oss.str());
+        }
+        if (kPrintDebug)
+        {
+            std::cout << "cudaMallocHost(" << this->m_p_dataRawPtr << ", " << this->m_size * sizeof(T) << ")" << std::endl;
         }
 
         // --------------

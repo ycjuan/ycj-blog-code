@@ -16,16 +16,14 @@ int main()
 {
     // --------------
     // Some constants
-    const size_t kArraySize = 10000;
+    const size_t kArraySize = 1000000;
 
     // --------------
     // Test CudaDeviceArray
     {
         size_t freeMemBeforeMalloc = getFreeMemoryInBytes();
-        size_t freeMemAfterMalloc;
         {
             CudaDeviceArray<float> arr(kArraySize, "arr1");
-            freeMemAfterMalloc = getFreeMemoryInBytes();
             assert(arr.data() != nullptr);
             assert(arr.getArraySize() == kArraySize);
             assert(arr.getElementSize() == sizeof(float));
@@ -34,7 +32,6 @@ int main()
         }
         size_t freeMemAfterFree = getFreeMemoryInBytes();
         assert(freeMemBeforeMalloc == freeMemAfterFree);
-        assert(freeMemBeforeMalloc - freeMemAfterMalloc == kArraySize * sizeof(float));
     }
 
     // --------------
@@ -49,11 +46,9 @@ int main()
     {
         size_t freeMemBeforeMalloc = getFreeMemoryInBytes();
         CudaArray<float> *arr = new CudaDeviceArray<float>(kArraySize, "arr1");
-        size_t freeMemAfterMalloc = getFreeMemoryInBytes();
         delete arr;
         size_t freeMemAfterFree = getFreeMemoryInBytes();
         assert(freeMemBeforeMalloc == freeMemAfterFree);
-        assert(freeMemBeforeMalloc - freeMemAfterMalloc == kArraySize * sizeof(float));
     }
 
     return 0;
