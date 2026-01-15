@@ -5,28 +5,39 @@
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
+#include <iostream>
+
+constexpr bool kPrintDebug = true;
 
 template <typename T> struct CudaDeviceDeleter
 {
-    void operator()(T* ptr) const { cudaFree(ptr); }
+    void operator()(T* ptr) const 
+    { 
+        cudaFree(ptr); 
+        if (kPrintDebug)
+        {
+            std::cout << "cudaFree(" << ptr << ")" << std::endl;
+        }
+    }
 };
 
 template <typename T> struct CudaHostDeleter
 {
-    void operator()(T* ptr) const { cudaFreeHost(ptr); }
+    void operator()(T* ptr) const 
+    { 
+        cudaFreeHost(ptr); 
+        if (kPrintDebug)
+        {
+            std::cout << "cudaFreeHost(" << ptr << ")" << std::endl;
+        }
+    }
 };
 
 template <typename T> class CudaArray
 {
 public:
-    CudaArray(uint64_t size, std::string name)
-        : m_size(size)
-        , m_name(name)
-    {
-    }
-
-    // virtual ~CudaArray() = default; // Very important to have this, see
-    // https://leimao.github.io/blog/CPP-Base-Class-Destructors/ for the reason
+    // See https://leimao.github.io/blog/CPP-Base-Class-Destructors/ for why we make this virtual
+    virtual ~CudaArray() = default;
 
     // Accessors
     __device__ __host__ T* data() const { return m_p_dataRawPtr; }
@@ -35,7 +46,13 @@ public:
     __device__ __host__ uint64_t getArraySizeInBytes() const { return m_size * sizeof(T); }
     __device__ __host__ std::string getName() const { return m_name; }
 
-protected:
+protected: // Making the constructor protected will make this class non-instantiable to the users
+    CudaArray(uint64_t size, std::string name)
+        : m_size(size)
+        , m_name(name)
+    {
+    }
+
     uint64_t m_size;
     std::string m_name;
     T* m_p_dataRawPtr;
@@ -56,6 +73,10 @@ public:
             std::ostringstream oss;
             oss << "Failed to allocate device memory for " << this->m_name << ": " << cudaGetErrorString(cudaError);
             throw std::runtime_error(oss.str());
+        }
+        if (kPrintDebug)
+        {
+            std::cout << "cudaMalloc(" << this->m_p_dataRawPtr << ", " << this->m_size * sizeof(T) << ")" << std::endl;
         }
 
         // --------------
