@@ -26,6 +26,11 @@ int main()
         {
             CudaDeviceArray<float> arr(kArraySize, "arr1");
             freeMemAfterMalloc = getFreeMemoryInBytes();
+            assert(arr.data() != nullptr);
+            assert(arr.getArraySize() == kArraySize);
+            assert(arr.getElementSize() == sizeof(float));
+            assert(arr.getArraySizeInBytes() == kArraySize * sizeof(float));
+            assert(arr.getName() == "arr1");
         }
         size_t freeMemAfterFree = getFreeMemoryInBytes();
         assert(freeMemBeforeMalloc == freeMemAfterFree);

@@ -55,7 +55,7 @@ protected: // Making the constructor protected will make this class non-instanti
 
     uint64_t m_size;
     std::string m_name;
-    T* m_p_dataRawPtr;
+    T* m_p_dataRawPtr = nullptr;
     std::shared_ptr<T> m_p_dataSmartPtr;
 };
 
