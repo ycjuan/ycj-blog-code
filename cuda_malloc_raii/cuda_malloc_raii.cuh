@@ -36,7 +36,7 @@ template <typename T> struct CudaHostDeleter
 template <typename T> class CudaArray
 {
 public:
-    // See https://leimao.github.io/blog/CPP-Base-Class-Destructors/ for why we make this virtual
+    // See https://leimao.github.io/blog/CPP-Base-Class-Destructors/ for why we need to make this virtual
     virtual ~CudaArray() = default;
 
     // Accessors

@@ -48,7 +48,7 @@ int main()
         CudaArray<float> *arr = new CudaDeviceArray<float>(kArraySize, "arr1");
         delete arr;
         size_t freeMemAfterFree = getFreeMemoryInBytes();
-        assert(freeMemBeforeMalloc == freeMemAfterFree);
+        assert(freeMemBeforeMalloc == freeMemAfterFree); // Make sure the destructor of the derived class is called
     }
 
     return 0;
