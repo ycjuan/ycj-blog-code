@@ -56,6 +56,11 @@ protected: // Making the constructor protected will make this class non-instanti
     uint64_t m_size;
     std::string m_name;
     T* m_p_dataRawPtr = nullptr;
+
+    // It is very important to note that we use shared_ptr here to release memory, instead of just call cudaFree / cudaFreeHost in the destructor.
+    // This is because we want to make this class copyable, but when we copy, we only want to copy the pointer, not the entire memory.
+    // This implies that we need some reference counting mechanism to release the memory when the last copy is out of scope.
+    // shared_ptr is a good choise for this purpose.
     std::shared_ptr<T> m_p_dataSmartPtr;
 };
 
