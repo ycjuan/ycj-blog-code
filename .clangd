@@ -1,3 +1,6 @@
+# Reference: https://gist.github.com/trxcllnt/dad9565a1cfd54aedbe8fcf052a7cd45
+
+# Apply this config conditionally to all CUDA files (We will just use nvcc for all files)
 If:
   PathMatch: .*\.(cu|cuh|cpp|hpp|c|h)$
 CompileFlags:
@@ -5,13 +8,15 @@ CompileFlags:
 
 ---
 
+# Tweak the clangd parse settings for all files
 CompileFlags:
   Add:
     - -xcuda
     - --cuda-path=/usr/local/cuda
     - -I/usr/local/cuda/include
-    #- -I/home/ec2-user/git/ycj-blog-code/**
-    
+    - -I/home/coder/local-repo/googletest/googletest/1.14.0.21/include
+    - -I/home/coder/local-repo/google_glog/google_glog/0.6.0.23/include
+
   Remove:
     # strip CUDA flags unknown to clang
     - "-gencode*"

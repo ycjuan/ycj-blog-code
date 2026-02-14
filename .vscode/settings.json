@@ -83,6 +83,7 @@
         "__locale": "cpp",
         "__config": "cpp",
         "future": "cpp",
-        "cinttypes": "cpp"
+        "cinttypes": "cpp",
+        "*.hpp": "cuda-cpp"
     }
 }
