@@ -33,9 +33,6 @@ add_library(${LIB_NAME} SHARED
 #    ${LIB_SOURCE_FILES}
 )
 
-# Set CUDA architecture
-set_property(TARGET ${LIB_NAME} PROPERTY CUDA_ARCHITECTURES 89)
-
 # Include directories
 target_include_directories(${LIB_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
