@@ -54,6 +54,17 @@ int main()
         assert(freeMemBeforeMalloc == freeMemAfterFree); // Make sure the destructor of the derived class is called
     }
 
+    {
+        std::cout << "======== Test Polymorphism 2 ========" << std::endl;
+        size_t freeMemBeforeMalloc = getFreeMemoryInBytes();
+        {
+            CudaArray<float> arr1 = CudaDeviceArray<float>(kArraySize, "arr1");
+            CudaArray<float> arr2 = CudaHostArray<float>(kArraySize, "arr2");
+        }
+        size_t freeMemAfterFree = getFreeMemoryInBytes();
+        assert(freeMemBeforeMalloc == freeMemAfterFree); // Make sure the destructor of the derived class is called
+    }   
+
     // --------------
     // Test copy
     {
