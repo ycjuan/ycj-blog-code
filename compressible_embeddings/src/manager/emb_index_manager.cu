@@ -7,12 +7,12 @@
 EmbIndexManager::EmbIndexManager(size_t numDocs,
                                  size_t totalEmbDim,
                                  std::vector<ResidentPartitionConfig> residentPartitionConfigs,
-                                 size_t maxWorkingSetSize)
+                                 size_t maxNumWorkingDocs)
     : m_numDocs(numDocs)
     , m_totalEmbDim(totalEmbDim)
-    , m_maxWorkingSetSize(maxWorkingSetSize)
-    , m_workingEmbIndex(maxWorkingSetSize, totalEmbDim)
-    , m_docIdxListToCopy(maxWorkingSetSize, "m_docIdxListToCopy")
+    , m_maxNumWorkingDocs(maxNumWorkingDocs)
+    , m_workingEmbIndex(maxNumWorkingDocs, totalEmbDim)
+    , m_docIdxListToDensify(maxNumWorkingDocs, "m_docIdxListToDensify")
 {
     std::sort(residentPartitionConfigs.begin(), residentPartitionConfigs.end());
 
@@ -53,13 +53,13 @@ void EmbIndexManager::update(const std::vector<T_DOC_IDX>& docIdxList, const std
 
 const WorkingEmbIndex& EmbIndexManager::densify(const std::vector<T_DOC_IDX>& docIdxList, size_t embIdxBeginIncl, size_t embIdxEndExcl, MemLayout memLayout)
 {
-    if (docIdxList.size() > m_maxWorkingSetSize)
+    if (docIdxList.size() > m_maxNumWorkingDocs)
     {
         std::ostringstream oss;
-        oss << "docIdxList.size() > m_maxWorkingSetSize: " << docIdxList.size() << " > " << m_maxWorkingSetSize;
+        oss << "docIdxList.size() > m_maxNumWorkingDocs: " << docIdxList.size() << " > " << m_maxNumWorkingDocs;
         throw std::runtime_error(oss.str());
     }
-    CHECK_CUDA(cudaMemcpy(m_docIdxListToCopy.data(),
+    CHECK_CUDA(cudaMemcpy(m_docIdxListToDensify.data(),
                           docIdxList.data(),
                           docIdxList.size() * sizeof(T_DOC_IDX),
                           cudaMemcpyHostToDevice));
@@ -69,11 +69,11 @@ const WorkingEmbIndex& EmbIndexManager::densify(const std::vector<T_DOC_IDX>& do
     m_workingEmbIndex.setEmbDimEndExcl(embIdxEndExcl);
 
     DensificationTask densificationTask;
-    densificationTask.numTasks = docIdxList.size();
-    densificationTask.embIdxBeginIncl = embIdxBeginIncl;
-    densificationTask.embIdxEndExcl = embIdxEndExcl;
-    densificationTask.d_workingSetEmbIndex = m_workingEmbIndex.data();
-    densificationTask.d_docIdxMap = m_docIdxListToCopy.data();
+    densificationTask.numDocsToDensify = docIdxList.size();
+    densificationTask.globalEmbIdxBeginIncl = embIdxBeginIncl;
+    densificationTask.globalEmbIdxEndExcl = embIdxEndExcl;
+    densificationTask.d_workingEmbIndex = m_workingEmbIndex.data();
+    densificationTask.d_docIdxList = m_docIdxListToDensify.data();
 
     for (size_t residentPartitionIdx = 0; residentPartitionIdx < m_residentEmbIndices.size(); ++residentPartitionIdx)
     {

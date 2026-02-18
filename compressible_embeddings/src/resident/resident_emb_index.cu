@@ -25,13 +25,13 @@ struct DensifyFromResidentKernelParams
     size_t embOffsetSrc;
 
     // Destination
-    T_EMB* d_workingSetEmbIndex;
-    int numDocsToCopy;
+    T_EMB* d_workingEmbIndex;
+    int numDocsToDensify;
     size_t embOffsetDst;
-    int embDimWorkingSetTotal;
+    int embDimWorking;
 
     // Shared
-    int embDimToCopy;
+    int embDimToDensify;
     T_DOC_IDX* d_docIdxMap;
 };
 
@@ -39,12 +39,12 @@ __global__ void densifyFromResidentKernel(DensifyFromResidentKernelParams params
 {
     size_t taskIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (taskIdx < params.numDocsToCopy)
+    if (taskIdx < params.numDocsToDensify)
     {
         T_DOC_IDX docIdxSrc = params.d_docIdxMap[taskIdx];
         T_DOC_IDX docIdxDst = taskIdx;
 
-        for (size_t embIdx = 0; embIdx < params.embDimToCopy; embIdx++)
+        for (size_t embIdx = 0; embIdx < params.embDimToDensify; embIdx++)
         {
             size_t memAddrSrc = getMemAddrRowMajor(docIdxSrc,
                                                    embIdx + params.embOffsetSrc,
@@ -52,9 +52,9 @@ __global__ void densifyFromResidentKernel(DensifyFromResidentKernelParams params
                                                    params.residentPartitionConfig.getEmbDim());
             size_t memAddrDst = getMemAddrRowMajor(docIdxDst,
                                                    embIdx + params.embOffsetDst,
-                                                   params.numDocsToCopy,
-                                                   params.embDimWorkingSetTotal);
-            params.d_workingSetEmbIndex[memAddrDst] = params.d_residentEmbIndex[memAddrSrc];
+                                                   params.numDocsToDensify,
+                                                   params.embDimWorking);
+            params.d_workingEmbIndex[memAddrDst] = params.d_residentEmbIndex[memAddrSrc];
             if (abs((static_cast<float>(params.d_residentEmbIndex[memAddrSrc]) - 0.933594f)) < 1e-3f)
             {
                 printf("docIdxSrc: %d, embIdx: %d, val: %f, docIdxDst: %d, embIdxDst: %d, numDocsToCopy: %d, embDimWorkingSetTotal: %d, dstMemAddr: %d\n",
@@ -63,8 +63,8 @@ __global__ void densifyFromResidentKernel(DensifyFromResidentKernelParams params
                        static_cast<float>(params.d_residentEmbIndex[memAddrSrc]),
                        static_cast<int>(docIdxDst),
                        static_cast<int>(embIdx + params.embOffsetDst),
-                       static_cast<int>(params.numDocsToCopy),
-                       static_cast<int>(params.embDimWorkingSetTotal),
+                       static_cast<int>(params.numDocsToDensify),
+                       static_cast<int>(params.embDimWorking),
                        static_cast<int>(memAddrDst));
             }
         }
@@ -73,25 +73,31 @@ __global__ void densifyFromResidentKernel(DensifyFromResidentKernelParams params
 
 void ResidentEmbIndex::densify(const DensificationTask& densificationTask) const
 {
-    const size_t embDimBeginInclReal = std::max(densificationTask.embIdxBeginIncl, m_residentPartitionConfig.getEmbDimBeginIncl());
-    const size_t embDimEndExclReal = std::min(densificationTask.embIdxEndExcl, m_residentPartitionConfig.getEmbDimEndExcl());
+    // -------------
+    // Obtain the real begin and end points we want to densify.
+    const size_t embDimBeginInclReal = std::max(densificationTask.globalEmbIdxBeginIncl, m_residentPartitionConfig.getEmbDimBeginIncl());
+    const size_t embDimEndExclReal = std::min(densificationTask.globalEmbIdxEndExcl, m_residentPartitionConfig.getEmbDimEndExcl());
 
+    // -------------
+    // Prepare the parameters for the kernel.
     DensifyFromResidentKernelParams params;
     params.d_residentEmbIndex = m_residentEmbIndex.data();
-    params.d_docIdxMap = densificationTask.d_docIdxMap;
-    params.d_workingSetEmbIndex = densificationTask.d_workingSetEmbIndex;
+    params.d_docIdxMap = densificationTask.d_docIdxList;
+    params.d_workingEmbIndex = densificationTask.d_workingEmbIndex;
     params.numDocsTotal = m_numDocs;
     params.residentPartitionConfig = m_residentPartitionConfig;
-    params.numDocsToCopy = densificationTask.numTasks;
-    params.embDimWorkingSetTotal = densificationTask.embIdxEndExcl - densificationTask.embIdxBeginIncl;
-    params.embDimToCopy = embDimEndExclReal - embDimBeginInclReal;
+    params.numDocsToDensify = densificationTask.numDocsToDensify;
+    params.embDimWorking = densificationTask.globalEmbIdxEndExcl - densificationTask.globalEmbIdxBeginIncl;
+    params.embDimToDensify = embDimEndExclReal - embDimBeginInclReal;
     params.embOffsetSrc = embDimBeginInclReal - m_residentPartitionConfig.getEmbDimBeginIncl();
-    params.embOffsetDst = embDimBeginInclReal - densificationTask.embIdxBeginIncl;
+    params.embOffsetDst = embDimBeginInclReal - densificationTask.globalEmbIdxBeginIncl;
     std::cout << "embOffsetDst: " << params.embOffsetDst << std::endl;
 
+    // -------------
+    // Launch the kernel.
     std::cout << "densifyFromResidentKernel start" << std::endl;
     constexpr size_t kBlockSize = 1024;
-    size_t gridSize = (params.numDocsToCopy + kBlockSize - 1) / kBlockSize;
+    size_t gridSize = (params.numDocsToDensify + kBlockSize - 1) / kBlockSize;
     densifyFromResidentKernel<<<gridSize, kBlockSize, 0, m_cudaStreamRead>>>(params);
     std::cout << "densifyFromResidentKernel done" << std::endl;
     CHECK_CUDA(cudaStreamSynchronize(m_cudaStreamRead));
@@ -121,10 +127,16 @@ __global__ void updateResidentKernel(T_DOC_IDX* h_docIdxChunk,
 
 void ResidentEmbIndex::update(const std::vector<T_DOC_IDX>& docIdxList, const std::vector<std::vector<T_EMB>>& emb2D)
 {
+    // Loop over docs chunk by chunk.
     for (size_t docIdxBeginIncl = 0; docIdxBeginIncl < docIdxList.size(); docIdxBeginIncl += kMaxUpdateBatchSize)
     {
+        // -----------
+        // Handle corner case to get the end index, and calculate real number of docs to update.
         size_t docIdxEndExcl = std::min(docIdxBeginIncl + kMaxUpdateBatchSize, docIdxList.size());
         size_t numDocsToUpdate = docIdxEndExcl - docIdxBeginIncl;
+
+        // -------------
+        // Copy data to the buffers
         T_DOC_IDX* h_docIdxChunk = m_docIdxChunk.data();
         T_EMB* h_embChunk = m_embChunk.data();
         for (size_t docIdx = 0; docIdx < numDocsToUpdate; ++docIdx)

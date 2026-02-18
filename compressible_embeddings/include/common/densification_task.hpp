@@ -4,9 +4,9 @@
 
 struct DensificationTask
 {
-    T_DOC_IDX* d_docIdxMap;
-    size_t numTasks;
-    size_t embIdxBeginIncl;
-    size_t embIdxEndExcl;
-    T_EMB* d_workingSetEmbIndex;
+    T_DOC_IDX* d_docIdxList;
+    size_t numDocsToDensify;
+    size_t globalEmbIdxBeginIncl;
+    size_t globalEmbIdxEndExcl;
+    T_EMB* d_workingEmbIndex;
 };

@@ -25,4 +25,4 @@ then the compressedPartitionConfigs will be {{0, 2}, {7, 10}, {13, 16}}.
 */
 std::vector<CompressedPartitionConfig> findCompressedPartitionConfigs(
     std::vector<ResidentPartitionConfig> residentPartitionConfigs,
-    size_t totalEmbDim);
+    size_t globalEmbDim);

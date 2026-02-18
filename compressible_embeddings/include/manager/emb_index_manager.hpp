@@ -14,22 +14,22 @@ class EmbIndexManager
 {
 public:
     EmbIndexManager(size_t numDocs,
-                    size_t totalEmbDim,
+                    size_t globalEmbDim,
                     std::vector<ResidentPartitionConfig> residentPartitionConfigs,
-                    size_t maxWorkingSetSize);
+                    size_t maxNumWorkingDocs);
 
     void update(const std::vector<T_DOC_IDX>& docIdxList, const std::vector<std::vector<T_EMB>>& emb2D);
 
     const WorkingEmbIndex& densify(const std::vector<T_DOC_IDX>& docIdxList,
-                                   size_t embIdxBeginIncl,
-                                   size_t embIdxEndExcl,
+                                   size_t globalEmbIdxBeginIncl,
+                                   size_t globalEmbIdxEndExcl,
                                    MemLayout memLayout);
 
 protected:
     // General meta data
     size_t m_numDocs;
     size_t m_totalEmbDim;
-    size_t m_maxWorkingSetSize;
+    size_t m_maxNumWorkingDocs;
 
     // Resident index
     std::vector<ResidentEmbIndex> m_residentEmbIndices;
@@ -38,7 +38,7 @@ protected:
     WorkingEmbIndex m_workingEmbIndex;
 
     // Densification
-    CudaDeviceArray<T_DOC_IDX> m_docIdxListToCopy;
+    CudaDeviceArray<T_DOC_IDX> m_docIdxListToDensify;
 
     // Cuda stream
     cudaStream_t m_cudaStreamRead;

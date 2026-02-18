@@ -7,5 +7,5 @@
 class CompressedEmbIndex
 {
 public:
-    CompressedEmbIndex(size_t numDocs, size_t totalEmbDim, std::vector<ResidentPartitionConfig> residentIndexConfigs, size_t maxWorkingSetSize);
+    CompressedEmbIndex(size_t numDocs, size_t globalEmbDim, std::vector<ResidentPartitionConfig> residentIndexConfigs, size_t maxNumDocsInWorkingIndex);
 };

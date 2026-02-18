@@ -12,7 +12,7 @@
 constexpr size_t kNumDocs = 10000;
 constexpr size_t kTotalEmbDim = 128;
 constexpr size_t kMaxWorkingSetSize = 1000;
-constexpr size_t kNumDocsToDensify = 2;
+constexpr size_t kNumDocsToDensify = 500;
 constexpr size_t kDensifiedEmbIdxBeginIncl = 3;
 constexpr size_t kDensifiedEmbIdxEndExcl = 125;
 const std::vector<ResidentPartitionConfig> kResidentPartitionConfigs
