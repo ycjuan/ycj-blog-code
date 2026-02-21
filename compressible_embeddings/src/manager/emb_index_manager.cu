@@ -177,6 +177,26 @@ void EmbIndexManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     std::cout << "cnt1: " << cnt1 << ", cnt2: " << cnt2 << std::endl;
 
     // ------------
+    // Verify no two docIdx map to the same cachedWorkingIdx.
+    {
+        std::unordered_set<T_DOC_IDX> seenWorkingIdx;
+        for (T_DOC_IDX docIdx : docIdxList)
+        {
+            auto it = m_cachedDocIdxToWorkingIdx.find(docIdx);
+            if (it != m_cachedDocIdxToWorkingIdx.end() && it->second < docIdxList.size())
+            {
+                if (!seenWorkingIdx.insert(it->second).second)
+                {
+                    std::ostringstream oss;
+                    oss << "Two docIdx values map to same cachedWorkingIdx: " << it->second
+                        << " (docIdx=" << docIdx << ")";
+                    throw std::runtime_error(oss.str());
+                }
+            }
+        }
+    }
+
+    // ------------
     // Second scan to put the uncached doc indices to the reorderedDocIdxList.
     int cnt3 = 0;
     int cnt4 = 0;
