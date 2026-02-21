@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <limits>
 
 #include "common/typedef.hpp"
 #include "manager/emb_index_manager.hpp"
@@ -19,6 +20,7 @@ EmbIndexManager::EmbIndexManager(size_t numDocs,
                       numBitsPerDim, centroidEmbs, centroidStdDevs)
     , m_workingEmbIndex(maxNumWorkingDocs, totalEmbDim)
     , m_docIdxListToDensify(maxNumWorkingDocs, "m_docIdxListToDensify")
+    , m_centroidEmbs(centroidEmbs)
 {
     std::sort(residentPartitionConfigs.begin(), residentPartitionConfigs.end());
 
@@ -55,6 +57,32 @@ void EmbIndexManager::update(const std::vector<T_DOC_IDX>& docIdxList, const std
         auto& embIndex = m_residentEmbIndices[residentPartitionIdx];
         embIndex.update(docIdxList, emb2D);
     }
+
+    // Compute nearest centroid for each doc (L2 distance over all dims)
+    std::vector<int> centroidIdxList(docIdxList.size());
+    size_t numCentroids = m_centroidEmbs.size();
+    for (size_t i = 0; i < docIdxList.size(); ++i)
+    {
+        float bestDist = std::numeric_limits<float>::max();
+        int bestCentroid = 0;
+        for (size_t c = 0; c < numCentroids; ++c)
+        {
+            float dist = 0.0f;
+            for (size_t d = 0; d < m_totalEmbDim; ++d)
+            {
+                float diff = static_cast<float>(emb2D[i][d]) - m_centroidEmbs[c][d];
+                dist += diff * diff;
+            }
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                bestCentroid = static_cast<int>(c);
+            }
+        }
+        centroidIdxList[i] = bestCentroid;
+    }
+
+    m_resQuantIndex.update(docIdxList, emb2D, centroidIdxList);
 }
 
 const WorkingEmbIndex& EmbIndexManager::densify(const std::vector<T_DOC_IDX>& docIdxList, size_t embIdxBeginIncl, size_t embIdxEndExcl, MemLayout memLayout)
@@ -86,6 +114,8 @@ const WorkingEmbIndex& EmbIndexManager::densify(const std::vector<T_DOC_IDX>& do
         const auto& embIndex = m_residentEmbIndices[residentPartitionIdx];
         embIndex.densify(densificationTask);
     }
+
+    m_resQuantIndex.densifyCompressed(densificationTask);
 
     return m_workingEmbIndex;
 }

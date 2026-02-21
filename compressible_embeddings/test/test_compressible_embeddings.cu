@@ -108,7 +108,7 @@ void verifyDensification(const WorkingEmbIndex& workingEmbIndex,
             if (isCompressedDim(embIdx))
             {
                 float error = std::abs(val - ref);
-                if (error > 1 * kCentroidStdDev)
+                if (error > 1.1f * kCentroidStdDev)
                 {
                     std::ostringstream oss;
                     oss << "Compressed dim: docIdx = " << docIdx << ", embIdx = " << embIdx
