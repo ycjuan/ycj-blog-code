@@ -97,6 +97,9 @@ void verifyDensification(const WorkingEmbIndex& workingEmbIndex,
                           kNumDocsToDensify * (kDensifiedEmbIdxEndExcl - kDensifiedEmbIdxBeginIncl) * sizeof(T_EMB),
                           cudaMemcpyDeviceToHost));
 
+    float compressedErrorSum = 0.0f;
+    size_t compressedCount = 0;
+
     for (size_t docIdx = 0; docIdx < docIdxList.size(); ++docIdx)
     {
         for (size_t embIdx = kDensifiedEmbIdxBeginIncl; embIdx < kDensifiedEmbIdxEndExcl; ++embIdx)
@@ -108,6 +111,8 @@ void verifyDensification(const WorkingEmbIndex& workingEmbIndex,
             if (isCompressedDim(embIdx))
             {
                 float error = std::abs(val - ref);
+                compressedErrorSum += error;
+                compressedCount++;
                 if (error > 1.1f * kCentroidStdDev)
                 {
                     std::ostringstream oss;
@@ -131,6 +136,7 @@ void verifyDensification(const WorkingEmbIndex& workingEmbIndex,
         }
     }
 
+    printf("Compressed dim avg error: %.6f (over %zu samples)\n", compressedErrorSum / compressedCount, compressedCount);
     printf("!!!!!!!!!!!! Densification verified successfully !!!!!!!!!!!!\n");
 }
 
