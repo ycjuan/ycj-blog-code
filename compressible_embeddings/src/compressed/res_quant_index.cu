@@ -17,9 +17,7 @@ ResQuantIndex::ResQuantIndex(size_t numDocs,
                              size_t numCentroids,
                              size_t numBitsPerDim,
                              const std::vector<std::vector<float>>& centroidEmbs,
-                             const std::vector<std::vector<float>>& centroidStdDevs,
-                             const std::vector<int>& centroidIdxPerDoc,
-                             const std::vector<T_RQ>& residuals)
+                             const std::vector<std::vector<float>>& centroidStdDevs)
     : CompressedEmbIndex(numDocs, globalEmbDim, {}, maxNumDocsInWorkingIndex)
     , m_numCentroids(numCentroids)
     , m_numBitsPerDim(numBitsPerDim)
@@ -57,19 +55,6 @@ ResQuantIndex::ResQuantIndex(size_t numDocs,
                               cudaMemcpyHostToDevice));
     }
 
-    // -------------------------------------------------------------------------
-    // Copy centroid indices to device
-    CHECK_CUDA(cudaMemcpy(m_centroidIdx.data(),
-                          centroidIdxPerDoc.data(),
-                          numDocs * sizeof(int),
-                          cudaMemcpyHostToDevice));
-
-    // -------------------------------------------------------------------------
-    // Copy quantized residuals to device
-    CHECK_CUDA(cudaMemcpy(m_residual.data(),
-                          residuals.data(),
-                          numDocs * m_rqDim * sizeof(T_RQ),
-                          cudaMemcpyHostToDevice));
 }
 
 // ============================================================================

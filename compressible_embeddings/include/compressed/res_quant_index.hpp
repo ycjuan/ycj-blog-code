@@ -23,9 +23,7 @@ public:
                   size_t numCentroids,
                   size_t numBitsPerDim,
                   const std::vector<std::vector<float>>& centroidEmbs,
-                  const std::vector<std::vector<float>>& centroidStdDevs,
-                  const std::vector<int>& centroidIdxPerDoc,
-                  const std::vector<T_RQ>& residuals);
+                  const std::vector<std::vector<float>>& centroidStdDevs);
 
     // Update per-document data: centroid assignment and quantized residuals.
     // docIdxList: which documents to update
