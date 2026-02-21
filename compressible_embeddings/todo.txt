@@ -1,3 +1,5 @@
 * design cache
 * get memory address polymorphism
 * revisit copy kernel
+* handle data type template
+* handle versioning
