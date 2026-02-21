@@ -22,6 +22,8 @@ const std::vector<ResidentPartitionConfig> kResidentPartitionConfigs
     = { ResidentPartitionConfig(0, 48, MemLayout::ROW_MAJOR), ResidentPartitionConfig(64, 96, MemLayout::ROW_MAJOR) };
 constexpr float kCentroidStdDev = 1.0f;
 constexpr float kCentroidMean = 0.0f;
+constexpr float kCacheRate = 0.5f;
+constexpr size_t kNumDensifyTrials = 5;
 
 std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<int>> populateRandomEmbIndex(
     const std::vector<std::vector<float>>& centroidEmbs,
@@ -158,13 +160,36 @@ int main()
     auto [docIdxList, emb2D, centroidIdxList] = populateRandomEmbIndex(centroidEmbs, centroidStdDevs);
     embIndexManager.update(docIdxList, emb2D);
 
-    std::vector<T_DOC_IDX> docIdxListToDensify = genRandomDocIdxList();
-    const WorkingEmbIndex& workingEmbIndex = embIndexManager.densify(docIdxListToDensify,
-                                                                     kDensifiedEmbIdxBeginIncl,
-                                                                     kDensifiedEmbIdxEndExcl,
-                                                                     MemLayout::ROW_MAJOR);
+    std::default_random_engine trialGenerator(123);
+    std::uniform_int_distribution<T_DOC_IDX> docIdxDist(0, kNumDocs - 1);
 
-    verifyDensification(workingEmbIndex, docIdxListToDensify, emb2D);
+    std::vector<T_DOC_IDX> docIdxListToDensify = genRandomDocIdxList();
+
+    for (size_t trial = 0; trial < kNumDensifyTrials; ++trial)
+    {
+        std::cout << "===== Trial " << trial << " =====" << std::endl;
+
+        const WorkingEmbIndex& workingEmbIndex = embIndexManager.densify(docIdxListToDensify,
+                                                                         kDensifiedEmbIdxBeginIncl,
+                                                                         kDensifiedEmbIdxEndExcl,
+                                                                         MemLayout::ROW_MAJOR);
+
+        verifyDensification(workingEmbIndex, docIdxListToDensify, emb2D);
+
+        // Build next trial's docIdxList: kCacheRate from current, (1 - kCacheRate) new random.
+        size_t numToKeep = static_cast<size_t>(kNumDocsToDensify * kCacheRate);
+        size_t numNew = kNumDocsToDensify - numToKeep;
+
+        std::unordered_set<T_DOC_IDX> nextSet(docIdxListToDensify.begin(),
+                                               docIdxListToDensify.begin() + numToKeep);
+        while (nextSet.size() < kNumDocsToDensify)
+        {
+            T_DOC_IDX candidate = docIdxDist(trialGenerator);
+            nextSet.insert(candidate);
+        }
+        docIdxListToDensify.assign(nextSet.begin(), nextSet.end());
+        std::sort(docIdxListToDensify.begin(), docIdxListToDensify.end());
+    }
 
     return 0;
 }
