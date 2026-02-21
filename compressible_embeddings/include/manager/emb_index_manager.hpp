@@ -58,6 +58,7 @@ protected:
 
     // For caching
     std::unordered_map<T_DOC_IDX, T_DOC_IDX> m_cachedDocIdxToWorkingIdx;
+    std::vector<T_DOC_IDX> m_cachedWorkingIdxToDocIdx;
     void cache(std::vector<T_DOC_IDX>& docIdxList);
     CudaHostArray<int8_t> m_hp_isCached;
 };

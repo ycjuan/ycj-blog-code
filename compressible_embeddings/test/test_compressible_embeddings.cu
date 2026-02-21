@@ -23,7 +23,7 @@ const std::vector<ResidentPartitionConfig> kResidentPartitionConfigs
 constexpr float kCentroidStdDev = 1.0f;
 constexpr float kCentroidMean = 0.0f;
 constexpr float kCacheRate = 0.5f;
-constexpr size_t kNumDensifyTrials = 5;
+constexpr size_t kNumDensifyTrials = 20;
 
 std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<int>> populateRandomEmbIndex(
     const std::vector<std::vector<float>>& centroidEmbs,

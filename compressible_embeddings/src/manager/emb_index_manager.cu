@@ -7,6 +7,11 @@
 #include "manager/emb_index_manager.hpp"
 #include "utils/util.hpp"
 
+namespace // Anonymous namespace to avoid polluting the global namespace.
+{
+    constexpr T_DOC_IDX kInvalidDocIdx = -1;
+}
+
 EmbIndexManager::EmbIndexManager(size_t numDocs,
                                  size_t totalEmbDim,
                                  std::vector<ResidentPartitionConfig> residentPartitionConfigs,
@@ -24,6 +29,7 @@ EmbIndexManager::EmbIndexManager(size_t numDocs,
     , m_docIdxListToDensify(maxNumWorkingDocs, "m_docIdxListToDensify")
     , m_centroidEmbs(centroidEmbs)
     , m_hp_isCached(maxNumWorkingDocs, "m_hp_isCached")
+    , m_cachedWorkingIdxToDocIdx(maxNumWorkingDocs, kInvalidDocIdx)
 {
     std::sort(residentPartitionConfigs.begin(), residentPartitionConfigs.end());
 
@@ -131,8 +137,6 @@ const WorkingEmbIndex& EmbIndexManager::densify(std::vector<T_DOC_IDX>& docIdxLi
 
 void EmbIndexManager::cache(std::vector<T_DOC_IDX>& docIdxList)
 {
-    constexpr T_DOC_IDX kInvalidDocIdx = -1;
-
     // ------------
     // Verify docIdxList is unique.
     {
@@ -208,10 +212,17 @@ void EmbIndexManager::cache(std::vector<T_DOC_IDX>& docIdxList)
             T_DOC_IDX uncachedDocIdx = uncachedDocIdxList.front();
             reorderedDocIdxList[workingIdx] = uncachedDocIdx;
             uncachedDocIdxList.pop();
+            T_DOC_IDX oldDocIdx = m_cachedWorkingIdxToDocIdx[workingIdx];
+            if (oldDocIdx != kInvalidDocIdx)
+            {
+                m_cachedDocIdxToWorkingIdx.erase(oldDocIdx);
+            }
             m_cachedDocIdxToWorkingIdx[uncachedDocIdx] = workingIdx;
+            m_cachedWorkingIdxToDocIdx[workingIdx] = uncachedDocIdx;
             m_hp_isCached.data()[workingIdx] = 0;
         }
-        else {
+        else 
+        {
             cnt4++;
         }
     }
