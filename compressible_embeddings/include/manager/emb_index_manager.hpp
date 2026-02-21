@@ -6,10 +6,10 @@
 
 #include "common/typedef.hpp"
 #include "compressed/compressed_partition_config.hpp"
-#include "compressed/res_quant_index.hpp"
-#include "resident/resident_emb_index.hpp"
+#include "compressed/res_quant_dataset.hpp"
+#include "resident/resident_emb_dataset.hpp"
 #include "resident/resident_partition_config.hpp"
-#include "working/working_emb_index.hpp"
+#include "working/working_emb_dataset.hpp"
 #include "utils/cuda_malloc_raii.hpp"
 
 class EmbIndexManager

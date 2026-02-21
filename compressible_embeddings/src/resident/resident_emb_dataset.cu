@@ -1,4 +1,4 @@
-#include "resident/resident_emb_index.hpp"
+#include "resident/resident_emb_dataset.hpp"
 #include "utils/cuda_malloc_raii.hpp"
 #include "utils/util.hpp"
 

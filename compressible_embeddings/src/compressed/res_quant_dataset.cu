@@ -1,4 +1,4 @@
-#include "compressed/res_quant_index.hpp"
+#include "compressed/res_quant_dataset.hpp"
 #include "utils/util.hpp"
 #include "common/memory_layout.hpp"
 

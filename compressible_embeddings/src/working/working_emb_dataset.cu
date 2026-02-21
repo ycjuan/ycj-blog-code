@@ -1,4 +1,4 @@
-#include "working/working_emb_index.hpp"
+#include "working/working_emb_dataset.hpp"
 
 WorkingEmbDataset::WorkingEmbDataset(size_t maxNumDocs, size_t totalEmbDim)
     : m_maxNumDocs(maxNumDocs)

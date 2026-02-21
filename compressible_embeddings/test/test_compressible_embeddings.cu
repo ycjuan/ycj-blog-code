@@ -7,7 +7,7 @@
 
 #include "manager/emb_index_manager.hpp"
 #include "resident/resident_partition_config.hpp"
-#include "working/working_emb_index.hpp"
+#include "working/working_emb_dataset.hpp"
 #include "utils/util.hpp"
 
 constexpr size_t kNumDocs = 10000;
