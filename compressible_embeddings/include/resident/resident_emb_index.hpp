@@ -40,6 +40,6 @@ private:
     CudaHostArray<T_EMB> m_embChunk;
 
     // Stream
-    cudaStream_t m_cudaStreamRead;
-    cudaStream_t m_cudaStreamWrite;
+    CudaStream m_cudaStreamRead;
+    CudaStream m_cudaStreamWrite;
 };

@@ -98,9 +98,9 @@ void ResidentEmbIndex::densify(const DensificationTask& densificationTask) const
     std::cout << "densifyFromResidentKernel start" << std::endl;
     constexpr size_t kBlockSize = 1024;
     size_t gridSize = (params.numDocsToDensify + kBlockSize - 1) / kBlockSize;
-    densifyFromResidentKernel<<<gridSize, kBlockSize, 0, m_cudaStreamRead>>>(params);
+    densifyFromResidentKernel<<<gridSize, kBlockSize, 0, m_cudaStreamRead.get()>>>(params);
     std::cout << "densifyFromResidentKernel done" << std::endl;
-    CHECK_CUDA(cudaStreamSynchronize(m_cudaStreamRead));
+    CHECK_CUDA(cudaStreamSynchronize(m_cudaStreamRead.get()));
     std::cout << "cudaStreamSynchronize done" << std::endl;
 }
 
@@ -120,7 +120,7 @@ __global__ void updateResidentKernel(T_DOC_IDX* h_docIdxChunk,
         {
             size_t srcMemAddr = getMemAddrRowMajor(srcDocIdx, embIdx, numDocsToUpdate, embDim);
             size_t dstMemAddr = getMemAddrRowMajor(dstDocIdx, embIdx, numDocsTotal, embDim);
-            d_residentEmbIndex[dstMemAddr] = h_embChunk[dstMemAddr];
+            d_residentEmbIndex[dstMemAddr] = h_embChunk[srcMemAddr];
         }
     }
 }
@@ -156,14 +156,14 @@ void ResidentEmbIndex::update(const std::vector<T_DOC_IDX>& docIdxList, const st
         size_t gridSize = (numDocsToUpdate + kBlockSize - 1) / kBlockSize;
 
         std::cout << "updateResidentKernel start" << std::endl;
-        updateResidentKernel<<<gridSize, kBlockSize, 0, m_cudaStreamRead>>>(h_docIdxChunk,
+        updateResidentKernel<<<gridSize, kBlockSize, 0, m_cudaStreamRead.get()>>>(h_docIdxChunk,
                                                                             h_embChunk,
                                                                             numDocsToUpdate,
                                                                             m_residentPartitionConfig.getEmbDim(),
                                                                             m_residentEmbIndex.data(),
                                                                             m_numDocs);
         std::cout << "updateResidentKernel done" << std::endl;
-        CHECK_CUDA(cudaStreamSynchronize(m_cudaStreamRead));
+        CHECK_CUDA(cudaStreamSynchronize(m_cudaStreamRead.get()));
         std::cout << "cudaStreamSynchronize done" << std::endl;
     }
 }

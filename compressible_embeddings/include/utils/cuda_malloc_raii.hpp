@@ -10,6 +10,33 @@
 
 constexpr bool kPrintDebug = true;
 
+struct CudaStreamDeleter
+{
+    void operator()(CUstream_st* stream) const { cudaStreamDestroy(stream); }
+};
+
+class CudaStream
+{
+public:
+    CudaStream()
+    {
+        cudaStream_t s;
+        cudaError_t err = cudaStreamCreate(&s);
+        if (err != cudaSuccess)
+        {
+            std::ostringstream oss;
+            oss << "Failed to create CUDA stream: " << cudaGetErrorString(err);
+            throw std::runtime_error(oss.str());
+        }
+        m_stream.reset(s);
+    }
+
+    cudaStream_t get() const { return m_stream.get(); }
+
+private:
+    std::unique_ptr<CUstream_st, CudaStreamDeleter> m_stream;
+};
+
 template <typename T> struct CudaDeviceDeleter
 {
     void operator()(T* ptr) const 
