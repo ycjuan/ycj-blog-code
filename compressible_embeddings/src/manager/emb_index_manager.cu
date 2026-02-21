@@ -115,6 +115,7 @@ const WorkingEmbIndex& EmbIndexManager::densify(std::vector<T_DOC_IDX>& docIdxLi
     densificationTask.globalEmbIdxEndExcl = embIdxEndExcl;
     densificationTask.d_workingEmbIndex = m_workingEmbIndex.data();
     densificationTask.d_docIdxList = m_docIdxListToDensify.data();
+    densificationTask.hp_isCached = m_hp_isCached.data();
 
     for (size_t residentPartitionIdx = 0; residentPartitionIdx < m_residentEmbIndices.size(); ++residentPartitionIdx)
     {

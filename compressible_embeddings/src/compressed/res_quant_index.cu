@@ -147,6 +147,8 @@ struct DensifyFromResQuantKernelParams
     size_t compressedEmbDimBegin;
     size_t compressedEmbDimEnd;
     size_t embOffsetDst;
+
+    int8_t* hp_isCached;
 };
 
 __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params)
@@ -158,6 +160,11 @@ __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params
 
     if (toScoreIdx < params.numDocsToDensify)
     {
+        if (params.hp_isCached[toScoreIdx])
+        {
+            return;
+        }
+
         int globalEmbIdx = localEmbIdx + params.compressedEmbDimBegin;
         T_DOC_IDX docIdx = params.d_docIdxList[toScoreIdx];
         int centroidIdx = params.d_centroidIdx[docIdx];
@@ -223,6 +230,7 @@ void ResQuantIndex::densifyCompressed(const DensificationTask& densificationTask
         params.compressedEmbDimBegin = embDimBeginReal;
         params.compressedEmbDimEnd = embDimEndReal;
         params.embOffsetDst = embDimBeginReal - densificationTask.globalEmbIdxBeginIncl;
+        params.hp_isCached = densificationTask.hp_isCached;
 
         constexpr size_t kBlockSize = 1024;
         size_t numTasks = densificationTask.numDocsToDensify * compressedEmbDim;

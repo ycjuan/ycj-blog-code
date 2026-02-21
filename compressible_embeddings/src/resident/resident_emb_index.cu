@@ -33,6 +33,7 @@ struct DensifyFromResidentKernelParams
     // Shared
     int embDimToDensify;
     T_DOC_IDX* d_docIdxMap;
+    int8_t* hp_isCached;
 };
 
 __global__ void densifyFromResidentKernel(DensifyFromResidentKernelParams params)
@@ -41,6 +42,11 @@ __global__ void densifyFromResidentKernel(DensifyFromResidentKernelParams params
 
     if (taskIdx < params.numDocsToDensify)
     {
+        if (params.hp_isCached[taskIdx])
+        {
+            return;
+        }
+
         T_DOC_IDX docIdxSrc = params.d_docIdxMap[taskIdx];
         T_DOC_IDX docIdxDst = taskIdx;
 
@@ -91,6 +97,7 @@ void ResidentEmbIndex::densify(const DensificationTask& densificationTask) const
     params.embDimToDensify = embDimEndExclReal - embDimBeginInclReal;
     params.embOffsetSrc = embDimBeginInclReal - m_residentPartitionConfig.getEmbDimBeginIncl();
     params.embOffsetDst = embDimBeginInclReal - densificationTask.globalEmbIdxBeginIncl;
+    params.hp_isCached = densificationTask.hp_isCached;
     std::cout << "embOffsetDst: " << params.embOffsetDst << std::endl;
 
     // -------------
