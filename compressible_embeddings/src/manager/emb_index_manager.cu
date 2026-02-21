@@ -151,7 +151,6 @@ void EmbIndexManager::cache(std::vector<T_DOC_IDX>& docIdxList)
             // Very important: if the cached working index is larger than the docIdxList.size(),
             //                 it is still considered as uncached.
             uncachedDocIdxList.push(docIdx);
-            m_hp_isCached.data()[workingIdx] = 0;
         }
     }
 
@@ -161,11 +160,27 @@ void EmbIndexManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     {
         if (reorderedDocIdxList[workingIdx] == kInvalidDocIdx)
         {
+            if (uncachedDocIdxList.empty())
+            {
+                std::ostringstream oss;
+                oss << "Uncached doc indices are empty. This should not happen.";
+                throw std::runtime_error(oss.str());
+            }
             T_DOC_IDX uncachedDocIdx = uncachedDocIdxList.front();
             reorderedDocIdxList[workingIdx] = uncachedDocIdx;
             uncachedDocIdxList.pop();
             m_cachedDocIdxToWorkingIdx[uncachedDocIdx] = workingIdx;
+            m_hp_isCached.data()[workingIdx] = 0;
         }
+    }
+
+    // ------------
+    // Verify the uncachedDocIdxList is empty.
+    if (!uncachedDocIdxList.empty())
+    {
+        std::ostringstream oss;
+        oss << "Uncached doc indices are not empty: " << uncachedDocIdxList.size();
+        throw std::runtime_error(oss.str());
     }
 
     // ------------
