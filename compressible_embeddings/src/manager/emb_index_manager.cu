@@ -7,10 +7,17 @@
 EmbIndexManager::EmbIndexManager(size_t numDocs,
                                  size_t totalEmbDim,
                                  std::vector<ResidentPartitionConfig> residentPartitionConfigs,
-                                 size_t maxNumWorkingDocs)
+                                 size_t maxNumWorkingDocs,
+                                 size_t numCentroids,
+                                 size_t numBitsPerDim,
+                                 const std::vector<std::vector<float>>& centroidEmbs,
+                                 const std::vector<std::vector<float>>& centroidStdDevs)
     : m_numDocs(numDocs)
     , m_totalEmbDim(totalEmbDim)
     , m_maxNumWorkingDocs(maxNumWorkingDocs)
+    , m_compressedPartitionConfigs(findCompressedPartitionConfigs(residentPartitionConfigs, totalEmbDim))
+    , m_resQuantIndex(numDocs, totalEmbDim, maxNumWorkingDocs, m_compressedPartitionConfigs,
+                      numCentroids, numBitsPerDim, centroidEmbs, centroidStdDevs)
     , m_workingEmbIndex(maxNumWorkingDocs, totalEmbDim)
     , m_docIdxListToDensify(maxNumWorkingDocs, "m_docIdxListToDensify")
 {

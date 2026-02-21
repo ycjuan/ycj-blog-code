@@ -5,6 +5,7 @@
 
 #include "common/typedef.hpp"
 #include "compressed/compressed_partition_config.hpp"
+#include "compressed/res_quant_index.hpp"
 #include "resident/resident_emb_index.hpp"
 #include "resident/resident_partition_config.hpp"
 #include "working/working_emb_index.hpp"
@@ -16,7 +17,11 @@ public:
     EmbIndexManager(size_t numDocs,
                     size_t globalEmbDim,
                     std::vector<ResidentPartitionConfig> residentPartitionConfigs,
-                    size_t maxNumWorkingDocs);
+                    size_t maxNumWorkingDocs,
+                    size_t numCentroids,
+                    size_t numBitsPerDim,
+                    const std::vector<std::vector<float>>& centroidEmbs,
+                    const std::vector<std::vector<float>>& centroidStdDevs);
 
     void update(const std::vector<T_DOC_IDX>& docIdxList, const std::vector<std::vector<T_EMB>>& emb2D);
 
@@ -33,6 +38,10 @@ protected:
 
     // Resident index
     std::vector<ResidentEmbIndex> m_residentEmbIndices;
+
+    // Compressed index (residual quantization)
+    std::vector<CompressedPartitionConfig> m_compressedPartitionConfigs;
+    ResQuantIndex m_resQuantIndex;
 
     // Working set index
     WorkingEmbIndex m_workingEmbIndex;

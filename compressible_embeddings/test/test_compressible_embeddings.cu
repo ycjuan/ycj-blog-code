@@ -15,6 +15,8 @@ constexpr size_t kMaxWorkingSetSize = 1000;
 constexpr size_t kNumDocsToDensify = 500;
 constexpr size_t kDensifiedEmbIdxBeginIncl = 3;
 constexpr size_t kDensifiedEmbIdxEndExcl = 125;
+constexpr size_t kNumCentroids = 16;
+constexpr size_t kNumBitsPerDim = 2;
 const std::vector<ResidentPartitionConfig> kResidentPartitionConfigs
     = { ResidentPartitionConfig(0, 48, MemLayout::ROW_MAJOR), ResidentPartitionConfig(64, 96, MemLayout::ROW_MAJOR) };
 
@@ -85,9 +87,21 @@ void verifyDensification(const WorkingEmbIndex& workingEmbIndex, const std::vect
 
 int main()
 {
-    std::cout << "Compiles successfully" << std::endl;
-    return 0;
-    EmbIndexManager embIndexManager(kNumDocs, kTotalEmbDim, kResidentPartitionConfigs, kMaxWorkingSetSize);
+    // Generate dummy centroid data
+    std::default_random_engine centroidGen(42);
+    std::normal_distribution<float> centroidDist(0.0f, 1.0f);
+    std::vector<std::vector<float>> centroidEmbs(kNumCentroids, std::vector<float>(kTotalEmbDim));
+    std::vector<std::vector<float>> centroidStdDevs(kNumCentroids, std::vector<float>(kTotalEmbDim, 0.1f));
+    for (size_t c = 0; c < kNumCentroids; c++)
+    {
+        for (size_t d = 0; d < kTotalEmbDim; d++)
+        {
+            centroidEmbs[c][d] = centroidDist(centroidGen);
+        }
+    }
+
+    EmbIndexManager embIndexManager(kNumDocs, kTotalEmbDim, kResidentPartitionConfigs, kMaxWorkingSetSize,
+                                    kNumCentroids, kNumBitsPerDim, centroidEmbs, centroidStdDevs);
 
     auto [docIdxList, emb2D] = populateRandomEmbIndex();
     embIndexManager.update(docIdxList, emb2D);

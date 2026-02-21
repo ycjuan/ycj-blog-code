@@ -1,8 +1,9 @@
 #pragma once
 
-#include <cuda_bf16.h>
+#include <cstddef>
+#include <vector>
 
-#include "manager/emb_index_manager.hpp"
+#include "resident/resident_partition_config.hpp"
 
 class CompressedEmbIndex
 {
