@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <limits>
+#include <queue>
 
 #include "common/typedef.hpp"
 #include "manager/emb_index_manager.hpp"
@@ -21,6 +22,7 @@ EmbIndexManager::EmbIndexManager(size_t numDocs,
     , m_workingEmbIndex(maxNumWorkingDocs, totalEmbDim)
     , m_docIdxListToDensify(maxNumWorkingDocs, "m_docIdxListToDensify")
     , m_centroidEmbs(centroidEmbs)
+    , m_hp_isCached(maxNumWorkingDocs, "m_hp_isCached")
 {
     std::sort(residentPartitionConfigs.begin(), residentPartitionConfigs.end());
 
@@ -85,7 +87,7 @@ void EmbIndexManager::update(const std::vector<T_DOC_IDX>& docIdxList, const std
     m_resQuantIndex.update(docIdxList, emb2D, centroidIdxList);
 }
 
-const WorkingEmbIndex& EmbIndexManager::densify(const std::vector<T_DOC_IDX>& docIdxList, size_t embIdxBeginIncl, size_t embIdxEndExcl, MemLayout memLayout)
+const WorkingEmbIndex& EmbIndexManager::densify(std::vector<T_DOC_IDX>& docIdxList, size_t embIdxBeginIncl, size_t embIdxEndExcl, MemLayout memLayout)
 {
     if (docIdxList.size() > m_maxNumWorkingDocs)
     {
@@ -93,6 +95,11 @@ const WorkingEmbIndex& EmbIndexManager::densify(const std::vector<T_DOC_IDX>& do
         oss << "docIdxList.size() > m_maxNumWorkingDocs: " << docIdxList.size() << " > " << m_maxNumWorkingDocs;
         throw std::runtime_error(oss.str());
     }
+    // ------------
+    // Cache the docIdxList.
+    cache(docIdxList);
+
+    
     CHECK_CUDA(cudaMemcpy(m_docIdxListToDensify.data(),
                           docIdxList.data(),
                           docIdxList.size() * sizeof(T_DOC_IDX),
@@ -118,4 +125,50 @@ const WorkingEmbIndex& EmbIndexManager::densify(const std::vector<T_DOC_IDX>& do
     m_resQuantIndex.densifyCompressed(densificationTask);
 
     return m_workingEmbIndex;
+}
+
+void EmbIndexManager::cache(std::vector<T_DOC_IDX>& docIdxList)
+{
+    constexpr T_DOC_IDX kInvalidDocIdx = -1;
+
+    // ------------
+    // First scan to find the cached working indices.
+    std::vector<T_DOC_IDX> reorderedDocIdxList(docIdxList.size(), kInvalidDocIdx);
+    std::queue<T_DOC_IDX> uncachedDocIdxList;
+    for (T_DOC_IDX workingIdx = 0; workingIdx < docIdxList.size(); ++workingIdx)
+    {
+        T_DOC_IDX docIdx = docIdxList[workingIdx];
+        auto it = m_cachedDocIdxToWorkingIdx.find(docIdx);
+        if (it != m_cachedDocIdxToWorkingIdx.end() && it->second < docIdxList.size())
+        {
+            T_DOC_IDX cachedWorkingIdx = it->second;
+            reorderedDocIdxList[cachedWorkingIdx] = docIdx;
+            m_hp_isCached.data()[cachedWorkingIdx] = 1;
+        }
+        else 
+        {
+            // Very important: if the cached working index is larger than the docIdxList.size(),
+            //                 it is still considered as uncached.
+            uncachedDocIdxList.push(docIdx);
+            m_hp_isCached.data()[workingIdx] = 0;
+        }
+    }
+
+    // ------------
+    // Second scan to put the uncached doc indices to the reorderedDocIdxList.
+    for (T_DOC_IDX workingIdx = 0; workingIdx < docIdxList.size(); ++workingIdx)
+    {
+        if (reorderedDocIdxList[workingIdx] == kInvalidDocIdx)
+        {
+            T_DOC_IDX uncachedDocIdx = uncachedDocIdxList.front();
+            reorderedDocIdxList[workingIdx] = uncachedDocIdx;
+            uncachedDocIdxList.pop();
+            m_cachedDocIdxToWorkingIdx[uncachedDocIdx] = workingIdx;
+        }
+    }
+
+    // ------------
+    // Reassign the reorderedDocIdxList to the docIdxList.
+    docIdxList = reorderedDocIdxList;
+
 }

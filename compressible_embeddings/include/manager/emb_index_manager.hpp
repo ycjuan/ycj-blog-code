@@ -2,6 +2,7 @@
 
 #include <cuda_bf16.h>
 #include <vector>
+#include <unordered_map>
 
 #include "common/typedef.hpp"
 #include "compressed/compressed_partition_config.hpp"
@@ -24,7 +25,7 @@ public:
 
     void update(const std::vector<T_DOC_IDX>& docIdxList, const std::vector<std::vector<T_EMB>>& emb2D);
 
-    const WorkingEmbIndex& densify(const std::vector<T_DOC_IDX>& docIdxList,
+    const WorkingEmbIndex& densify(std::vector<T_DOC_IDX>& docIdxList,
                                    size_t globalEmbIdxBeginIncl,
                                    size_t globalEmbIdxEndExcl,
                                    MemLayout memLayout);
@@ -55,6 +56,10 @@ protected:
     cudaStream_t m_cudaStreamRead;
     cudaStream_t m_cudaStreamWrite;
 
+    // For caching
+    std::unordered_map<T_DOC_IDX, T_DOC_IDX> m_cachedDocIdxToWorkingIdx;
+    void cache(std::vector<T_DOC_IDX>& docIdxList);
+    CudaHostArray<int8_t> m_hp_isCached;
 };
 
 /*
