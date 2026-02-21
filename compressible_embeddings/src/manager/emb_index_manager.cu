@@ -48,7 +48,7 @@ EmbIndexManager::EmbIndexManager(size_t numDocs,
 
     for (const auto& residentPartitionConfig : residentPartitionConfigs)
     {
-        m_residentEmbIndices.push_back(ResidentEmbIndex(numDocs, residentPartitionConfig));
+        m_residentEmbIndices.push_back(ResidentEmbDataset(numDocs, residentPartitionConfig));
     }
 }
 
@@ -94,7 +94,7 @@ void EmbIndexManager::update(const std::vector<T_DOC_IDX>& docIdxList, const std
     m_resQuantIndex.update(docIdxList, emb2D, centroidIdxList);
 }
 
-const WorkingEmbIndex& EmbIndexManager::densify(std::vector<T_DOC_IDX>& docIdxList, size_t embIdxBeginIncl, size_t embIdxEndExcl, MemLayout memLayout)
+const WorkingEmbDataset& EmbIndexManager::densify(std::vector<T_DOC_IDX>& docIdxList, size_t embIdxBeginIncl, size_t embIdxEndExcl, MemLayout memLayout)
 {
     if (docIdxList.size() > m_maxNumWorkingDocs)
     {

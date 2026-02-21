@@ -25,7 +25,7 @@ public:
 
     void update(const std::vector<T_DOC_IDX>& docIdxList, const std::vector<std::vector<T_EMB>>& emb2D);
 
-    const WorkingEmbIndex& densify(std::vector<T_DOC_IDX>& docIdxList,
+    const WorkingEmbDataset& densify(std::vector<T_DOC_IDX>& docIdxList,
                                    size_t globalEmbIdxBeginIncl,
                                    size_t globalEmbIdxEndExcl,
                                    MemLayout memLayout);
@@ -37,14 +37,14 @@ protected:
     size_t m_maxNumWorkingDocs;
 
     // Resident index
-    std::vector<ResidentEmbIndex> m_residentEmbIndices;
+    std::vector<ResidentEmbDataset> m_residentEmbIndices;
 
     // Compressed index (residual quantization)
     std::vector<CompressedPartitionConfig> m_compressedPartitionConfigs;
-    ResQuantIndex m_resQuantIndex;
+    ResQuantDataset m_resQuantIndex;
 
     // Working set index
-    WorkingEmbIndex m_workingEmbIndex;
+    WorkingEmbDataset m_workingEmbIndex;
 
     // Densification
     CudaDeviceArray<T_DOC_IDX> m_docIdxListToDensify;

@@ -6,10 +6,10 @@
 #include "utils/cuda_malloc_raii.hpp"
 #include "common/memory_layout.hpp"
 
-class WorkingEmbIndex
+class WorkingEmbDataset
 {
 public:
-    WorkingEmbIndex(size_t maxNumDocs, size_t totalEmbDim);
+    WorkingEmbDataset(size_t maxNumDocs, size_t totalEmbDim);
     T_EMB* data() const;
 
     // Setters and getters

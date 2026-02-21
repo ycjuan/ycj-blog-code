@@ -9,14 +9,14 @@
 #include "common/densification_task.hpp"
 #include "utils/cuda_malloc_raii.hpp"
 
-class ResQuantIndex : public CompressedEmbIndex
+class ResQuantDataset : public CompressedEmbDataset
 {
 public:
     // centroidEmbs: numCentroids x globalEmbDim (centroid mean values)
     // centroidStdDevs: numCentroids x globalEmbDim (per-dimension standard deviations)
     // centroidIdxPerDoc: numDocs (centroid assignment for each document)
     // residuals: numDocs x rqDim (pre-quantized residuals, packed into T_RQ)
-    ResQuantIndex(size_t numDocs,
+    ResQuantDataset(size_t numDocs,
                   size_t globalEmbDim,
                   size_t maxNumDocsInWorkingIndex,
                   std::vector<CompressedPartitionConfig> compressedPartitionConfigs,

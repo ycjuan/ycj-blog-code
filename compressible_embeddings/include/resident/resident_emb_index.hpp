@@ -8,11 +8,11 @@
 #include "resident/resident_partition_config.hpp"
 #include "utils/cuda_malloc_raii.hpp"
 
-class ResidentEmbIndex
+class ResidentEmbDataset
 {
 public:
     // Constructor
-    ResidentEmbIndex(size_t numDocs, ResidentPartitionConfig residentPartitionConfig);
+    ResidentEmbDataset(size_t numDocs, ResidentPartitionConfig residentPartitionConfig);
 
     // Getters
     T_EMB* data() const;

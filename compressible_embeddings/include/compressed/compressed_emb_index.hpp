@@ -5,8 +5,8 @@
 
 #include "resident/resident_partition_config.hpp"
 
-class CompressedEmbIndex
+class CompressedEmbDataset
 {
 public:
-    CompressedEmbIndex(size_t numDocs, size_t globalEmbDim, std::vector<ResidentPartitionConfig> residentIndexConfigs, size_t maxNumDocsInWorkingIndex);
+    CompressedEmbDataset(size_t numDocs, size_t globalEmbDim, std::vector<ResidentPartitionConfig> residentIndexConfigs, size_t maxNumDocsInWorkingIndex);
 };

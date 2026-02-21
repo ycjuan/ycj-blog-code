@@ -10,14 +10,14 @@
 // Constructor
 // ============================================================================
 
-ResQuantIndex::ResQuantIndex(size_t numDocs,
+ResQuantDataset::ResQuantDataset(size_t numDocs,
                              size_t globalEmbDim,
                              size_t maxNumDocsInWorkingIndex,
                              std::vector<CompressedPartitionConfig> compressedPartitionConfigs,
                              size_t numBitsPerDim,
                              const std::vector<std::vector<float>>& centroidEmbs,
                              const std::vector<std::vector<float>>& centroidStdDevs)
-    : CompressedEmbIndex(numDocs, globalEmbDim, {}, maxNumDocsInWorkingIndex)
+    : CompressedEmbDataset(numDocs, globalEmbDim, {}, maxNumDocsInWorkingIndex)
     , m_numCentroids(centroidEmbs.size())
     , m_numBitsPerDim(numBitsPerDim)
     , m_rqDim(getRqDim(globalEmbDim, numBitsPerDim))
@@ -60,15 +60,15 @@ ResQuantIndex::ResQuantIndex(size_t numDocs,
 // Getters
 // ============================================================================
 
-size_t ResQuantIndex::getNumCentroids() const { return m_numCentroids; }
-size_t ResQuantIndex::getNumBitsPerDim() const { return m_numBitsPerDim; }
-size_t ResQuantIndex::getRqDimPerDoc() const { return m_rqDim; }
+size_t ResQuantDataset::getNumCentroids() const { return m_numCentroids; }
+size_t ResQuantDataset::getNumBitsPerDim() const { return m_numBitsPerDim; }
+size_t ResQuantDataset::getRqDimPerDoc() const { return m_rqDim; }
 
 // ============================================================================
 // update
 // ============================================================================
 
-void ResQuantIndex::update(const std::vector<T_DOC_IDX>& docIdxList,
+void ResQuantDataset::update(const std::vector<T_DOC_IDX>& docIdxList,
                            const std::vector<std::vector<T_EMB>>& emb2D,
                            const std::vector<int>& centroidIdxList)
 {
@@ -197,7 +197,7 @@ __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params
 // densifyCompressed
 // ============================================================================
 
-void ResQuantIndex::densifyCompressed(const DensificationTask& densificationTask) const
+void ResQuantDataset::densifyCompressed(const DensificationTask& densificationTask) const
 {
     size_t globalEmbDim = m_rqDim * kBitsPerRqInt / m_numBitsPerDim;
 

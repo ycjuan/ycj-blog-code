@@ -89,7 +89,7 @@ bool isCompressedDim(size_t embIdx)
     return (embIdx >= 48 && embIdx < 64) || embIdx >= 96;
 }
 
-void verifyDensification(const WorkingEmbIndex& workingEmbIndex,
+void verifyDensification(const WorkingEmbDataset& workingEmbIndex,
                          const std::vector<T_DOC_IDX>& docIdxList,
                          const std::vector<std::vector<T_EMB>>& emb2D)
 {
@@ -169,7 +169,7 @@ int main()
     {
         std::cout << "===== Trial " << trial << " =====" << std::endl;
 
-        const WorkingEmbIndex& workingEmbIndex = embIndexManager.densify(docIdxListToDensify,
+        const WorkingEmbDataset& workingEmbIndex = embIndexManager.densify(docIdxListToDensify,
                                                                          kDensifiedEmbIdxBeginIncl,
                                                                          kDensifiedEmbIdxEndExcl,
                                                                          MemLayout::ROW_MAJOR);

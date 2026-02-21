@@ -2,7 +2,7 @@
 #include "utils/cuda_malloc_raii.hpp"
 #include "utils/util.hpp"
 
-ResidentEmbIndex::ResidentEmbIndex(size_t numDocs, ResidentPartitionConfig residentPartitionConfig)
+ResidentEmbDataset::ResidentEmbDataset(size_t numDocs, ResidentPartitionConfig residentPartitionConfig)
     : m_numDocs(numDocs)
     , m_residentPartitionConfig(residentPartitionConfig)
     , m_residentEmbIndex(numDocs * residentPartitionConfig.getEmbDim(), "m_residentEmbIndex")
@@ -11,9 +11,9 @@ ResidentEmbIndex::ResidentEmbIndex(size_t numDocs, ResidentPartitionConfig resid
 {
 }
 
-T_EMB* ResidentEmbIndex::data() const { return m_residentEmbIndex.data(); }
+T_EMB* ResidentEmbDataset::data() const { return m_residentEmbIndex.data(); }
 
-ResidentPartitionConfig ResidentEmbIndex::getResidentPartitionConfig() const { return m_residentPartitionConfig; }
+ResidentPartitionConfig ResidentEmbDataset::getResidentPartitionConfig() const { return m_residentPartitionConfig; }
 
 struct DensifyFromResidentKernelParams
 {
@@ -65,7 +65,7 @@ __global__ void densifyFromResidentKernel(DensifyFromResidentKernelParams params
     }
 }
 
-void ResidentEmbIndex::densify(const DensificationTask& densificationTask) const
+void ResidentEmbDataset::densify(const DensificationTask& densificationTask) const
 {
     // -------------
     // Obtain the real begin and end points we want to densify.
@@ -120,7 +120,7 @@ __global__ void updateResidentKernel(T_DOC_IDX* h_docIdxChunk,
     }
 }
 
-void ResidentEmbIndex::update(const std::vector<T_DOC_IDX>& docIdxList, const std::vector<std::vector<T_EMB>>& emb2D)
+void ResidentEmbDataset::update(const std::vector<T_DOC_IDX>& docIdxList, const std::vector<std::vector<T_EMB>>& emb2D)
 {
     // Loop over docs chunk by chunk.
     for (size_t docIdxBeginIncl = 0; docIdxBeginIncl < docIdxList.size(); docIdxBeginIncl += kMaxUpdateBatchSize)
