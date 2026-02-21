@@ -33,7 +33,7 @@ private:
     ResidentPartitionConfig m_residentPartitionConfig;
 
     // Index
-    CudaDeviceArray<T_EMB> m_residentEmbIndex;
+    CudaDeviceArray<T_EMB> m_residentEmbDataset;
 
     // Update buffer
     CudaHostArray<T_DOC_IDX> m_docIdxChunk;

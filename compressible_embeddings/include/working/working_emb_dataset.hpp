@@ -28,5 +28,5 @@ private:
     MemLayout m_memLayout;
     size_t m_embDimBeginIncl;
     size_t m_embDimEndExcl;
-    CudaDeviceArray<T_EMB> m_workingEmbIndex;
+    CudaDeviceArray<T_EMB> m_workingEmbDataset;
 };

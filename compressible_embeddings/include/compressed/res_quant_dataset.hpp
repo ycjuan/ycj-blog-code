@@ -18,7 +18,7 @@ public:
     // residuals: numDocs x rqDim (pre-quantized residuals, packed into T_RQ)
     ResQuantDataset(size_t numDocs,
                   size_t globalEmbDim,
-                  size_t maxNumDocsInWorkingIndex,
+                  size_t maxNumDocsInWorkingDataset,
                   std::vector<CompressedPartitionConfig> compressedPartitionConfigs,
                   size_t numBitsPerDim,
                   const std::vector<std::vector<float>>& centroidEmbs,

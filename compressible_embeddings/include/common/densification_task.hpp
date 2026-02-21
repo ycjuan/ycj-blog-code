@@ -8,6 +8,6 @@ struct DensificationTask
     size_t numDocsToDensify;
     size_t globalEmbIdxBeginIncl;
     size_t globalEmbIdxEndExcl;
-    T_EMB* d_workingEmbIndex;
+    T_EMB* d_workingEmbDataset;
     int8_t* hp_isCached;
 };

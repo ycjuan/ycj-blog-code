@@ -12,12 +12,12 @@
 
 ResQuantDataset::ResQuantDataset(size_t numDocs,
                              size_t globalEmbDim,
-                             size_t maxNumDocsInWorkingIndex,
+                             size_t maxNumDocsInWorkingDataset,
                              std::vector<CompressedPartitionConfig> compressedPartitionConfigs,
                              size_t numBitsPerDim,
                              const std::vector<std::vector<float>>& centroidEmbs,
                              const std::vector<std::vector<float>>& centroidStdDevs)
-    : CompressedEmbDataset(numDocs, globalEmbDim, {}, maxNumDocsInWorkingIndex)
+    : CompressedEmbDataset(numDocs, globalEmbDim, {}, maxNumDocsInWorkingDataset)
     , m_numCentroids(centroidEmbs.size())
     , m_numBitsPerDim(numBitsPerDim)
     , m_rqDim(getRqDim(globalEmbDim, numBitsPerDim))
@@ -140,7 +140,7 @@ struct DensifyFromResQuantKernelParams
     // Densification task
     T_DOC_IDX* d_docIdxList;
     int numDocsToDensify;
-    T_EMB* d_workingEmbIndex;
+    T_EMB* d_workingEmbDataset;
     size_t embDimWorking;
 
     // Which compressed partition and its offset in the working index
@@ -189,7 +189,7 @@ __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params
                                                 localEmbIdx + params.embOffsetDst,
                                                 params.numDocsToDensify,
                                                 params.embDimWorking);
-        params.d_workingEmbIndex[dstMemAddr] = rst;
+        params.d_workingEmbDataset[dstMemAddr] = rst;
     }
 }
 
@@ -225,7 +225,7 @@ void ResQuantDataset::densifyCompressed(const DensificationTask& densificationTa
         params.numBitsPerDim = m_numBitsPerDim;
         params.d_docIdxList = densificationTask.d_docIdxList;
         params.numDocsToDensify = densificationTask.numDocsToDensify;
-        params.d_workingEmbIndex = densificationTask.d_workingEmbIndex;
+        params.d_workingEmbDataset = densificationTask.d_workingEmbDataset;
         params.embDimWorking = densificationTask.globalEmbIdxEndExcl - densificationTask.globalEmbIdxBeginIncl;
         params.compressedEmbDimBegin = embDimBeginReal;
         params.compressedEmbDimEnd = embDimEndReal;

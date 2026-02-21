@@ -4,7 +4,7 @@
 #include <unordered_set>
 
 #include "common/typedef.hpp"
-#include "manager/emb_index_manager.hpp"
+#include "manager/emb_dataset_manager.hpp"
 #include "utils/util.hpp"
 
 namespace // Anonymous namespace to avoid polluting the global namespace.
@@ -12,7 +12,7 @@ namespace // Anonymous namespace to avoid polluting the global namespace.
     constexpr T_DOC_IDX kInvalidDocIdx = -1;
 }
 
-EmbIndexManager::EmbIndexManager(size_t numDocs,
+EmbDatasetManager::EmbDatasetManager(size_t numDocs,
                                  size_t totalEmbDim,
                                  std::vector<ResidentPartitionConfig> residentPartitionConfigs,
                                  size_t maxNumWorkingDocs,
@@ -23,9 +23,9 @@ EmbIndexManager::EmbIndexManager(size_t numDocs,
     , m_totalEmbDim(totalEmbDim)
     , m_maxNumWorkingDocs(maxNumWorkingDocs)
     , m_compressedPartitionConfigs(findCompressedPartitionConfigs(residentPartitionConfigs, totalEmbDim))
-    , m_resQuantIndex(numDocs, totalEmbDim, maxNumWorkingDocs, m_compressedPartitionConfigs,
+    , m_resQuantDataset(numDocs, totalEmbDim, maxNumWorkingDocs, m_compressedPartitionConfigs,
                       numBitsPerDim, centroidEmbs, centroidStdDevs)
-    , m_workingEmbIndex(maxNumWorkingDocs, totalEmbDim)
+    , m_workingEmbDataset(maxNumWorkingDocs, totalEmbDim)
     , m_docIdxListToDensify(maxNumWorkingDocs, "m_docIdxListToDensify")
     , m_centroidEmbs(centroidEmbs)
     , m_hp_isCached(maxNumWorkingDocs, "m_hp_isCached")
@@ -48,11 +48,11 @@ EmbIndexManager::EmbIndexManager(size_t numDocs,
 
     for (const auto& residentPartitionConfig : residentPartitionConfigs)
     {
-        m_residentEmbIndices.push_back(ResidentEmbDataset(numDocs, residentPartitionConfig));
+        m_residentEmbDatasets.push_back(ResidentEmbDataset(numDocs, residentPartitionConfig));
     }
 }
 
-void EmbIndexManager::update(const std::vector<T_DOC_IDX>& docIdxList, const std::vector<std::vector<T_EMB>>& emb2D)
+void EmbDatasetManager::update(const std::vector<T_DOC_IDX>& docIdxList, const std::vector<std::vector<T_EMB>>& emb2D)
 {
     if (docIdxList.size() > m_numDocs)
     {
@@ -61,10 +61,10 @@ void EmbIndexManager::update(const std::vector<T_DOC_IDX>& docIdxList, const std
         throw std::runtime_error(oss.str());
     }
 
-    for (size_t residentPartitionIdx = 0; residentPartitionIdx < m_residentEmbIndices.size(); ++residentPartitionIdx)
+    for (size_t residentPartitionIdx = 0; residentPartitionIdx < m_residentEmbDatasets.size(); ++residentPartitionIdx)
     {
-        auto& embIndex = m_residentEmbIndices[residentPartitionIdx];
-        embIndex.update(docIdxList, emb2D);
+        auto& embDataset = m_residentEmbDatasets[residentPartitionIdx];
+        embDataset.update(docIdxList, emb2D);
     }
 
     // Compute nearest centroid for each doc (L2 distance over all dims)
@@ -91,10 +91,10 @@ void EmbIndexManager::update(const std::vector<T_DOC_IDX>& docIdxList, const std
         centroidIdxList[i] = bestCentroid;
     }
 
-    m_resQuantIndex.update(docIdxList, emb2D, centroidIdxList);
+    m_resQuantDataset.update(docIdxList, emb2D, centroidIdxList);
 }
 
-const WorkingEmbDataset& EmbIndexManager::densify(std::vector<T_DOC_IDX>& docIdxList, size_t embIdxBeginIncl, size_t embIdxEndExcl, MemLayout memLayout)
+const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docIdxList, size_t embIdxBeginIncl, size_t embIdxEndExcl, MemLayout memLayout)
 {
     if (docIdxList.size() > m_maxNumWorkingDocs)
     {
@@ -112,30 +112,30 @@ const WorkingEmbDataset& EmbIndexManager::densify(std::vector<T_DOC_IDX>& docIdx
                           docIdxList.size() * sizeof(T_DOC_IDX),
                           cudaMemcpyHostToDevice));
 
-    m_workingEmbIndex.setMemLayout(memLayout);
-    m_workingEmbIndex.setEmbDimBeginIncl(embIdxBeginIncl);
-    m_workingEmbIndex.setEmbDimEndExcl(embIdxEndExcl);
+    m_workingEmbDataset.setMemLayout(memLayout);
+    m_workingEmbDataset.setEmbDimBeginIncl(embIdxBeginIncl);
+    m_workingEmbDataset.setEmbDimEndExcl(embIdxEndExcl);
 
     DensificationTask densificationTask;
     densificationTask.numDocsToDensify = docIdxList.size();
     densificationTask.globalEmbIdxBeginIncl = embIdxBeginIncl;
     densificationTask.globalEmbIdxEndExcl = embIdxEndExcl;
-    densificationTask.d_workingEmbIndex = m_workingEmbIndex.data();
+    densificationTask.d_workingEmbDataset = m_workingEmbDataset.data();
     densificationTask.d_docIdxList = m_docIdxListToDensify.data();
     densificationTask.hp_isCached = m_hp_isCached.data();
 
-    for (size_t residentPartitionIdx = 0; residentPartitionIdx < m_residentEmbIndices.size(); ++residentPartitionIdx)
+    for (size_t residentPartitionIdx = 0; residentPartitionIdx < m_residentEmbDatasets.size(); ++residentPartitionIdx)
     {
-        const auto& embIndex = m_residentEmbIndices[residentPartitionIdx];
-        embIndex.densify(densificationTask);
+        const auto& embDataset = m_residentEmbDatasets[residentPartitionIdx];
+        embDataset.densify(densificationTask);
     }
 
-    m_resQuantIndex.densifyCompressed(densificationTask);
+    m_resQuantDataset.densifyCompressed(densificationTask);
 
-    return m_workingEmbIndex;
+    return m_workingEmbDataset;
 }
 
-void EmbIndexManager::cache(std::vector<T_DOC_IDX>& docIdxList)
+void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
 {
     // ------------
     // Verify docIdxList is unique.

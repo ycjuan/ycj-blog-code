@@ -3,13 +3,13 @@
 WorkingEmbDataset::WorkingEmbDataset(size_t maxNumDocs, size_t totalEmbDim)
     : m_maxNumDocs(maxNumDocs)
     , m_totalEmbDim(totalEmbDim)
-    , m_workingEmbIndex(maxNumDocs * totalEmbDim, "m_workingSetEmbIndex")
+    , m_workingEmbDataset(maxNumDocs * totalEmbDim, "m_workingSetEmbDataset")
 {
 }
 
 T_EMB* WorkingEmbDataset::data() const
 {
-    return m_workingEmbIndex.data();
+    return m_workingEmbDataset.data();
 }
 
 void WorkingEmbDataset::setMemLayout(MemLayout memLayout)

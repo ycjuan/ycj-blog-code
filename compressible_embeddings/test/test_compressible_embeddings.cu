@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <tuple>
 
-#include "manager/emb_index_manager.hpp"
+#include "manager/emb_dataset_manager.hpp"
 #include "resident/resident_partition_config.hpp"
 #include "working/working_emb_dataset.hpp"
 #include "utils/util.hpp"
@@ -25,7 +25,7 @@ constexpr float kCentroidMean = 0.0f;
 constexpr float kCacheRate = 0.5f;
 constexpr size_t kNumDensifyTrials = 20;
 
-std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<int>> populateRandomEmbIndex(
+std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<int>> populateRandomEmbDataset(
     const std::vector<std::vector<float>>& centroidEmbs,
     const std::vector<std::vector<float>>& centroidStdDevs)
 {
@@ -89,13 +89,13 @@ bool isCompressedDim(size_t embIdx)
     return (embIdx >= 48 && embIdx < 64) || embIdx >= 96;
 }
 
-void verifyDensification(const WorkingEmbDataset& workingEmbIndex,
+void verifyDensification(const WorkingEmbDataset& workingEmbDataset,
                          const std::vector<T_DOC_IDX>& docIdxList,
                          const std::vector<std::vector<T_EMB>>& emb2D)
 {
-    std::vector<T_EMB> v_workingEmbIndex(kMaxWorkingSetSize * kTotalEmbDim);
-    CHECK_CUDA(cudaMemcpy(v_workingEmbIndex.data(),
-                          workingEmbIndex.data(),
+    std::vector<T_EMB> v_workingEmbDataset(kMaxWorkingSetSize * kTotalEmbDim);
+    CHECK_CUDA(cudaMemcpy(v_workingEmbDataset.data(),
+                          workingEmbDataset.data(),
                           kNumDocsToDensify * (kDensifiedEmbIdxEndExcl - kDensifiedEmbIdxBeginIncl) * sizeof(T_EMB),
                           cudaMemcpyDeviceToHost));
 
@@ -107,7 +107,7 @@ void verifyDensification(const WorkingEmbDataset& workingEmbIndex,
         for (size_t embIdx = kDensifiedEmbIdxBeginIncl; embIdx < kDensifiedEmbIdxEndExcl; ++embIdx)
         {
             size_t memAddr = getMemAddrRowMajor(docIdx, embIdx - kDensifiedEmbIdxBeginIncl, kNumDocsToDensify, kDensifiedEmbIdxEndExcl - kDensifiedEmbIdxBeginIncl);
-            float val = static_cast<float>(v_workingEmbIndex.at(memAddr));
+            float val = static_cast<float>(v_workingEmbDataset.at(memAddr));
             float ref = static_cast<float>(emb2D.at(docIdxList.at(docIdx)).at(embIdx));
 
             if (isCompressedDim(embIdx))
@@ -154,11 +154,11 @@ int main()
 
     auto [centroidEmbs, centroidStdDevs] = genRandCentroids();
 
-    EmbIndexManager embIndexManager(kNumDocs, kTotalEmbDim, kResidentPartitionConfigs, kMaxWorkingSetSize,
+    EmbDatasetManager embDatasetManager(kNumDocs, kTotalEmbDim, kResidentPartitionConfigs, kMaxWorkingSetSize,
                                     kNumBitsPerDim, centroidEmbs, centroidStdDevs);
 
-    auto [docIdxList, emb2D, centroidIdxList] = populateRandomEmbIndex(centroidEmbs, centroidStdDevs);
-    embIndexManager.update(docIdxList, emb2D);
+    auto [docIdxList, emb2D, centroidIdxList] = populateRandomEmbDataset(centroidEmbs, centroidStdDevs);
+    embDatasetManager.update(docIdxList, emb2D);
 
     std::default_random_engine trialGenerator(123);
     std::uniform_int_distribution<T_DOC_IDX> docIdxDist(0, kNumDocs - 1);
@@ -169,12 +169,12 @@ int main()
     {
         std::cout << "===== Trial " << trial << " =====" << std::endl;
 
-        const WorkingEmbDataset& workingEmbIndex = embIndexManager.densify(docIdxListToDensify,
+        const WorkingEmbDataset& workingEmbDataset = embDatasetManager.densify(docIdxListToDensify,
                                                                          kDensifiedEmbIdxBeginIncl,
                                                                          kDensifiedEmbIdxEndExcl,
                                                                          MemLayout::ROW_MAJOR);
 
-        verifyDensification(workingEmbIndex, docIdxListToDensify, emb2D);
+        verifyDensification(workingEmbDataset, docIdxListToDensify, emb2D);
 
         // Build next trial's docIdxList: kCacheRate from current, (1 - kCacheRate) new random.
         size_t numToKeep = static_cast<size_t>(kNumDocsToDensify * kCacheRate);

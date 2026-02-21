@@ -8,5 +8,5 @@
 class CompressedEmbDataset
 {
 public:
-    CompressedEmbDataset(size_t numDocs, size_t globalEmbDim, std::vector<ResidentPartitionConfig> residentIndexConfigs, size_t maxNumDocsInWorkingIndex);
+    CompressedEmbDataset(size_t numDocs, size_t globalEmbDim, std::vector<ResidentPartitionConfig> residentIndexConfigs, size_t maxNumDocsInWorkingDataset);
 };

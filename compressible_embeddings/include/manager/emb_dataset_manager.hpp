@@ -12,10 +12,10 @@
 #include "working/working_emb_dataset.hpp"
 #include "utils/cuda_malloc_raii.hpp"
 
-class EmbIndexManager
+class EmbDatasetManager
 {
 public:
-    EmbIndexManager(size_t numDocs,
+    EmbDatasetManager(size_t numDocs,
                     size_t globalEmbDim,
                     std::vector<ResidentPartitionConfig> residentPartitionConfigs,
                     size_t maxNumWorkingDocs,
@@ -37,14 +37,14 @@ protected:
     size_t m_maxNumWorkingDocs;
 
     // Resident index
-    std::vector<ResidentEmbDataset> m_residentEmbIndices;
+    std::vector<ResidentEmbDataset> m_residentEmbDatasets;
 
     // Compressed index (residual quantization)
     std::vector<CompressedPartitionConfig> m_compressedPartitionConfigs;
-    ResQuantDataset m_resQuantIndex;
+    ResQuantDataset m_resQuantDataset;
 
     // Working set index
-    WorkingEmbDataset m_workingEmbIndex;
+    WorkingEmbDataset m_workingEmbDataset;
 
     // Densification
     CudaDeviceArray<T_DOC_IDX> m_docIdxListToDensify;
