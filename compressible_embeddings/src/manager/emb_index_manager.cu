@@ -136,6 +136,8 @@ void EmbIndexManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     // First scan to find the cached working indices.
     std::vector<T_DOC_IDX> reorderedDocIdxList(docIdxList.size(), kInvalidDocIdx);
     std::queue<T_DOC_IDX> uncachedDocIdxList;
+    int cnt1 = 0;
+    int cnt2 = 0;
     for (T_DOC_IDX workingIdx = 0; workingIdx < docIdxList.size(); ++workingIdx)
     {
         T_DOC_IDX docIdx = docIdxList[workingIdx];
@@ -145,34 +147,39 @@ void EmbIndexManager::cache(std::vector<T_DOC_IDX>& docIdxList)
             T_DOC_IDX cachedWorkingIdx = it->second;
             reorderedDocIdxList[cachedWorkingIdx] = docIdx;
             m_hp_isCached.data()[cachedWorkingIdx] = 1;
+            cnt1++;
         }
         else 
         {
             // Very important: if the cached working index is larger than the docIdxList.size(),
             //                 it is still considered as uncached.
             uncachedDocIdxList.push(docIdx);
+            cnt2++;
         }
     }
 
+    std::cout << "cnt1: " << cnt1 << ", cnt2: " << cnt2 << std::endl;
+
     // ------------
     // Second scan to put the uncached doc indices to the reorderedDocIdxList.
+    int cnt3 = 0;
+    int cnt4 = 0;
     for (T_DOC_IDX workingIdx = 0; workingIdx < docIdxList.size(); ++workingIdx)
     {
         if (reorderedDocIdxList[workingIdx] == kInvalidDocIdx)
         {
-            if (uncachedDocIdxList.empty())
-            {
-                std::ostringstream oss;
-                oss << "Uncached doc indices are empty. This should not happen.";
-                throw std::runtime_error(oss.str());
-            }
+            cnt3++;
             T_DOC_IDX uncachedDocIdx = uncachedDocIdxList.front();
             reorderedDocIdxList[workingIdx] = uncachedDocIdx;
             uncachedDocIdxList.pop();
             m_cachedDocIdxToWorkingIdx[uncachedDocIdx] = workingIdx;
             m_hp_isCached.data()[workingIdx] = 0;
         }
+        else {
+            cnt4++;
+        }
     }
+    std::cout << "cnt1 cnt2 cnt3 cnt4: " << cnt1 << " " << cnt2 << " " << cnt3 << " " << cnt4 << std::endl;
 
     // ------------
     // Verify the uncachedDocIdxList is empty.
