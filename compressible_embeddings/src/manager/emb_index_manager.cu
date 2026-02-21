@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <limits>
 #include <queue>
+#include <unordered_set>
 
 #include "common/typedef.hpp"
 #include "manager/emb_index_manager.hpp"
@@ -131,6 +132,21 @@ const WorkingEmbIndex& EmbIndexManager::densify(std::vector<T_DOC_IDX>& docIdxLi
 void EmbIndexManager::cache(std::vector<T_DOC_IDX>& docIdxList)
 {
     constexpr T_DOC_IDX kInvalidDocIdx = -1;
+
+    // ------------
+    // Verify docIdxList is unique.
+    {
+        std::unordered_set<T_DOC_IDX> seen;
+        for (T_DOC_IDX docIdx : docIdxList)
+        {
+            if (!seen.insert(docIdx).second)
+            {
+                std::ostringstream oss;
+                oss << "Duplicate docIdx in docIdxList: " << docIdx;
+                throw std::runtime_error(oss.str());
+            }
+        }
+    }
 
     // ------------
     // First scan to find the cached working indices.
