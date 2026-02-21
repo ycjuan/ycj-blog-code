@@ -19,20 +19,25 @@ constexpr size_t kNumCentroids = 16;
 constexpr size_t kNumBitsPerDim = 2;
 const std::vector<ResidentPartitionConfig> kResidentPartitionConfigs
     = { ResidentPartitionConfig(0, 48, MemLayout::ROW_MAJOR), ResidentPartitionConfig(64, 96, MemLayout::ROW_MAJOR) };
+constexpr float kCentroidStdDev = 1.0f;
+constexpr float kCentroidMean = 0.0f;
 
 std::pair<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>> populateRandomEmbIndex()
 {
     std::vector<T_DOC_IDX> docIdxList(kNumDocs);
     std::vector<std::vector<T_EMB>> emb2D(kNumDocs);
     std::default_random_engine generator;
-    std::normal_distribution<float> distribution(0.0f, 1.0f);
+    std::normal_distribution<float> distribution(kCentroidMean, kCentroidStdDev);
     for (size_t docIdx = 0; docIdx < kNumDocs; ++docIdx)
     {
         docIdxList.at(docIdx) = docIdx;
         emb2D.at(docIdx).resize(kTotalEmbDim);
         for (size_t embIdx = 0; embIdx < kTotalEmbDim; ++embIdx)
         {
-            emb2D.at(docIdx).at(embIdx) = (T_EMB)distribution(generator);
+            float randVal = distribution(generator);
+            randVal = std::min(randVal, kCentroidMean + 3 * kCentroidStdDev);
+            randVal = std::max(randVal, kCentroidMean - 3 * kCentroidStdDev);
+            emb2D.at(docIdx).at(embIdx) = (T_EMB)randVal;
         }
     }
     return std::make_pair(docIdxList, emb2D);
@@ -50,6 +55,22 @@ std::vector<T_DOC_IDX> genRandomDocIdxList()
     std::vector<T_DOC_IDX> docIdxList(docIdxSet.begin(), docIdxSet.end());
     std::sort(docIdxList.begin(), docIdxList.end());
     return docIdxList;
+}
+
+std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> genRandCentroids()
+{
+    std::default_random_engine generator(42);
+    std::normal_distribution<float> distribution(kCentroidMean, kCentroidStdDev);
+    std::vector<std::vector<float>> centroidEmbs(kNumCentroids, std::vector<float>(kTotalEmbDim));
+    std::vector<std::vector<float>> centroidStdDevs(kNumCentroids, std::vector<float>(kTotalEmbDim, kCentroidStdDev));
+    for (size_t c = 0; c < kNumCentroids; c++)
+    {
+        for (size_t d = 0; d < kTotalEmbDim; d++)
+        {
+            centroidEmbs[c][d] = distribution(generator);
+        }
+    }
+    return std::make_pair(centroidEmbs, centroidStdDevs);
 }
 
 void verifyDensification(const WorkingEmbIndex& workingEmbIndex, const std::vector<T_DOC_IDX>& docIdxList, const std::vector<std::vector<T_EMB>>& emb2D)
@@ -95,18 +116,7 @@ int main()
         return 0;
     }
 
-    // Generate dummy centroid data
-    std::default_random_engine centroidGen(42);
-    std::normal_distribution<float> centroidDist(0.0f, 1.0f);
-    std::vector<std::vector<float>> centroidEmbs(kNumCentroids, std::vector<float>(kTotalEmbDim));
-    std::vector<std::vector<float>> centroidStdDevs(kNumCentroids, std::vector<float>(kTotalEmbDim, 0.1f));
-    for (size_t c = 0; c < kNumCentroids; c++)
-    {
-        for (size_t d = 0; d < kTotalEmbDim; d++)
-        {
-            centroidEmbs[c][d] = centroidDist(centroidGen);
-        }
-    }
+    auto [centroidEmbs, centroidStdDevs] = genRandCentroids();
 
     EmbIndexManager embIndexManager(kNumDocs, kTotalEmbDim, kResidentPartitionConfigs, kMaxWorkingSetSize,
                                     kNumBitsPerDim, centroidEmbs, centroidStdDevs);
