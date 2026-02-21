@@ -12,19 +12,19 @@
 
 ResQuantIndex::ResQuantIndex(size_t numDocs,
                              size_t globalEmbDim,
-                             std::vector<ResidentPartitionConfig> residentIndexConfigs,
                              size_t maxNumDocsInWorkingIndex,
+                             std::vector<CompressedPartitionConfig> compressedPartitionConfigs,
                              size_t numCentroids,
                              size_t numBitsPerDim,
                              const std::vector<std::vector<float>>& centroidEmbs,
                              const std::vector<std::vector<float>>& centroidStdDevs,
                              const std::vector<int>& centroidIdxPerDoc,
                              const std::vector<T_RQ>& residuals)
-    : CompressedEmbIndex(numDocs, globalEmbDim, residentIndexConfigs, maxNumDocsInWorkingIndex)
+    : CompressedEmbIndex(numDocs, globalEmbDim, {}, maxNumDocsInWorkingIndex)
     , m_numCentroids(numCentroids)
     , m_numBitsPerDim(numBitsPerDim)
     , m_rqDim(getRqDim(globalEmbDim, numBitsPerDim))
-    , m_compressedPartitionConfigs(findCompressedPartitionConfigs(residentIndexConfigs, globalEmbDim))
+    , m_compressedPartitionConfigs(std::move(compressedPartitionConfigs))
     , m_centroidEmb(numCentroids * globalEmbDim * 2, "m_centroidEmb")
     , m_centroidIdx(numDocs, "m_centroidIdx")
     , m_residual(numDocs * m_rqDim, "m_residual")

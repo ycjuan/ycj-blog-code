@@ -18,8 +18,8 @@ public:
     // residuals: numDocs x rqDim (pre-quantized residuals, packed into T_RQ)
     ResQuantIndex(size_t numDocs,
                   size_t globalEmbDim,
-                  std::vector<ResidentPartitionConfig> residentIndexConfigs,
                   size_t maxNumDocsInWorkingIndex,
+                  std::vector<CompressedPartitionConfig> compressedPartitionConfigs,
                   size_t numCentroids,
                   size_t numBitsPerDim,
                   const std::vector<std::vector<float>>& centroidEmbs,
