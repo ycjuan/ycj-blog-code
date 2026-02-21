@@ -76,7 +76,7 @@ std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> genR
     {
         for (size_t d = 0; d < kTotalEmbDim; d++)
         {
-            centroidEmbs[c][d] = distribution(generator);
+            centroidEmbs[c][d] = std::min(100.0f, std::max(-100.0f, distribution(generator)));
         }
     }
     return std::make_pair(centroidEmbs, centroidStdDevs);
