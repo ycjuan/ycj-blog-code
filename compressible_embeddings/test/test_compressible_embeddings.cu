@@ -187,6 +187,18 @@ int main()
             T_DOC_IDX candidate = docIdxDist(trialGenerator);
             nextSet.insert(candidate);
         }
+        // Verify cache rate: count overlap between current docIdxListToDensify and nextSet.
+        std::unordered_set<T_DOC_IDX> prevSet(docIdxListToDensify.begin(), docIdxListToDensify.end());
+        size_t overlapCount = 0;
+        for (T_DOC_IDX idx : nextSet)
+        {
+            if (prevSet.count(idx)) overlapCount++;
+        }
+        float actualCacheRate = static_cast<float>(overlapCount) / kNumDocsToDensify;
+        printf("Trial %zu cache rate: %.3f (expected >= %.3f, overlap %zu / %zu)\n",
+               trial, actualCacheRate, kCacheRate, overlapCount, kNumDocsToDensify);
+        assert(overlapCount >= numToKeep && "Cache rate verification failed: fewer overlapping docs than expected");
+
         docIdxListToDensify.assign(nextSet.begin(), nextSet.end());
         std::sort(docIdxListToDensify.begin(), docIdxListToDensify.end());
     }
