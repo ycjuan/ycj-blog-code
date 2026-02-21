@@ -3,3 +3,4 @@
 * revisit copy kernel
 * handle data type template
 * handle versioning
+* handle the logic that update should invalid cache
