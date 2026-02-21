@@ -22,21 +22,27 @@ const std::vector<ResidentPartitionConfig> kResidentPartitionConfigs
 constexpr float kCentroidStdDev = 1.0f;
 constexpr float kCentroidMean = 0.0f;
 
-std::pair<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>> populateRandomEmbIndex()
+std::pair<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>> populateRandomEmbIndex(
+    const std::vector<std::vector<float>>& centroidEmbs,
+    const std::vector<std::vector<float>>& centroidStdDevs)
 {
+    size_t numCentroids = centroidEmbs.size();
     std::vector<T_DOC_IDX> docIdxList(kNumDocs);
     std::vector<std::vector<T_EMB>> emb2D(kNumDocs);
     std::default_random_engine generator;
-    std::normal_distribution<float> distribution(kCentroidMean, kCentroidStdDev);
     for (size_t docIdx = 0; docIdx < kNumDocs; ++docIdx)
     {
         docIdxList.at(docIdx) = docIdx;
         emb2D.at(docIdx).resize(kTotalEmbDim);
+        size_t centroidIdx = docIdx % numCentroids;
         for (size_t embIdx = 0; embIdx < kTotalEmbDim; ++embIdx)
         {
+            float centroid = centroidEmbs[centroidIdx][embIdx];
+            float stdDev = centroidStdDevs[centroidIdx][embIdx];
+            std::normal_distribution<float> distribution(centroid, stdDev);
             float randVal = distribution(generator);
-            randVal = std::min(randVal, kCentroidMean + 3 * kCentroidStdDev);
-            randVal = std::max(randVal, kCentroidMean - 3 * kCentroidStdDev);
+            randVal = std::min(randVal, centroid + 3 * stdDev);
+            randVal = std::max(randVal, centroid - 3 * stdDev);
             emb2D.at(docIdx).at(embIdx) = (T_EMB)randVal;
         }
     }
@@ -121,7 +127,7 @@ int main()
     EmbIndexManager embIndexManager(kNumDocs, kTotalEmbDim, kResidentPartitionConfigs, kMaxWorkingSetSize,
                                     kNumBitsPerDim, centroidEmbs, centroidStdDevs);
 
-    auto [docIdxList, emb2D] = populateRandomEmbIndex();
+    auto [docIdxList, emb2D] = populateRandomEmbIndex(centroidEmbs, centroidStdDevs);
     embIndexManager.update(docIdxList, emb2D);
 
     std::vector<T_DOC_IDX> docIdxListToDensify = genRandomDocIdxList();
