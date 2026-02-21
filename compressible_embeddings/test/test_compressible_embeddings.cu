@@ -87,6 +87,14 @@ void verifyDensification(const WorkingEmbIndex& workingEmbIndex, const std::vect
 
 int main()
 {
+    int deviceCount = 0;
+    cudaError_t err = cudaGetDeviceCount(&deviceCount);
+    if (err != cudaSuccess || deviceCount == 0)
+    {
+        std::cout << "!!!!!!!!!! No CUDA device found or error occurred: " << cudaGetErrorString(err) << std::endl;
+        return 0;
+    }
+
     // Generate dummy centroid data
     std::default_random_engine centroidGen(42);
     std::normal_distribution<float> centroidDist(0.0f, 1.0f);
