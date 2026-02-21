@@ -178,7 +178,6 @@ int main()
 
         // Build next trial's docIdxList: kCacheRate from current, (1 - kCacheRate) new random.
         size_t numToKeep = static_cast<size_t>(kNumDocsToDensify * kCacheRate);
-        size_t numNew = kNumDocsToDensify - numToKeep;
 
         std::unordered_set<T_DOC_IDX> nextSet(docIdxListToDensify.begin(),
                                                docIdxListToDensify.begin() + numToKeep);

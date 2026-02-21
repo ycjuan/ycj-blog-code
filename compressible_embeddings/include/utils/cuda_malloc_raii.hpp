@@ -8,7 +8,7 @@
 #include <iostream>
 #include <cuda_runtime.h>
 
-constexpr bool kPrintDebug = true;
+constexpr bool kPrintDebug = false;
 
 struct CudaStreamDeleter
 {

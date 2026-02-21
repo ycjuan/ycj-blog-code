@@ -61,18 +61,6 @@ __global__ void densifyFromResidentKernel(DensifyFromResidentKernelParams params
                                                    params.numDocsToDensify,
                                                    params.embDimWorking);
             params.d_workingEmbIndex[memAddrDst] = params.d_residentEmbIndex[memAddrSrc];
-            if (abs((static_cast<float>(params.d_residentEmbIndex[memAddrSrc]) - 0.933594f)) < 1e-3f)
-            {
-                printf("docIdxSrc: %d, embIdx: %d, val: %f, docIdxDst: %d, embIdxDst: %d, numDocsToCopy: %d, embDimWorkingSetTotal: %d, dstMemAddr: %d\n",
-                       static_cast<int>(docIdxSrc),
-                       static_cast<int>(embIdx + params.embOffsetSrc),
-                       static_cast<float>(params.d_residentEmbIndex[memAddrSrc]),
-                       static_cast<int>(docIdxDst),
-                       static_cast<int>(embIdx + params.embOffsetDst),
-                       static_cast<int>(params.numDocsToDensify),
-                       static_cast<int>(params.embDimWorking),
-                       static_cast<int>(memAddrDst));
-            }
         }
     }
 }
