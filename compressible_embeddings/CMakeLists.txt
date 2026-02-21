@@ -41,7 +41,7 @@ target_link_libraries(${LIB_NAME}
 
 # Compiler flags
 target_compile_options(${LIB_NAME} PRIVATE
-    $<$<COMPILE_LANGUAGE:CUDA>:-O3>
+    $<$<COMPILE_LANGUAGE:CUDA>:-O3 -Wno-deprecated-gpu-targets>
     $<$<COMPILE_LANGUAGE:CXX>:-O3>
     $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
     $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler -fopenmp>
@@ -52,6 +52,10 @@ add_executable(test_${LIB_NAME} test/test_compressible_embeddings.cu)
 
 # Link library
 target_link_libraries(test_${LIB_NAME} ${LIB_NAME})
+
+target_compile_options(test_${LIB_NAME} PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:-Wno-deprecated-gpu-targets>
+)
 
 # Set linker language to CUDA
 set_target_properties(${LIB_NAME} PROPERTIES LINKER_LANGUAGE CUDA)
