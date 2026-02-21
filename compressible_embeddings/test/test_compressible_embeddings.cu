@@ -109,7 +109,7 @@ int main()
     }
 
     EmbIndexManager embIndexManager(kNumDocs, kTotalEmbDim, kResidentPartitionConfigs, kMaxWorkingSetSize,
-                                    kNumCentroids, kNumBitsPerDim, centroidEmbs, centroidStdDevs);
+                                    kNumBitsPerDim, centroidEmbs, centroidStdDevs);
 
     auto [docIdxList, emb2D] = populateRandomEmbIndex();
     embIndexManager.update(docIdxList, emb2D);

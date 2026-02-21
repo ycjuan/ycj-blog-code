@@ -14,19 +14,18 @@ ResQuantIndex::ResQuantIndex(size_t numDocs,
                              size_t globalEmbDim,
                              size_t maxNumDocsInWorkingIndex,
                              std::vector<CompressedPartitionConfig> compressedPartitionConfigs,
-                             size_t numCentroids,
                              size_t numBitsPerDim,
                              const std::vector<std::vector<float>>& centroidEmbs,
                              const std::vector<std::vector<float>>& centroidStdDevs)
     : CompressedEmbIndex(numDocs, globalEmbDim, {}, maxNumDocsInWorkingIndex)
-    , m_numCentroids(numCentroids)
+    , m_numCentroids(centroidEmbs.size())
     , m_numBitsPerDim(numBitsPerDim)
     , m_rqDim(getRqDim(globalEmbDim, numBitsPerDim))
     , m_compressedPartitionConfigs(std::move(compressedPartitionConfigs))
-    , m_centroidEmb(numCentroids * globalEmbDim * 2, "m_centroidEmb")
+    , m_centroidEmb(m_numCentroids * globalEmbDim * 2, "m_centroidEmb")
     , m_centroidIdx(numDocs, "m_centroidIdx")
     , m_residual(numDocs * m_rqDim, "m_residual")
-    , m_centroidEmbHost(numCentroids * globalEmbDim * 2, "m_centroidEmbHost")
+    , m_centroidEmbHost(m_numCentroids * globalEmbDim * 2, "m_centroidEmbHost")
     , m_centroidIdxHost(numDocs, "m_centroidIdxHost")
     , m_residualHost(numDocs * m_rqDim, "m_residualHost")
 {
@@ -40,18 +39,18 @@ ResQuantIndex::ResQuantIndex(size_t numDocs,
     // -------------------------------------------------------------------------
     // Copy centroid embeddings to host buffer and device (interleaved [emb, stdDev] per dim)
     {
-        for (size_t c = 0; c < numCentroids; c++)
+        for (size_t c = 0; c < m_numCentroids; c++)
         {
             for (size_t d = 0; d < globalEmbDim; d++)
             {
-                size_t addr = getMemAddrRowMajor(c, d * 2, numCentroids, globalEmbDim * 2);
+                size_t addr = getMemAddrRowMajor(c, d * 2, m_numCentroids, globalEmbDim * 2);
                 m_centroidEmbHost.data()[addr] = static_cast<T_EMB>(centroidEmbs[c][d]);
                 m_centroidEmbHost.data()[addr + 1] = static_cast<T_EMB>(centroidStdDevs[c][d]);
             }
         }
         CHECK_CUDA(cudaMemcpy(m_centroidEmb.data(),
                               m_centroidEmbHost.data(),
-                              numCentroids * globalEmbDim * 2 * sizeof(T_EMB),
+                              m_numCentroids * globalEmbDim * 2 * sizeof(T_EMB),
                               cudaMemcpyHostToDevice));
     }
 

@@ -20,7 +20,6 @@ public:
                   size_t globalEmbDim,
                   size_t maxNumDocsInWorkingIndex,
                   std::vector<CompressedPartitionConfig> compressedPartitionConfigs,
-                  size_t numCentroids,
                   size_t numBitsPerDim,
                   const std::vector<std::vector<float>>& centroidEmbs,
                   const std::vector<std::vector<float>>& centroidStdDevs);

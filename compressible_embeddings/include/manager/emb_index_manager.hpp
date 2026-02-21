@@ -18,7 +18,6 @@ public:
                     size_t globalEmbDim,
                     std::vector<ResidentPartitionConfig> residentPartitionConfigs,
                     size_t maxNumWorkingDocs,
-                    size_t numCentroids,
                     size_t numBitsPerDim,
                     const std::vector<std::vector<float>>& centroidEmbs,
                     const std::vector<std::vector<float>>& centroidStdDevs);
