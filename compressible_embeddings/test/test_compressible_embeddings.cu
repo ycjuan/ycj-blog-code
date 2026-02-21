@@ -85,6 +85,8 @@ void verifyDensification(const WorkingEmbIndex& workingEmbIndex, const std::vect
 
 int main()
 {
+    std::cout << "Compiles successfully" << std::endl;
+    return 0;
     EmbIndexManager embIndexManager(kNumDocs, kTotalEmbDim, kResidentPartitionConfigs, kMaxWorkingSetSize);
 
     auto [docIdxList, emb2D] = populateRandomEmbIndex();

@@ -1,0 +1,3 @@
+* design cache
+* get memory address polymorphism
+* revisit copy kernel
