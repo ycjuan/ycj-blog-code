@@ -82,7 +82,14 @@ std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> genR
     return std::make_pair(centroidEmbs, centroidStdDevs);
 }
 
-void verifyDensification(const WorkingEmbIndex& workingEmbIndex, const std::vector<T_DOC_IDX>& docIdxList, const std::vector<std::vector<T_EMB>>& emb2D)
+bool isCompressedDim(size_t embIdx)
+{
+    return (embIdx >= 48 && embIdx < 64) || embIdx >= 96;
+}
+
+void verifyDensification(const WorkingEmbIndex& workingEmbIndex,
+                         const std::vector<T_DOC_IDX>& docIdxList,
+                         const std::vector<std::vector<T_EMB>>& emb2D)
 {
     std::vector<T_EMB> v_workingEmbIndex(kMaxWorkingSetSize * kTotalEmbDim);
     CHECK_CUDA(cudaMemcpy(v_workingEmbIndex.data(),
@@ -94,20 +101,32 @@ void verifyDensification(const WorkingEmbIndex& workingEmbIndex, const std::vect
     {
         for (size_t embIdx = kDensifiedEmbIdxBeginIncl; embIdx < kDensifiedEmbIdxEndExcl; ++embIdx)
         {
-            if ( (embIdx >= 48 && embIdx < 64) || embIdx >= 96)
-            {
-                continue;
-            }
             size_t memAddr = getMemAddrRowMajor(docIdx, embIdx - kDensifiedEmbIdxBeginIncl, kNumDocsToDensify, kDensifiedEmbIdxEndExcl - kDensifiedEmbIdxBeginIncl);
-            auto val = v_workingEmbIndex.at(memAddr);
-            auto ref = emb2D.at(docIdxList.at(docIdx)).at(embIdx);
-            if (val != ref)
+            float val = static_cast<float>(v_workingEmbIndex.at(memAddr));
+            float ref = static_cast<float>(emb2D.at(docIdxList.at(docIdx)).at(embIdx));
+
+            if (isCompressedDim(embIdx))
             {
-                std::ostringstream oss;
-                oss << "docIdx = " << docIdx << ", embIdx = " << embIdx << ", val(" << static_cast<float>(val)
-                    << ") != ref(" << static_cast<float>(ref) << ")"
-                    << ", memAddr: " << memAddr;
-                throw std::runtime_error(oss.str());
+                float error = std::abs(val - ref);
+                if (error > 1 * kCentroidStdDev)
+                {
+                    std::ostringstream oss;
+                    oss << "Compressed dim: docIdx = " << docIdx << ", embIdx = " << embIdx
+                        << ", val(" << val << ") != ref(" << ref << ")"
+                        << ", error = " << error << ", threshold = " << kCentroidStdDev;
+                    throw std::runtime_error(oss.str());
+                }
+            }
+            else
+            {
+                if (val != ref)
+                {
+                    std::ostringstream oss;
+                    oss << "Resident dim: docIdx = " << docIdx << ", embIdx = " << embIdx
+                        << ", val(" << val << ") != ref(" << ref << ")"
+                        << ", memAddr: " << memAddr;
+                    throw std::runtime_error(oss.str());
+                }
             }
         }
     }
