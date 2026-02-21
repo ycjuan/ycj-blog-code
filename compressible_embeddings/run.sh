@@ -2,7 +2,9 @@
 
 set -e
 
-#rm -rf build
+if [[ "$1" == "-a" ]]; then
+    rm -rf build
+fi
 mkdir -p build
 cd build
 cmake ..
