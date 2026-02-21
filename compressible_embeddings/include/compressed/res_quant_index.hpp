@@ -12,22 +12,24 @@
 class ResQuantIndex : public CompressedEmbIndex
 {
 public:
+    // centroidEmbs: numCentroids x globalEmbDim (centroid mean values)
+    // centroidStdDevs: numCentroids x globalEmbDim (per-dimension standard deviations)
+    // centroidIdxPerDoc: numDocs (centroid assignment for each document)
+    // residuals: numDocs x rqDim (pre-quantized residuals, packed into T_RQ)
     ResQuantIndex(size_t numDocs,
                   size_t globalEmbDim,
                   std::vector<ResidentPartitionConfig> residentIndexConfigs,
                   size_t maxNumDocsInWorkingIndex,
                   size_t numCentroids,
-                  size_t numBitsPerDim);
-
-    // Set centroid embeddings (typically called once after training).
-    // centroidEmbs: numCentroids x globalEmbDim (the centroid mean values)
-    // centroidStdDevs: numCentroids x globalEmbDim (per-dimension standard deviations)
-    void setCentroids(const std::vector<std::vector<float>>& centroidEmbs,
-                      const std::vector<std::vector<float>>& centroidStdDevs);
+                  size_t numBitsPerDim,
+                  const std::vector<std::vector<float>>& centroidEmbs,
+                  const std::vector<std::vector<float>>& centroidStdDevs,
+                  const std::vector<int>& centroidIdxPerDoc,
+                  const std::vector<T_RQ>& residuals);
 
     // Update per-document data: centroid assignment and quantized residuals.
     // docIdxList: which documents to update
-    // emb2D: full embeddings for each doc (used to compute residuals for compressed dimensions)
+    // emb2D: full embeddings for each doc (used to compute residuals)
     // centroidIdxList: centroid assignment for each doc (parallel to docIdxList)
     void update(const std::vector<T_DOC_IDX>& docIdxList,
                 const std::vector<std::vector<T_EMB>>& emb2D,
@@ -56,6 +58,9 @@ private:
     // Per-document data on device
     CudaDeviceArray<int> m_centroidIdx;   // numDocs x 1
     CudaDeviceArray<T_RQ> m_residual;     // numDocs x rqDim
+
+    // Host-side copy of centroid embeddings (needed for computing residuals in update)
+    CudaHostArray<T_EMB> m_centroidEmbHost;
 
     // Host buffers for updates
     CudaHostArray<int> m_centroidIdxHost;

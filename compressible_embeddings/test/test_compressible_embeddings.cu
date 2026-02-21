@@ -23,7 +23,7 @@ std::pair<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>> populateRando
     std::vector<T_DOC_IDX> docIdxList(kNumDocs);
     std::vector<std::vector<T_EMB>> emb2D(kNumDocs);
     std::default_random_engine generator;
-    std::uniform_real_distribution<float> distribution(0.0, 1.0);
+    std::normal_distribution<float> distribution(0.0f, 1.0f);
     for (size_t docIdx = 0; docIdx < kNumDocs; ++docIdx)
     {
         docIdxList.at(docIdx) = docIdx;

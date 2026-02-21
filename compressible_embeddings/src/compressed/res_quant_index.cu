@@ -15,7 +15,11 @@ ResQuantIndex::ResQuantIndex(size_t numDocs,
                              std::vector<ResidentPartitionConfig> residentIndexConfigs,
                              size_t maxNumDocsInWorkingIndex,
                              size_t numCentroids,
-                             size_t numBitsPerDim)
+                             size_t numBitsPerDim,
+                             const std::vector<std::vector<float>>& centroidEmbs,
+                             const std::vector<std::vector<float>>& centroidStdDevs,
+                             const std::vector<int>& centroidIdxPerDoc,
+                             const std::vector<T_RQ>& residuals)
     : CompressedEmbIndex(numDocs, globalEmbDim, residentIndexConfigs, maxNumDocsInWorkingIndex)
     , m_numCentroids(numCentroids)
     , m_numBitsPerDim(numBitsPerDim)
@@ -24,6 +28,7 @@ ResQuantIndex::ResQuantIndex(size_t numDocs,
     , m_centroidEmb(numCentroids * globalEmbDim * 2, "m_centroidEmb")
     , m_centroidIdx(numDocs, "m_centroidIdx")
     , m_residual(numDocs * m_rqDim, "m_residual")
+    , m_centroidEmbHost(numCentroids * globalEmbDim * 2, "m_centroidEmbHost")
     , m_centroidIdxHost(numDocs, "m_centroidIdxHost")
     , m_residualHost(numDocs * m_rqDim, "m_residualHost")
 {
@@ -33,6 +38,38 @@ ResQuantIndex::ResQuantIndex(size_t numDocs,
         oss << "kBitsPerRqInt (" << kBitsPerRqInt << ") must be divisible by numBitsPerDim (" << numBitsPerDim << ")";
         throw std::runtime_error(oss.str());
     }
+
+    // -------------------------------------------------------------------------
+    // Copy centroid embeddings to host buffer and device (interleaved [emb, stdDev] per dim)
+    {
+        for (size_t c = 0; c < numCentroids; c++)
+        {
+            for (size_t d = 0; d < globalEmbDim; d++)
+            {
+                size_t addr = getMemAddrRowMajor(c, d * 2, numCentroids, globalEmbDim * 2);
+                m_centroidEmbHost.data()[addr] = static_cast<T_EMB>(centroidEmbs[c][d]);
+                m_centroidEmbHost.data()[addr + 1] = static_cast<T_EMB>(centroidStdDevs[c][d]);
+            }
+        }
+        CHECK_CUDA(cudaMemcpy(m_centroidEmb.data(),
+                              m_centroidEmbHost.data(),
+                              numCentroids * globalEmbDim * 2 * sizeof(T_EMB),
+                              cudaMemcpyHostToDevice));
+    }
+
+    // -------------------------------------------------------------------------
+    // Copy centroid indices to device
+    CHECK_CUDA(cudaMemcpy(m_centroidIdx.data(),
+                          centroidIdxPerDoc.data(),
+                          numDocs * sizeof(int),
+                          cudaMemcpyHostToDevice));
+
+    // -------------------------------------------------------------------------
+    // Copy quantized residuals to device
+    CHECK_CUDA(cudaMemcpy(m_residual.data(),
+                          residuals.data(),
+                          numDocs * m_rqDim * sizeof(T_RQ),
+                          cudaMemcpyHostToDevice));
 }
 
 // ============================================================================
@@ -42,42 +79,6 @@ ResQuantIndex::ResQuantIndex(size_t numDocs,
 size_t ResQuantIndex::getNumCentroids() const { return m_numCentroids; }
 size_t ResQuantIndex::getNumBitsPerDim() const { return m_numBitsPerDim; }
 size_t ResQuantIndex::getRqDimPerDoc() const { return m_rqDim; }
-
-// ============================================================================
-// setCentroids
-// ============================================================================
-
-void ResQuantIndex::setCentroids(const std::vector<std::vector<float>>& centroidEmbs,
-                                 const std::vector<std::vector<float>>& centroidStdDevs)
-{
-    if (centroidEmbs.size() != m_numCentroids || centroidStdDevs.size() != m_numCentroids)
-    {
-        std::ostringstream oss;
-        oss << "Expected " << m_numCentroids << " centroids, got embs=" << centroidEmbs.size()
-            << " stdDevs=" << centroidStdDevs.size();
-        throw std::runtime_error(oss.str());
-    }
-
-    // The centroid embedding layout is: numCentroids x (globalEmbDim * 2), row-major.
-    // For each centroid and each embedding dimension, we store [value, stdDev] interleaved.
-    size_t globalEmbDim = m_rqDim * kBitsPerRqInt / m_numBitsPerDim; // recover globalEmbDim
-    CudaHostArray<T_EMB> centroidEmbHost(m_numCentroids * globalEmbDim * 2, "centroidEmbHost");
-
-    for (size_t c = 0; c < m_numCentroids; c++)
-    {
-        for (size_t d = 0; d < globalEmbDim; d++)
-        {
-            size_t addr = getMemAddrRowMajor(c, d * 2, m_numCentroids, globalEmbDim * 2);
-            centroidEmbHost.data()[addr] = static_cast<T_EMB>(centroidEmbs[c][d]);
-            centroidEmbHost.data()[addr + 1] = static_cast<T_EMB>(centroidStdDevs[c][d]);
-        }
-    }
-
-    CHECK_CUDA(cudaMemcpy(m_centroidEmb.data(),
-                          centroidEmbHost.data(),
-                          m_numCentroids * globalEmbDim * 2 * sizeof(T_EMB),
-                          cudaMemcpyHostToDevice));
-}
 
 // ============================================================================
 // update
@@ -96,14 +97,6 @@ void ResQuantIndex::update(const std::vector<T_DOC_IDX>& docIdxList,
 
     size_t globalEmbDim = m_rqDim * kBitsPerRqInt / m_numBitsPerDim;
 
-    // We need centroid embeddings on host to compute residuals.
-    // Copy them from device temporarily.
-    CudaHostArray<T_EMB> centroidEmbHost(m_numCentroids * globalEmbDim * 2, "centroidEmbHostTmp");
-    CHECK_CUDA(cudaMemcpy(centroidEmbHost.data(),
-                          m_centroidEmb.data(),
-                          m_numCentroids * globalEmbDim * 2 * sizeof(T_EMB),
-                          cudaMemcpyDeviceToHost));
-
     for (size_t i = 0; i < docIdxList.size(); i++)
     {
         T_DOC_IDX docIdx = docIdxList[i];
@@ -116,8 +109,8 @@ void ResQuantIndex::update(const std::vector<T_DOC_IDX>& docIdxList,
         for (size_t embIdx = 0; embIdx < globalEmbDim; embIdx++)
         {
             size_t centroidAddr = getMemAddrRowMajor(centroidIdx, embIdx * 2, m_numCentroids, globalEmbDim * 2);
-            float centroidVal = static_cast<float>(centroidEmbHost.data()[centroidAddr]);
-            float stdDev = static_cast<float>(centroidEmbHost.data()[centroidAddr + 1]);
+            float centroidVal = static_cast<float>(m_centroidEmbHost.data()[centroidAddr]);
+            float stdDev = static_cast<float>(m_centroidEmbHost.data()[centroidAddr + 1]);
             float embVal = static_cast<float>(emb2D[i][embIdx]);
             float residual = embVal - centroidVal;
 
