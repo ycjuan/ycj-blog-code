@@ -430,11 +430,11 @@ Both are okay.
 Note that in the step, we will also record a list of "copy tasks" to indicate what should be copied from where to where
 (for those uncached doc indices) like this:
 
-  copyTasks = [(srcDocIdx=13, dstWokringIdx=1), (srcDocIdx=9, dstWokringIdx=2)] 
+  copyTasks = [(srcDocIdx=13, dstWokringIdx=1), (srcDocIdx=9, dstWokringIdx=3)]
   (assuming reorderedDocIdxList is [2, 13, 6, 9])
 
 ==== Final step ====
-Finally, we reassign the reorderedDocIdxList to the desiredDocIdxList. In the densification kernels, we will provide
-isCached as a parameter. When ever the kernel sees a T, it will skip the memory copy for that doc because the embeddings
-for that doc is already in right position in the WorkingEmbDataset.
+Finally, we reassign the reorderedDocIdxList to the desiredDocIdxList. In the densification kernels, we will only copy
+the embeddings according to the copyTasks list. (So as you can see in this example, only 2 out of 4 embeddings (13, 9)
+are copied.)
 */
