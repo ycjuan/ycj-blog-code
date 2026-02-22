@@ -1,5 +1,5 @@
 #include "common/memory_layout.hpp"
-#include "compressed/res_quant/res_quant_dataset.hpp"
+#include "compressible/res_quant/res_quant_dataset.hpp"
 #include "utils/util.hpp"
 
 #include <algorithm>

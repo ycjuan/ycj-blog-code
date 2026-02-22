@@ -1,6 +1,6 @@
 #include <algorithm>
 
-#include "compressed/compressed_partition_config.hpp"
+#include "compressible/compressible_partition_config.hpp"
 #include "resident/resident_partition_config.hpp"
 
 CompressiblePartitionConfig::CompressiblePartitionConfig(size_t embDimBeginIncl, size_t embDimEndExcl)
