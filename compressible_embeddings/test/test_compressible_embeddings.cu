@@ -119,7 +119,17 @@ std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> genR
     return std::make_pair(centroidEmbs, centroidStdDevs);
 }
 
-bool isCompressedDim(size_t embIdx) { return (embIdx >= 48 && embIdx < 64) || embIdx >= 96; }
+bool isCompressedDim(size_t embIdx)
+{
+    for (const auto& config : kResidentPartitionConfigs)
+    {
+        if (embIdx >= config.getEmbDimBeginIncl() && embIdx < config.getEmbDimEndExcl())
+        {
+            return false;
+        }
+    }
+    return true;
+}
 
 // Verify the densification result.
 float verifyDensification(const WorkingEmbDataset& workingEmbDataset,
