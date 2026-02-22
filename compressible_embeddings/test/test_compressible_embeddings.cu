@@ -192,7 +192,9 @@ float verifyDensification(const ExpSetting& s,
 
     float compressedErrorSum = 0.0f;
     size_t compressedCount = 0;
+    std::string errorMsg;
 
+#pragma omp parallel for schedule(static) reduction(+:compressedErrorSum, compressedCount)
     for (size_t docIdx = 0; docIdx < docIdxList.size(); ++docIdx)
     {
         for (size_t embIdx = s.densifiedEmbIdxBeginIncl; embIdx < s.densifiedEmbIdxEndExcl; ++embIdx)
@@ -209,25 +211,36 @@ float verifyDensification(const ExpSetting& s,
                 compressedCount++;
                 if (error > 1.1f * s.centroidStdDev)
                 {
-                    std::ostringstream oss;
-                    oss << "Compressed dim: docIdx = " << docIdx << ", embIdx = " << embIdx << ", val(" << val
-                        << ") != ref(" << ref << ")"
-                        << ", error = " << error << ", threshold = " << s.centroidStdDev;
-                    throw std::runtime_error(oss.str());
+#pragma omp critical
+                    {
+                        std::ostringstream oss;
+                        oss << "Compressed dim: docIdx = " << docIdx << ", embIdx = " << embIdx << ", val(" << val
+                            << ") != ref(" << ref << ")"
+                            << ", error = " << error << ", threshold = " << s.centroidStdDev;
+                        errorMsg = oss.str();
+                    }
                 }
             }
             else
             {
                 if (val != ref)
                 {
-                    std::ostringstream oss;
-                    oss << "Resident dim: docIdx = " << docIdx << ", embIdx = " << embIdx << ", val(" << val
-                        << ") != ref(" << ref << ")"
-                        << ", memAddr: " << memAddr;
-                    throw std::runtime_error(oss.str());
+#pragma omp critical
+                    {
+                        std::ostringstream oss;
+                        oss << "Resident dim: docIdx = " << docIdx << ", embIdx = " << embIdx << ", val(" << val
+                            << ") != ref(" << ref << ")"
+                            << ", memAddr: " << memAddr;
+                        errorMsg = oss.str();
+                    }
                 }
             }
         }
+    }
+
+    if (!errorMsg.empty())
+    {
+        throw std::runtime_error(errorMsg);
     }
 
     return compressedErrorSum / compressedCount;
