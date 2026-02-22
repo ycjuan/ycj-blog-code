@@ -24,6 +24,20 @@ struct TimeRecord
     float densifyMemcpyH2DMs = 0.0f;
     std::vector<float> densifyResidentPartitionMs;
     float densifyCompressedMs = 0.0f;
+
+    void print() const
+    {
+        printf("  [densify] cache: %.3f ms\n", densifyCacheMs);
+        printf("    [cache] first scan: %.3f ms\n", cacheFirstScanMs);
+        printf("    [cache] second scan: %.3f ms\n", cacheSecondScanMs);
+        printf("    [cache] reassign: %.3f ms\n", cacheReassignMs);
+        printf("  [densify] cudaMemcpy docIdxList H2D: %.3f ms\n", densifyMemcpyH2DMs);
+        for (size_t i = 0; i < densifyResidentPartitionMs.size(); ++i)
+        {
+            printf("  [densify] residentPartition[%zu]: %.3f ms\n", i, densifyResidentPartitionMs[i]);
+        }
+        printf("  [densify] densifyCompressed: %.3f ms\n", densifyCompressedMs);
+    }
 };
 
 class EmbDatasetManager

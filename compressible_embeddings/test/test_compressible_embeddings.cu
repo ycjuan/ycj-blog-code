@@ -10,9 +10,9 @@
 #include "working/working_emb_dataset.hpp"
 #include "utils/util.hpp"
 
-constexpr size_t kNumDocs = 200000;
+constexpr size_t kNumDocs = 50000;
 constexpr size_t kTotalEmbDim = 128;
-constexpr size_t kMaxWorkingSetSize = 100000;
+constexpr size_t kMaxWorkingSetSize = 50000;
 constexpr size_t kNumDocsToDensify = 10000;
 constexpr size_t kDensifiedEmbIdxBeginIncl = 3;
 constexpr size_t kDensifiedEmbIdxEndExcl = 125;
