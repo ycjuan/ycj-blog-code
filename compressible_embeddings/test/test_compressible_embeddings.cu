@@ -55,7 +55,7 @@ std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<
     return std::make_tuple(docIdxList, emb2D, centroidIdxList);
 }
 
-std::vector<T_DOC_IDX> genNextDocIdxList(const std::vector<T_DOC_IDX>& current, int trial)
+std::pair<std::vector<T_DOC_IDX>, float> genNextDocIdxList(const std::vector<T_DOC_IDX>& current, int trial)
 {
     static std::default_random_engine generator(trial);
     size_t numToKeep = static_cast<size_t>(kNumDocsToDensify * kCacheRate);
@@ -76,14 +76,12 @@ std::vector<T_DOC_IDX> genNextDocIdxList(const std::vector<T_DOC_IDX>& current, 
             overlapCount++;
         }
     }
-    float actualCacheRate = static_cast<float>(overlapCount) / kNumDocsToDensify;
-    std::cout << std::fixed << std::setprecision(3) << "Trial " << trial << " cache rate: " << actualCacheRate
-              << " (expected >= " << kCacheRate << ", overlap " << overlapCount << " / " << kNumDocsToDensify << ")\n";
     assert(overlapCount >= numToKeep && "Cache rate verification failed: fewer overlapping docs than expected");
 
+    float cacheRate = static_cast<float>(overlapCount) / kNumDocsToDensify;
     std::vector<T_DOC_IDX> next(nextSet.begin(), nextSet.end());
     std::sort(next.begin(), next.end());
-    return next;
+    return { next, cacheRate };
 }
 
 std::vector<T_DOC_IDX> genRandomDocIdxList()
@@ -118,9 +116,9 @@ std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> genR
 
 bool isCompressedDim(size_t embIdx) { return (embIdx >= 48 && embIdx < 64) || embIdx >= 96; }
 
-void verifyDensification(const WorkingEmbDataset& workingEmbDataset,
-                         const std::vector<T_DOC_IDX>& docIdxList,
-                         const std::vector<std::vector<T_EMB>>& emb2D)
+float verifyDensification(const WorkingEmbDataset& workingEmbDataset,
+                          const std::vector<T_DOC_IDX>& docIdxList,
+                          const std::vector<std::vector<T_EMB>>& emb2D)
 {
     std::vector<T_EMB> v_workingEmbDataset(kMaxWorkingSetSize * kTotalEmbDim);
     CHECK_CUDA(cudaMemcpy(v_workingEmbDataset.data(),
@@ -170,10 +168,7 @@ void verifyDensification(const WorkingEmbDataset& workingEmbDataset,
         }
     }
 
-    std::cout << std::fixed << std::setprecision(6)
-              << "Compressed dim avg error: " << compressedErrorSum / compressedCount << " (over " << compressedCount
-              << " samples)\n"
-              << "!!!!!!!!!!!! Densification verified successfully !!!!!!!!!!!!\n";
+    return compressedErrorSum / compressedCount;
 }
 
 int main()
@@ -211,30 +206,41 @@ int main()
     // Generate random docs to densify
     std::vector<T_DOC_IDX> docIdxListToDensify = genRandomDocIdxList();
 
+    float totalDensifyTimeMs = 0.0f;
+    float totalCompressedError = 0.0f;
+    float totalCacheRate = 0.0f;
+
     for (int trial = -3; trial < kNumDensifyTrials; ++trial)
     {
         if (trial == 0)
         {
             embDatasetManager.getLastTimeRecordAndReset();
+            totalDensifyTimeMs = 0.0f;
+            totalCompressedError = 0.0f;
+            totalCacheRate = 0.0f;
         }
 
         Timer timer;
-        std::cout << "===== Trial " << trial << " =====" << std::endl;
-
         timer.tic();
         const WorkingEmbDataset& workingEmbDataset = embDatasetManager.densify(docIdxListToDensify,
                                                                                kDensifiedEmbIdxBeginIncl,
                                                                                kDensifiedEmbIdxEndExcl,
                                                                                MemLayout::ROW_MAJOR);
+        totalDensifyTimeMs += timer.tocMs();
 
-        float timeMs = timer.tocMs();
-        std::cout << std::fixed << std::setprecision(3) << "Densification time: " << timeMs << " ms\n";
+        totalCompressedError += verifyDensification(workingEmbDataset, docIdxListToDensify, emb2D);
 
-        verifyDensification(workingEmbDataset, docIdxListToDensify, emb2D);
-
-        docIdxListToDensify = genNextDocIdxList(docIdxListToDensify, trial);
+        auto [nextList, cacheRate] = genNextDocIdxList(docIdxListToDensify, trial);
+        totalCacheRate += cacheRate;
+        docIdxListToDensify = std::move(nextList);
     }
 
+    float n = static_cast<float>(kNumDensifyTrials);
+    std::cout << std::fixed << std::setprecision(3)
+              << "\n===== Summary (avg over " << kNumDensifyTrials << " trials) =====\n"
+              << "Densification time: " << totalDensifyTimeMs / n << " ms\n"
+              << "Cache rate: " << totalCacheRate / n << "\n";
+    std::cout << std::setprecision(6) << "Compressed dim avg error: " << totalCompressedError / n << "\n";
     std::cout << "\n===== Time Record =====\n";
     embDatasetManager.getLastTimeRecordAndReset().print();
 
