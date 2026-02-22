@@ -247,7 +247,10 @@ void ResQuantDataset::densifyCompressed(const DensificationTask& densificationTa
         params.d_copyTasks = densificationTask.d_copyTasks;
         params.numCopyTasks = densificationTask.numCopyTasks;
 
-        if (densificationTask.numCopyTasks == 0) continue;
+        if (densificationTask.numCopyTasks == 0)
+        {
+            continue;
+        }
         constexpr size_t kBlockSize = 1024;
         size_t numTasks = densificationTask.numCopyTasks * compressedEmbDim;
         size_t gridSize = (numTasks + kBlockSize - 1) / kBlockSize;

@@ -83,7 +83,10 @@ void ResidentEmbDataset::densify(const DensificationTask& densificationTask) con
     params.numCopyTasks = densificationTask.numCopyTasks;
     // -------------
     // Launch the kernel.
-    if (params.numCopyTasks == 0) return;
+    if (params.numCopyTasks == 0)
+    {
+        return;
+    }
     constexpr size_t kBlockSize = 1024;
     size_t numTasks = params.numCopyTasks * params.embDimToDensify;
     size_t gridSize = (numTasks + kBlockSize - 1) / kBlockSize;
