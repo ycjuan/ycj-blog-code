@@ -179,6 +179,7 @@ int main()
 
         float timeMs = timer.tocMs();
         totalTimeMs += timeMs;
+        printf("Densification time: %.3f ms\n", timeMs);
 
         verifyDensification(workingEmbDataset, docIdxListToDensify, emb2D);
 
