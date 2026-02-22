@@ -123,14 +123,14 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
     // Cache the docIdxList.
     timer.tic();
     cache(docIdxList);
-    m_lastTimeRecord.densifyCacheMs = timer.tocMs();
+    m_lastTimeRecord.densifyCacheMs += timer.tocMs();
 
     timer.tic();
     CHECK_CUDA(cudaMemcpy(m_docIdxListToDensify.data(),
                           docIdxList.data(),
                           docIdxList.size() * sizeof(T_DOC_IDX),
                           cudaMemcpyHostToDevice));
-    m_lastTimeRecord.densifyMemcpyH2DMs = timer.tocMs();
+    m_lastTimeRecord.densifyMemcpyH2DMs += timer.tocMs();
 
     m_workingEmbDataset.setMemLayout(memLayout);
     m_workingEmbDataset.setEmbDimBeginIncl(embIdxBeginIncl);
@@ -149,14 +149,14 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
         timer.tic();
         const auto& embDataset = m_residentEmbDatasets[residentPartitionIdx];
         embDataset.densify(densificationTask);
-        m_lastTimeRecord.densifyResidentPartitionMs[residentPartitionIdx] = timer.tocMs();
+        m_lastTimeRecord.densifyResidentPartitionMs[residentPartitionIdx] += timer.tocMs();
     }
 
     timer.tic();
     m_resQuantDataset.densifyCompressed(densificationTask);
-    m_lastTimeRecord.densifyCompressedMs = timer.tocMs();
+    m_lastTimeRecord.densifyCompressedMs += timer.tocMs();
 
-    m_lastTimeRecord.densifyTotalMs = e2eTimer.tocMs();
+    m_lastTimeRecord.densifyTotalMs += e2eTimer.tocMs();
 
     return m_workingEmbDataset;
 }
@@ -211,7 +211,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
             cnt2++;
         }
     }
-    m_lastTimeRecord.cacheFirstScanMs = timer.tocMs();
+    m_lastTimeRecord.cacheFirstScanMs += timer.tocMs();
 
     // ------------
     // Verify no two docIdx map to the same cachedWorkingIdx.
@@ -263,7 +263,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
             cnt4++;
         }
     }
-    m_lastTimeRecord.cacheSecondScanMs = timer.tocMs();
+    m_lastTimeRecord.cacheSecondScanMs += timer.tocMs();
 
     // ------------
     // Verify the uncachedDocIdxList is empty.
@@ -299,6 +299,6 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     // Reassign the reorderedDocIdxList to the docIdxList.
     timer.tic();
     docIdxList = reorderedDocIdxList;
-    m_lastTimeRecord.cacheReassignMs = timer.tocMs();
-    m_lastTimeRecord.cacheTotalMs = e2eTimer.tocMs();
+    m_lastTimeRecord.cacheReassignMs += timer.tocMs();
+    m_lastTimeRecord.cacheTotalMs += e2eTimer.tocMs();
 }
