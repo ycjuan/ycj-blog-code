@@ -3,7 +3,6 @@
 #include <iomanip>
 #include <iostream>
 #include <random>
-#include <tuple>
 #include <unordered_set>
 
 #include "manager/emb_dataset_manager.hpp"
@@ -11,39 +10,44 @@
 #include "utils/util.hpp"
 #include "working/working_emb_dataset.hpp"
 
-constexpr size_t kNumDocs = 50000;
-constexpr size_t kTotalEmbDim = 128;
-constexpr size_t kMaxWorkingSetSize = 50000;
-constexpr size_t kNumDocsToDensify = 10000;
-constexpr size_t kDensifiedEmbIdxBeginIncl = 3;
-constexpr size_t kDensifiedEmbIdxEndExcl = 125;
-constexpr size_t kNumCentroids = 16;
-constexpr size_t kNumBitsPerDim = 2;
-const std::vector<ResidentPartitionConfig> kResidentPartitionConfigs
-    = { ResidentPartitionConfig(0, 48, MemLayout::ROW_MAJOR), ResidentPartitionConfig(64, 96, MemLayout::ROW_MAJOR) };
-constexpr float kCentroidStdDev = 1.0f;
-constexpr float kCentroidMean = 0.0f;
-constexpr float kCacheRate = 0.9f;
-constexpr int kNumDensifyTrials = 20;
+struct ExpSetting
+{
+    size_t numDocs = 50000;
+    size_t totalEmbDim = 128;
+    size_t maxWorkingSetSize = 50000;
+    size_t numDocsToDensify = 10000;
+    size_t densifiedEmbIdxBeginIncl = 3;
+    size_t densifiedEmbIdxEndExcl = 125;
+    size_t numCentroids = 16;
+    size_t numBitsPerDim = 2;
+    std::vector<ResidentPartitionConfig> residentPartitionConfigs
+        = { ResidentPartitionConfig(0, 48, MemLayout::ROW_MAJOR),
+            ResidentPartitionConfig(64, 96, MemLayout::ROW_MAJOR) };
+    float centroidStdDev = 1.0f;
+    float centroidMean = 0.0f;
+    float cacheRate = 0.9f;
+    int numDensifyTrials = 20;
+};
 
 // Generate random document data given the centroids and std devs.
 std::pair<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>> genRandDocData(
+    const ExpSetting& s,
     const std::vector<std::vector<float>>& centroidEmbs,
     const std::vector<std::vector<float>>& centroidStdDevs)
 {
     size_t numCentroids = centroidEmbs.size();
-    std::vector<T_DOC_IDX> docIdxList(kNumDocs);
-    std::vector<std::vector<T_EMB>> emb2D(kNumDocs);
+    std::vector<T_DOC_IDX> docIdxList(s.numDocs);
+    std::vector<std::vector<T_EMB>> emb2D(s.numDocs);
     std::default_random_engine generator;
-    for (size_t docIdx = 0; docIdx < kNumDocs; ++docIdx)
+    for (size_t docIdx = 0; docIdx < s.numDocs; ++docIdx)
     {
         docIdxList.at(docIdx) = docIdx;
-        emb2D.at(docIdx).resize(kTotalEmbDim);
+        emb2D.at(docIdx).resize(s.totalEmbDim);
         int centroidIdx = docIdx % numCentroids;
-        for (size_t embIdx = 0; embIdx < kTotalEmbDim; ++embIdx)
+        for (size_t embIdx = 0; embIdx < s.totalEmbDim; ++embIdx)
         {
-            float centroid = centroidEmbs[centroidIdx][embIdx];
-            float stdDev = centroidStdDevs[centroidIdx][embIdx];
+            float centroid = centroidEmbs.at(centroidIdx).at(embIdx);
+            float stdDev = centroidStdDevs.at(centroidIdx).at(embIdx);
             std::normal_distribution<float> distribution(centroid, stdDev);
             float randVal = distribution(generator);
             randVal = std::min(randVal, centroid + 3 * stdDev);
@@ -55,15 +59,18 @@ std::pair<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>> genRandDocDat
 }
 
 // Generate the next docIdxList to densify based on the current docIdxList and the cache rate.
-// If the cache rate is 0.9, then 90% of the current docIdxList will be kept, while the remaining 10% will be randomly generated.
-std::pair<std::vector<T_DOC_IDX>, float> genNextDocIdxList(const std::vector<T_DOC_IDX>& current, int trial)
+// If the cache rate is 0.9, then 90% of the current docIdxList will be kept, while the remaining 10% will be randomly
+// generated.
+std::pair<std::vector<T_DOC_IDX>, float> genNextDocIdxList(const ExpSetting& s,
+                                                           const std::vector<T_DOC_IDX>& current,
+                                                           int trial)
 {
     static std::default_random_engine generator(trial);
-    size_t numToKeep = static_cast<size_t>(kNumDocsToDensify * kCacheRate);
-    std::uniform_int_distribution<T_DOC_IDX> dist(0, kNumDocs - 1);
+    size_t numToKeep = static_cast<size_t>(s.numDocsToDensify * s.cacheRate);
+    std::uniform_int_distribution<T_DOC_IDX> dist(0, s.numDocs - 1);
 
     std::unordered_set<T_DOC_IDX> nextSet(current.begin(), current.begin() + numToKeep);
-    while (nextSet.size() < kNumDocsToDensify)
+    while (nextSet.size() < s.numDocsToDensify)
     {
         nextSet.insert(dist(generator));
     }
@@ -79,19 +86,19 @@ std::pair<std::vector<T_DOC_IDX>, float> genNextDocIdxList(const std::vector<T_D
     }
     assert(overlapCount >= numToKeep && "Cache rate verification failed: fewer overlapping docs than expected");
 
-    float cacheRate = static_cast<float>(overlapCount) / kNumDocsToDensify;
+    float cacheRate = static_cast<float>(overlapCount) / s.numDocsToDensify;
     std::vector<T_DOC_IDX> next(nextSet.begin(), nextSet.end());
     std::sort(next.begin(), next.end());
     return { next, cacheRate };
 }
 
 // Generate a random docIdxList to densify.
-std::vector<T_DOC_IDX> genRandomDocIdxList()
+std::vector<T_DOC_IDX> genRandomDocIdxList(const ExpSetting& s)
 {
     std::unordered_set<T_DOC_IDX> docIdxSet;
     std::default_random_engine generator;
-    std::uniform_int_distribution<T_DOC_IDX> distribution(0, kNumDocs - 1);
-    while (docIdxSet.size() < kNumDocsToDensify)
+    std::uniform_int_distribution<T_DOC_IDX> distribution(0, s.numDocs - 1);
+    while (docIdxSet.size() < s.numDocsToDensify)
     {
         docIdxSet.insert(distribution(generator));
     }
@@ -101,25 +108,26 @@ std::vector<T_DOC_IDX> genRandomDocIdxList()
 }
 
 // Generate random centroids and std devs.
-std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> genRandCentroids()
+std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> genRandCentroids(const ExpSetting& s)
 {
     std::default_random_engine generator(42);
-    std::normal_distribution<float> distribution(kCentroidMean, kCentroidStdDev);
-    std::vector<std::vector<float>> centroidEmbs(kNumCentroids, std::vector<float>(kTotalEmbDim));
-    std::vector<std::vector<float>> centroidStdDevs(kNumCentroids, std::vector<float>(kTotalEmbDim, kCentroidStdDev));
-    for (size_t c = 0; c < kNumCentroids; c++)
+    std::normal_distribution<float> distribution(s.centroidMean, s.centroidStdDev);
+    std::vector<std::vector<float>> centroidEmbs(s.numCentroids, std::vector<float>(s.totalEmbDim));
+    std::vector<std::vector<float>> centroidStdDevs(s.numCentroids,
+                                                    std::vector<float>(s.totalEmbDim, s.centroidStdDev));
+    for (size_t c = 0; c < s.numCentroids; c++)
     {
-        for (size_t d = 0; d < kTotalEmbDim; d++)
+        for (size_t d = 0; d < s.totalEmbDim; d++)
         {
-            centroidEmbs[c][d] = std::min(100.0f, std::max(-100.0f, distribution(generator)));
+            centroidEmbs.at(c).at(d) = std::min(100.0f, std::max(-100.0f, distribution(generator)));
         }
     }
     return std::make_pair(centroidEmbs, centroidStdDevs);
 }
 
-bool isCompressedDim(size_t embIdx)
+bool isCompressedDim(const ExpSetting& s, size_t embIdx)
 {
-    for (const auto& config : kResidentPartitionConfigs)
+    for (const auto& config : s.residentPartitionConfigs)
     {
         if (embIdx >= config.getEmbDimBeginIncl() && embIdx < config.getEmbDimEndExcl())
         {
@@ -130,14 +138,16 @@ bool isCompressedDim(size_t embIdx)
 }
 
 // Verify the densification result.
-float verifyDensification(const WorkingEmbDataset& workingEmbDataset,
+float verifyDensification(const ExpSetting& s,
+                          const WorkingEmbDataset& workingEmbDataset,
                           const std::vector<T_DOC_IDX>& docIdxList,
                           const std::vector<std::vector<T_EMB>>& emb2D)
 {
-    std::vector<T_EMB> v_workingEmbDataset(kMaxWorkingSetSize * kTotalEmbDim);
+    size_t densifiedEmbDim = s.densifiedEmbIdxEndExcl - s.densifiedEmbIdxBeginIncl;
+    std::vector<T_EMB> v_workingEmbDataset(s.maxWorkingSetSize * s.totalEmbDim);
     CHECK_CUDA(cudaMemcpy(v_workingEmbDataset.data(),
                           workingEmbDataset.data(),
-                          kNumDocsToDensify * (kDensifiedEmbIdxEndExcl - kDensifiedEmbIdxBeginIncl) * sizeof(T_EMB),
+                          s.numDocsToDensify * densifiedEmbDim * sizeof(T_EMB),
                           cudaMemcpyDeviceToHost));
 
     float compressedErrorSum = 0.0f;
@@ -145,26 +155,24 @@ float verifyDensification(const WorkingEmbDataset& workingEmbDataset,
 
     for (size_t docIdx = 0; docIdx < docIdxList.size(); ++docIdx)
     {
-        for (size_t embIdx = kDensifiedEmbIdxBeginIncl; embIdx < kDensifiedEmbIdxEndExcl; ++embIdx)
+        for (size_t embIdx = s.densifiedEmbIdxBeginIncl; embIdx < s.densifiedEmbIdxEndExcl; ++embIdx)
         {
-            size_t memAddr = getMemAddrRowMajor(docIdx,
-                                                embIdx - kDensifiedEmbIdxBeginIncl,
-                                                kNumDocsToDensify,
-                                                kDensifiedEmbIdxEndExcl - kDensifiedEmbIdxBeginIncl);
+            size_t memAddr
+                = getMemAddrRowMajor(docIdx, embIdx - s.densifiedEmbIdxBeginIncl, s.numDocsToDensify, densifiedEmbDim);
             float val = static_cast<float>(v_workingEmbDataset.at(memAddr));
             float ref = static_cast<float>(emb2D.at(docIdxList.at(docIdx)).at(embIdx));
 
-            if (isCompressedDim(embIdx))
+            if (isCompressedDim(s, embIdx))
             {
                 float error = std::abs(val - ref);
                 compressedErrorSum += error;
                 compressedCount++;
-                if (error > 1.1f * kCentroidStdDev)
+                if (error > 1.1f * s.centroidStdDev)
                 {
                     std::ostringstream oss;
                     oss << "Compressed dim: docIdx = " << docIdx << ", embIdx = " << embIdx << ", val(" << val
                         << ") != ref(" << ref << ")"
-                        << ", error = " << error << ", threshold = " << kCentroidStdDev;
+                        << ", error = " << error << ", threshold = " << s.centroidStdDev;
                     throw std::runtime_error(oss.str());
                 }
             }
@@ -185,31 +193,26 @@ float verifyDensification(const WorkingEmbDataset& workingEmbDataset,
     return compressedErrorSum / compressedCount;
 }
 
-int main()
+void runExp(ExpSetting s)
 {
-    if (!hasCudaDevice())
-    {
-        return 0;
-    }
-
     // ------------------
     // Prepare the data
 
     // --------
     // Generate the centroids
-    auto [centroidEmbs, centroidStdDevs] = genRandCentroids();
+    auto [centroidEmbs, centroidStdDevs] = genRandCentroids(s);
 
     // --------
     // Generate 2D embeddings and centroid indices
-    auto [docIdxList, emb2D] = genRandDocData(centroidEmbs, centroidStdDevs);
+    auto [docIdxList, emb2D] = genRandDocData(s, centroidEmbs, centroidStdDevs);
 
     // ------------------
     // Initialize the EmbDatasetManager
-    EmbDatasetManager embDatasetManager(kNumDocs,
-                                        kTotalEmbDim,
-                                        kResidentPartitionConfigs,
-                                        kMaxWorkingSetSize,
-                                        kNumBitsPerDim,
+    EmbDatasetManager embDatasetManager(s.numDocs,
+                                        s.totalEmbDim,
+                                        s.residentPartitionConfigs,
+                                        s.maxWorkingSetSize,
+                                        s.numBitsPerDim,
                                         centroidEmbs,
                                         centroidStdDevs);
     // --------
@@ -218,7 +221,7 @@ int main()
 
     // --------
     // Generate random docs to densify
-    std::vector<T_DOC_IDX> docIdxListToDensify = genRandomDocIdxList();
+    std::vector<T_DOC_IDX> docIdxListToDensify = genRandomDocIdxList(s);
 
     // --------
     // Some statistics
@@ -228,7 +231,7 @@ int main()
 
     // --------
     // Densify the data
-    for (int trial = -3; trial < kNumDensifyTrials; ++trial)
+    for (int trial = -3; trial < s.numDensifyTrials; ++trial)
     {
         // --------
         // Start the formal benchmark after 3 warmup trials
@@ -245,31 +248,42 @@ int main()
         Timer timer;
         timer.tic();
         const WorkingEmbDataset& workingEmbDataset = embDatasetManager.densify(docIdxListToDensify,
-                                                                               kDensifiedEmbIdxBeginIncl,
-                                                                               kDensifiedEmbIdxEndExcl,
+                                                                               s.densifiedEmbIdxBeginIncl,
+                                                                               s.densifiedEmbIdxEndExcl,
                                                                                MemLayout::ROW_MAJOR);
         totalDensifyTimeMs += timer.tocMs();
 
         // --------
         // Verify the result
-        totalCompressedError += verifyDensification(workingEmbDataset, docIdxListToDensify, emb2D);
+        totalCompressedError += verifyDensification(s, workingEmbDataset, docIdxListToDensify, emb2D);
 
         // --------
         // Generate the next docIdxList to densify
-        auto [nextList, cacheRate] = genNextDocIdxList(docIdxListToDensify, trial);
+        auto [nextList, cacheRate] = genNextDocIdxList(s, docIdxListToDensify, trial);
         totalCacheRate += cacheRate;
         docIdxListToDensify = std::move(nextList);
     }
 
     // --------
     // Print the statistics
-    std::cout << std::fixed << std::setprecision(3)
-              << "\n===== Summary (avg over " << kNumDensifyTrials << " trials) =====\n"
-              << "Densification time: " << totalDensifyTimeMs / kNumDensifyTrials << " ms\n"
-              << "Cache rate: " << totalCacheRate / kNumDensifyTrials << "\n";
-    std::cout << std::setprecision(6) << "Compressed dim avg error: " << totalCompressedError / kNumDensifyTrials << "\n";
+    std::cout << std::fixed << std::setprecision(3) << "\n===== Summary (avg over " << s.numDensifyTrials
+              << " trials) =====\n"
+              << "Densification time: " << totalDensifyTimeMs / s.numDensifyTrials << " ms\n"
+              << "Cache rate: " << totalCacheRate / s.numDensifyTrials << "\n";
+    std::cout << std::setprecision(6) << "Compressed dim avg error: " << totalCompressedError / s.numDensifyTrials
+              << "\n";
     std::cout << "\n===== Time Record =====\n";
     embDatasetManager.getLastTimeRecordAndReset().print();
+}
+
+int main()
+{
+    if (!hasCudaDevice())
+    {
+        return 0;
+    }
+
+    runExp(ExpSetting {});
 
     return 0;
 }
