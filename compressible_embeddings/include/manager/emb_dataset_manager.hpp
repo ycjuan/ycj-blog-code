@@ -3,48 +3,48 @@
 #include <cuda_bf16.h>
 #include <iomanip>
 #include <iostream>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 #include "common/typedef.hpp"
 #include "compressed/res_quant_dataset.hpp"
 #include "resident/resident_emb_dataset.hpp"
 #include "resident/resident_partition_config.hpp"
-#include "working/working_emb_dataset.hpp"
 #include "utils/cuda_malloc_raii.hpp"
+#include "working/working_emb_dataset.hpp"
 
 struct TimeRecord
 {
     // cache() segments
+    float cacheTotalMs = 0.0f;
     float cacheFirstScanMs = 0.0f;
     float cacheSecondScanMs = 0.0f;
     float cacheReassignMs = 0.0f;
 
     // densify() segments
+    float densifyTotalMs = 0.0f;
     float densifyCacheMs = 0.0f;
     float densifyMemcpyH2DMs = 0.0f;
     std::vector<float> densifyResidentPartitionMs;
     float densifyCompressedMs = 0.0f;
 
-    float cacheTotalMs = 0.0f;
-    float densifyTotalMs = 0.0f;
-
+    // count
     int count = 0;
 
     void print() const
     {
         float n = static_cast<float>(count);
-        std::cout << std::fixed << std::setprecision(3)
-                  << "  [densify] count: " << count << "\n"
-                  << "  [densify] total: " << densifyTotalMs / n << " ms avg\n"
-                  << "  [densify] cache: " << densifyCacheMs / n << " ms avg (total: " << cacheTotalMs / n << " ms avg)\n"
-                  << "    [cache] first scan: " << cacheFirstScanMs / n << " ms avg\n"
-                  << "    [cache] second scan: " << cacheSecondScanMs / n << " ms avg\n"
-                  << "    [cache] reassign: " << cacheReassignMs / n << " ms avg\n"
-                  << "  [densify] cudaMemcpy docIdxList H2D: " << densifyMemcpyH2DMs / n << " ms avg\n";
+        std::cout << std::fixed << std::setprecision(3) << "[densify] count: " << count << "\n"
+                  << "[densify] total: " << densifyTotalMs / n << " ms avg\n"
+                  << "[densify] cache: " << densifyCacheMs / n << " ms avg (total: " << cacheTotalMs / n << " ms avg)\n"
+                  << "          [cache] first scan: " << cacheFirstScanMs / n << " ms avg\n"
+                  << "          [cache] second scan: " << cacheSecondScanMs / n << " ms avg\n"
+                  << "          [cache] reassign: " << cacheReassignMs / n << " ms avg\n"
+                  << "[densify] cudaMemcpy docIdxList H2D: " << densifyMemcpyH2DMs / n << " ms avg\n";
         for (size_t i = 0; i < densifyResidentPartitionMs.size(); ++i)
         {
-            std::cout << "  [densify] residentPartition[" << i << "]: " << densifyResidentPartitionMs[i] / n << " ms avg\n";
+            std::cout << "  [densify] residentPartition[" << i << "]: " << densifyResidentPartitionMs[i] / n
+                      << " ms avg\n";
         }
         std::cout << "  [densify] densifyCompressed: " << densifyCompressedMs / n << " ms avg\n";
     }
@@ -54,24 +54,24 @@ class EmbDatasetManager
 {
 public:
     EmbDatasetManager(size_t numDocs,
-                    size_t globalEmbDim,
-                    std::vector<ResidentPartitionConfig> residentPartitionConfigs,
-                    size_t maxNumWorkingDocs,
-                    size_t numBitsPerDim,
-                    const std::vector<std::vector<float>>& centroidEmbs,
-                    const std::vector<std::vector<float>>& centroidStdDevs);
+                      size_t globalEmbDim,
+                      std::vector<ResidentPartitionConfig> residentPartitionConfigs,
+                      size_t maxNumWorkingDocs,
+                      size_t numBitsPerDim,
+                      const std::vector<std::vector<float>>& centroidEmbs,
+                      const std::vector<std::vector<float>>& centroidStdDevs);
 
     void update(const std::vector<T_DOC_IDX>& docIdxList, const std::vector<std::vector<T_EMB>>& emb2D);
 
     const WorkingEmbDataset& densify(std::vector<T_DOC_IDX>& docIdxList,
-                                   size_t globalEmbIdxBeginIncl,
-                                   size_t globalEmbIdxEndExcl,
-                                   MemLayout memLayout);
+                                     size_t globalEmbIdxBeginIncl,
+                                     size_t globalEmbIdxEndExcl,
+                                     MemLayout memLayout);
 
     TimeRecord getLastTimeRecordAndReset()
     {
         TimeRecord record = m_lastTimeRecord;
-        m_lastTimeRecord = TimeRecord{};
+        m_lastTimeRecord = TimeRecord {};
         return record;
     }
 
@@ -109,7 +109,3 @@ protected:
     // Time record
     TimeRecord m_lastTimeRecord;
 };
-
-/*
-https://en.wikipedia.org/wiki/Resident_set_size
-*/
