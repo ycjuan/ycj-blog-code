@@ -59,7 +59,7 @@ struct ExpSetting
 };
 
 // Generate random document data given the centroids and std devs.
-std::pair<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>> genRandDocData(
+std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<int>> genRandDocData(
     const ExpSetting& s,
     const std::vector<std::vector<float>>& centroidEmbs,
     const std::vector<std::vector<float>>& centroidStdDevs)
@@ -67,6 +67,7 @@ std::pair<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>> genRandDocDat
     size_t numCentroids = centroidEmbs.size();
     std::vector<T_DOC_IDX> docIdxList(s.numDocs);
     std::vector<std::vector<T_EMB>> emb2D(s.numDocs);
+    std::vector<int> centroidIdxList(s.numDocs);
     int numThreads = omp_get_max_threads();
     std::vector<std::default_random_engine> generators(numThreads);
     for (int t = 0; t < numThreads; ++t)
@@ -80,6 +81,7 @@ std::pair<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>> genRandDocDat
         docIdxList.at(docIdx) = docIdx;
         emb2D.at(docIdx).resize(s.totalEmbDim);
         int centroidIdx = docIdx % numCentroids;
+        centroidIdxList.at(docIdx) = centroidIdx;
         for (size_t embIdx = 0; embIdx < s.totalEmbDim; ++embIdx)
         {
             float centroid = centroidEmbs.at(centroidIdx).at(embIdx);
@@ -91,7 +93,7 @@ std::pair<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>> genRandDocDat
             emb2D.at(docIdx).at(embIdx) = (T_EMB)randVal;
         }
     }
-    return { docIdxList, emb2D };
+    return { docIdxList, emb2D, centroidIdxList };
 }
 
 // Generate the next docIdxList to densify based on the current docIdxList and the cache rate.
@@ -242,7 +244,7 @@ void runExp(ExpSetting s)
 
     // --------
     // Generate 2D embeddings and centroid indices
-    auto [docIdxList, emb2D] = genRandDocData(s, centroidEmbs, centroidStdDevs);
+    auto [docIdxList, emb2D, centroidIdxList] = genRandDocData(s, centroidEmbs, centroidStdDevs);
 
     // ------------------
     // Initialize the EmbDatasetManager
@@ -255,7 +257,7 @@ void runExp(ExpSetting s)
                                         centroidStdDevs);
     // --------
     // Ingest the data into the EmbDatasetManager
-    embDatasetManager.update(docIdxList, emb2D);
+    embDatasetManager.update(docIdxList, emb2D, centroidIdxList);
 
     // --------
     // Generate random docs to densify

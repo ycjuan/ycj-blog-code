@@ -43,7 +43,9 @@ public:
                       const std::vector<std::vector<float>>& centroidEmbs,
                       const std::vector<std::vector<float>>& centroidStdDevs);
 
-    void update(const std::vector<T_DOC_IDX>& docIdxList, const std::vector<std::vector<T_EMB>>& emb2D);
+    void update(const std::vector<T_DOC_IDX>& docIdxList,
+                const std::vector<std::vector<T_EMB>>& emb2D,
+                const std::vector<int>& centroidIdxList);
 
     const WorkingEmbDataset& densify(std::vector<T_DOC_IDX>& docIdxList,
                                      size_t globalEmbIdxBeginIncl,

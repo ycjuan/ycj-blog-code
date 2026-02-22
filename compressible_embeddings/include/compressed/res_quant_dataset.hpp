@@ -14,7 +14,7 @@ class ResQuantDataset : public CompressedEmbDataset
 public:
     // centroidEmbs: numCentroids x globalEmbDim (centroid mean values)
     // centroidStdDevs: numCentroids x globalEmbDim (per-dimension standard deviations)
-    // centroidIdxPerDoc: numDocs (centroid assignment for each document)
+    // centroidIdxList: numDocs (centroid assignment for each document)
     // residuals: numDocs x rqDim (pre-quantized residuals, packed into T_RQ)
     ResQuantDataset(size_t numDocs,
                   size_t globalEmbDim,
@@ -26,7 +26,8 @@ public:
 
     // Update per-document data: centroid assignment and quantized residuals.
     void update(const std::vector<T_DOC_IDX>& docIdxList,
-                const std::vector<std::vector<T_EMB>>& emb2D);
+                const std::vector<std::vector<T_EMB>>& emb2D,
+                const std::vector<int>& centroidIdxList);
 
     // Densify compressed partitions by reconstructing from centroid + dequantized residual.
     void densifyCompressed(const DensificationTask& densificationTask) const;

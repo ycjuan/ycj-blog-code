@@ -87,7 +87,9 @@ EmbDatasetManager::EmbDatasetManager(size_t numDocs,
     }
 }
 
-void EmbDatasetManager::update(const std::vector<T_DOC_IDX>& docIdxList, const std::vector<std::vector<T_EMB>>& emb2D)
+void EmbDatasetManager::update(const std::vector<T_DOC_IDX>& docIdxList,
+                               const std::vector<std::vector<T_EMB>>& emb2D,
+                               const std::vector<int>& centroidIdxList)
 {
     // --------------
     // Some input sanity checks.
@@ -108,7 +110,7 @@ void EmbDatasetManager::update(const std::vector<T_DOC_IDX>& docIdxList, const s
 
     // --------------
     // Update the compressed dataset.
-    m_resQuantDataset.update(docIdxList, emb2D);
+    m_resQuantDataset.update(docIdxList, emb2D, centroidIdxList);
 }
 
 const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docIdxList,
