@@ -27,6 +27,34 @@ struct ExpSetting
     float centroidMean = 0.0f;
     float cacheRate = 0.9f;
     int numDensifyTrials = 20;
+
+    void print() const
+    {
+        std::cout << "===== ExpSetting =====\n"
+                  << "numDocs: " << numDocs << "\n"
+                  << "totalEmbDim: " << totalEmbDim << "\n"
+                  << "maxWorkingSetSize: " << maxWorkingSetSize << "\n"
+                  << "numDocsToDensify: " << numDocsToDensify << "\n"
+                  << "densifiedEmbIdxBeginIncl: " << densifiedEmbIdxBeginIncl << "\n"
+                  << "densifiedEmbIdxEndExcl: " << densifiedEmbIdxEndExcl << "\n"
+                  << "numCentroids: " << numCentroids << "\n"
+                  << "numBitsPerDim: " << numBitsPerDim << "\n"
+                  << "residentPartitionConfigs: [";
+        for (size_t i = 0; i < residentPartitionConfigs.size(); ++i)
+        {
+            if (i > 0)
+            {
+                std::cout << ", ";
+            }
+            std::cout << "[" << residentPartitionConfigs.at(i).getEmbDimBeginIncl() << ", "
+                      << residentPartitionConfigs.at(i).getEmbDimEndExcl() << ")";
+        }
+        std::cout << "]\n"
+                  << "centroidStdDev: " << centroidStdDev << "\n"
+                  << "centroidMean: " << centroidMean << "\n"
+                  << "cacheRate: " << cacheRate << "\n"
+                  << "numDensifyTrials: " << numDensifyTrials << "\n";
+    }
 };
 
 // Generate random document data given the centroids and std devs.
@@ -195,6 +223,8 @@ float verifyDensification(const ExpSetting& s,
 
 void runExp(ExpSetting s)
 {
+    s.print();
+
     // ------------------
     // Prepare the data
 
