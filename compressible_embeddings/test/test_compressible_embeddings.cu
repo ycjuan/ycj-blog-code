@@ -10,10 +10,10 @@
 #include "working/working_emb_dataset.hpp"
 #include "utils/util.hpp"
 
-constexpr size_t kNumDocs = 10000;
+constexpr size_t kNumDocs = 200000;
 constexpr size_t kTotalEmbDim = 128;
-constexpr size_t kMaxWorkingSetSize = 1000;
-constexpr size_t kNumDocsToDensify = 500;
+constexpr size_t kMaxWorkingSetSize = 100000;
+constexpr size_t kNumDocsToDensify = 10000;
 constexpr size_t kDensifiedEmbIdxBeginIncl = 3;
 constexpr size_t kDensifiedEmbIdxEndExcl = 125;
 constexpr size_t kNumCentroids = 16;
@@ -22,7 +22,7 @@ const std::vector<ResidentPartitionConfig> kResidentPartitionConfigs
     = { ResidentPartitionConfig(0, 48, MemLayout::ROW_MAJOR), ResidentPartitionConfig(64, 96, MemLayout::ROW_MAJOR) };
 constexpr float kCentroidStdDev = 1.0f;
 constexpr float kCentroidMean = 0.0f;
-constexpr float kCacheRate = 0.5f;
+constexpr float kCacheRate = 0.9f;
 constexpr int kNumDensifyTrials = 20;
 
 std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<int>> populateRandomEmbDataset(

@@ -10,6 +10,7 @@
 namespace // Anonymous namespace to avoid polluting the global namespace.
 {
 constexpr T_DOC_IDX kInvalidDocIdx = -1;
+constexpr bool kDebug = false;
 }
 
 EmbDatasetManager::EmbDatasetManager(size_t numDocs,
@@ -109,14 +110,21 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
         oss << "docIdxList.size() > m_maxNumWorkingDocs: " << docIdxList.size() << " > " << m_maxNumWorkingDocs;
         throw std::runtime_error(oss.str());
     }
+
+    Timer timer;
+
     // ------------
     // Cache the docIdxList.
+    timer.tic();
     cache(docIdxList);
+    printf("  [densify] cache: %.3f ms\n", timer.tocMs());
 
+    timer.tic();
     CHECK_CUDA(cudaMemcpy(m_docIdxListToDensify.data(),
                           docIdxList.data(),
                           docIdxList.size() * sizeof(T_DOC_IDX),
                           cudaMemcpyHostToDevice));
+    printf("  [densify] cudaMemcpy docIdxList H2D: %.3f ms\n", timer.tocMs());
 
     m_workingEmbDataset.setMemLayout(memLayout);
     m_workingEmbDataset.setEmbDimBeginIncl(embIdxBeginIncl);
@@ -132,20 +140,28 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
 
     for (size_t residentPartitionIdx = 0; residentPartitionIdx < m_residentEmbDatasets.size(); ++residentPartitionIdx)
     {
+        timer.tic();
         const auto& embDataset = m_residentEmbDatasets[residentPartitionIdx];
         embDataset.densify(densificationTask);
+        printf("  [densify] residentPartition[%zu]: %.3f ms\n", residentPartitionIdx, timer.tocMs());
     }
 
+    timer.tic();
     m_resQuantDataset.densifyCompressed(densificationTask);
+    printf("  [densify] densifyCompressed: %.3f ms\n", timer.tocMs());
 
     return m_workingEmbDataset;
 }
 
 void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
 {
+    Timer timer;
+
     // ------------
     // Verify docIdxList is unique.
+    if (kDebug)
     {
+        timer.tic();
         std::unordered_set<T_DOC_IDX> seen;
         for (T_DOC_IDX docIdx : docIdxList)
         {
@@ -156,10 +172,12 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
                 throw std::runtime_error(oss.str());
             }
         }
+        printf("    [cache] verify unique: %.3f ms\n", timer.tocMs());
     }
 
     // ------------
     // First scan to find the cached working indices.
+    timer.tic();
     std::vector<T_DOC_IDX> reorderedDocIdxList(docIdxList.size(), kInvalidDocIdx);
     std::queue<T_DOC_IDX> uncachedDocIdxList;
     int cnt1 = 0;
@@ -183,12 +201,13 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
             cnt2++;
         }
     }
-
-    std::cout << "cnt1: " << cnt1 << ", cnt2: " << cnt2 << std::endl;
+    printf("    [cache] first scan (cached=%d, uncached=%d): %.3f ms\n", cnt1, cnt2, timer.tocMs());
 
     // ------------
     // Verify no two docIdx map to the same cachedWorkingIdx.
+    if (kDebug)
     {
+        timer.tic();
         std::unordered_set<T_DOC_IDX> seenWorkingIdx;
         for (T_DOC_IDX docIdx : docIdxList)
         {
@@ -204,10 +223,12 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
                 }
             }
         }
+        printf("    [cache] verify no collision: %.3f ms\n", timer.tocMs());
     }
 
     // ------------
     // Second scan to put the uncached doc indices to the reorderedDocIdxList.
+    timer.tic();
     int cnt3 = 0;
     int cnt4 = 0;
     for (T_DOC_IDX workingIdx = 0; workingIdx < docIdxList.size(); ++workingIdx)
@@ -232,7 +253,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
             cnt4++;
         }
     }
-    std::cout << "cnt1 cnt2 cnt3 cnt4: " << cnt1 << " " << cnt2 << " " << cnt3 << " " << cnt4 << std::endl;
+    printf("    [cache] second scan (evicted=%d, kept=%d): %.3f ms\n", cnt3, cnt4, timer.tocMs());
 
     // ------------
     // Verify the uncachedDocIdxList is empty.
@@ -245,5 +266,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
 
     // ------------
     // Reassign the reorderedDocIdxList to the docIdxList.
+    timer.tic();
     docIdxList = reorderedDocIdxList;
+    printf("    [cache] reassign: %.3f ms\n", timer.tocMs());
 }
