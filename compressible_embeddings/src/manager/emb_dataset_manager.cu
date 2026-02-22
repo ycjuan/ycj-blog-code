@@ -11,8 +11,34 @@
 
 namespace // Anonymous namespace to avoid polluting the global namespace.
 {
-constexpr T_DOC_IDX kInvalidDocIdx = -1;
-constexpr bool kDebug = false;
+constexpr T_DOC_IDX kInvalidDocIdx = -1; // Use -1 to indicate an invalid index in caching.
+constexpr bool kDebug = false; // Set to true to perform some slow checks.
+}
+
+void TimeRecord::print() const
+{
+    float n = static_cast<float>(count);
+    std::cout << std::fixed << std::setprecision(3) << "[densify] count: " << count << "\n"
+              << "[densify] total: " << densifyTotalMs / n << " ms avg\n"
+              << "[densify] total - cache: " << (densifyTotalMs - densifyCacheMs) / n << " ms avg\n"
+              << "[densify] cache: " << densifyCacheMs / n << " ms avg\n"
+              << "          [cache] first scan: " << cacheFirstScanMs / n << " ms avg\n"
+              << "          [cache] second scan: " << cacheSecondScanMs / n << " ms avg\n"
+              << "          [cache] reassign: " << cacheReassignMs / n << " ms avg\n"
+              << "[densify] cudaMemcpy docIdxList H2D: " << densifyMemcpyH2DMs / n << " ms avg\n";
+    for (size_t i = 0; i < densifyResidentPartitionMs.size(); ++i)
+    {
+        std::cout << "[densify] residentPartition[" << i << "]: " << densifyResidentPartitionMs[i] / n
+                  << " ms avg\n";
+    }
+    std::cout << "[densify] densifyCompressed: " << densifyCompressedMs / n << " ms avg\n";
+}
+
+TimeRecord EmbDatasetManager::getLastTimeRecordAndReset()
+{
+    TimeRecord record = m_lastTimeRecord;
+    m_lastTimeRecord = TimeRecord{};
+    return record;
 }
 
 EmbDatasetManager::EmbDatasetManager(size_t numDocs,
@@ -38,8 +64,11 @@ EmbDatasetManager::EmbDatasetManager(size_t numDocs,
     , m_hp_isCached(maxNumWorkingDocs, "m_hp_isCached")
     , m_cachedWorkingIdxToDocIdx(maxNumWorkingDocs, kInvalidDocIdx)
 {
+    // --------------
+    // We don't really need this sort, but we just do it for convenience.
     std::sort(residentPartitionConfigs.begin(), residentPartitionConfigs.end());
 
+    // --------------
     // Confirm the resident partitions are disjoint in embDim space.
     for (size_t i = 1; i < residentPartitionConfigs.size(); ++i)
     {
@@ -53,6 +82,8 @@ EmbDatasetManager::EmbDatasetManager(size_t numDocs,
         }
     }
 
+    // --------------
+    // Initialize the resident datasets.
     for (const auto& residentPartitionConfig : residentPartitionConfigs)
     {
         m_residentEmbDatasets.push_back(ResidentEmbDataset(numDocs, residentPartitionConfig));

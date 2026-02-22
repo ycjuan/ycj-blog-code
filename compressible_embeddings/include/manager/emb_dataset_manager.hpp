@@ -1,8 +1,6 @@
 #pragma once
 
 #include <cuda_bf16.h>
-#include <iomanip>
-#include <iostream>
 #include <unordered_map>
 #include <vector>
 
@@ -30,29 +28,13 @@ struct TimeRecord
     // count
     int count = 0;
 
-    void print() const
-    {
-        float n = static_cast<float>(count);
-        std::cout << std::fixed << std::setprecision(3) << "[densify] count: " << count << "\n"
-                  << "[densify] total: " << densifyTotalMs / n << " ms avg\n"
-                  << "[densify] total - cache: " << (densifyTotalMs - densifyCacheMs) / n << " ms avg\n"
-                  << "[densify] cache: " << densifyCacheMs / n << " ms avg\n"
-                  << "          [cache] first scan: " << cacheFirstScanMs / n << " ms avg\n"
-                  << "          [cache] second scan: " << cacheSecondScanMs / n << " ms avg\n"
-                  << "          [cache] reassign: " << cacheReassignMs / n << " ms avg\n"
-                  << "[densify] cudaMemcpy docIdxList H2D: " << densifyMemcpyH2DMs / n << " ms avg\n";
-        for (size_t i = 0; i < densifyResidentPartitionMs.size(); ++i)
-        {
-            std::cout << "[densify] residentPartition[" << i << "]: " << densifyResidentPartitionMs[i] / n
-                      << " ms avg\n";
-        }
-        std::cout << "[densify] densifyCompressed: " << densifyCompressedMs / n << " ms avg\n";
-    }
+    void print() const;
 };
 
 class EmbDatasetManager
 {
 public:
+
     EmbDatasetManager(size_t numDocs,
                       size_t globalEmbDim,
                       std::vector<ResidentPartitionConfig> residentPartitionConfigs,
@@ -68,12 +50,7 @@ public:
                                      size_t globalEmbIdxEndExcl,
                                      MemLayout memLayout);
 
-    TimeRecord getLastTimeRecordAndReset()
-    {
-        TimeRecord record = m_lastTimeRecord;
-        m_lastTimeRecord = TimeRecord {};
-        return record;
-    }
+    TimeRecord getLastTimeRecordAndReset();
 
 protected:
     // General meta data
