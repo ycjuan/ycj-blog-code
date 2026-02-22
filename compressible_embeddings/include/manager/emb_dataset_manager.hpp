@@ -17,11 +17,11 @@ struct TimeRecord
     float cacheFirstScanMs = 0.0f;
     float cacheSecondScanMs = 0.0f;
     float cacheReassignMs = 0.0f;
-    float cacheCopyTasksMs = 0.0f;
     
     // densify() segments
     float densifyTotalMs = 0.0f;
     float densifyCacheMs = 0.0f;
+    float densifyCopyTasksMs = 0.0f;
     float densifyMemcpyH2DMs = 0.0f;
     std::vector<float> densifyResidentPartitionMs;
     float densifyCompressedMs = 0.0f;
@@ -81,6 +81,7 @@ protected:
     std::unordered_map<T_DOC_IDX, T_DOC_IDX> m_currDocIdxToWorkingIdx;
     std::vector<T_DOC_IDX> m_currDocIdxListInWorkingDataset;
     void cache(std::vector<T_DOC_IDX>& docIdxList);
+    std::vector<CopyTask> m_copyTasks;
     CudaDeviceArray<CopyTask> m_d_copyTasks;
     size_t m_numCopyTasks = 0;
 
