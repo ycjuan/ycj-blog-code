@@ -8,7 +8,7 @@
 #include "compressed/res_quant_dataset.hpp"
 #include "resident/resident_emb_dataset.hpp"
 #include "resident/resident_partition_config.hpp"
-#include "utils/cuda_malloc_raii.hpp"
+#include "utils/cuda_raii.hpp"
 #include "working/working_emb_dataset.hpp"
 
 struct TimeRecord

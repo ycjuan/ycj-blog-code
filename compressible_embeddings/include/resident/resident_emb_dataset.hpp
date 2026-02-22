@@ -6,7 +6,7 @@
 #include "common/typedef.hpp"
 #include "common/densification_task.hpp"
 #include "resident/resident_partition_config.hpp"
-#include "utils/cuda_malloc_raii.hpp"
+#include "utils/cuda_raii.hpp"
 
 class ResidentEmbDataset
 {

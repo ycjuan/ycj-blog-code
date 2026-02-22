@@ -1,5 +1,5 @@
 #include "resident/resident_emb_dataset.hpp"
-#include "utils/cuda_malloc_raii.hpp"
+#include "utils/cuda_raii.hpp"
 #include "utils/util.hpp"
 
 ResidentEmbDataset::ResidentEmbDataset(size_t numDocs, ResidentPartitionConfig residentPartitionConfig)

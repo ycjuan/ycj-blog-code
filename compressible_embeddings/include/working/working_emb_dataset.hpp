@@ -3,7 +3,7 @@
 #include <cuda_bf16.h>
 
 #include "common/typedef.hpp"
-#include "utils/cuda_malloc_raii.hpp"
+#include "utils/cuda_raii.hpp"
 #include "common/memory_layout.hpp"
 
 class WorkingEmbDataset

@@ -7,7 +7,7 @@
 #include "compressed/residual_quantization.hpp"
 #include "common/typedef.hpp"
 #include "common/densification_task.hpp"
-#include "utils/cuda_malloc_raii.hpp"
+#include "utils/cuda_raii.hpp"
 
 class ResQuantDataset : public CompressedEmbDataset
 {
