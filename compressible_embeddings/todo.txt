@@ -7,3 +7,4 @@
 * handle compressed polymorphism
 * use GPU for nearest centroid assignment
 * find a better way than using isCached
+* add a special optimization to handle if the desired doc is at working set size - desired set size

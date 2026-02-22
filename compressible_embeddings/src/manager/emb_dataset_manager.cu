@@ -338,3 +338,61 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
         m_lastTimeRecord.cacheReassignMs += timer.tocMs();
     }
 }
+
+/*
+Let's say we have the following densification task:
+  desiredDocIdxList = [2, 6, 9, 13]
+
+And in the current WorkingEmbDataset, we have the following doc indices (here we assume maxNumWorkingDocs = 5)
+  currentDocIdxList = [2, 5, 6, 10, 13]
+
+Naively thinking, you may think all 2, 6, 13 are already cached (YAY!). Unfortunately, it is not the case.
+In this example, only 2 is cached. 6 and 13 are not cached because they are at different positions in the working
+dataset. (In desiredDocIdxList, 6 is at position 1, while in currentDocIdxList, 6 is at position 2.)
+
+That is to say, the precise definition of "cached" is NOT just "the desired doc is in the working dataset". It's more
+strict than that - it has to be "the desired doc is in the working dataset AND at the desired position"
+
+The naive solution is to just copy the embeddings of doc 6 from position 2 to position 1 in WorkingEmbDataset. However,
+such copy will take time. Is there a way to avoid copying doc 6 at all?
+
+Yes, the answer is we alter desiredDocIdxList.
+So basically, in this example we want to re-order desiredDocIdxList to [2, 9, 6, 13]. This way, we have both doc 2 and 6
+cached.
+
+It is important to note that doc 13 will never be cached. The reason is that in currentDocIdxList, doc 13 is at position
+4, but the length of desiredDocIdxList is 4. So there is no way we can re-order desiredDocIdxList so that doc 13 is at
+the position 4.
+
+In order to achieve such re-ordering, we will do it in two steps:
+
+==== Step 1 ====
+We create a new reorderedDocIdxList with -1 as initial value and has the same length as desiredDocIdxList. Like this:
+
+  reorderedDocIdxList = [-1, -1, -1, -1]
+
+The we loop through desiredDocIdxList, and for each docIdx, we know where the corresponding working index is in
+currentDocIdxList. So it will be like this:
+
+  reorderedDocIdxList = [2, -1, 6, -1]
+
+At the same time, we maintain two lists: one is to record the uncached doc indices, and the other one to record the
+cached working indices.
+
+  uncachedDocIdxList = [9, 13]
+  isCached = [T, F, T, F]
+
+==== Step 2 ====
+In this step, we want to put those uncached doc indices to the reorderedDocIdxList. This time we loop through the
+reorderedDocIdxList, and every time we see a -1, it means it is an "empty slot", so then we pop the top of the
+uncachedDocIdxList and put it there. Depending on you like to use stack or queue for the uncachedDocIdxList, you may get
+either:
+
+  reorderedDocIdxList = [2, 9, 6, 13] (using queue)
+  reorderedDocIdxList = [2, 13, 9, 6] (using stack)
+
+==== Final step ====
+Finally, we reassign the reorderedDocIdxList to the desiredDocIdxList. In the densification kernels, we will provide
+isCached as a parameter. When ever the kernel sees a T, it will skip the memory copy for that doc because the embeddings
+for that doc is already in right position in the WorkingEmbDataset.
+*/
