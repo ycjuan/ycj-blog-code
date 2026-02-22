@@ -29,20 +29,24 @@ struct TimeRecord
     float cacheTotalMs = 0.0f;
     float densifyTotalMs = 0.0f;
 
+    int count = 0;
+
     void print() const
     {
+        float n = static_cast<float>(count);
         std::cout << std::fixed << std::setprecision(3)
-                  << "  [densify] total: " << densifyTotalMs << " ms\n"
-                  << "  [densify] cache: " << densifyCacheMs << " ms (total: " << cacheTotalMs << " ms)\n"
-                  << "    [cache] first scan: " << cacheFirstScanMs << " ms\n"
-                  << "    [cache] second scan: " << cacheSecondScanMs << " ms\n"
-                  << "    [cache] reassign: " << cacheReassignMs << " ms\n"
-                  << "  [densify] cudaMemcpy docIdxList H2D: " << densifyMemcpyH2DMs << " ms\n";
+                  << "  [densify] count: " << count << "\n"
+                  << "  [densify] total: " << densifyTotalMs / n << " ms avg\n"
+                  << "  [densify] cache: " << densifyCacheMs / n << " ms avg (total: " << cacheTotalMs / n << " ms avg)\n"
+                  << "    [cache] first scan: " << cacheFirstScanMs / n << " ms avg\n"
+                  << "    [cache] second scan: " << cacheSecondScanMs / n << " ms avg\n"
+                  << "    [cache] reassign: " << cacheReassignMs / n << " ms avg\n"
+                  << "  [densify] cudaMemcpy docIdxList H2D: " << densifyMemcpyH2DMs / n << " ms avg\n";
         for (size_t i = 0; i < densifyResidentPartitionMs.size(); ++i)
         {
-            std::cout << "  [densify] residentPartition[" << i << "]: " << densifyResidentPartitionMs[i] << " ms\n";
+            std::cout << "  [densify] residentPartition[" << i << "]: " << densifyResidentPartitionMs[i] / n << " ms avg\n";
         }
-        std::cout << "  [densify] densifyCompressed: " << densifyCompressedMs << " ms\n";
+        std::cout << "  [densify] densifyCompressed: " << densifyCompressedMs / n << " ms avg\n";
     }
 };
 
@@ -65,6 +69,7 @@ public:
                                    MemLayout memLayout);
 
     const TimeRecord& getLastTimeRecord() const { return m_lastTimeRecord; }
+    void resetTimeRecord() { m_lastTimeRecord = TimeRecord{}; }
 
 protected:
     // General meta data

@@ -115,8 +115,8 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
 
     Timer timer;
     Timer e2eTimer;
-    m_lastTimeRecord = TimeRecord{};
     m_lastTimeRecord.densifyResidentPartitionMs.resize(m_residentEmbDatasets.size());
+    m_lastTimeRecord.count++;
     e2eTimer.tic();
 
     // ------------

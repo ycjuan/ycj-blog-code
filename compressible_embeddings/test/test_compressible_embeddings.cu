@@ -204,11 +204,15 @@ int main()
     // Ingest the data into the EmbDatasetManager
     embDatasetManager.update(docIdxList, emb2D);
 
+    // --------
+    // Generate random docs to densify
     std::vector<T_DOC_IDX> docIdxListToDensify = genRandomDocIdxList();
 
-    float totalTimeMs = 0.0f;
     for (int trial = -3; trial < kNumDensifyTrials; ++trial)
     {
+        if (trial == 0)
+            embDatasetManager.resetTimeRecord();
+
         Timer timer;
         std::cout << "===== Trial " << trial << " =====" << std::endl;
 
@@ -219,7 +223,6 @@ int main()
                                                                          MemLayout::ROW_MAJOR);
 
         float timeMs = timer.tocMs();
-        totalTimeMs += timeMs;
         std::cout << std::fixed << std::setprecision(3) << "Densification time: " << timeMs << " ms\n";
 
         verifyDensification(workingEmbDataset, docIdxListToDensify, emb2D);
@@ -227,8 +230,8 @@ int main()
         docIdxListToDensify = genNextDocIdxList(docIdxListToDensify, trial);
     }
 
-    float avgTimeMs = totalTimeMs / (kNumDensifyTrials - 3);
-    std::cout << std::fixed << std::setprecision(3) << "Average densification time: " << avgTimeMs << " ms\n";
+    std::cout << "\n===== Time Record =====\n";
+    embDatasetManager.getLastTimeRecord().print();
 
     return 0;
 }

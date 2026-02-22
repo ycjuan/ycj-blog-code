@@ -17,6 +17,11 @@ BreakBeforeBraces: Allman
 # Alignment
 AlignOperands: true
 
+# One-line statements
+AllowShortBlocksOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: false
+
+
 # Special
 # This will make 
 # void longFunc(int a,
