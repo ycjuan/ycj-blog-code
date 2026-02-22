@@ -1,6 +1,6 @@
 #include <algorithm>
 #include <limits>
-#include <queue>
+#include <stack>
 #include <unordered_set>
 
 #include "common/typedef.hpp"
@@ -179,7 +179,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     // First scan to find the cached working indices.
     timer.tic();
     std::vector<T_DOC_IDX> reorderedDocIdxList(docIdxList.size(), kInvalidDocIdx);
-    std::queue<T_DOC_IDX> uncachedDocIdxList;
+    std::stack<T_DOC_IDX> uncachedDocIdxList;
     int cnt1 = 0;
     int cnt2 = 0;
     for (T_DOC_IDX workingIdx = 0; workingIdx < docIdxList.size(); ++workingIdx)
@@ -236,7 +236,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
         if (reorderedDocIdxList[workingIdx] == kInvalidDocIdx)
         {
             cnt3++;
-            T_DOC_IDX uncachedDocIdx = uncachedDocIdxList.front();
+            T_DOC_IDX uncachedDocIdx = uncachedDocIdxList.top();
             reorderedDocIdxList[workingIdx] = uncachedDocIdx;
             uncachedDocIdxList.pop();
             T_DOC_IDX oldDocIdx = m_cachedWorkingIdxToDocIdx[workingIdx];
