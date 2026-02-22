@@ -43,10 +43,10 @@ struct TimeRecord
                   << "[densify] cudaMemcpy docIdxList H2D: " << densifyMemcpyH2DMs / n << " ms avg\n";
         for (size_t i = 0; i < densifyResidentPartitionMs.size(); ++i)
         {
-            std::cout << "  [densify] residentPartition[" << i << "]: " << densifyResidentPartitionMs[i] / n
+            std::cout << "[densify] residentPartition[" << i << "]: " << densifyResidentPartitionMs[i] / n
                       << " ms avg\n";
         }
-        std::cout << "  [densify] densifyCompressed: " << densifyCompressedMs / n << " ms avg\n";
+        std::cout << "[densify] densifyCompressed: " << densifyCompressedMs / n << " ms avg\n";
     }
 };
 

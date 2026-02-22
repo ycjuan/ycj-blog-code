@@ -27,21 +27,19 @@ constexpr float kCacheRate = 0.9f;
 constexpr int kNumDensifyTrials = 20;
 
 // Generate random document data given the centroids and std devs.
-std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<int>> genRandDocData(
+std::pair<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>> genRandDocData(
     const std::vector<std::vector<float>>& centroidEmbs,
     const std::vector<std::vector<float>>& centroidStdDevs)
 {
     size_t numCentroids = centroidEmbs.size();
     std::vector<T_DOC_IDX> docIdxList(kNumDocs);
     std::vector<std::vector<T_EMB>> emb2D(kNumDocs);
-    std::vector<int> centroidIdxList(kNumDocs);
     std::default_random_engine generator;
     for (size_t docIdx = 0; docIdx < kNumDocs; ++docIdx)
     {
         docIdxList.at(docIdx) = docIdx;
         emb2D.at(docIdx).resize(kTotalEmbDim);
         int centroidIdx = docIdx % numCentroids;
-        centroidIdxList.at(docIdx) = centroidIdx;
         for (size_t embIdx = 0; embIdx < kTotalEmbDim; ++embIdx)
         {
             float centroid = centroidEmbs[centroidIdx][embIdx];
@@ -53,7 +51,7 @@ std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<
             emb2D.at(docIdx).at(embIdx) = (T_EMB)randVal;
         }
     }
-    return std::make_tuple(docIdxList, emb2D, centroidIdxList);
+    return { docIdxList, emb2D };
 }
 
 // Generate the next docIdxList to densify based on the current docIdxList and the cache rate.
@@ -203,7 +201,7 @@ int main()
 
     // --------
     // Generate 2D embeddings and centroid indices
-    auto [docIdxList, emb2D, centroidIdxList] = genRandDocData(centroidEmbs, centroidStdDevs);
+    auto [docIdxList, emb2D] = genRandDocData(centroidEmbs, centroidStdDevs);
 
     // ------------------
     // Initialize the EmbDatasetManager
