@@ -3,6 +3,7 @@
 #include <cuda_bf16.h>
 #include <vector>
 #include <unordered_map>
+#include <string>
 
 #include "common/typedef.hpp"
 #include "compressed/res_quant_dataset.hpp"
@@ -10,6 +11,20 @@
 #include "resident/resident_partition_config.hpp"
 #include "working/working_emb_dataset.hpp"
 #include "utils/cuda_malloc_raii.hpp"
+
+struct TimeRecord
+{
+    // cache() segments
+    float cacheFirstScanMs = 0.0f;
+    float cacheSecondScanMs = 0.0f;
+    float cacheReassignMs = 0.0f;
+
+    // densify() segments
+    float densifyCacheMs = 0.0f;
+    float densifyMemcpyH2DMs = 0.0f;
+    std::vector<float> densifyResidentPartitionMs;
+    float densifyCompressedMs = 0.0f;
+};
 
 class EmbDatasetManager
 {
@@ -28,6 +43,8 @@ public:
                                    size_t globalEmbIdxBeginIncl,
                                    size_t globalEmbIdxEndExcl,
                                    MemLayout memLayout);
+
+    const TimeRecord& getLastTimeRecord() const { return m_lastTimeRecord; }
 
 protected:
     // General meta data
@@ -59,6 +76,9 @@ protected:
     std::vector<T_DOC_IDX> m_cachedWorkingIdxToDocIdx;
     void cache(std::vector<T_DOC_IDX>& docIdxList);
     CudaHostArray<int8_t> m_hp_isCached;
+
+    // Time record
+    TimeRecord m_lastTimeRecord;
 };
 
 /*
