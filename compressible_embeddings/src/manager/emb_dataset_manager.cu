@@ -27,8 +27,7 @@ void TimeRecord::print() const
               << "[densify] cudaMemcpy docIdxList H2D: " << densifyMemcpyH2DMs / n << " ms avg\n";
     for (size_t i = 0; i < densifyResidentPartitionMs.size(); ++i)
     {
-        std::cout << "[densify] residentPartition[" << i << "]: " << densifyResidentPartitionMs[i] / n
-                  << " ms avg\n";
+        std::cout << "[densify] residentPartition[" << i << "]: " << densifyResidentPartitionMs[i] / n << " ms avg\n";
     }
     std::cout << "[densify] densifyCompressed: " << densifyCompressedMs / n << " ms avg\n";
 }
@@ -36,7 +35,7 @@ void TimeRecord::print() const
 TimeRecord EmbDatasetManager::getLastTimeRecordAndReset()
 {
     TimeRecord record = m_lastTimeRecord;
-    m_lastTimeRecord = TimeRecord{};
+    m_lastTimeRecord = TimeRecord {};
     return record;
 }
 
@@ -117,6 +116,8 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
                                                     size_t embIdxEndExcl,
                                                     MemLayout memLayout)
 {
+    // --------------
+    // Input sanity checks.
     if (docIdxList.size() > m_maxNumWorkingDocs)
     {
         std::ostringstream oss;
@@ -124,50 +125,83 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
         throw std::runtime_error(oss.str());
     }
 
-    Timer timer;
+    // --------------
+    // Prepare timers
     Timer e2eTimer;
-    m_lastTimeRecord.densifyResidentPartitionMs.resize(m_residentEmbDatasets.size());
-    m_lastTimeRecord.count++;
-    e2eTimer.tic();
+    {
+        m_lastTimeRecord.count++;
+        e2eTimer.tic();
+    }
 
     // ------------
     // Cache the docIdxList.
-    timer.tic();
-    cache(docIdxList);
-    m_lastTimeRecord.densifyCacheMs += timer.tocMs();
-
-    timer.tic();
-    CHECK_CUDA(cudaMemcpy(m_docIdxListToDensify.data(),
-                          docIdxList.data(),
-                          docIdxList.size() * sizeof(T_DOC_IDX),
-                          cudaMemcpyHostToDevice));
-    m_lastTimeRecord.densifyMemcpyH2DMs += timer.tocMs();
-
-    m_workingEmbDataset.setMemLayout(memLayout);
-    m_workingEmbDataset.setEmbDimBeginIncl(embIdxBeginIncl);
-    m_workingEmbDataset.setEmbDimEndExcl(embIdxEndExcl);
-
-    DensificationTask densificationTask;
-    densificationTask.numDocsToDensify = docIdxList.size();
-    densificationTask.globalEmbIdxBeginIncl = embIdxBeginIncl;
-    densificationTask.globalEmbIdxEndExcl = embIdxEndExcl;
-    densificationTask.d_workingEmbDataset = m_workingEmbDataset.data();
-    densificationTask.d_docIdxList = m_docIdxListToDensify.data();
-    densificationTask.hp_isCached = m_hp_isCached.data();
-
-    for (size_t residentPartitionIdx = 0; residentPartitionIdx < m_residentEmbDatasets.size(); ++residentPartitionIdx)
     {
+        Timer timer;
         timer.tic();
-        const auto& embDataset = m_residentEmbDatasets[residentPartitionIdx];
-        embDataset.densify(densificationTask);
-        m_lastTimeRecord.densifyResidentPartitionMs[residentPartitionIdx] += timer.tocMs();
+        cache(docIdxList);
+        m_lastTimeRecord.densifyCacheMs += timer.tocMs();
     }
 
-    timer.tic();
-    m_resQuantDataset.densifyCompressed(densificationTask);
-    m_lastTimeRecord.densifyCompressedMs += timer.tocMs();
+    // --------------
+    // Copy the docIdxList to the device.
+    {
+        Timer timer;
+        timer.tic();
+        CHECK_CUDA(cudaMemcpy(m_docIdxListToDensify.data(),
+                              docIdxList.data(),
+                              docIdxList.size() * sizeof(T_DOC_IDX),
+                              cudaMemcpyHostToDevice));
+        m_lastTimeRecord.densifyMemcpyH2DMs += timer.tocMs();
+    }
 
-    m_lastTimeRecord.densifyTotalMs += e2eTimer.tocMs();
+    // --------------
+    // Set the working dataset properties.
+    {
+        m_workingEmbDataset.setMemLayout(memLayout);
+        m_workingEmbDataset.setEmbDimBeginIncl(embIdxBeginIncl);
+        m_workingEmbDataset.setEmbDimEndExcl(embIdxEndExcl);
+    }
+
+    // --------------
+    // Prepare the densification task.
+    DensificationTask densificationTask;
+    {
+        densificationTask.numDocsToDensify = docIdxList.size();
+        densificationTask.globalEmbIdxBeginIncl = embIdxBeginIncl;
+        densificationTask.globalEmbIdxEndExcl = embIdxEndExcl;
+        densificationTask.d_workingEmbDataset = m_workingEmbDataset.data();
+        densificationTask.d_docIdxList = m_docIdxListToDensify.data();
+        densificationTask.hp_isCached = m_hp_isCached.data();
+    }
+
+    // --------------
+    // Densify the resident datasets.
+    {
+        m_lastTimeRecord.densifyResidentPartitionMs.resize(m_residentEmbDatasets.size());
+        for (size_t residentPartitionIdx = 0; residentPartitionIdx < m_residentEmbDatasets.size();
+             ++residentPartitionIdx)
+        {
+            Timer timer;
+            timer.tic();
+            const auto& embDataset = m_residentEmbDatasets[residentPartitionIdx];
+            embDataset.densify(densificationTask);
+            m_lastTimeRecord.densifyResidentPartitionMs[residentPartitionIdx] += timer.tocMs();
+        }
+    }
+    // --------------
+    // Densify the compressed dataset.
+    {
+        Timer timer;
+        timer.tic();
+        m_resQuantDataset.densifyCompressed(densificationTask);
+        m_lastTimeRecord.densifyCompressedMs += timer.tocMs();
+    }
+
+    // --------------
+    // Record the end time.
+    {
+        m_lastTimeRecord.densifyTotalMs += e2eTimer.tocMs();
+    }
 
     return m_workingEmbDataset;
 }
@@ -242,7 +276,8 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
                 }
             }
         }
-        std::cout << std::fixed << std::setprecision(3) << "    [cache] verify no collision: " << timer.tocMs() << " ms\n";
+        std::cout << std::fixed << std::setprecision(3) << "    [cache] verify no collision: " << timer.tocMs()
+                  << " ms\n";
     }
 
     // ------------

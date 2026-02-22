@@ -6,3 +6,4 @@
 * think about if 1.1 * kStdDev makes sense or not
 * handle compressed polymorphism
 * use GPU for nearest centroid assignment
+* find a better way than using isCached
