@@ -86,17 +86,12 @@ void ResidentEmbDataset::densify(const DensificationTask& densificationTask) con
     params.embOffsetSrc = embDimBeginInclReal - m_residentPartitionConfig.getEmbDimBeginIncl();
     params.embOffsetDst = embDimBeginInclReal - densificationTask.globalEmbIdxBeginIncl;
     params.hp_isCached = densificationTask.hp_isCached;
-    std::cout << "embOffsetDst: " << params.embOffsetDst << std::endl;
-
     // -------------
     // Launch the kernel.
-    std::cout << "densifyFromResidentKernel start" << std::endl;
     constexpr size_t kBlockSize = 1024;
     size_t gridSize = (params.numDocsToDensify + kBlockSize - 1) / kBlockSize;
     densifyFromResidentKernel<<<gridSize, kBlockSize, 0, m_cudaStreamRead.get()>>>(params);
-    std::cout << "densifyFromResidentKernel done" << std::endl;
     CHECK_CUDA(cudaStreamSynchronize(m_cudaStreamRead.get()));
-    std::cout << "cudaStreamSynchronize done" << std::endl;
 }
 
 __global__ void updateResidentKernel(T_DOC_IDX* h_docIdxChunk,
@@ -150,15 +145,12 @@ void ResidentEmbDataset::update(const std::vector<T_DOC_IDX>& docIdxList, const 
         static constexpr size_t kBlockSize = 1024;
         size_t gridSize = (numDocsToUpdate + kBlockSize - 1) / kBlockSize;
 
-        std::cout << "updateResidentKernel start" << std::endl;
         updateResidentKernel<<<gridSize, kBlockSize, 0, m_cudaStreamRead.get()>>>(h_docIdxChunk,
                                                                             h_embChunk,
                                                                             numDocsToUpdate,
                                                                             m_residentPartitionConfig.getEmbDim(),
                                                                             m_residentEmbDataset.data(),
                                                                             m_numDocs);
-        std::cout << "updateResidentKernel done" << std::endl;
         CHECK_CUDA(cudaStreamSynchronize(m_cudaStreamRead.get()));
-        std::cout << "cudaStreamSynchronize done" << std::endl;
     }
 }
