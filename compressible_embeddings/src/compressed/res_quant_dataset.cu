@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <limits>
 #include <sstream>
 
 // ============================================================================
@@ -68,23 +69,33 @@ size_t ResQuantDataset::getRqDimPerDoc() const { return m_rqDim; }
 // ============================================================================
 
 void ResQuantDataset::update(const std::vector<T_DOC_IDX>& docIdxList,
-                             const std::vector<std::vector<T_EMB>>& emb2D,
-                             const std::vector<int>& centroidIdxList)
+                             const std::vector<std::vector<T_EMB>>& emb2D)
 {
-    if (docIdxList.size() != centroidIdxList.size())
-    {
-        std::ostringstream oss;
-        oss << "docIdxList.size() (" << docIdxList.size() << ") != centroidIdxList.size() (" << centroidIdxList.size()
-            << ")";
-        throw std::runtime_error(oss.str());
-    }
-
     size_t globalEmbDim = m_rqDim * kBitsPerRqInt / m_numBitsPerDim;
 
     for (size_t i = 0; i < docIdxList.size(); i++)
     {
         T_DOC_IDX docIdx = docIdxList[i];
-        int centroidIdx = centroidIdxList[i];
+
+        // Centroid assignment: find nearest centroid by L2 distance
+        float bestDist = std::numeric_limits<float>::max();
+        int centroidIdx = 0;
+        for (size_t c = 0; c < m_numCentroids; ++c)
+        {
+            float dist = 0.0f;
+            for (size_t d = 0; d < globalEmbDim; ++d)
+            {
+                size_t addr = getMemAddrRowMajor(c, d * 2, m_numCentroids, globalEmbDim * 2);
+                float centroidVal = static_cast<float>(m_centroidEmbHost.data()[addr]);
+                float diff = static_cast<float>(emb2D[i][d]) - centroidVal;
+                dist += diff * diff;
+            }
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                centroidIdx = static_cast<int>(c);
+            }
+        }
 
         // Store centroid index
         m_centroidIdxHost.data()[docIdx] = centroidIdx;

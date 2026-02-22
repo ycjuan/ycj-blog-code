@@ -70,9 +70,6 @@ protected:
     // Densification
     CudaDeviceArray<T_DOC_IDX> m_docIdxListToDensify;
 
-    // Centroid embeddings (host, for nearest-centroid assignment)
-    std::vector<std::vector<float>> m_centroidEmbs;
-
     // Cuda stream
     cudaStream_t m_cudaStreamRead;
     cudaStream_t m_cudaStreamWrite;

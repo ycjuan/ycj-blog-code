@@ -25,12 +25,8 @@ public:
                   const std::vector<std::vector<float>>& centroidStdDevs);
 
     // Update per-document data: centroid assignment and quantized residuals.
-    // docIdxList: which documents to update
-    // emb2D: full embeddings for each doc (used to compute residuals)
-    // centroidIdxList: centroid assignment for each doc (parallel to docIdxList)
     void update(const std::vector<T_DOC_IDX>& docIdxList,
-                const std::vector<std::vector<T_EMB>>& emb2D,
-                const std::vector<int>& centroidIdxList);
+                const std::vector<std::vector<T_EMB>>& emb2D);
 
     // Densify compressed partitions by reconstructing from centroid + dequantized residual.
     void densifyCompressed(const DensificationTask& densificationTask) const;
