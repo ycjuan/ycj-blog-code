@@ -4,17 +4,16 @@
 struct DensifyFromResidentKernelParams
 {
     // Source
-    const T_EMB* d_residentEmbDataset;
-    T_DOC_IDX* docIdxList;
-    T_DOC_IDX numDocsTotal;
+    const T_EMB* d_srcEmbData;
+    T_DOC_IDX srcNumDocs;
     ResidentPartitionConfig residentPartitionConfig;
-    size_t embOffsetSrc;
+    int srcEmbOffset;
 
     // Destination
-    T_EMB* d_workingEmbDataset;
-    int numDocsToDensify;
-    size_t embOffsetDst;
-    int embDimWorking;
+    T_EMB* d_dstEmbData;
+    int dstNumDocs;
+    int dstEmbOffset;
+    int dstEmbDim;
 
     // Shared
     int embDimToDensify;
@@ -25,24 +24,22 @@ struct DensifyFromResidentKernelParams
 __global__ void densifyFromResidentKernel(DensifyFromResidentKernelParams params)
 {
     size_t taskIdx = blockIdx.x * blockDim.x + threadIdx.x;
-    size_t copyIdx = taskIdx / params.embDimToDensify;
+    size_t copyTaskIdx = taskIdx / params.embDimToDensify;
     size_t embIdx = taskIdx % params.embDimToDensify;
 
-    if (copyIdx < params.numCopyTasks)
+    if (copyTaskIdx < params.numCopyTasks)
     {
-        CopyTask task = params.d_copyTasks[copyIdx];
-        T_DOC_IDX docIdxSrc = task.srcDocIdx;
-        T_DOC_IDX docIdxDst = task.dstDocIdx;
+        CopyTask task = params.d_copyTasks[copyTaskIdx];
 
-        size_t memAddrSrc = getMemAddrRowMajor(docIdxSrc,
-                                               embIdx + params.embOffsetSrc,
-                                               params.numDocsTotal,
+        size_t memAddrSrc = getMemAddrRowMajor(task.srcDocIdx,
+                                               embIdx + params.srcEmbOffset,
+                                               params.srcNumDocs,
                                                params.residentPartitionConfig.getEmbDim());
-        size_t memAddrDst = getMemAddrRowMajor(docIdxDst,
-                                               embIdx + params.embOffsetDst,
-                                               params.numDocsToDensify,
-                                               params.embDimWorking);
-        params.d_workingEmbDataset[memAddrDst] = params.d_residentEmbDataset[memAddrSrc];
+        size_t memAddrDst = getMemAddrRowMajor(task.dstDocIdx,
+                                               embIdx + params.dstEmbOffset,
+                                               params.dstNumDocs,
+                                               params.dstEmbDim);
+        params.d_dstEmbData[memAddrDst] = params.d_srcEmbData[memAddrSrc];
     }
 }
 
@@ -56,15 +53,15 @@ void ResidentEmbDataset::densify(const DensificationTask& densificationTask) con
     // -------------
     // Prepare the parameters for the kernel.
     DensifyFromResidentKernelParams params;
-    params.d_residentEmbDataset = m_d_embData.data();
-    params.d_workingEmbDataset = densificationTask.d_workingEmbDataset;
-    params.numDocsTotal = m_numDocs;
+    params.d_srcEmbData = m_d_embData.data();
+    params.d_dstEmbData = densificationTask.d_workingEmbDataset;
+    params.srcNumDocs = m_numDocs;
     params.residentPartitionConfig = m_residentPartitionConfig;
-    params.numDocsToDensify = densificationTask.numDocsToDensify;
-    params.embDimWorking = densificationTask.globalEmbIdxEndExcl - densificationTask.globalEmbIdxBeginIncl;
+    params.dstNumDocs = densificationTask.numDocsToDensify;
+    params.dstEmbDim = densificationTask.globalEmbIdxEndExcl - densificationTask.globalEmbIdxBeginIncl;
     params.embDimToDensify = embDimEndExclReal - embDimBeginInclReal;
-    params.embOffsetSrc = embDimBeginInclReal - m_residentPartitionConfig.getEmbDimBeginIncl();
-    params.embOffsetDst = embDimBeginInclReal - densificationTask.globalEmbIdxBeginIncl;
+    params.srcEmbOffset = embDimBeginInclReal - m_residentPartitionConfig.getEmbDimBeginIncl();
+    params.dstEmbOffset = embDimBeginInclReal - densificationTask.globalEmbIdxBeginIncl;
     params.d_copyTasks = densificationTask.d_copyTasks;
     params.numCopyTasks = densificationTask.numCopyTasks;
     // -------------
