@@ -9,22 +9,27 @@
 
 namespace // Anonymous namespace to avoid polluting the global namespace.
 {
-    constexpr T_DOC_IDX kInvalidDocIdx = -1;
+constexpr T_DOC_IDX kInvalidDocIdx = -1;
 }
 
 EmbDatasetManager::EmbDatasetManager(size_t numDocs,
-                                 size_t totalEmbDim,
-                                 std::vector<ResidentPartitionConfig> residentPartitionConfigs,
-                                 size_t maxNumWorkingDocs,
-                                 size_t numBitsPerDim,
-                                 const std::vector<std::vector<float>>& centroidEmbs,
-                                 const std::vector<std::vector<float>>& centroidStdDevs)
+                                     size_t totalEmbDim,
+                                     std::vector<ResidentPartitionConfig> residentPartitionConfigs,
+                                     size_t maxNumWorkingDocs,
+                                     size_t numBitsPerDim,
+                                     const std::vector<std::vector<float>>& centroidEmbs,
+                                     const std::vector<std::vector<float>>& centroidStdDevs)
     : m_numDocs(numDocs)
     , m_totalEmbDim(totalEmbDim)
     , m_maxNumWorkingDocs(maxNumWorkingDocs)
     , m_compressedPartitionConfigs(findCompressedPartitionConfigs(residentPartitionConfigs, totalEmbDim))
-    , m_resQuantDataset(numDocs, totalEmbDim, maxNumWorkingDocs, m_compressedPartitionConfigs,
-                      numBitsPerDim, centroidEmbs, centroidStdDevs)
+    , m_resQuantDataset(numDocs,
+                        totalEmbDim,
+                        maxNumWorkingDocs,
+                        m_compressedPartitionConfigs,
+                        numBitsPerDim,
+                        centroidEmbs,
+                        centroidStdDevs)
     , m_workingEmbDataset(maxNumWorkingDocs, totalEmbDim)
     , m_docIdxListToDensify(maxNumWorkingDocs, "m_docIdxListToDensify")
     , m_centroidEmbs(centroidEmbs)
@@ -94,7 +99,10 @@ void EmbDatasetManager::update(const std::vector<T_DOC_IDX>& docIdxList, const s
     m_resQuantDataset.update(docIdxList, emb2D, centroidIdxList);
 }
 
-const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docIdxList, size_t embIdxBeginIncl, size_t embIdxEndExcl, MemLayout memLayout)
+const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docIdxList,
+                                                    size_t embIdxBeginIncl,
+                                                    size_t embIdxEndExcl,
+                                                    MemLayout memLayout)
 {
     if (docIdxList.size() > m_maxNumWorkingDocs)
     {
@@ -106,7 +114,6 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
     // Cache the docIdxList.
     cache(docIdxList);
 
-    
     CHECK_CUDA(cudaMemcpy(m_docIdxListToDensify.data(),
                           docIdxList.data(),
                           docIdxList.size() * sizeof(T_DOC_IDX),
@@ -169,7 +176,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
             m_hp_isCached.data()[cachedWorkingIdx] = 1;
             cnt1++;
         }
-        else 
+        else
         {
             // Very important: if the cached working index is larger than the docIdxList.size(),
             //                 it is still considered as uncached.
@@ -192,8 +199,8 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
                 if (!seenWorkingIdx.insert(it->second).second)
                 {
                     std::ostringstream oss;
-                    oss << "Two docIdx values map to same cachedWorkingIdx: " << it->second
-                        << " (docIdx=" << docIdx << ")";
+                    oss << "Two docIdx values map to same cachedWorkingIdx: " << it->second << " (docIdx=" << docIdx
+                        << ")";
                     throw std::runtime_error(oss.str());
                 }
             }
@@ -221,7 +228,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
             m_cachedWorkingIdxToDocIdx[workingIdx] = uncachedDocIdx;
             m_hp_isCached.data()[workingIdx] = 0;
         }
-        else 
+        else
         {
             cnt4++;
         }
@@ -240,5 +247,4 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     // ------------
     // Reassign the reorderedDocIdxList to the docIdxList.
     docIdxList = reorderedDocIdxList;
-
 }
