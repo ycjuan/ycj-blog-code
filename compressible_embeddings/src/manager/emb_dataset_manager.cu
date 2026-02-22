@@ -237,12 +237,12 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     int cnt2 = 0;
     for (T_DOC_IDX workingIdx = 0; workingIdx < docIdxList.size(); ++workingIdx)
     {
-        T_DOC_IDX docIdx = docIdxList[workingIdx];
+        T_DOC_IDX docIdx = docIdxList.at(workingIdx);
         auto it = m_cachedDocIdxToWorkingIdx.find(docIdx);
         if (it != m_cachedDocIdxToWorkingIdx.end() && it->second < docIdxList.size())
         {
             T_DOC_IDX cachedWorkingIdx = it->second;
-            reorderedDocIdxList[cachedWorkingIdx] = docIdx;
+            reorderedDocIdxList.at(cachedWorkingIdx) = docIdx;
             m_hp_isCached.data()[cachedWorkingIdx] = 1;
             cnt1++;
         }
@@ -287,19 +287,19 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     int cnt4 = 0;
     for (T_DOC_IDX workingIdx = 0; workingIdx < docIdxList.size(); ++workingIdx)
     {
-        if (reorderedDocIdxList[workingIdx] == kInvalidDocIdx)
+        if (reorderedDocIdxList.at(workingIdx) == kInvalidDocIdx)
         {
             cnt3++;
             T_DOC_IDX uncachedDocIdx = uncachedDocIdxList.top();
-            reorderedDocIdxList[workingIdx] = uncachedDocIdx;
+            reorderedDocIdxList.at(workingIdx) = uncachedDocIdx;
             uncachedDocIdxList.pop();
-            T_DOC_IDX oldDocIdx = m_cachedWorkingIdxToDocIdx[workingIdx];
+            T_DOC_IDX oldDocIdx = m_cachedWorkingIdxToDocIdx.at(workingIdx);
             if (oldDocIdx != kInvalidDocIdx)
             {
                 m_cachedDocIdxToWorkingIdx.erase(oldDocIdx);
             }
             m_cachedDocIdxToWorkingIdx[uncachedDocIdx] = workingIdx;
-            m_cachedWorkingIdxToDocIdx[workingIdx] = uncachedDocIdx;
+            m_cachedWorkingIdxToDocIdx.at(workingIdx) = uncachedDocIdx;
             m_hp_isCached.data()[workingIdx] = 0;
         }
         else

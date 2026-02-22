@@ -75,7 +75,7 @@ void ResQuantDataset::update(const std::vector<T_DOC_IDX>& docIdxList,
 
     for (size_t i = 0; i < docIdxList.size(); i++)
     {
-        T_DOC_IDX docIdx = docIdxList[i];
+        T_DOC_IDX docIdx = docIdxList.at(i);
 
         // Centroid assignment: find nearest centroid by L2 distance
         float bestDist = std::numeric_limits<float>::max();
@@ -87,7 +87,7 @@ void ResQuantDataset::update(const std::vector<T_DOC_IDX>& docIdxList,
             {
                 size_t addr = getMemAddrRowMajor(c, d * 2, m_numCentroids, globalEmbDim * 2);
                 float centroidVal = static_cast<float>(m_centroidEmbHost.data()[addr]);
-                float diff = static_cast<float>(emb2D[i][d]) - centroidVal;
+                float diff = static_cast<float>(emb2D.at(i).at(d)) - centroidVal;
                 dist += diff * diff;
             }
             if (dist < bestDist)
@@ -106,7 +106,7 @@ void ResQuantDataset::update(const std::vector<T_DOC_IDX>& docIdxList,
             size_t centroidAddr = getMemAddrRowMajor(centroidIdx, embIdx * 2, m_numCentroids, globalEmbDim * 2);
             float centroidVal = static_cast<float>(m_centroidEmbHost.data()[centroidAddr]);
             float stdDev = static_cast<float>(m_centroidEmbHost.data()[centroidAddr + 1]);
-            float embVal = static_cast<float>(emb2D[i][embIdx]);
+            float embVal = static_cast<float>(emb2D.at(i).at(embIdx));
             float residual = embVal - centroidVal;
 
             int rqIdx = getRqIdx(embIdx, m_numBitsPerDim, kBitsPerRqInt);
