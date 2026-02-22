@@ -25,9 +25,13 @@ struct TimeRecord
     std::vector<float> densifyResidentPartitionMs;
     float densifyCompressedMs = 0.0f;
 
+    float cacheTotalMs = 0.0f;
+    float densifyTotalMs = 0.0f;
+
     void print() const
     {
-        printf("  [densify] cache: %.3f ms\n", densifyCacheMs);
+        printf("  [densify] total: %.3f ms\n", densifyTotalMs);
+        printf("  [densify] cache: %.3f ms (total: %.3f ms)\n", densifyCacheMs, cacheTotalMs);
         printf("    [cache] first scan: %.3f ms\n", cacheFirstScanMs);
         printf("    [cache] second scan: %.3f ms\n", cacheSecondScanMs);
         printf("    [cache] reassign: %.3f ms\n", cacheReassignMs);

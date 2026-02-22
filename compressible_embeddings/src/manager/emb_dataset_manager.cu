@@ -112,8 +112,10 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
     }
 
     Timer timer;
+    Timer e2eTimer;
     m_lastTimeRecord = TimeRecord{};
     m_lastTimeRecord.densifyResidentPartitionMs.resize(m_residentEmbDatasets.size());
+    e2eTimer.tic();
 
     // ------------
     // Cache the docIdxList.
@@ -152,12 +154,16 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
     m_resQuantDataset.densifyCompressed(densificationTask);
     m_lastTimeRecord.densifyCompressedMs = timer.tocMs();
 
+    m_lastTimeRecord.densifyTotalMs = e2eTimer.tocMs();
+
     return m_workingEmbDataset;
 }
 
 void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
 {
     Timer timer;
+    Timer e2eTimer;
+    e2eTimer.tic();
 
     // ------------
     // Verify docIdxList is unique.
@@ -292,4 +298,5 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     timer.tic();
     docIdxList = reorderedDocIdxList;
     m_lastTimeRecord.cacheReassignMs = timer.tocMs();
+    m_lastTimeRecord.cacheTotalMs = e2eTimer.tocMs();
 }
