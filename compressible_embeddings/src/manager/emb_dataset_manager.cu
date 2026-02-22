@@ -59,6 +59,7 @@ EmbDatasetManager::EmbDatasetManager(size_t numDocs,
                         centroidStdDevs)
     , m_workingEmbDataset(maxNumWorkingDocs, totalEmbDim)
     , m_docIdxListToDensify(maxNumWorkingDocs, "m_docIdxListToDensify")
+    , m_h_copyTasks(maxNumWorkingDocs, "m_h_copyTasks")
     , m_d_copyTasks(maxNumWorkingDocs, "m_d_copyTasks")
     , m_currDocIdxListInWorkingDataset(maxNumWorkingDocs, kInvalidDocIdx)
 {
@@ -150,8 +151,7 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
     {
         Timer timer;
         timer.tic();
-        CHECK_CUDA(cudaMemcpy(m_d_copyTasks.data(), m_copyTasks.data(), m_copyTasks.size() * sizeof(CopyTask), cudaMemcpyHostToDevice));
-        m_numCopyTasks = m_copyTasks.size();
+        CHECK_CUDA(cudaMemcpy(m_d_copyTasks.data(), m_h_copyTasks.data(), m_numCopyTasks * sizeof(CopyTask), cudaMemcpyHostToDevice));
         m_lastTimeRecord.densifyCopyTasksMs += timer.tocMs();
     }
 
@@ -243,7 +243,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& desiredDocIdxList)
     // First scan to find the cached working indices.
     std::vector<T_DOC_IDX> reorderedDocIdxList(desiredDocIdxList.size(), kInvalidDocIdx);
     std::stack<T_DOC_IDX> uncachedDocIndices;
-    m_copyTasks.clear();
+    m_numCopyTasks = 0;
 
      // these two counters are for some sanity checks later. They will be ++ in step 1 and -- in step 2.
      // At the end both should be 0.
@@ -322,7 +322,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& desiredDocIdxList)
                 // Also update the m_currDocIdxInWorkingDataset to make this working index point to uncachedDocIdx
                 m_currDocIdxToWorkingIdx[uncachedDocIdx] = workingIdx;
                 m_currDocIdxListInWorkingDataset.at(workingIdx) = uncachedDocIdx;
-                m_copyTasks.push_back(CopyTask { uncachedDocIdx, workingIdx });
+                m_h_copyTasks.data()[m_numCopyTasks++] = CopyTask { uncachedDocIdx, workingIdx };
 
                 // ---------
                 // Decrease the counter - meaning "we have dealt with one more uncached doc index"
