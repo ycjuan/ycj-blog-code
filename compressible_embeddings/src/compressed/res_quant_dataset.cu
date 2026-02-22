@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <iostream>
 #include <limits>
+#include <omp.h>
 #include <sstream>
 
 // ============================================================================
@@ -73,6 +74,7 @@ void ResQuantDataset::update(const std::vector<T_DOC_IDX>& docIdxList,
 {
     size_t globalEmbDim = m_rqDim * kBitsPerRqInt / m_numBitsPerDim;
 
+#pragma omp parallel for schedule(static)
     for (size_t i = 0; i < docIdxList.size(); i++)
     {
         T_DOC_IDX docIdx = docIdxList.at(i);
