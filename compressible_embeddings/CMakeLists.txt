@@ -54,7 +54,7 @@ add_executable(test_${LIB_NAME} test/test_compressible_embeddings.cu)
 target_link_libraries(test_${LIB_NAME} ${LIB_NAME})
 
 target_compile_options(test_${LIB_NAME} PRIVATE
-    $<$<COMPILE_LANGUAGE:CUDA>:-Wno-deprecated-gpu-targets>
+    $<$<COMPILE_LANGUAGE:CUDA>:-Wno-deprecated-gpu-targets -Xcompiler -fopenmp>
 )
 
 # Set linker language to CUDA

@@ -2,6 +2,7 @@
 #include <cassert>
 #include <iomanip>
 #include <iostream>
+#include <omp.h>
 #include <random>
 #include <unordered_set>
 
@@ -66,9 +67,16 @@ std::pair<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>> genRandDocDat
     size_t numCentroids = centroidEmbs.size();
     std::vector<T_DOC_IDX> docIdxList(s.numDocs);
     std::vector<std::vector<T_EMB>> emb2D(s.numDocs);
-    std::default_random_engine generator;
+    int numThreads = omp_get_max_threads();
+    std::vector<std::default_random_engine> generators(numThreads);
+    for (int t = 0; t < numThreads; ++t)
+    {
+        generators.at(t).seed(t);
+    }
+#pragma omp parallel for schedule(static)
     for (size_t docIdx = 0; docIdx < s.numDocs; ++docIdx)
     {
+        std::default_random_engine& generator = generators.at(omp_get_thread_num());
         docIdxList.at(docIdx) = docIdx;
         emb2D.at(docIdx).resize(s.totalEmbDim);
         int centroidIdx = docIdx % numCentroids;
