@@ -15,15 +15,15 @@
 ResQuantDataset::ResQuantDataset(size_t numDocs,
                                  size_t globalEmbDim,
                                  size_t maxNumDocsInWorkingDataset,
-                                 std::vector<CompressedPartitionConfig> compressedPartitionConfigs,
+                                 std::vector<CompressiblePartitionConfig> compressiblePartitionConfigs,
                                  size_t numBitsPerDim,
                                  const std::vector<std::vector<float>>& centroidEmbs,
                                  const std::vector<std::vector<float>>& centroidStdDevs)
-    : CompressedEmbDataset(numDocs, globalEmbDim, {}, maxNumDocsInWorkingDataset)
+    : CompressibleEmbDataset(numDocs, globalEmbDim, {}, maxNumDocsInWorkingDataset)
     , m_numCentroids(centroidEmbs.size())
     , m_numBitsPerDim(numBitsPerDim)
     , m_rqDim(getRqDim(globalEmbDim, numBitsPerDim))
-    , m_compressedPartitionConfigs(std::move(compressedPartitionConfigs))
+    , m_compressiblePartitionConfigs(std::move(compressiblePartitionConfigs))
     , m_d_centroidEmb(m_numCentroids * globalEmbDim * 2, "m_centroidEmb")
     , m_d_centroidIdx(numDocs, "m_centroidIdx")
     , m_d_residual(numDocs * m_rqDim, "m_residual")
@@ -157,9 +157,9 @@ struct DensifyFromResQuantKernelParams
     T_EMB* d_workingEmbDataset;
     size_t embDimWorking;
 
-    // Which compressed partition and its offset in the working index
-    size_t compressedEmbDimBegin;
-    size_t compressedEmbDimEnd;
+    // Which compressible partition and its offset in the working index
+    size_t compressibleEmbDimBegin;
+    size_t compressibleEmbDimEnd;
     size_t embOffsetDst;
 
     CopyTask* d_copyTasks;
@@ -169,9 +169,9 @@ struct DensifyFromResQuantKernelParams
 __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params)
 {
     size_t tidx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
-    size_t compressedEmbDim = params.compressedEmbDimEnd - params.compressedEmbDimBegin;
-    int copyIdx = tidx / compressedEmbDim;
-    int localEmbIdx = tidx % compressedEmbDim;
+    size_t compressibleEmbDim = params.compressibleEmbDimEnd - params.compressibleEmbDimBegin;
+    int copyIdx = tidx / compressibleEmbDim;
+    int localEmbIdx = tidx % compressibleEmbDim;
 
     if (copyIdx < params.numCopyTasks)
     {
@@ -179,7 +179,7 @@ __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params
         T_DOC_IDX docIdx = task.srcDocIdx;
         int toScoreIdx = task.dstDocIdx;
 
-        int globalEmbIdx = localEmbIdx + params.compressedEmbDimBegin;
+        int globalEmbIdx = localEmbIdx + params.compressibleEmbDimBegin;
         int centroidIdx = params.d_centroidIdx[docIdx];
 
         // Get centroid value and stdDev
@@ -207,26 +207,26 @@ __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params
 }
 
 // ============================================================================
-// densifyCompressed
+// densifyCompressible
 // ============================================================================
 
-void ResQuantDataset::densifyCompressed(const DensificationTask& densificationTask) const
+void ResQuantDataset::densifyCompressible(const DensificationTask& densificationTask) const
 {
     size_t globalEmbDim = m_rqDim * kBitsPerRqInt / m_numBitsPerDim;
 
-    for (const auto& compressedConfig : m_compressedPartitionConfigs)
+    for (const auto& compressibleConfig : m_compressiblePartitionConfigs)
     {
-        // Compute the overlap between this compressed partition and the requested range.
+        // Compute the overlap between this compressible partition and the requested range.
         size_t embDimBeginReal
-            = std::max(densificationTask.globalEmbIdxBeginIncl, compressedConfig.getEmbDimBeginIncl());
-        size_t embDimEndReal = std::min(densificationTask.globalEmbIdxEndExcl, compressedConfig.getEmbDimEndExcl());
+            = std::max(densificationTask.globalEmbIdxBeginIncl, compressibleConfig.getEmbDimBeginIncl());
+        size_t embDimEndReal = std::min(densificationTask.globalEmbIdxEndExcl, compressibleConfig.getEmbDimEndExcl());
 
         if (embDimBeginReal >= embDimEndReal)
         {
             continue; // No overlap
         }
 
-        size_t compressedEmbDim = embDimEndReal - embDimBeginReal;
+        size_t compressibleEmbDim = embDimEndReal - embDimBeginReal;
 
         DensifyFromResQuantKernelParams params;
         params.d_centroidEmb = m_d_centroidEmb.data();
@@ -241,8 +241,8 @@ void ResQuantDataset::densifyCompressed(const DensificationTask& densificationTa
         params.numDocsToDensify = densificationTask.numDocsToDensify;
         params.d_workingEmbDataset = densificationTask.d_workingEmbDataset;
         params.embDimWorking = densificationTask.globalEmbIdxEndExcl - densificationTask.globalEmbIdxBeginIncl;
-        params.compressedEmbDimBegin = embDimBeginReal;
-        params.compressedEmbDimEnd = embDimEndReal;
+        params.compressibleEmbDimBegin = embDimBeginReal;
+        params.compressibleEmbDimEnd = embDimEndReal;
         params.embOffsetDst = embDimBeginReal - densificationTask.globalEmbIdxBeginIncl;
         params.d_copyTasks = densificationTask.d_copyTasks;
         params.numCopyTasks = densificationTask.numCopyTasks;
@@ -252,7 +252,7 @@ void ResQuantDataset::densifyCompressed(const DensificationTask& densificationTa
             continue;
         }
         constexpr size_t kBlockSize = 1024;
-        size_t numTasks = densificationTask.numCopyTasks * compressedEmbDim;
+        size_t numTasks = densificationTask.numCopyTasks * compressibleEmbDim;
         size_t gridSize = (numTasks + kBlockSize - 1) / kBlockSize;
         densifyFromResQuantKernel<<<gridSize, kBlockSize>>>(params);
         CHECK_CUDA(cudaGetLastError());

@@ -9,7 +9,7 @@
 #include "common/densification_task.hpp"
 #include "utils/cuda_raii.hpp"
 
-class ResQuantDataset : public CompressedEmbDataset
+class ResQuantDataset : public CompressibleEmbDataset
 {
 public:
     // centroidEmbs: numCentroids x globalEmbDim (centroid mean values)
@@ -19,7 +19,7 @@ public:
     ResQuantDataset(size_t numDocs,
                   size_t globalEmbDim,
                   size_t maxNumDocsInWorkingDataset,
-                  std::vector<CompressedPartitionConfig> compressedPartitionConfigs,
+                  std::vector<CompressiblePartitionConfig> compressiblePartitionConfigs,
                   size_t numBitsPerDim,
                   const std::vector<std::vector<float>>& centroidEmbs,
                   const std::vector<std::vector<float>>& centroidStdDevs);
@@ -29,8 +29,8 @@ public:
                 const std::vector<std::vector<T_EMB>>& emb2D,
                 const std::vector<int>& centroidIdxList);
 
-    // Densify compressed partitions by reconstructing from centroid + dequantized residual.
-    void densifyCompressed(const DensificationTask& densificationTask) const;
+    // Densify compressible partitions by reconstructing from centroid + dequantized residual.
+    void densifyCompressible(const DensificationTask& densificationTask) const;
 
     // Getters
     size_t getNumCentroids() const;
@@ -43,8 +43,8 @@ private:
     size_t m_numBitsPerDim;
     size_t m_rqDim; // number of T_RQ elements per document
 
-    // Compressed partition configs (complement of resident partitions)
-    std::vector<CompressedPartitionConfig> m_compressedPartitionConfigs;
+    // Compressible partition configs (complement of resident partitions)
+    std::vector<CompressiblePartitionConfig> m_compressiblePartitionConfigs;
 
     // Centroid data on device: numCentroids x globalEmbDim x 2 (interleaved [emb, stdDev] per dim)
     CudaDeviceArray<T_EMB> m_d_centroidEmb;

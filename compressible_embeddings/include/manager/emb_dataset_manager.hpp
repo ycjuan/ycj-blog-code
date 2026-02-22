@@ -24,7 +24,7 @@ struct TimeRecord
     float densifyCopyTasksMs = 0.0f;
     float densifyMemcpyH2DMs = 0.0f;
     std::vector<float> densifyResidentPartitionMs;
-    float densifyCompressedMs = 0.0f;
+    float densifyCompressibleMs = 0.0f;
 
     // count
     int count = 0;
@@ -64,7 +64,7 @@ protected:
     // Resident datasets
     std::vector<ResidentEmbDataset> m_residentEmbDatasets;
 
-    // Compressed dataset (residual quantization)
+    // Compressible dataset (residual quantization)
     ResQuantDataset m_resQuantDataset;
 
     // Working set dataset

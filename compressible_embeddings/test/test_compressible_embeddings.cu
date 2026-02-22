@@ -165,7 +165,7 @@ std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> genR
     return std::make_pair(centroidEmbs, centroidStdDevs);
 }
 
-bool isCompressedDim(const ExpSetting& s, size_t embIdx)
+bool isCompressibleDim(const ExpSetting& s, size_t embIdx)
 {
     for (const auto& config : s.residentPartitionConfigs)
     {
@@ -190,11 +190,11 @@ float verifyDensification(const ExpSetting& s,
                           s.numDocsToDensify * densifiedEmbDim * sizeof(T_EMB),
                           cudaMemcpyDeviceToHost));
 
-    float compressedErrorSum = 0.0f;
-    size_t compressedCount = 0;
+    float compressibleErrorSum = 0.0f;
+    size_t compressibleCount = 0;
     std::string errorMsg;
 
-#pragma omp parallel for schedule(static) reduction(+:compressedErrorSum, compressedCount)
+#pragma omp parallel for schedule(static) reduction(+:compressibleErrorSum, compressibleCount)
     for (size_t docIdx = 0; docIdx < docIdxList.size(); ++docIdx)
     {
         for (size_t embIdx = s.densifiedEmbIdxBeginIncl; embIdx < s.densifiedEmbIdxEndExcl; ++embIdx)
@@ -204,17 +204,17 @@ float verifyDensification(const ExpSetting& s,
             float val = static_cast<float>(v_workingEmbDataset.at(memAddr));
             float ref = static_cast<float>(emb2D.at(docIdxList.at(docIdx)).at(embIdx));
 
-            if (isCompressedDim(s, embIdx))
+            if (isCompressibleDim(s, embIdx))
             {
                 float error = std::abs(val - ref);
-                compressedErrorSum += error;
-                compressedCount++;
+                compressibleErrorSum += error;
+                compressibleCount++;
                 if (error > 1.1f * s.centroidStdDev)
                 {
 #pragma omp critical
                     {
                         std::ostringstream oss;
-                        oss << "Compressed dim: docIdx = " << docIdx << ", embIdx = " << embIdx << ", val(" << val
+                        oss << "Compressible dim: docIdx = " << docIdx << ", embIdx = " << embIdx << ", val(" << val
                             << ") != ref(" << ref << ")"
                             << ", error = " << error << ", threshold = " << s.centroidStdDev;
                         errorMsg = oss.str();
@@ -243,7 +243,7 @@ float verifyDensification(const ExpSetting& s,
         throw std::runtime_error(errorMsg);
     }
 
-    return compressedErrorSum / compressedCount;
+    return compressibleErrorSum / compressibleCount;
 }
 
 void runExp(ExpSetting s)
@@ -293,7 +293,7 @@ void runExp(ExpSetting s)
     // --------
     // Some statistics
     float totalDensifyTimeMs = 0.0f;
-    float totalCompressedError = 0.0f;
+    float totalCompressibleError = 0.0f;
     float totalCacheRate = 0.0f;
 
     // --------
@@ -306,7 +306,7 @@ void runExp(ExpSetting s)
         {
             embDatasetManager.getLastTimeRecordAndReset();
             totalDensifyTimeMs = 0.0f;
-            totalCompressedError = 0.0f;
+            totalCompressibleError = 0.0f;
             totalCacheRate = 0.0f;
         }
 
@@ -324,9 +324,9 @@ void runExp(ExpSetting s)
         // --------
         // Verify the result
         timer.tic();
-        float compressedError = verifyDensification(s, workingEmbDataset, docIdxListToDensify, emb2D);
+        float compressibleError = verifyDensification(s, workingEmbDataset, docIdxListToDensify, emb2D);
         float verifyMs = timer.tocMs();
-        totalCompressedError += compressedError;
+        totalCompressibleError += compressibleError;
 
         // --------
         // Generate the next docIdxList to densify
@@ -356,7 +356,7 @@ void runExp(ExpSetting s)
               << " trials) =====\n"
               << "Densification time: " << totalDensifyTimeMs / s.numDensifyTrials << " ms\n"
               << "Cache rate: " << totalCacheRate / s.numDensifyTrials << "\n";
-    std::cout << std::setprecision(6) << "Compressed dim avg error: " << totalCompressedError / s.numDensifyTrials
+    std::cout << std::setprecision(6) << "Compressible dim avg error: " << totalCompressibleError / s.numDensifyTrials
               << "\n";
     std::cout << "\n===== Time Record =====\n";
     embDatasetManager.getLastTimeRecordAndReset().print();

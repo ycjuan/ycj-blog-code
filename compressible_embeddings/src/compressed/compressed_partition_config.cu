@@ -3,23 +3,23 @@
 #include "compressed/compressed_partition_config.hpp"
 #include "resident/resident_partition_config.hpp"
 
-CompressedPartitionConfig::CompressedPartitionConfig(size_t embDimBeginIncl, size_t embDimEndExcl)
+CompressiblePartitionConfig::CompressiblePartitionConfig(size_t embDimBeginIncl, size_t embDimEndExcl)
     : m_embDimBeginIncl(embDimBeginIncl)
     , m_embDimEndExcl(embDimEndExcl)
 {
 }
 
-size_t CompressedPartitionConfig::getEmbDimBeginIncl() const
+size_t CompressiblePartitionConfig::getEmbDimBeginIncl() const
 {
     return m_embDimBeginIncl;
 }
 
-size_t CompressedPartitionConfig::getEmbDimEndExcl() const
+size_t CompressiblePartitionConfig::getEmbDimEndExcl() const
 {
     return m_embDimEndExcl;
 }
 
-bool CompressedPartitionConfig::operator<(const CompressedPartitionConfig& other) const
+bool CompressiblePartitionConfig::operator<(const CompressiblePartitionConfig& other) const
 {
     if (m_embDimBeginIncl != other.m_embDimBeginIncl)
     {
@@ -31,23 +31,23 @@ bool CompressedPartitionConfig::operator<(const CompressedPartitionConfig& other
     }
 }
 
-std::vector<CompressedPartitionConfig> findCompressedPartitionConfigs(std::vector<ResidentPartitionConfig> residentPartitionConfigs, size_t totalEmbDim)
+std::vector<CompressiblePartitionConfig> findCompressiblePartitionConfigs(std::vector<ResidentPartitionConfig> residentPartitionConfigs, size_t totalEmbDim)
 {
     std::sort(residentPartitionConfigs.begin(), residentPartitionConfigs.end());
-    std::vector<CompressedPartitionConfig> compressedPartitionConfigs;
+    std::vector<CompressiblePartitionConfig> compressiblePartitionConfigs;
     int currBeginIncl = 0;
     for (const auto& residentPartitionConfig : residentPartitionConfigs)
     {
         if (currBeginIncl < residentPartitionConfig.getEmbDimBeginIncl())
         {
-            compressedPartitionConfigs.push_back(
-                CompressedPartitionConfig(currBeginIncl, residentPartitionConfig.getEmbDimBeginIncl()));
+            compressiblePartitionConfigs.push_back(
+                CompressiblePartitionConfig(currBeginIncl, residentPartitionConfig.getEmbDimBeginIncl()));
         }
         currBeginIncl = residentPartitionConfig.getEmbDimEndExcl();
     }
     if (currBeginIncl < totalEmbDim)
     {
-        compressedPartitionConfigs.push_back(CompressedPartitionConfig(currBeginIncl, totalEmbDim));
+        compressiblePartitionConfigs.push_back(CompressiblePartitionConfig(currBeginIncl, totalEmbDim));
     }
-    return compressedPartitionConfigs;
+    return compressiblePartitionConfigs;
 }

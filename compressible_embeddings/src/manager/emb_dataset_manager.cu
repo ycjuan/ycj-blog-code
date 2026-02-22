@@ -30,7 +30,7 @@ void TimeRecord::print() const
     {
         std::cout << "[densify] residentPartition[" << i << "]: " << densifyResidentPartitionMs[i] / n << " ms avg\n";
     }
-    std::cout << "[densify] densifyCompressed: " << densifyCompressedMs / n << " ms avg\n";
+    std::cout << "[densify] densifyCompressible: " << densifyCompressibleMs / n << " ms avg\n";
 }
 
 TimeRecord EmbDatasetManager::getLastTimeRecordAndReset()
@@ -53,7 +53,7 @@ EmbDatasetManager::EmbDatasetManager(size_t numDocs,
     , m_resQuantDataset(numDocs,
                         totalEmbDim,
                         maxNumWorkingDocs,
-                        findCompressedPartitionConfigs(residentPartitionConfigs, totalEmbDim),
+                        findCompressiblePartitionConfigs(residentPartitionConfigs, totalEmbDim),
                         numBitsPerDim,
                         centroidEmbs,
                         centroidStdDevs)
@@ -111,7 +111,7 @@ void EmbDatasetManager::update(const std::vector<T_DOC_IDX>& docIdxList,
     }
 
     // --------------
-    // Update the compressed dataset.
+    // Update the compressible dataset.
     m_resQuantDataset.update(docIdxList, emb2D, centroidIdxList);
 }
 
@@ -203,12 +203,12 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
         }
     }
     // --------------
-    // Densify the compressed dataset.
+    // Densify the compressible dataset.
     {
         Timer timer;
         timer.tic();
-        m_resQuantDataset.densifyCompressed(densificationTask);
-        m_lastTimeRecord.densifyCompressedMs += timer.tocMs();
+        m_resQuantDataset.densifyCompressible(densificationTask);
+        m_lastTimeRecord.densifyCompressibleMs += timer.tocMs();
     }
 
     // --------------
