@@ -5,13 +5,13 @@
 ResidentEmbDataset::ResidentEmbDataset(size_t numDocs, ResidentPartitionConfig residentPartitionConfig)
     : m_numDocs(numDocs)
     , m_residentPartitionConfig(residentPartitionConfig)
-    , m_residentEmbDataset(numDocs * residentPartitionConfig.getEmbDim(), "m_residentEmbDataset")
-    , m_docIdxChunk(kMaxUpdateBatchSize, "m_docIdxChunk")
-    , m_embChunk(kMaxUpdateBatchSize * residentPartitionConfig.getEmbDim(), "m_embChunk")
+    , m_d_embData(numDocs * residentPartitionConfig.getEmbDim(), "m_residentEmbDataset")
+    , m_h_docIdxChunk(kMaxUpdateBatchSize, "m_docIdxChunk")
+    , m_h_embDataChunk(kMaxUpdateBatchSize * residentPartitionConfig.getEmbDim(), "m_embChunk")
 {
 }
 
-T_EMB* ResidentEmbDataset::data() const { return m_residentEmbDataset.data(); }
+T_EMB* ResidentEmbDataset::data() const { return m_d_embData.data(); }
 
 ResidentPartitionConfig ResidentEmbDataset::getResidentPartitionConfig() const { return m_residentPartitionConfig; }
 
@@ -70,7 +70,7 @@ void ResidentEmbDataset::densify(const DensificationTask& densificationTask) con
     // -------------
     // Prepare the parameters for the kernel.
     DensifyFromResidentKernelParams params;
-    params.d_residentEmbDataset = m_residentEmbDataset.data();
+    params.d_residentEmbDataset = m_d_embData.data();
     params.d_workingEmbDataset = densificationTask.d_workingEmbDataset;
     params.numDocsTotal = m_numDocs;
     params.residentPartitionConfig = m_residentPartitionConfig;
@@ -127,8 +127,8 @@ void ResidentEmbDataset::update(const std::vector<T_DOC_IDX>& docIdxList, const 
 
         // -------------
         // Copy data to the buffers
-        T_DOC_IDX* h_docIdxChunk = m_docIdxChunk.data();
-        T_EMB* h_embChunk = m_embChunk.data();
+        T_DOC_IDX* h_docIdxChunk = m_h_docIdxChunk.data();
+        T_EMB* h_embChunk = m_h_embDataChunk.data();
         for (size_t docIdx = 0; docIdx < numDocsToUpdate; ++docIdx)
         {
             h_docIdxChunk[docIdx] = docIdxList.at(docIdx + docIdxBeginIncl);
@@ -149,7 +149,7 @@ void ResidentEmbDataset::update(const std::vector<T_DOC_IDX>& docIdxList, const 
                                                                             h_embChunk,
                                                                             numDocsToUpdate,
                                                                             m_residentPartitionConfig.getEmbDim(),
-                                                                            m_residentEmbDataset.data(),
+                                                                            m_d_embData.data(),
                                                                             m_numDocs);
         CHECK_CUDA(cudaStreamSynchronize(m_cudaStreamRead.get()));
     }
