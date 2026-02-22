@@ -6,6 +6,8 @@
 #include <random>
 #include <unordered_set>
 
+constexpr bool kVerbose = false;
+
 #include "manager/emb_dataset_manager.hpp"
 #include "resident/resident_partition_config.hpp"
 #include "utils/util.hpp"
@@ -303,17 +305,36 @@ void runExp(ExpSetting s)
                                                                                s.densifiedEmbIdxBeginIncl,
                                                                                s.densifiedEmbIdxEndExcl,
                                                                                MemLayout::ROW_MAJOR);
-        totalDensifyTimeMs += timer.tocMs();
+        float densifyMs = timer.tocMs();
+        totalDensifyTimeMs += densifyMs;
 
         // --------
         // Verify the result
-        totalCompressedError += verifyDensification(s, workingEmbDataset, docIdxListToDensify, emb2D);
+        timer.tic();
+        float compressedError = verifyDensification(s, workingEmbDataset, docIdxListToDensify, emb2D);
+        float verifyMs = timer.tocMs();
+        totalCompressedError += compressedError;
 
         // --------
         // Generate the next docIdxList to densify
+        timer.tic();
         auto [nextList, cacheRate] = genNextDocIdxList(s, docIdxListToDensify, trial);
+        float genNextMs = timer.tocMs();
         totalCacheRate += cacheRate;
         docIdxListToDensify = std::move(nextList);
+
+        // --------
+        // Per-trial verbose output
+        if (kVerbose)
+        {
+            std::cout << std::fixed << std::setprecision(3)
+                      << "[trial " << trial << "]"
+                      << "  densify: " << densifyMs << " ms"
+                      << "  verify: " << verifyMs << " ms"
+                      << "  gen_next: " << genNextMs << " ms"
+                      << "  cache_rate: " << cacheRate
+                      << "\n";
+        }
     }
 
     // --------
