@@ -403,7 +403,7 @@ We create a new reorderedDocIdxList with -1 as initial value and has the same le
 
   reorderedDocIdxList = [-1, -1, -1, -1]
 
-The we loop through desiredDocIdxList, and for each docIdx, we know 
+The we loop through desiredDocIdxList, and for each docIdx, we know
   1) if it is in currDocIdxList, and if yes,
   2) where it is in currDocIdxList,
 
@@ -411,11 +411,9 @@ So it will be like this (2 / 6 are found in currDocIdxList, while 9 and 13 are n
 
   reorderedDocIdxList = [2, -1, 6, -1]
 
-At the same time, we maintain two lists: one is to record the uncached doc indices, and the other one to record the
-cached doc indices.
+At the same time, we will maintain a list to record the uncached doc indices, which we will deal with in step 2.
 
   uncachedDocIdxList = [9, 13]
-  isCached = [T, F, T, F]
 
 ==== Step 2 ====
 In this step, we want to put those uncached doc indices to the reorderedDocIdxList. This time we loop through the
@@ -427,6 +425,12 @@ either:
   reorderedDocIdxList = [2, 13, 9, 6] (using stack)
 
 Both are okay.
+
+Note that in the step, we will also record a list of "copy tasks" to indicate what should be copied from where to where
+(for those uncached doc indices) like this:
+
+  copyTasks = [(srcDocIdx=13, dstWokringIdx=1), (srcDocIdx=9, dstWokringIdx=2)] 
+  (assuming reorderedDocIdxList is [2, 13, 6, 9])
 
 ==== Final step ====
 Finally, we reassign the reorderedDocIdxList to the desiredDocIdxList. In the densification kernels, we will provide
