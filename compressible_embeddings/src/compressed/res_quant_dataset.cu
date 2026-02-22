@@ -1,22 +1,22 @@
+#include "common/memory_layout.hpp"
 #include "compressed/res_quant_dataset.hpp"
 #include "utils/util.hpp"
-#include "common/memory_layout.hpp"
 
 #include <algorithm>
-#include <sstream>
 #include <iostream>
+#include <sstream>
 
 // ============================================================================
 // Constructor
 // ============================================================================
 
 ResQuantDataset::ResQuantDataset(size_t numDocs,
-                             size_t globalEmbDim,
-                             size_t maxNumDocsInWorkingDataset,
-                             std::vector<CompressedPartitionConfig> compressedPartitionConfigs,
-                             size_t numBitsPerDim,
-                             const std::vector<std::vector<float>>& centroidEmbs,
-                             const std::vector<std::vector<float>>& centroidStdDevs)
+                                 size_t globalEmbDim,
+                                 size_t maxNumDocsInWorkingDataset,
+                                 std::vector<CompressedPartitionConfig> compressedPartitionConfigs,
+                                 size_t numBitsPerDim,
+                                 const std::vector<std::vector<float>>& centroidEmbs,
+                                 const std::vector<std::vector<float>>& centroidStdDevs)
     : CompressedEmbDataset(numDocs, globalEmbDim, {}, maxNumDocsInWorkingDataset)
     , m_numCentroids(centroidEmbs.size())
     , m_numBitsPerDim(numBitsPerDim)
@@ -53,7 +53,6 @@ ResQuantDataset::ResQuantDataset(size_t numDocs,
                               m_numCentroids * globalEmbDim * 2 * sizeof(T_EMB),
                               cudaMemcpyHostToDevice));
     }
-
 }
 
 // ============================================================================
@@ -69,13 +68,14 @@ size_t ResQuantDataset::getRqDimPerDoc() const { return m_rqDim; }
 // ============================================================================
 
 void ResQuantDataset::update(const std::vector<T_DOC_IDX>& docIdxList,
-                           const std::vector<std::vector<T_EMB>>& emb2D,
-                           const std::vector<int>& centroidIdxList)
+                             const std::vector<std::vector<T_EMB>>& emb2D,
+                             const std::vector<int>& centroidIdxList)
 {
     if (docIdxList.size() != centroidIdxList.size())
     {
         std::ostringstream oss;
-        oss << "docIdxList.size() (" << docIdxList.size() << ") != centroidIdxList.size() (" << centroidIdxList.size() << ")";
+        oss << "docIdxList.size() (" << docIdxList.size() << ") != centroidIdxList.size() (" << centroidIdxList.size()
+            << ")";
         throw std::runtime_error(oss.str());
     }
 
@@ -111,10 +111,8 @@ void ResQuantDataset::update(const std::vector<T_DOC_IDX>& docIdxList,
                           cudaMemcpyHostToDevice));
 
     // Copy residuals to device
-    CHECK_CUDA(cudaMemcpy(m_residual.data(),
-                          m_residualHost.data(),
-                          m_residual.getArraySizeInBytes(),
-                          cudaMemcpyHostToDevice));
+    CHECK_CUDA(
+        cudaMemcpy(m_residual.data(), m_residualHost.data(), m_residual.getArraySizeInBytes(), cudaMemcpyHostToDevice));
 }
 
 // ============================================================================
@@ -170,8 +168,8 @@ __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params
         int centroidIdx = params.d_centroidIdx[docIdx];
 
         // Get centroid value and stdDev
-        size_t centroidMemAddr = getMemAddrRowMajor(centroidIdx, globalEmbIdx * 2,
-                                                     params.numCentroids, params.globalEmbDim * 2);
+        size_t centroidMemAddr
+            = getMemAddrRowMajor(centroidIdx, globalEmbIdx * 2, params.numCentroids, params.globalEmbDim * 2);
         T_EMB centroid = params.d_centroidEmb[centroidMemAddr];
         float stdDev = static_cast<float>(params.d_centroidEmb[centroidMemAddr + 1]);
 
@@ -186,9 +184,9 @@ __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params
 
         // Write to working index
         size_t dstMemAddr = getMemAddrRowMajor(toScoreIdx,
-                                                localEmbIdx + params.embOffsetDst,
-                                                params.numDocsToDensify,
-                                                params.embDimWorking);
+                                               localEmbIdx + params.embOffsetDst,
+                                               params.numDocsToDensify,
+                                               params.embDimWorking);
         params.d_workingEmbDataset[dstMemAddr] = rst;
     }
 }
@@ -204,7 +202,8 @@ void ResQuantDataset::densifyCompressed(const DensificationTask& densificationTa
     for (const auto& compressedConfig : m_compressedPartitionConfigs)
     {
         // Compute the overlap between this compressed partition and the requested range.
-        size_t embDimBeginReal = std::max(densificationTask.globalEmbIdxBeginIncl, compressedConfig.getEmbDimBeginIncl());
+        size_t embDimBeginReal
+            = std::max(densificationTask.globalEmbIdxBeginIncl, compressedConfig.getEmbDimBeginIncl());
         size_t embDimEndReal = std::min(densificationTask.globalEmbIdxEndExcl, compressedConfig.getEmbDimEndExcl());
 
         if (embDimBeginReal >= embDimEndReal)
