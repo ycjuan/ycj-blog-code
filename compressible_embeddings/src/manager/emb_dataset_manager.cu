@@ -59,7 +59,7 @@ EmbDatasetManager::EmbDatasetManager(size_t numDocs,
     , m_workingEmbDataset(maxNumWorkingDocs, totalEmbDim)
     , m_docIdxListToDensify(maxNumWorkingDocs, "m_docIdxListToDensify")
     , m_hp_isCached(maxNumWorkingDocs, "m_hp_isCached")
-    , m_cachedWorkingIdxToDocIdx(maxNumWorkingDocs, kInvalidDocIdx)
+    , m_currDocIdxListInWorkingDataset(maxNumWorkingDocs, kInvalidDocIdx)
 {
     // --------------
     // We don't really need this sort, but we just do it for convenience.
@@ -206,19 +206,20 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
     return m_workingEmbDataset;
 }
 
-void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
+// Please check the example in the end of this file to understand the caching logic.
+void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& desiredDocIdxList)
 {
     // ------------
-    // Verify docIdxList is unique (only run in debug mode)
+    // Verify desiredDocIdxList is unique (only run in debug mode)
     if (kDebug)
     {
         std::unordered_set<T_DOC_IDX> seen;
-        for (T_DOC_IDX docIdx : docIdxList)
+        for (T_DOC_IDX docIdx : desiredDocIdxList)
         {
             if (!seen.insert(docIdx).second)
             {
                 std::ostringstream oss;
-                oss << "Duplicate docIdx in docIdxList: " << docIdx;
+                oss << "Duplicate docIdx in desiredDocIdxList: " << docIdx;
                 throw std::runtime_error(oss.str());
             }
         }
@@ -226,29 +227,32 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
 
     // ------------
     // First scan to find the cached working indices.
-    std::vector<T_DOC_IDX> reorderedDocIdxList(docIdxList.size(), kInvalidDocIdx);
-    std::stack<T_DOC_IDX> uncachedDocIdxList;
+    std::vector<T_DOC_IDX> reorderedDocIdxList(desiredDocIdxList.size(), kInvalidDocIdx);
+    std::stack<T_DOC_IDX> uncachedDocIndices;
+
+     // these two counters are for some sanity checks later. They will be ++ in step 1 and -- in step 2.
+     // At the end both should be 0.
     int cntCached = 0;
     int cntUncached = 0;
     {
         Timer timer;
         timer.tic();
-        for (T_DOC_IDX workingIdx = 0; workingIdx < docIdxList.size(); ++workingIdx)
+        for (T_DOC_IDX desiredWorkingIdx = 0; desiredWorkingIdx < desiredDocIdxList.size(); ++desiredWorkingIdx)
         {
-            T_DOC_IDX docIdx = docIdxList.at(workingIdx);
-            auto it = m_cachedDocIdxToWorkingIdx.find(docIdx);
-            if (it != m_cachedDocIdxToWorkingIdx.end() && it->second < docIdxList.size())
+            T_DOC_IDX desiredDocIdx = desiredDocIdxList.at(desiredWorkingIdx);
+            auto it = m_currDocIdxToWorkingIdx.find(desiredDocIdx);
+            if (it != m_currDocIdxToWorkingIdx.end() && it->second < desiredDocIdxList.size()) // "->second" is the "current working index"
             {
-                T_DOC_IDX cachedWorkingIdx = it->second;
-                reorderedDocIdxList.at(cachedWorkingIdx) = docIdx;
-                m_hp_isCached.data()[cachedWorkingIdx] = 1;
+                T_DOC_IDX currWorkingIdx = it->second;
+                reorderedDocIdxList.at(currWorkingIdx) = desiredDocIdx;
+                m_hp_isCached.data()[currWorkingIdx] = 1;
                 cntCached++;
             }
             else
             {
                 // Very important: if the cached working index is larger than the docIdxList.size(),
                 //                 it is still considered as uncached.
-                uncachedDocIdxList.push(docIdx);
+                uncachedDocIndices.push(desiredDocIdx);
                 cntUncached++;
             }
         }
@@ -260,10 +264,10 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     if (kDebug)
     {
         std::unordered_set<T_DOC_IDX> seenWorkingIdx;
-        for (T_DOC_IDX docIdx : docIdxList)
+        for (T_DOC_IDX docIdx : desiredDocIdxList)
         {
-            auto it = m_cachedDocIdxToWorkingIdx.find(docIdx);
-            if (it != m_cachedDocIdxToWorkingIdx.end() && it->second < docIdxList.size())
+            auto it = m_currDocIdxToWorkingIdx.find(docIdx);
+            if (it != m_currDocIdxToWorkingIdx.end() && it->second < desiredDocIdxList.size())
             {
                 if (!seenWorkingIdx.insert(it->second).second)
                 {
@@ -281,25 +285,39 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     {
         Timer timer;
         timer.tic();
-        for (T_DOC_IDX workingIdx = 0; workingIdx < docIdxList.size(); ++workingIdx)
+        for (T_DOC_IDX workingIdx = 0; workingIdx < reorderedDocIdxList.size(); ++workingIdx)
         {
-            if (reorderedDocIdxList.at(workingIdx) == kInvalidDocIdx)
+            if (reorderedDocIdxList.at(workingIdx) == kInvalidDocIdx) // It means this working index is an "empty slot"
             {
-                cntUncached--;
-                T_DOC_IDX uncachedDocIdx = uncachedDocIdxList.top();
+                // ---------
+                // Find a uncached doc index and put it in the empty slot, and then pop it
+                T_DOC_IDX uncachedDocIdx = uncachedDocIndices.top();
                 reorderedDocIdxList.at(workingIdx) = uncachedDocIdx;
-                uncachedDocIdxList.pop();
-                T_DOC_IDX oldDocIdx = m_cachedWorkingIdxToDocIdx.at(workingIdx);
+                uncachedDocIndices.pop();
+
+                // ---------
+                // Find which doc this working index is currently pointing to, and remove it from the m_currDocIdxToWorkingIdx map
+                T_DOC_IDX oldDocIdx = m_currDocIdxListInWorkingDataset.at(workingIdx);
                 if (oldDocIdx != kInvalidDocIdx)
                 {
-                    m_cachedDocIdxToWorkingIdx.erase(oldDocIdx);
+                    m_currDocIdxToWorkingIdx.erase(oldDocIdx);
                 }
-                m_cachedDocIdxToWorkingIdx[uncachedDocIdx] = workingIdx;
-                m_cachedWorkingIdxToDocIdx.at(workingIdx) = uncachedDocIdx;
+
+                // ---------
+                // Update the m_currDocIdxToWorkingIdx to make uncachedDocIdx point to this working index
+                // Also update the m_currDocIdxInWorkingDataset to make this working index point to uncachedDocIdx
+                m_currDocIdxToWorkingIdx[uncachedDocIdx] = workingIdx;
+                m_currDocIdxListInWorkingDataset.at(workingIdx) = uncachedDocIdx;
                 m_hp_isCached.data()[workingIdx] = 0;
+
+                // ---------
+                // Decrease the counter - meaning "we have dealt with one more uncached doc index"
+                cntUncached--;
             }
-            else
+            else // It means this working index is already occupied (i.e., cached)
             {
+                // ---------
+                // Decrease the counter - meaning "we have seen one more cached doc index"
                 cntCached--;
             }
         }
@@ -309,10 +327,10 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     // ------------
     // Verifications
     {
-        if (!uncachedDocIdxList.empty())
+        if (!uncachedDocIndices.empty())
         {
             std::ostringstream oss;
-            oss << "Uncached doc indices are not empty: " << uncachedDocIdxList.size();
+            oss << "Uncached doc indices are not empty: " << uncachedDocIndices.size();
             throw std::runtime_error(oss.str());
         }
         if (cntCached != 0)
@@ -334,7 +352,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     {
         Timer timer;
         timer.tic();
-        docIdxList = reorderedDocIdxList;
+        desiredDocIdxList = reorderedDocIdxList;
         m_lastTimeRecord.cacheReassignMs += timer.tocMs();
     }
 }
@@ -344,25 +362,25 @@ Let's say we have the following densification task:
   desiredDocIdxList = [2, 6, 9, 13]
 
 And in the current WorkingEmbDataset, we have the following doc indices (here we assume maxNumWorkingDocs = 5)
-  currentDocIdxList = [2, 5, 6, 10, 13]
+  currDocIdxList = [2, 5, 6, 10, 13]
 
 Naively thinking, you may think all 2, 6, 13 are already cached (YAY!). Unfortunately, it is not the case.
-In this example, only 2 is cached. 6 and 13 are not cached because they are at different positions in the working
-dataset. (In desiredDocIdxList, 6 is at position 1, while in currentDocIdxList, 6 is at position 2.)
+In this example, only 2 is cached. 6 and 13 are not cached because they are at different positions in the
+WorkingEmbDataset. (In desiredDocIdxList, 6 is at position 1, while in currDocIdxList, 6 is at position 2.)
 
-That is to say, the precise definition of "cached" is NOT just "the desired doc is in the working dataset". It's more
-strict than that - it has to be "the desired doc is in the working dataset AND at the desired position"
+That is to say, the precise definition of "cached" is NOT just "the desired doc is in the WorkingEmbDataset". It's more
+strict than that - it has to be "the desired doc is in the WorkingEmbDataset AND at the desired position"
 
-The naive solution is to just copy the embeddings of doc 6 from position 2 to position 1 in WorkingEmbDataset. However,
-such copy will take time. Is there a way to avoid copying doc 6 at all?
+The naive solution is to just copy the embeddings of doc 6 from position 2 to position 1 in the WorkingEmbDataset.
+However, such copy will take time. Is there a way to avoid copying doc 6 at all?
 
-Yes, the answer is we alter desiredDocIdxList.
-So basically, in this example we want to re-order desiredDocIdxList to [2, 9, 6, 13]. This way, we have both doc 2 and 6
-cached.
+Yes, the answer is we alter the desiredDocIdxList.
+So basically, in this example we want to re-order the desiredDocIdxList to [2, 9, 6, 13]. This way, we have both doc 2
+and 6 cached.
 
-It is important to note that doc 13 will never be cached. The reason is that in currentDocIdxList, doc 13 is at position
-4, but the length of desiredDocIdxList is 4. So there is no way we can re-order desiredDocIdxList so that doc 13 is at
-the position 4.
+It is important to note that doc 13 will never be cached. The reason is that in currDocIdxList, doc 13 is at position
+4, but the length of desiredDocIdxList is 4. So there is no way we can re-order the desiredDocIdxList so that doc 13 is
+at the position 4.
 
 In order to achieve such re-ordering, we will do it in two steps:
 
@@ -371,13 +389,16 @@ We create a new reorderedDocIdxList with -1 as initial value and has the same le
 
   reorderedDocIdxList = [-1, -1, -1, -1]
 
-The we loop through desiredDocIdxList, and for each docIdx, we know where the corresponding working index is in
-currentDocIdxList. So it will be like this:
+The we loop through desiredDocIdxList, and for each docIdx, we know 
+  1) if it is in currDocIdxList, and if yes,
+  2) where it is in currDocIdxList,
+
+So it will be like this (2 / 6 are found in currDocIdxList, while 9 and 13 are not):
 
   reorderedDocIdxList = [2, -1, 6, -1]
 
 At the same time, we maintain two lists: one is to record the uncached doc indices, and the other one to record the
-cached working indices.
+cached doc indices.
 
   uncachedDocIdxList = [9, 13]
   isCached = [T, F, T, F]
@@ -390,6 +411,8 @@ either:
 
   reorderedDocIdxList = [2, 9, 6, 13] (using queue)
   reorderedDocIdxList = [2, 13, 9, 6] (using stack)
+
+Both are okay.
 
 ==== Final step ====
 Finally, we reassign the reorderedDocIdxList to the desiredDocIdxList. In the densification kernels, we will provide
