@@ -1,15 +1,15 @@
+#include <algorithm>
 #include <cassert>
 #include <iomanip>
-#include <random>
 #include <iostream>
-#include <unordered_set>
-#include <algorithm>
+#include <random>
 #include <tuple>
+#include <unordered_set>
 
 #include "manager/emb_dataset_manager.hpp"
 #include "resident/resident_partition_config.hpp"
-#include "working/working_emb_dataset.hpp"
 #include "utils/util.hpp"
+#include "working/working_emb_dataset.hpp"
 
 constexpr size_t kNumDocs = 50000;
 constexpr size_t kTotalEmbDim = 128;
@@ -71,11 +71,13 @@ std::vector<T_DOC_IDX> genNextDocIdxList(const std::vector<T_DOC_IDX>& current, 
     size_t overlapCount = 0;
     for (T_DOC_IDX idx : nextSet)
     {
-        if (prevSet.count(idx)) overlapCount++;
+        if (prevSet.count(idx))
+        {
+            overlapCount++;
+        }
     }
     float actualCacheRate = static_cast<float>(overlapCount) / kNumDocsToDensify;
-    std::cout << std::fixed << std::setprecision(3)
-              << "Trial " << trial << " cache rate: " << actualCacheRate
+    std::cout << std::fixed << std::setprecision(3) << "Trial " << trial << " cache rate: " << actualCacheRate
               << " (expected >= " << kCacheRate << ", overlap " << overlapCount << " / " << kNumDocsToDensify << ")\n";
     assert(overlapCount >= numToKeep && "Cache rate verification failed: fewer overlapping docs than expected");
 
@@ -114,10 +116,7 @@ std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> genR
     return std::make_pair(centroidEmbs, centroidStdDevs);
 }
 
-bool isCompressedDim(size_t embIdx)
-{
-    return (embIdx >= 48 && embIdx < 64) || embIdx >= 96;
-}
+bool isCompressedDim(size_t embIdx) { return (embIdx >= 48 && embIdx < 64) || embIdx >= 96; }
 
 void verifyDensification(const WorkingEmbDataset& workingEmbDataset,
                          const std::vector<T_DOC_IDX>& docIdxList,
@@ -136,7 +135,10 @@ void verifyDensification(const WorkingEmbDataset& workingEmbDataset,
     {
         for (size_t embIdx = kDensifiedEmbIdxBeginIncl; embIdx < kDensifiedEmbIdxEndExcl; ++embIdx)
         {
-            size_t memAddr = getMemAddrRowMajor(docIdx, embIdx - kDensifiedEmbIdxBeginIncl, kNumDocsToDensify, kDensifiedEmbIdxEndExcl - kDensifiedEmbIdxBeginIncl);
+            size_t memAddr = getMemAddrRowMajor(docIdx,
+                                                embIdx - kDensifiedEmbIdxBeginIncl,
+                                                kNumDocsToDensify,
+                                                kDensifiedEmbIdxEndExcl - kDensifiedEmbIdxBeginIncl);
             float val = static_cast<float>(v_workingEmbDataset.at(memAddr));
             float ref = static_cast<float>(emb2D.at(docIdxList.at(docIdx)).at(embIdx));
 
@@ -148,8 +150,8 @@ void verifyDensification(const WorkingEmbDataset& workingEmbDataset,
                 if (error > 1.1f * kCentroidStdDev)
                 {
                     std::ostringstream oss;
-                    oss << "Compressed dim: docIdx = " << docIdx << ", embIdx = " << embIdx
-                        << ", val(" << val << ") != ref(" << ref << ")"
+                    oss << "Compressed dim: docIdx = " << docIdx << ", embIdx = " << embIdx << ", val(" << val
+                        << ") != ref(" << ref << ")"
                         << ", error = " << error << ", threshold = " << kCentroidStdDev;
                     throw std::runtime_error(oss.str());
                 }
@@ -159,8 +161,8 @@ void verifyDensification(const WorkingEmbDataset& workingEmbDataset,
                 if (val != ref)
                 {
                     std::ostringstream oss;
-                    oss << "Resident dim: docIdx = " << docIdx << ", embIdx = " << embIdx
-                        << ", val(" << val << ") != ref(" << ref << ")"
+                    oss << "Resident dim: docIdx = " << docIdx << ", embIdx = " << embIdx << ", val(" << val
+                        << ") != ref(" << ref << ")"
                         << ", memAddr: " << memAddr;
                     throw std::runtime_error(oss.str());
                 }
@@ -168,8 +170,9 @@ void verifyDensification(const WorkingEmbDataset& workingEmbDataset,
         }
     }
 
-    std::cout << std::fixed << std::setprecision(6) << "Compressed dim avg error: " << compressedErrorSum / compressedCount
-              << " (over " << compressedCount << " samples)\n"
+    std::cout << std::fixed << std::setprecision(6)
+              << "Compressed dim avg error: " << compressedErrorSum / compressedCount << " (over " << compressedCount
+              << " samples)\n"
               << "!!!!!!!!!!!! Densification verified successfully !!!!!!!!!!!!\n";
 }
 
@@ -182,7 +185,7 @@ int main()
 
     // ------------------
     // Prepare the data
-    
+
     // --------
     // Generate the centroids
     auto [centroidEmbs, centroidStdDevs] = genRandCentroids();
@@ -211,16 +214,18 @@ int main()
     for (int trial = -3; trial < kNumDensifyTrials; ++trial)
     {
         if (trial == 0)
+        {
             embDatasetManager.resetTimeRecord();
+        }
 
         Timer timer;
         std::cout << "===== Trial " << trial << " =====" << std::endl;
 
         timer.tic();
         const WorkingEmbDataset& workingEmbDataset = embDatasetManager.densify(docIdxListToDensify,
-                                                                         kDensifiedEmbIdxBeginIncl,
-                                                                         kDensifiedEmbIdxEndExcl,
-                                                                         MemLayout::ROW_MAJOR);
+                                                                               kDensifiedEmbIdxBeginIncl,
+                                                                               kDensifiedEmbIdxEndExcl,
+                                                                               MemLayout::ROW_MAJOR);
 
         float timeMs = timer.tocMs();
         std::cout << std::fixed << std::setprecision(3) << "Densification time: " << timeMs << " ms\n";
