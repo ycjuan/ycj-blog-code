@@ -26,7 +26,7 @@ constexpr float kCentroidMean = 0.0f;
 constexpr float kCacheRate = 0.9f;
 constexpr int kNumDensifyTrials = 20;
 
-std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<int>> populateRandomEmbDataset(
+std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<int>> genRandDocData(
     const std::vector<std::vector<float>>& centroidEmbs,
     const std::vector<std::vector<float>>& centroidStdDevs)
 {
@@ -146,20 +146,33 @@ void verifyDensification(const WorkingEmbDataset& workingEmbDataset,
 
 int main()
 {
-    int deviceCount = 0;
-    cudaError_t err = cudaGetDeviceCount(&deviceCount);
-    if (err != cudaSuccess || deviceCount == 0)
+    if (!hasCudaDevice())
     {
-        std::cout << "!!!!!!!!!! No CUDA device found or error occurred: " << cudaGetErrorString(err) << std::endl;
         return 0;
     }
 
+    // ------------------
+    // Prepare the data
+    
+    // --------
+    // Generate the centroids
     auto [centroidEmbs, centroidStdDevs] = genRandCentroids();
 
-    EmbDatasetManager embDatasetManager(kNumDocs, kTotalEmbDim, kResidentPartitionConfigs, kMaxWorkingSetSize,
-                                    kNumBitsPerDim, centroidEmbs, centroidStdDevs);
+    // --------
+    // Generate 2D embeddings and centroid indices
+    auto [docIdxList, emb2D, centroidIdxList] = genRandDocData(centroidEmbs, centroidStdDevs);
 
-    auto [docIdxList, emb2D, centroidIdxList] = populateRandomEmbDataset(centroidEmbs, centroidStdDevs);
+    // ------------------
+    // Initialize the EmbDatasetManager
+    EmbDatasetManager embDatasetManager(kNumDocs,
+                                        kTotalEmbDim,
+                                        kResidentPartitionConfigs,
+                                        kMaxWorkingSetSize,
+                                        kNumBitsPerDim,
+                                        centroidEmbs,
+                                        centroidStdDevs);
+    // --------
+    // Ingest the data into the EmbDatasetManager
     embDatasetManager.update(docIdxList, emb2D);
 
     std::default_random_engine trialGenerator(123);

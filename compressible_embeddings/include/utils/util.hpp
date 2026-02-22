@@ -34,6 +34,18 @@ private:
     std::chrono::high_resolution_clock::time_point start_;
 };
 
+inline bool hasCudaDevice()
+{
+    int deviceCount = 0;
+    cudaError_t err = cudaGetDeviceCount(&deviceCount);
+    if (err != cudaSuccess || deviceCount == 0)
+    {
+        std::cout << "!!!!!!!!!! No CUDA device found or error occurred: " << cudaGetErrorString(err) << std::endl;
+        return false;
+    }
+    return true;
+}
+
 inline void printDeviceInfo()
 {
     using namespace std;
