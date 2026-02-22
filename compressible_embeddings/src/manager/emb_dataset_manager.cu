@@ -24,6 +24,7 @@ void TimeRecord::print() const
               << "          [cache] first scan: " << cacheFirstScanMs / n << " ms avg\n"
               << "          [cache] second scan: " << cacheSecondScanMs / n << " ms avg\n"
               << "          [cache] reassign: " << cacheReassignMs / n << " ms avg\n"
+              << "          [cache] copy tasks: " << cacheCopyTasksMs / n << " ms avg\n"
               << "[densify] cudaMemcpy docIdxList H2D: " << densifyMemcpyH2DMs / n << " ms avg\n";
     for (size_t i = 0; i < densifyResidentPartitionMs.size(); ++i)
     {
@@ -58,7 +59,7 @@ EmbDatasetManager::EmbDatasetManager(size_t numDocs,
                         centroidStdDevs)
     , m_workingEmbDataset(maxNumWorkingDocs, totalEmbDim)
     , m_docIdxListToDensify(maxNumWorkingDocs, "m_docIdxListToDensify")
-    , m_hp_isCached(maxNumWorkingDocs, "m_hp_isCached")
+    , m_d_copyTasks(maxNumWorkingDocs, "m_d_copyTasks")
     , m_currDocIdxListInWorkingDataset(maxNumWorkingDocs, kInvalidDocIdx)
 {
     // --------------
@@ -169,11 +170,12 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
     DensificationTask densificationTask;
     {
         densificationTask.numDocsToDensify = docIdxList.size();
+        densificationTask.numCopyTasks = m_numCopyTasks;
         densificationTask.globalEmbIdxBeginIncl = embIdxBeginIncl;
         densificationTask.globalEmbIdxEndExcl = embIdxEndExcl;
         densificationTask.d_workingEmbDataset = m_workingEmbDataset.data();
         densificationTask.d_docIdxList = m_docIdxListToDensify.data();
-        densificationTask.hp_isCached = m_hp_isCached.data();
+        densificationTask.d_copyTasks = m_d_copyTasks.data();
     }
 
     // --------------
@@ -231,6 +233,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& desiredDocIdxList)
     // First scan to find the cached working indices.
     std::vector<T_DOC_IDX> reorderedDocIdxList(desiredDocIdxList.size(), kInvalidDocIdx);
     std::stack<T_DOC_IDX> uncachedDocIndices;
+    std::vector<CopyTask> copyTasks;
 
      // these two counters are for some sanity checks later. They will be ++ in step 1 and -- in step 2.
      // At the end both should be 0.
@@ -247,7 +250,6 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& desiredDocIdxList)
             {
                 T_DOC_IDX currWorkingIdx = it->second;
                 reorderedDocIdxList.at(currWorkingIdx) = desiredDocIdx;
-                m_hp_isCached.data()[currWorkingIdx] = 1;
                 cntCached++;
             }
             else
@@ -310,7 +312,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& desiredDocIdxList)
                 // Also update the m_currDocIdxInWorkingDataset to make this working index point to uncachedDocIdx
                 m_currDocIdxToWorkingIdx[uncachedDocIdx] = workingIdx;
                 m_currDocIdxListInWorkingDataset.at(workingIdx) = uncachedDocIdx;
-                m_hp_isCached.data()[workingIdx] = 0;
+                copyTasks.push_back(CopyTask { uncachedDocIdx, workingIdx });
 
                 // ---------
                 // Decrease the counter - meaning "we have dealt with one more uncached doc index"
@@ -356,6 +358,16 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& desiredDocIdxList)
         timer.tic();
         desiredDocIdxList = reorderedDocIdxList;
         m_lastTimeRecord.cacheReassignMs += timer.tocMs();
+    }
+
+    // ------------
+    // Copy the copy tasks to the device.
+    {
+        Timer timer;
+        timer.tic();
+        CHECK_CUDA(cudaMemcpy(m_d_copyTasks.data(), copyTasks.data(), copyTasks.size() * sizeof(CopyTask), cudaMemcpyHostToDevice));
+        m_numCopyTasks = copyTasks.size();
+        m_lastTimeRecord.cacheCopyTasksMs += timer.tocMs();
     }
 }
 

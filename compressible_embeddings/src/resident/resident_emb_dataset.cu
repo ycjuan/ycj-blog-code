@@ -32,24 +32,21 @@ struct DensifyFromResidentKernelParams
 
     // Shared
     int embDimToDensify;
-    T_DOC_IDX* d_docIdxMap;
-    int8_t* hp_isCached;
+    CopyTask* d_copyTasks;
+    int numCopyTasks;
 };
 
 __global__ void densifyFromResidentKernel(DensifyFromResidentKernelParams params)
 {
     size_t taskIdx = blockIdx.x * blockDim.x + threadIdx.x;
-    size_t docIdxDst = taskIdx / params.embDimToDensify;
+    size_t copyIdx = taskIdx / params.embDimToDensify;
     size_t embIdx = taskIdx % params.embDimToDensify;
 
-    if (docIdxDst < params.numDocsToDensify)
+    if (copyIdx < params.numCopyTasks)
     {
-        if (params.hp_isCached[docIdxDst])
-        {
-            return;
-        }
-
-        T_DOC_IDX docIdxSrc = params.d_docIdxMap[docIdxDst];
+        CopyTask task = params.d_copyTasks[copyIdx];
+        T_DOC_IDX docIdxSrc = task.srcDocIdx;
+        T_DOC_IDX docIdxDst = task.dstDocIdx;
 
         size_t memAddrSrc = getMemAddrRowMajor(docIdxSrc,
                                                embIdx + params.embOffsetSrc,
@@ -74,7 +71,6 @@ void ResidentEmbDataset::densify(const DensificationTask& densificationTask) con
     // Prepare the parameters for the kernel.
     DensifyFromResidentKernelParams params;
     params.d_residentEmbDataset = m_residentEmbDataset.data();
-    params.d_docIdxMap = densificationTask.d_docIdxList;
     params.d_workingEmbDataset = densificationTask.d_workingEmbDataset;
     params.numDocsTotal = m_numDocs;
     params.residentPartitionConfig = m_residentPartitionConfig;
@@ -83,11 +79,13 @@ void ResidentEmbDataset::densify(const DensificationTask& densificationTask) con
     params.embDimToDensify = embDimEndExclReal - embDimBeginInclReal;
     params.embOffsetSrc = embDimBeginInclReal - m_residentPartitionConfig.getEmbDimBeginIncl();
     params.embOffsetDst = embDimBeginInclReal - densificationTask.globalEmbIdxBeginIncl;
-    params.hp_isCached = densificationTask.hp_isCached;
+    params.d_copyTasks = densificationTask.d_copyTasks;
+    params.numCopyTasks = densificationTask.numCopyTasks;
     // -------------
     // Launch the kernel.
+    if (params.numCopyTasks == 0) return;
     constexpr size_t kBlockSize = 1024;
-    size_t numTasks = params.numDocsToDensify * params.embDimToDensify;
+    size_t numTasks = params.numCopyTasks * params.embDimToDensify;
     size_t gridSize = (numTasks + kBlockSize - 1) / kBlockSize;
     densifyFromResidentKernel<<<gridSize, kBlockSize, 0, m_cudaStreamRead.get()>>>(params);
     CHECK_CUDA(cudaStreamSynchronize(m_cudaStreamRead.get()));

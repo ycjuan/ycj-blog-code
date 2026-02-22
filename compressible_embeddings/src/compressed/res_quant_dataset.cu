@@ -162,25 +162,24 @@ struct DensifyFromResQuantKernelParams
     size_t compressedEmbDimEnd;
     size_t embOffsetDst;
 
-    int8_t* hp_isCached;
+    CopyTask* d_copyTasks;
+    int numCopyTasks;
 };
 
 __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params)
 {
     size_t tidx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
     size_t compressedEmbDim = params.compressedEmbDimEnd - params.compressedEmbDimBegin;
-    int toScoreIdx = tidx / compressedEmbDim;
+    int copyIdx = tidx / compressedEmbDim;
     int localEmbIdx = tidx % compressedEmbDim;
 
-    if (toScoreIdx < params.numDocsToDensify)
+    if (copyIdx < params.numCopyTasks)
     {
-        if (params.hp_isCached[toScoreIdx])
-        {
-            return;
-        }
+        CopyTask task = params.d_copyTasks[copyIdx];
+        T_DOC_IDX docIdx = task.srcDocIdx;
+        int toScoreIdx = task.dstDocIdx;
 
         int globalEmbIdx = localEmbIdx + params.compressedEmbDimBegin;
-        T_DOC_IDX docIdx = params.d_docIdxList[toScoreIdx];
         int centroidIdx = params.d_centroidIdx[docIdx];
 
         // Get centroid value and stdDev
@@ -245,10 +244,12 @@ void ResQuantDataset::densifyCompressed(const DensificationTask& densificationTa
         params.compressedEmbDimBegin = embDimBeginReal;
         params.compressedEmbDimEnd = embDimEndReal;
         params.embOffsetDst = embDimBeginReal - densificationTask.globalEmbIdxBeginIncl;
-        params.hp_isCached = densificationTask.hp_isCached;
+        params.d_copyTasks = densificationTask.d_copyTasks;
+        params.numCopyTasks = densificationTask.numCopyTasks;
 
+        if (densificationTask.numCopyTasks == 0) continue;
         constexpr size_t kBlockSize = 1024;
-        size_t numTasks = densificationTask.numDocsToDensify * compressedEmbDim;
+        size_t numTasks = densificationTask.numCopyTasks * compressedEmbDim;
         size_t gridSize = (numTasks + kBlockSize - 1) / kBlockSize;
         densifyFromResQuantKernel<<<gridSize, kBlockSize>>>(params);
         CHECK_CUDA(cudaGetLastError());
