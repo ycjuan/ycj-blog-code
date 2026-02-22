@@ -16,7 +16,6 @@
 struct TimeRecord
 {
     // cache() segments
-    float cacheTotalMs = 0.0f;
     float cacheFirstScanMs = 0.0f;
     float cacheSecondScanMs = 0.0f;
     float cacheReassignMs = 0.0f;
@@ -36,7 +35,8 @@ struct TimeRecord
         float n = static_cast<float>(count);
         std::cout << std::fixed << std::setprecision(3) << "[densify] count: " << count << "\n"
                   << "[densify] total: " << densifyTotalMs / n << " ms avg\n"
-                  << "[densify] cache: " << densifyCacheMs / n << " ms avg (total: " << cacheTotalMs / n << " ms avg)\n"
+                  << "[densify] total - cache: " << (densifyTotalMs - densifyCacheMs) / n << " ms avg\n"
+                  << "[densify] cache: " << densifyCacheMs / n << " ms avg\n"
                   << "          [cache] first scan: " << cacheFirstScanMs / n << " ms avg\n"
                   << "          [cache] second scan: " << cacheSecondScanMs / n << " ms avg\n"
                   << "          [cache] reassign: " << cacheReassignMs / n << " ms avg\n"
