@@ -68,8 +68,12 @@ public:
                                    size_t globalEmbIdxEndExcl,
                                    MemLayout memLayout);
 
-    const TimeRecord& getLastTimeRecord() const { return m_lastTimeRecord; }
-    void resetTimeRecord() { m_lastTimeRecord = TimeRecord{}; }
+    TimeRecord getLastTimeRecordAndReset()
+    {
+        TimeRecord record = m_lastTimeRecord;
+        m_lastTimeRecord = TimeRecord{};
+        return record;
+    }
 
 protected:
     // General meta data

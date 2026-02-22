@@ -215,7 +215,7 @@ int main()
     {
         if (trial == 0)
         {
-            embDatasetManager.resetTimeRecord();
+            embDatasetManager.getLastTimeRecordAndReset();
         }
 
         Timer timer;
@@ -236,7 +236,7 @@ int main()
     }
 
     std::cout << "\n===== Time Record =====\n";
-    embDatasetManager.getLastTimeRecord().print();
+    embDatasetManager.getLastTimeRecordAndReset().print();
 
     return 0;
 }
