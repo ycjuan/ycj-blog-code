@@ -35,13 +35,13 @@ protected:
     size_t m_totalEmbDim;
     size_t m_maxNumWorkingDocs;
 
-    // Resident index
+    // Resident datasets
     std::vector<ResidentEmbDataset> m_residentEmbDatasets;
 
-    // Compressed index (residual quantization)
+    // Compressed dataset (residual quantization)
     ResQuantDataset m_resQuantDataset;
 
-    // Working set index
+    // Working set dataset
     WorkingEmbDataset m_workingEmbDataset;
 
     // Densification
