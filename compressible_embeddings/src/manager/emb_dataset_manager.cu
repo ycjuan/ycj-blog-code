@@ -92,6 +92,8 @@ EmbDatasetManager::EmbDatasetManager(size_t numDocs,
 
 void EmbDatasetManager::update(const std::vector<T_DOC_IDX>& docIdxList, const std::vector<std::vector<T_EMB>>& emb2D)
 {
+    // --------------
+    // Some input sanity checks.
     if (docIdxList.size() > m_numDocs)
     {
         std::ostringstream oss;
@@ -99,13 +101,16 @@ void EmbDatasetManager::update(const std::vector<T_DOC_IDX>& docIdxList, const s
         throw std::runtime_error(oss.str());
     }
 
+    // --------------
+    // Update the resident datasets.
     for (size_t residentPartitionIdx = 0; residentPartitionIdx < m_residentEmbDatasets.size(); ++residentPartitionIdx)
     {
         auto& embDataset = m_residentEmbDatasets[residentPartitionIdx];
         embDataset.update(docIdxList, emb2D);
     }
 
-    // Compute nearest centroid for each doc (L2 distance over all dims)
+    // --------------
+    // Centroid assignment
     std::vector<int> centroidIdxList(docIdxList.size());
     size_t numCentroids = m_centroidEmbs.size();
     for (size_t i = 0; i < docIdxList.size(); ++i)
@@ -129,6 +134,8 @@ void EmbDatasetManager::update(const std::vector<T_DOC_IDX>& docIdxList, const s
         centroidIdxList[i] = bestCentroid;
     }
 
+    // --------------
+    // Update the compressed dataset.
     m_resQuantDataset.update(docIdxList, emb2D, centroidIdxList);
 }
 
