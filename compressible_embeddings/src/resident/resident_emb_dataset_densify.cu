@@ -23,9 +23,9 @@ struct DensifyFromResidentKernelParams
 
 __global__ void densifyFromResidentKernel(DensifyFromResidentKernelParams params)
 {
-    size_t taskIdx = blockIdx.x * blockDim.x + threadIdx.x;
-    size_t copyTaskIdx = taskIdx / params.embDimToCopy;
-    size_t embIdx = taskIdx % params.embDimToCopy;
+    size_t cudaTaskId = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t copyTaskIdx = cudaTaskId / params.embDimToCopy;
+    size_t embIdx = cudaTaskId % params.embDimToCopy;
 
     if (copyTaskIdx < params.numCopyTasks)
     {
