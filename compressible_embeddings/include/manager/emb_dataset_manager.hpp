@@ -59,8 +59,6 @@ protected:
     std::vector<T_DOC_IDX> m_cachedWorkingIdxToDocIdx;
     void cache(std::vector<T_DOC_IDX>& docIdxList);
     CudaHostArray<int8_t> m_hp_isCached;
-    std::vector<T_DOC_IDX> m_reorderedDocIdxList;
-    std::vector<T_DOC_IDX> m_uncachedDocIdxList;
 };
 
 /*

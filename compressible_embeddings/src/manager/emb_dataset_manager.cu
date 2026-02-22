@@ -35,7 +35,6 @@ EmbDatasetManager::EmbDatasetManager(size_t numDocs,
     , m_centroidEmbs(centroidEmbs)
     , m_hp_isCached(maxNumWorkingDocs, "m_hp_isCached")
     , m_cachedWorkingIdxToDocIdx(maxNumWorkingDocs, kInvalidDocIdx)
-    , m_reorderedDocIdxList(maxNumWorkingDocs, kInvalidDocIdx)
 {
     std::sort(residentPartitionConfigs.begin(), residentPartitionConfigs.end());
 
@@ -179,14 +178,8 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     // ------------
     // First scan to find the cached working indices.
     timer.tic();
-    std::fill(m_reorderedDocIdxList.begin(), m_reorderedDocIdxList.begin() + docIdxList.size(), kInvalidDocIdx);
-    // m_uncachedDocIdxList is a queue; ensure it's empty before use.
-    if (!m_uncachedDocIdxList.empty())
-    {
-        std::ostringstream oss;
-        oss << "m_uncachedDocIdxList is not empty: " << m_uncachedDocIdxList.size();
-        throw std::runtime_error(oss.str());
-    }
+    std::vector<T_DOC_IDX> reorderedDocIdxList(docIdxList.size(), kInvalidDocIdx);
+    std::queue<T_DOC_IDX> uncachedDocIdxList;
     int cnt1 = 0;
     int cnt2 = 0;
     for (T_DOC_IDX workingIdx = 0; workingIdx < docIdxList.size(); ++workingIdx)
@@ -196,7 +189,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
         if (it != m_cachedDocIdxToWorkingIdx.end() && it->second < docIdxList.size())
         {
             T_DOC_IDX cachedWorkingIdx = it->second;
-            m_reorderedDocIdxList[cachedWorkingIdx] = docIdx;
+            reorderedDocIdxList[cachedWorkingIdx] = docIdx;
             m_hp_isCached.data()[cachedWorkingIdx] = 1;
             cnt1++;
         }
@@ -204,7 +197,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
         {
             // Very important: if the cached working index is larger than the docIdxList.size(),
             //                 it is still considered as uncached.
-            m_uncachedDocIdxList.push_back(docIdx);
+            uncachedDocIdxList.push(docIdx);
             cnt2++;
         }
     }
@@ -240,12 +233,12 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     int cnt4 = 0;
     for (T_DOC_IDX workingIdx = 0; workingIdx < docIdxList.size(); ++workingIdx)
     {
-        if (m_reorderedDocIdxList[workingIdx] == kInvalidDocIdx)
+        if (reorderedDocIdxList[workingIdx] == kInvalidDocIdx)
         {
             cnt3++;
-            T_DOC_IDX uncachedDocIdx = m_uncachedDocIdxList.back();
-            m_reorderedDocIdxList[workingIdx] = uncachedDocIdx;
-            m_uncachedDocIdxList.pop_back();
+            T_DOC_IDX uncachedDocIdx = uncachedDocIdxList.front();
+            reorderedDocIdxList[workingIdx] = uncachedDocIdx;
+            uncachedDocIdxList.pop();
             T_DOC_IDX oldDocIdx = m_cachedWorkingIdxToDocIdx[workingIdx];
             if (oldDocIdx != kInvalidDocIdx)
             {
@@ -263,16 +256,17 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     printf("    [cache] second scan (evicted=%d, kept=%d): %.3f ms\n", cnt3, cnt4, timer.tocMs());
 
     // ------------
-    // Verify the m_uncachedDocIdxList is empty.
-    if (!m_uncachedDocIdxList.empty())
+    // Verify the uncachedDocIdxList is empty.
+    if (!uncachedDocIdxList.empty())
     {
         std::ostringstream oss;
-        oss << "Uncached doc indices are not empty: " << m_uncachedDocIdxList.size();
+        oss << "Uncached doc indices are not empty: " << uncachedDocIdxList.size();
         throw std::runtime_error(oss.str());
     }
+
     // ------------
-    // Reassign the m_reorderedDocIdxList to the docIdxList.
+    // Reassign the reorderedDocIdxList to the docIdxList.
     timer.tic();
-    docIdxList.assign(m_reorderedDocIdxList.begin(), m_reorderedDocIdxList.begin() + docIdxList.size());
+    docIdxList = reorderedDocIdxList;
     printf("    [cache] reassign: %.3f ms\n", timer.tocMs());
 }
