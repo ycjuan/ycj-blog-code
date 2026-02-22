@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "common/typedef.hpp"
-#include "compressed/res_quant_dataset.hpp"
+#include "compressed/res_quant/res_quant_dataset.hpp"
 #include "resident/resident_emb_dataset.hpp"
 #include "resident/resident_partition_config.hpp"
 #include "utils/cuda_raii.hpp"
