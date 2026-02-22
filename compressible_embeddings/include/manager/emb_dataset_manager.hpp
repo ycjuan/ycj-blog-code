@@ -1,9 +1,10 @@
 #pragma once
 
 #include <cuda_bf16.h>
+#include <iomanip>
+#include <iostream>
 #include <vector>
 #include <unordered_map>
-#include <string>
 
 #include "common/typedef.hpp"
 #include "compressed/res_quant_dataset.hpp"
@@ -30,17 +31,18 @@ struct TimeRecord
 
     void print() const
     {
-        printf("  [densify] total: %.3f ms\n", densifyTotalMs);
-        printf("  [densify] cache: %.3f ms (total: %.3f ms)\n", densifyCacheMs, cacheTotalMs);
-        printf("    [cache] first scan: %.3f ms\n", cacheFirstScanMs);
-        printf("    [cache] second scan: %.3f ms\n", cacheSecondScanMs);
-        printf("    [cache] reassign: %.3f ms\n", cacheReassignMs);
-        printf("  [densify] cudaMemcpy docIdxList H2D: %.3f ms\n", densifyMemcpyH2DMs);
+        std::cout << std::fixed << std::setprecision(3)
+                  << "  [densify] total: " << densifyTotalMs << " ms\n"
+                  << "  [densify] cache: " << densifyCacheMs << " ms (total: " << cacheTotalMs << " ms)\n"
+                  << "    [cache] first scan: " << cacheFirstScanMs << " ms\n"
+                  << "    [cache] second scan: " << cacheSecondScanMs << " ms\n"
+                  << "    [cache] reassign: " << cacheReassignMs << " ms\n"
+                  << "  [densify] cudaMemcpy docIdxList H2D: " << densifyMemcpyH2DMs << " ms\n";
         for (size_t i = 0; i < densifyResidentPartitionMs.size(); ++i)
         {
-            printf("  [densify] residentPartition[%zu]: %.3f ms\n", i, densifyResidentPartitionMs[i]);
+            std::cout << "  [densify] residentPartition[" << i << "]: " << densifyResidentPartitionMs[i] << " ms\n";
         }
-        printf("  [densify] densifyCompressed: %.3f ms\n", densifyCompressedMs);
+        std::cout << "  [densify] densifyCompressed: " << densifyCompressedMs << " ms\n";
     }
 };
 

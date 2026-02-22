@@ -1,4 +1,5 @@
 #include <cassert>
+#include <iomanip>
 #include <random>
 #include <iostream>
 #include <unordered_set>
@@ -138,8 +139,9 @@ void verifyDensification(const WorkingEmbDataset& workingEmbDataset,
         }
     }
 
-    printf("Compressed dim avg error: %.6f (over %zu samples)\n", compressedErrorSum / compressedCount, compressedCount);
-    printf("!!!!!!!!!!!! Densification verified successfully !!!!!!!!!!!!\n");
+    std::cout << std::fixed << std::setprecision(6) << "Compressed dim avg error: " << compressedErrorSum / compressedCount
+              << " (over " << compressedCount << " samples)\n"
+              << "!!!!!!!!!!!! Densification verified successfully !!!!!!!!!!!!\n";
 }
 
 int main()
@@ -179,7 +181,7 @@ int main()
 
         float timeMs = timer.tocMs();
         totalTimeMs += timeMs;
-        printf("Densification time: %.3f ms\n", timeMs);
+        std::cout << std::fixed << std::setprecision(3) << "Densification time: " << timeMs << " ms\n";
 
         verifyDensification(workingEmbDataset, docIdxListToDensify, emb2D);
 
@@ -201,8 +203,9 @@ int main()
             if (prevSet.count(idx)) overlapCount++;
         }
         float actualCacheRate = static_cast<float>(overlapCount) / kNumDocsToDensify;
-        printf("Trial %zu cache rate: %.3f (expected >= %.3f, overlap %zu / %zu)\n",
-               trial, actualCacheRate, kCacheRate, overlapCount, kNumDocsToDensify);
+        std::cout << std::fixed << std::setprecision(3)
+                  << "Trial " << trial << " cache rate: " << actualCacheRate
+                  << " (expected >= " << kCacheRate << ", overlap " << overlapCount << " / " << kNumDocsToDensify << ")\n";
         assert(overlapCount >= numToKeep && "Cache rate verification failed: fewer overlapping docs than expected");
 
         docIdxListToDensify.assign(nextSet.begin(), nextSet.end());
@@ -210,7 +213,7 @@ int main()
     }
 
     float avgTimeMs = totalTimeMs / (kNumDensifyTrials - 3);
-    printf("Average densification time: %.3f ms\n", avgTimeMs);
+    std::cout << std::fixed << std::setprecision(3) << "Average densification time: " << avgTimeMs << " ms\n";
 
     return 0;
 }

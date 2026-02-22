@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <iomanip>
+#include <iostream>
 #include <limits>
 #include <stack>
 #include <unordered_set>
@@ -180,7 +182,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
                 throw std::runtime_error(oss.str());
             }
         }
-        printf("    [cache] verify unique: %.3f ms\n", timer.tocMs());
+        std::cout << std::fixed << std::setprecision(3) << "    [cache] verify unique: " << timer.tocMs() << " ms\n";
     }
 
     // ------------
@@ -231,7 +233,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
                 }
             }
         }
-        printf("    [cache] verify no collision: %.3f ms\n", timer.tocMs());
+        std::cout << std::fixed << std::setprecision(3) << "    [cache] verify no collision: " << timer.tocMs() << " ms\n";
     }
 
     // ------------
