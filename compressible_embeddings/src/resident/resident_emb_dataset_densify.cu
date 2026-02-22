@@ -1,24 +1,55 @@
 #include "resident/resident_emb_dataset.hpp"
 #include "utils/util.hpp"
 
+/*
+Let's explain how this works by an example. Let's say we have:
+  - A GlobalEmbDataset with 10M docs, and 1024d embeddings. (10M x 1024).
+    - Note "GlobalEmbDataset" is just a "concept", in practice, it is represented by ResidentEmbDataset and CompressibleEmbDataset.
+  - We have a CompressibleEmbDataset with 10M docs, and 1024d embeddings, but using residual quantization to compress each emb dim to 2 bits. (10M x 1024)
+  - Among those 1024d, [128:512] (384d) are "resident" embeddings, so this ResidentEmbDataset has 10M docs, and 384d embeddings. (10M x 384)
+  - Now we assume we have maxNumWorkingDocs = 100k, so we will have a WorkingEmbDataset with 10k docs, and 1024d max embeddings. (100k x 1024)
+    - It is important to note that the WorkingEmbDataset is just a "container", exactly how many docs and embedding dims depends on the caller's ask.
+  - Now let's say we want to densify desiredDocIdxList = [2, 6, 9, 13], assuming the dims to copy is [192, 768] (576d)
+  - And assume in the current WorkingEmbDataset, we have currDocIdxList = [2, 5, 6, 10, 13], we also assume the embedding dim being 1024.
+  - So following our explanation in the manager/emb_dataset_manager.cu, we will:
+    - Reorder the desiredDocIdxList to [2, 13, 6, 9]
+    - Create a list of copy task: copyTasks = [(srcDocIdx=13, dstDocIdx=1), (srcDocIdx=9, dstDocIdx=3)]
+
+So conceptually, we want to perform the following copies:
+  - Copy GlobalEmbDataset[13][192:768] to WorkingEmbDataset[13][0:576]
+  - Copy GlobalEmbDataset[9][192:768] to WorkingEmbDataset[9][0:576]
+
+However, in practice, since [128:512] are "resident" embeddings, we actually need to split the copy into the following tasks:
+  1. Copy ResidentEmbDataset[13][64:384] to WorkingEmbDataset[1][0:320]
+  2. Copy ResidentEmbDataset[9][64:384] to WorkingEmbDataset[3][0:320]
+  3. Copy CompressibleEmbDataset[13][384:768] to ResidentEmbDataset[13][320:576]
+  4. Copy CompressibleEmbDataset[9][384:768] to ResidentEmbDataset[9][320:576]
+
+The kernel in this file, performs (1) and (2), while (3) and (4) are performed in the compressible/res_quant/res_quant_dataset.cu.
+
+It is important to note how those index shifts are calculated.
+  - We want [192:768] from the GlobalEmbDataset, but when we write to the WorkingEmbDataset, we want to write to [0:576], not [192:768].
+  - The [128:512] resident dims in GlobalEmbDataset, from ResidentEmbDataset's POV, are actually [0:384]
+*/
+
 struct DensifyFromResidentKernelParams
 {
     // Source
-    const T_EMB* d_srcEmbData;
-    T_DOC_IDX srcNumDocs;
-    int srcEmbDim;
-    int srcEmbOffset;
+    const T_EMB* d_srcEmbData; // 10M x 384
+    T_DOC_IDX srcNumDocs; // 10M
+    int srcEmbDim; // 384
+    int srcEmbOffset; // 192 - 128 = 64
 
     // Destination
-    T_EMB* d_dstEmbData;
-    int dstNumDocs;
-    int dstEmbDim;
-    int dstEmbOffset;
+    T_EMB* d_dstEmbData; // 100k x 1024 as the "max", but in reality it is 4 x (768 - 192 = 576)
+    int dstNumDocs; // 4
+    int dstEmbDim; // 576
+    int dstEmbOffset; // 0
 
     // Copy tasks
-    int embDimToCopy;
-    CopyTask* d_copyTasks;
-    int numCopyTasks;
+    int embDimToCopy; // (512 - 192 = 320)
+    CopyTask* d_copyTasks; // [(srcDocIdx=13, dstDocIdx=1), (srcDocIdx=9, dstDocIdx=3)]
+    int numCopyTasks; // 2
 };
 
 __global__ void densifyFromResidentKernel(DensifyFromResidentKernelParams params)
