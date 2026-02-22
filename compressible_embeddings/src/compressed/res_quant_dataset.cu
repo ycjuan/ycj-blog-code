@@ -24,12 +24,12 @@ ResQuantDataset::ResQuantDataset(size_t numDocs,
     , m_numBitsPerDim(numBitsPerDim)
     , m_rqDim(getRqDim(globalEmbDim, numBitsPerDim))
     , m_compressedPartitionConfigs(std::move(compressedPartitionConfigs))
-    , m_centroidEmb(m_numCentroids * globalEmbDim * 2, "m_centroidEmb")
-    , m_centroidIdx(numDocs, "m_centroidIdx")
-    , m_residual(numDocs * m_rqDim, "m_residual")
-    , m_centroidEmbHost(m_numCentroids * globalEmbDim * 2, "m_centroidEmbHost")
-    , m_centroidIdxHost(numDocs, "m_centroidIdxHost")
-    , m_residualHost(numDocs * m_rqDim, "m_residualHost")
+    , m_d_centroidEmb(m_numCentroids * globalEmbDim * 2, "m_centroidEmb")
+    , m_d_centroidIdx(numDocs, "m_centroidIdx")
+    , m_d_residual(numDocs * m_rqDim, "m_residual")
+    , m_h_centroidEmb(m_numCentroids * globalEmbDim * 2, "m_centroidEmbHost")
+    , m_h_centroidIdx(numDocs, "m_centroidIdxHost")
+    , m_h_residual(numDocs * m_rqDim, "m_residualHost")
 {
     if (kBitsPerRqInt % numBitsPerDim != 0)
     {
@@ -46,12 +46,12 @@ ResQuantDataset::ResQuantDataset(size_t numDocs,
             for (size_t d = 0; d < globalEmbDim; d++)
             {
                 size_t addr = getMemAddrRowMajor(c, d * 2, m_numCentroids, globalEmbDim * 2);
-                m_centroidEmbHost.data()[addr] = static_cast<T_EMB>(centroidEmbs[c][d]);
-                m_centroidEmbHost.data()[addr + 1] = static_cast<T_EMB>(centroidStdDevs[c][d]);
+                m_h_centroidEmb.data()[addr] = static_cast<T_EMB>(centroidEmbs[c][d]);
+                m_h_centroidEmb.data()[addr + 1] = static_cast<T_EMB>(centroidStdDevs[c][d]);
             }
         }
-        CHECK_CUDA(cudaMemcpy(m_centroidEmb.data(),
-                              m_centroidEmbHost.data(),
+        CHECK_CUDA(cudaMemcpy(m_d_centroidEmb.data(),
+                              m_h_centroidEmb.data(),
                               m_numCentroids * globalEmbDim * 2 * sizeof(T_EMB),
                               cudaMemcpyHostToDevice));
     }
@@ -103,32 +103,32 @@ void ResQuantDataset::update(const std::vector<T_DOC_IDX>& docIdxList,
         int centroidIdx = centroidIdxList.at(i);
 
         // Store centroid index
-        m_centroidIdxHost.data()[docIdx] = centroidIdx;
+        m_h_centroidIdx.data()[docIdx] = centroidIdx;
 
         // Compute and quantize residuals for all dimensions
         for (size_t embIdx = 0; embIdx < globalEmbDim; embIdx++)
         {
             size_t centroidAddr = getMemAddrRowMajor(centroidIdx, embIdx * 2, m_numCentroids, globalEmbDim * 2);
-            float centroidVal = static_cast<float>(m_centroidEmbHost.data()[centroidAddr]);
-            float stdDev = static_cast<float>(m_centroidEmbHost.data()[centroidAddr + 1]);
+            float centroidVal = static_cast<float>(m_h_centroidEmb.data()[centroidAddr]);
+            float stdDev = static_cast<float>(m_h_centroidEmb.data()[centroidAddr + 1]);
             float embVal = static_cast<float>(emb2D.at(i).at(embIdx));
             float residual = embVal - centroidVal;
 
             int rqIdx = getRqIdx(embIdx, m_numBitsPerDim, kBitsPerRqInt);
-            size_t rqMemAddr = getMemAddrRowMajor(docIdx, rqIdx, m_residualHost.getArraySize() / m_rqDim, m_rqDim);
-            quantize(m_numBitsPerDim, kBitsPerRqInt, stdDev, residual, m_residualHost.data()[rqMemAddr], embIdx);
+            size_t rqMemAddr = getMemAddrRowMajor(docIdx, rqIdx, m_h_residual.getArraySize() / m_rqDim, m_rqDim);
+            quantize(m_numBitsPerDim, kBitsPerRqInt, stdDev, residual, m_h_residual.data()[rqMemAddr], embIdx);
         }
     }
 
     // Copy centroid indices to device
-    CHECK_CUDA(cudaMemcpy(m_centroidIdx.data(),
-                          m_centroidIdxHost.data(),
-                          m_centroidIdx.getArraySizeInBytes(),
+    CHECK_CUDA(cudaMemcpy(m_d_centroidIdx.data(),
+                          m_h_centroidIdx.data(),
+                          m_d_centroidIdx.getArraySizeInBytes(),
                           cudaMemcpyHostToDevice));
 
     // Copy residuals to device
     CHECK_CUDA(
-        cudaMemcpy(m_residual.data(), m_residualHost.data(), m_residual.getArraySizeInBytes(), cudaMemcpyHostToDevice));
+        cudaMemcpy(m_d_residual.data(), m_h_residual.data(), m_d_residual.getArraySizeInBytes(), cudaMemcpyHostToDevice));
 }
 
 // ============================================================================
@@ -229,12 +229,12 @@ void ResQuantDataset::densifyCompressed(const DensificationTask& densificationTa
         size_t compressedEmbDim = embDimEndReal - embDimBeginReal;
 
         DensifyFromResQuantKernelParams params;
-        params.d_centroidEmb = m_centroidEmb.data();
+        params.d_centroidEmb = m_d_centroidEmb.data();
         params.numCentroids = m_numCentroids;
         params.globalEmbDim = globalEmbDim;
-        params.d_centroidIdx = m_centroidIdx.data();
-        params.d_residual = m_residual.data();
-        params.numDocsTotal = m_centroidIdx.getArraySize();
+        params.d_centroidIdx = m_d_centroidIdx.data();
+        params.d_residual = m_d_residual.data();
+        params.numDocsTotal = m_d_centroidIdx.getArraySize();
         params.rqDim = m_rqDim;
         params.numBitsPerDim = m_numBitsPerDim;
         params.d_docIdxList = densificationTask.d_docIdxList;

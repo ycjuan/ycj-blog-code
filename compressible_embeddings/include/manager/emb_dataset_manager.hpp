@@ -71,7 +71,7 @@ protected:
     WorkingEmbDataset m_workingEmbDataset;
 
     // Densification
-    CudaDeviceArray<T_DOC_IDX> m_docIdxListToDensify;
+    CudaDeviceArray<T_DOC_IDX> m_d_docIdxListToDensify;
 
     // Cuda stream
     cudaStream_t m_cudaStreamRead;

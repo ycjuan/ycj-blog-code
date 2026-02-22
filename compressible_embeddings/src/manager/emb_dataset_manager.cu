@@ -58,7 +58,7 @@ EmbDatasetManager::EmbDatasetManager(size_t numDocs,
                         centroidEmbs,
                         centroidStdDevs)
     , m_workingEmbDataset(maxNumWorkingDocs, totalEmbDim)
-    , m_docIdxListToDensify(maxNumWorkingDocs, "m_docIdxListToDensify")
+    , m_d_docIdxListToDensify(maxNumWorkingDocs, "m_docIdxListToDensify")
     , m_h_copyTasks(maxNumWorkingDocs, "m_h_copyTasks")
     , m_d_copyTasks(maxNumWorkingDocs, "m_d_copyTasks")
     , m_currDocIdxListInWorkingDataset(maxNumWorkingDocs, kInvalidDocIdx)
@@ -160,7 +160,7 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
     {
         Timer timer;
         timer.tic();
-        CHECK_CUDA(cudaMemcpy(m_docIdxListToDensify.data(),
+        CHECK_CUDA(cudaMemcpy(m_d_docIdxListToDensify.data(),
                               docIdxList.data(),
                               docIdxList.size() * sizeof(T_DOC_IDX),
                               cudaMemcpyHostToDevice));
@@ -184,7 +184,7 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
         densificationTask.globalEmbIdxBeginIncl = embIdxBeginIncl;
         densificationTask.globalEmbIdxEndExcl = embIdxEndExcl;
         densificationTask.d_workingEmbDataset = m_workingEmbDataset.data();
-        densificationTask.d_docIdxList = m_docIdxListToDensify.data();
+        densificationTask.d_docIdxList = m_d_docIdxListToDensify.data();
         densificationTask.d_copyTasks = m_d_copyTasks.data();
     }
 

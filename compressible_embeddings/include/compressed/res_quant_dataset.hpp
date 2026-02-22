@@ -47,16 +47,16 @@ private:
     std::vector<CompressedPartitionConfig> m_compressedPartitionConfigs;
 
     // Centroid data on device: numCentroids x globalEmbDim x 2 (interleaved [emb, stdDev] per dim)
-    CudaDeviceArray<T_EMB> m_centroidEmb;
+    CudaDeviceArray<T_EMB> m_d_centroidEmb;
 
     // Per-document data on device
-    CudaDeviceArray<int> m_centroidIdx;   // numDocs x 1
-    CudaDeviceArray<T_RQ> m_residual;     // numDocs x rqDim
+    CudaDeviceArray<int> m_d_centroidIdx;   // numDocs x 1
+    CudaDeviceArray<T_RQ> m_d_residual;     // numDocs x rqDim
 
     // Host-side copy of centroid embeddings (needed for computing residuals in update)
-    CudaHostArray<T_EMB> m_centroidEmbHost;
+    CudaHostArray<T_EMB> m_h_centroidEmb;
 
     // Host buffers for updates
-    CudaHostArray<int> m_centroidIdxHost;
-    CudaHostArray<T_RQ> m_residualHost;
+    CudaHostArray<int> m_h_centroidIdx;
+    CudaHostArray<T_RQ> m_h_residual;
 };
