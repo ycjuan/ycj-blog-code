@@ -206,12 +206,18 @@ int main()
     // Generate random docs to densify
     std::vector<T_DOC_IDX> docIdxListToDensify = genRandomDocIdxList();
 
+    // --------
+    // Some statistics
     float totalDensifyTimeMs = 0.0f;
     float totalCompressedError = 0.0f;
     float totalCacheRate = 0.0f;
 
+    // --------
+    // Densify the data
     for (int trial = -3; trial < kNumDensifyTrials; ++trial)
     {
+        // --------
+        // Start the formal benchmark after 3 warmup trials
         if (trial == 0)
         {
             embDatasetManager.getLastTimeRecordAndReset();
@@ -220,6 +226,8 @@ int main()
             totalCacheRate = 0.0f;
         }
 
+        // --------
+        // Densification
         Timer timer;
         timer.tic();
         const WorkingEmbDataset& workingEmbDataset = embDatasetManager.densify(docIdxListToDensify,
@@ -228,19 +236,24 @@ int main()
                                                                                MemLayout::ROW_MAJOR);
         totalDensifyTimeMs += timer.tocMs();
 
+        // --------
+        // Verify the result
         totalCompressedError += verifyDensification(workingEmbDataset, docIdxListToDensify, emb2D);
 
+        // --------
+        // Generate the next docIdxList to densify
         auto [nextList, cacheRate] = genNextDocIdxList(docIdxListToDensify, trial);
         totalCacheRate += cacheRate;
         docIdxListToDensify = std::move(nextList);
     }
 
-    float n = static_cast<float>(kNumDensifyTrials);
+    // --------
+    // Print the statistics
     std::cout << std::fixed << std::setprecision(3)
               << "\n===== Summary (avg over " << kNumDensifyTrials << " trials) =====\n"
-              << "Densification time: " << totalDensifyTimeMs / n << " ms\n"
-              << "Cache rate: " << totalCacheRate / n << "\n";
-    std::cout << std::setprecision(6) << "Compressed dim avg error: " << totalCompressedError / n << "\n";
+              << "Densification time: " << totalDensifyTimeMs / kNumDensifyTrials << " ms\n"
+              << "Cache rate: " << totalCacheRate / kNumDensifyTrials << "\n";
+    std::cout << std::setprecision(6) << "Compressed dim avg error: " << totalCompressedError / kNumDensifyTrials << "\n";
     std::cout << "\n===== Time Record =====\n";
     embDatasetManager.getLastTimeRecordAndReset().print();
 
