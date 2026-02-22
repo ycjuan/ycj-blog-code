@@ -240,14 +240,20 @@ void runExp(ExpSetting s)
 
     // --------
     // Generate the centroids
+    Timer t;
+    t.tic();
     auto [centroidEmbs, centroidStdDevs] = genRandCentroids(s);
+    std::cout << std::fixed << std::setprecision(3) << "genRandCentroids: " << t.tocMs() << " ms\n";
 
     // --------
     // Generate 2D embeddings and centroid indices
+    t.tic();
     auto [docIdxList, emb2D, centroidIdxList] = genRandDocData(s, centroidEmbs, centroidStdDevs);
+    std::cout << "genRandDocData: " << t.tocMs() << " ms\n";
 
     // ------------------
     // Initialize the EmbDatasetManager
+    t.tic();
     EmbDatasetManager embDatasetManager(s.numDocs,
                                         s.totalEmbDim,
                                         s.residentPartitionConfigs,
@@ -255,13 +261,19 @@ void runExp(ExpSetting s)
                                         s.numBitsPerDim,
                                         centroidEmbs,
                                         centroidStdDevs);
+    std::cout << "EmbDatasetManager ctor: " << t.tocMs() << " ms\n";
+
     // --------
     // Ingest the data into the EmbDatasetManager
+    t.tic();
     embDatasetManager.update(docIdxList, emb2D, centroidIdxList);
+    std::cout << "update: " << t.tocMs() << " ms\n";
 
     // --------
     // Generate random docs to densify
+    t.tic();
     std::vector<T_DOC_IDX> docIdxListToDensify = genRandomDocIdxList(s);
+    std::cout << "genRandomDocIdxList: " << t.tocMs() << " ms\n";
 
     // --------
     // Some statistics
