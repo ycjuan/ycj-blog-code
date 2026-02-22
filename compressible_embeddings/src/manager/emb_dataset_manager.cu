@@ -22,11 +22,10 @@ EmbDatasetManager::EmbDatasetManager(size_t numDocs,
     : m_numDocs(numDocs)
     , m_totalEmbDim(totalEmbDim)
     , m_maxNumWorkingDocs(maxNumWorkingDocs)
-    , m_compressedPartitionConfigs(findCompressedPartitionConfigs(residentPartitionConfigs, totalEmbDim))
     , m_resQuantDataset(numDocs,
                         totalEmbDim,
                         maxNumWorkingDocs,
-                        m_compressedPartitionConfigs,
+                        findCompressedPartitionConfigs(residentPartitionConfigs, totalEmbDim),
                         numBitsPerDim,
                         centroidEmbs,
                         centroidStdDevs)

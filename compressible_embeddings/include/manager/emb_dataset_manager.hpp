@@ -5,7 +5,6 @@
 #include <unordered_map>
 
 #include "common/typedef.hpp"
-#include "compressed/compressed_partition_config.hpp"
 #include "compressed/res_quant_dataset.hpp"
 #include "resident/resident_emb_dataset.hpp"
 #include "resident/resident_partition_config.hpp"
@@ -40,7 +39,6 @@ protected:
     std::vector<ResidentEmbDataset> m_residentEmbDatasets;
 
     // Compressed index (residual quantization)
-    std::vector<CompressedPartitionConfig> m_compressedPartitionConfigs;
     ResQuantDataset m_resQuantDataset;
 
     // Working set index
