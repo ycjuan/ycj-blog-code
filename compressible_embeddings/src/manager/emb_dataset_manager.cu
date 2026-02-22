@@ -265,6 +265,27 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
     }
 
     // ------------
+    // Check cnt1, cnt2, cnt3, cnt4.
+    if (cnt1 + cnt2 != (int)docIdxList.size())
+    {
+        std::ostringstream oss;
+        oss << "cnt1 + cnt2 != docIdxList.size(): " << cnt1 << " + " << cnt2 << " != " << docIdxList.size();
+        throw std::runtime_error(oss.str());
+    }
+    if (cnt3 != cnt2)
+    {
+        std::ostringstream oss;
+        oss << "cnt3 != cnt2: " << cnt3 << " != " << cnt2;
+        throw std::runtime_error(oss.str());
+    }
+    if (cnt4 != cnt1)
+    {
+        std::ostringstream oss;
+        oss << "cnt4 != cnt1: " << cnt4 << " != " << cnt1;
+        throw std::runtime_error(oss.str());
+    }
+
+    // ------------
     // Reassign the reorderedDocIdxList to the docIdxList.
     timer.tic();
     docIdxList = reorderedDocIdxList;
