@@ -208,13 +208,10 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
 
 void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
 {
-    Timer timer;
-
     // ------------
-    // Verify docIdxList is unique.
+    // Verify docIdxList is unique (only run in debug mode)
     if (kDebug)
     {
-        timer.tic();
         std::unordered_set<T_DOC_IDX> seen;
         for (T_DOC_IDX docIdx : docIdxList)
         {
@@ -225,42 +222,43 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
                 throw std::runtime_error(oss.str());
             }
         }
-        std::cout << std::fixed << std::setprecision(3) << "    [cache] verify unique: " << timer.tocMs() << " ms\n";
     }
 
     // ------------
     // First scan to find the cached working indices.
-    timer.tic();
     std::vector<T_DOC_IDX> reorderedDocIdxList(docIdxList.size(), kInvalidDocIdx);
     std::stack<T_DOC_IDX> uncachedDocIdxList;
-    int cnt1 = 0;
-    int cnt2 = 0;
-    for (T_DOC_IDX workingIdx = 0; workingIdx < docIdxList.size(); ++workingIdx)
+    int cntCached = 0;
+    int cntUncached = 0;
     {
-        T_DOC_IDX docIdx = docIdxList.at(workingIdx);
-        auto it = m_cachedDocIdxToWorkingIdx.find(docIdx);
-        if (it != m_cachedDocIdxToWorkingIdx.end() && it->second < docIdxList.size())
+        Timer timer;
+        timer.tic();
+        for (T_DOC_IDX workingIdx = 0; workingIdx < docIdxList.size(); ++workingIdx)
         {
-            T_DOC_IDX cachedWorkingIdx = it->second;
-            reorderedDocIdxList.at(cachedWorkingIdx) = docIdx;
-            m_hp_isCached.data()[cachedWorkingIdx] = 1;
-            cnt1++;
+            T_DOC_IDX docIdx = docIdxList.at(workingIdx);
+            auto it = m_cachedDocIdxToWorkingIdx.find(docIdx);
+            if (it != m_cachedDocIdxToWorkingIdx.end() && it->second < docIdxList.size())
+            {
+                T_DOC_IDX cachedWorkingIdx = it->second;
+                reorderedDocIdxList.at(cachedWorkingIdx) = docIdx;
+                m_hp_isCached.data()[cachedWorkingIdx] = 1;
+                cntCached++;
+            }
+            else
+            {
+                // Very important: if the cached working index is larger than the docIdxList.size(),
+                //                 it is still considered as uncached.
+                uncachedDocIdxList.push(docIdx);
+                cntUncached++;
+            }
         }
-        else
-        {
-            // Very important: if the cached working index is larger than the docIdxList.size(),
-            //                 it is still considered as uncached.
-            uncachedDocIdxList.push(docIdx);
-            cnt2++;
-        }
+        m_lastTimeRecord.cacheFirstScanMs += timer.tocMs();
     }
-    m_lastTimeRecord.cacheFirstScanMs += timer.tocMs();
 
     // ------------
-    // Verify no two docIdx map to the same cachedWorkingIdx.
+    // Verify no two docIdx map to the same cachedWorkingIdx. (only run in debug mode)
     if (kDebug)
     {
-        timer.tic();
         std::unordered_set<T_DOC_IDX> seenWorkingIdx;
         for (T_DOC_IDX docIdx : docIdxList)
         {
@@ -276,72 +274,67 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& docIdxList)
                 }
             }
         }
-        std::cout << std::fixed << std::setprecision(3) << "    [cache] verify no collision: " << timer.tocMs()
-                  << " ms\n";
     }
 
     // ------------
     // Second scan to put the uncached doc indices to the reorderedDocIdxList.
-    timer.tic();
-    int cnt3 = 0;
-    int cnt4 = 0;
-    for (T_DOC_IDX workingIdx = 0; workingIdx < docIdxList.size(); ++workingIdx)
     {
-        if (reorderedDocIdxList.at(workingIdx) == kInvalidDocIdx)
+        Timer timer;
+        timer.tic();
+        for (T_DOC_IDX workingIdx = 0; workingIdx < docIdxList.size(); ++workingIdx)
         {
-            cnt3++;
-            T_DOC_IDX uncachedDocIdx = uncachedDocIdxList.top();
-            reorderedDocIdxList.at(workingIdx) = uncachedDocIdx;
-            uncachedDocIdxList.pop();
-            T_DOC_IDX oldDocIdx = m_cachedWorkingIdxToDocIdx.at(workingIdx);
-            if (oldDocIdx != kInvalidDocIdx)
+            if (reorderedDocIdxList.at(workingIdx) == kInvalidDocIdx)
             {
-                m_cachedDocIdxToWorkingIdx.erase(oldDocIdx);
+                cntUncached--;
+                T_DOC_IDX uncachedDocIdx = uncachedDocIdxList.top();
+                reorderedDocIdxList.at(workingIdx) = uncachedDocIdx;
+                uncachedDocIdxList.pop();
+                T_DOC_IDX oldDocIdx = m_cachedWorkingIdxToDocIdx.at(workingIdx);
+                if (oldDocIdx != kInvalidDocIdx)
+                {
+                    m_cachedDocIdxToWorkingIdx.erase(oldDocIdx);
+                }
+                m_cachedDocIdxToWorkingIdx[uncachedDocIdx] = workingIdx;
+                m_cachedWorkingIdxToDocIdx.at(workingIdx) = uncachedDocIdx;
+                m_hp_isCached.data()[workingIdx] = 0;
             }
-            m_cachedDocIdxToWorkingIdx[uncachedDocIdx] = workingIdx;
-            m_cachedWorkingIdxToDocIdx.at(workingIdx) = uncachedDocIdx;
-            m_hp_isCached.data()[workingIdx] = 0;
+            else
+            {
+                cntCached--;
+            }
         }
-        else
+        m_lastTimeRecord.cacheSecondScanMs += timer.tocMs();
+    }
+
+    // ------------
+    // Verifications
+    {
+        if (!uncachedDocIdxList.empty())
         {
-            cnt4++;
+            std::ostringstream oss;
+            oss << "Uncached doc indices are not empty: " << uncachedDocIdxList.size();
+            throw std::runtime_error(oss.str());
         }
-    }
-    m_lastTimeRecord.cacheSecondScanMs += timer.tocMs();
-
-    // ------------
-    // Verify the uncachedDocIdxList is empty.
-    if (!uncachedDocIdxList.empty())
-    {
-        std::ostringstream oss;
-        oss << "Uncached doc indices are not empty: " << uncachedDocIdxList.size();
-        throw std::runtime_error(oss.str());
-    }
-
-    // ------------
-    // Check cnt1, cnt2, cnt3, cnt4.
-    if (cnt1 + cnt2 != (int)docIdxList.size())
-    {
-        std::ostringstream oss;
-        oss << "cnt1 + cnt2 != docIdxList.size(): " << cnt1 << " + " << cnt2 << " != " << docIdxList.size();
-        throw std::runtime_error(oss.str());
-    }
-    if (cnt3 != cnt2)
-    {
-        std::ostringstream oss;
-        oss << "cnt3 != cnt2: " << cnt3 << " != " << cnt2;
-        throw std::runtime_error(oss.str());
-    }
-    if (cnt4 != cnt1)
-    {
-        std::ostringstream oss;
-        oss << "cnt4 != cnt1: " << cnt4 << " != " << cnt1;
-        throw std::runtime_error(oss.str());
+        if (cntCached != 0)
+        {
+            std::ostringstream oss;
+            oss << "cntCached != 0: " << cntCached;
+            throw std::runtime_error(oss.str());
+        }
+        if (cntUncached != 0)
+        {
+            std::ostringstream oss;
+            oss << "cntUncached != 0: " << cntUncached;
+            throw std::runtime_error(oss.str());
+        }
     }
 
     // ------------
     // Reassign the reorderedDocIdxList to the docIdxList.
-    timer.tic();
-    docIdxList = reorderedDocIdxList;
-    m_lastTimeRecord.cacheReassignMs += timer.tocMs();
+    {
+        Timer timer;
+        timer.tic();
+        docIdxList = reorderedDocIdxList;
+        m_lastTimeRecord.cacheReassignMs += timer.tocMs();
+    }
 }
