@@ -23,7 +23,7 @@ const std::vector<ResidentPartitionConfig> kResidentPartitionConfigs
 constexpr float kCentroidStdDev = 1.0f;
 constexpr float kCentroidMean = 0.0f;
 constexpr float kCacheRate = 0.5f;
-constexpr size_t kNumDensifyTrials = 20;
+constexpr int kNumDensifyTrials = 20;
 
 std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<int>> populateRandomEmbDataset(
     const std::vector<std::vector<float>>& centroidEmbs,
@@ -165,14 +165,20 @@ int main()
 
     std::vector<T_DOC_IDX> docIdxListToDensify = genRandomDocIdxList();
 
-    for (size_t trial = 0; trial < kNumDensifyTrials; ++trial)
+    float totalTimeMs = 0.0f;
+    for (int trial = -3; trial < kNumDensifyTrials; ++trial)
     {
+        Timer timer;
         std::cout << "===== Trial " << trial << " =====" << std::endl;
 
+        timer.tic();
         const WorkingEmbDataset& workingEmbDataset = embDatasetManager.densify(docIdxListToDensify,
                                                                          kDensifiedEmbIdxBeginIncl,
                                                                          kDensifiedEmbIdxEndExcl,
                                                                          MemLayout::ROW_MAJOR);
+
+        float timeMs = timer.tocMs();
+        totalTimeMs += timeMs;
 
         verifyDensification(workingEmbDataset, docIdxListToDensify, emb2D);
 
@@ -201,6 +207,9 @@ int main()
         docIdxListToDensify.assign(nextSet.begin(), nextSet.end());
         std::sort(docIdxListToDensify.begin(), docIdxListToDensify.end());
     }
+
+    float avgTimeMs = totalTimeMs / (kNumDensifyTrials - 3);
+    printf("Average densification time: %.3f ms\n", avgTimeMs);
 
     return 0;
 }
