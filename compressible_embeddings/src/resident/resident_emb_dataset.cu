@@ -39,29 +39,27 @@ struct DensifyFromResidentKernelParams
 __global__ void densifyFromResidentKernel(DensifyFromResidentKernelParams params)
 {
     size_t taskIdx = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t docIdxDst = taskIdx / params.embDimToDensify;
+    size_t embIdx = taskIdx % params.embDimToDensify;
 
-    if (taskIdx < params.numDocsToDensify)
+    if (docIdxDst < params.numDocsToDensify)
     {
-        if (params.hp_isCached[taskIdx])
+        if (params.hp_isCached[docIdxDst])
         {
             return;
         }
 
-        T_DOC_IDX docIdxSrc = params.d_docIdxMap[taskIdx];
-        T_DOC_IDX docIdxDst = taskIdx;
+        T_DOC_IDX docIdxSrc = params.d_docIdxMap[docIdxDst];
 
-        for (size_t embIdx = 0; embIdx < params.embDimToDensify; embIdx++)
-        {
-            size_t memAddrSrc = getMemAddrRowMajor(docIdxSrc,
-                                                   embIdx + params.embOffsetSrc,
-                                                   params.numDocsTotal,
-                                                   params.residentPartitionConfig.getEmbDim());
-            size_t memAddrDst = getMemAddrRowMajor(docIdxDst,
-                                                   embIdx + params.embOffsetDst,
-                                                   params.numDocsToDensify,
-                                                   params.embDimWorking);
-            params.d_workingEmbDataset[memAddrDst] = params.d_residentEmbDataset[memAddrSrc];
-        }
+        size_t memAddrSrc = getMemAddrRowMajor(docIdxSrc,
+                                               embIdx + params.embOffsetSrc,
+                                               params.numDocsTotal,
+                                               params.residentPartitionConfig.getEmbDim());
+        size_t memAddrDst = getMemAddrRowMajor(docIdxDst,
+                                               embIdx + params.embOffsetDst,
+                                               params.numDocsToDensify,
+                                               params.embDimWorking);
+        params.d_workingEmbDataset[memAddrDst] = params.d_residentEmbDataset[memAddrSrc];
     }
 }
 
@@ -89,7 +87,8 @@ void ResidentEmbDataset::densify(const DensificationTask& densificationTask) con
     // -------------
     // Launch the kernel.
     constexpr size_t kBlockSize = 1024;
-    size_t gridSize = (params.numDocsToDensify + kBlockSize - 1) / kBlockSize;
+    size_t numTasks = params.numDocsToDensify * params.embDimToDensify;
+    size_t gridSize = (numTasks + kBlockSize - 1) / kBlockSize;
     densifyFromResidentKernel<<<gridSize, kBlockSize, 0, m_cudaStreamRead.get()>>>(params);
     CHECK_CUDA(cudaStreamSynchronize(m_cudaStreamRead.get()));
 }
