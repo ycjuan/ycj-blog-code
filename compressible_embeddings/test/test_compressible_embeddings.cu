@@ -55,6 +55,35 @@ std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<
     return std::make_tuple(docIdxList, emb2D, centroidIdxList);
 }
 
+std::vector<T_DOC_IDX> genNextDocIdxList(const std::vector<T_DOC_IDX>& current, int trial)
+{
+    static std::default_random_engine generator(trial);
+    size_t numToKeep = static_cast<size_t>(kNumDocsToDensify * kCacheRate);
+    std::uniform_int_distribution<T_DOC_IDX> dist(0, kNumDocs - 1);
+
+    std::unordered_set<T_DOC_IDX> nextSet(current.begin(), current.begin() + numToKeep);
+    while (nextSet.size() < kNumDocsToDensify)
+    {
+        nextSet.insert(dist(generator));
+    }
+
+    std::unordered_set<T_DOC_IDX> prevSet(current.begin(), current.end());
+    size_t overlapCount = 0;
+    for (T_DOC_IDX idx : nextSet)
+    {
+        if (prevSet.count(idx)) overlapCount++;
+    }
+    float actualCacheRate = static_cast<float>(overlapCount) / kNumDocsToDensify;
+    std::cout << std::fixed << std::setprecision(3)
+              << "Trial " << trial << " cache rate: " << actualCacheRate
+              << " (expected >= " << kCacheRate << ", overlap " << overlapCount << " / " << kNumDocsToDensify << ")\n";
+    assert(overlapCount >= numToKeep && "Cache rate verification failed: fewer overlapping docs than expected");
+
+    std::vector<T_DOC_IDX> next(nextSet.begin(), nextSet.end());
+    std::sort(next.begin(), next.end());
+    return next;
+}
+
 std::vector<T_DOC_IDX> genRandomDocIdxList()
 {
     std::unordered_set<T_DOC_IDX> docIdxSet;
@@ -175,9 +204,6 @@ int main()
     // Ingest the data into the EmbDatasetManager
     embDatasetManager.update(docIdxList, emb2D);
 
-    std::default_random_engine trialGenerator(123);
-    std::uniform_int_distribution<T_DOC_IDX> docIdxDist(0, kNumDocs - 1);
-
     std::vector<T_DOC_IDX> docIdxListToDensify = genRandomDocIdxList();
 
     float totalTimeMs = 0.0f;
@@ -198,31 +224,7 @@ int main()
 
         verifyDensification(workingEmbDataset, docIdxListToDensify, emb2D);
 
-        // Build next trial's docIdxList: kCacheRate from current, (1 - kCacheRate) new random.
-        size_t numToKeep = static_cast<size_t>(kNumDocsToDensify * kCacheRate);
-
-        std::unordered_set<T_DOC_IDX> nextSet(docIdxListToDensify.begin(),
-                                               docIdxListToDensify.begin() + numToKeep);
-        while (nextSet.size() < kNumDocsToDensify)
-        {
-            T_DOC_IDX candidate = docIdxDist(trialGenerator);
-            nextSet.insert(candidate);
-        }
-        // Verify cache rate: count overlap between current docIdxListToDensify and nextSet.
-        std::unordered_set<T_DOC_IDX> prevSet(docIdxListToDensify.begin(), docIdxListToDensify.end());
-        size_t overlapCount = 0;
-        for (T_DOC_IDX idx : nextSet)
-        {
-            if (prevSet.count(idx)) overlapCount++;
-        }
-        float actualCacheRate = static_cast<float>(overlapCount) / kNumDocsToDensify;
-        std::cout << std::fixed << std::setprecision(3)
-                  << "Trial " << trial << " cache rate: " << actualCacheRate
-                  << " (expected >= " << kCacheRate << ", overlap " << overlapCount << " / " << kNumDocsToDensify << ")\n";
-        assert(overlapCount >= numToKeep && "Cache rate verification failed: fewer overlapping docs than expected");
-
-        docIdxListToDensify.assign(nextSet.begin(), nextSet.end());
-        std::sort(docIdxListToDensify.begin(), docIdxListToDensify.end());
+        docIdxListToDensify = genNextDocIdxList(docIdxListToDensify, trial);
     }
 
     float avgTimeMs = totalTimeMs / (kNumDensifyTrials - 3);
