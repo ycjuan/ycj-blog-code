@@ -26,6 +26,7 @@ constexpr float kCentroidMean = 0.0f;
 constexpr float kCacheRate = 0.9f;
 constexpr int kNumDensifyTrials = 20;
 
+// Generate random document data given the centroids and std devs.
 std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<int>> genRandDocData(
     const std::vector<std::vector<float>>& centroidEmbs,
     const std::vector<std::vector<float>>& centroidStdDevs)
@@ -55,6 +56,8 @@ std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<
     return std::make_tuple(docIdxList, emb2D, centroidIdxList);
 }
 
+// Generate the next docIdxList to densify based on the current docIdxList and the cache rate.
+// If the cache rate is 0.9, then 90% of the current docIdxList will be kept, while the remaining 10% will be randomly generated.
 std::pair<std::vector<T_DOC_IDX>, float> genNextDocIdxList(const std::vector<T_DOC_IDX>& current, int trial)
 {
     static std::default_random_engine generator(trial);
@@ -84,6 +87,7 @@ std::pair<std::vector<T_DOC_IDX>, float> genNextDocIdxList(const std::vector<T_D
     return { next, cacheRate };
 }
 
+// Generate a random docIdxList to densify.
 std::vector<T_DOC_IDX> genRandomDocIdxList()
 {
     std::unordered_set<T_DOC_IDX> docIdxSet;
@@ -98,6 +102,7 @@ std::vector<T_DOC_IDX> genRandomDocIdxList()
     return docIdxList;
 }
 
+// Generate random centroids and std devs.
 std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> genRandCentroids()
 {
     std::default_random_engine generator(42);
@@ -116,6 +121,7 @@ std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> genR
 
 bool isCompressedDim(size_t embIdx) { return (embIdx >= 48 && embIdx < 64) || embIdx >= 96; }
 
+// Verify the densification result.
 float verifyDensification(const WorkingEmbDataset& workingEmbDataset,
                           const std::vector<T_DOC_IDX>& docIdxList,
                           const std::vector<std::vector<T_EMB>>& emb2D)
