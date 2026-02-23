@@ -12,27 +12,26 @@ struct DensifyFromResQuantKernelParams
     // Centroid data
     const T_EMB* d_centroidEmb;
     size_t numCentroids;
-    size_t globalEmbDim;
-
-    // Per-doc data
-    const int* d_centroidIdx;
-    const T_RQ* d_residual;
-    size_t numDocsTotal;
-    size_t rqDim;
 
     // RQ config
     int numBitsPerDim;
+    size_t rqDim;
 
-    // Densification task
-    int numDocsToDensify;
-    T_EMB* d_workingEmbDataset;
-    size_t embDimWorking;
+    // Source
+    const int* d_srcCentroidIdx;
+    const T_RQ* d_srcResidual;
+    size_t srcEmbDim;
+    size_t srcNumDocs;
 
-    // Which compressible partition and its offset in the working index
-    size_t compressibleEmbDimBegin;
-    size_t compressibleEmbDimEnd;
-    size_t embOffsetDst;
+    // Destination
+    T_EMB* d_dstEmbData;
+    size_t dstEmbOffset;
+    int dstNumDocs;
+    size_t dstEmbDim;
 
+    // Copy tasks
+    size_t embDimToCopyBeginIncl;
+    size_t embDimToCopyEndExcl;
     CopyTask* d_copyTasks;
     int numCopyTasks;
 };
@@ -40,7 +39,7 @@ struct DensifyFromResQuantKernelParams
 __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params)
 {
     size_t tidx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
-    size_t compressibleEmbDim = params.compressibleEmbDimEnd - params.compressibleEmbDimBegin;
+    size_t compressibleEmbDim = params.embDimToCopyEndExcl - params.embDimToCopyBeginIncl;
     int copyIdx = tidx / compressibleEmbDim;
     int localEmbIdx = tidx % compressibleEmbDim;
 
@@ -50,19 +49,19 @@ __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params
         T_DOC_IDX docIdx = task.srcDocIdx;
         int toScoreIdx = task.dstDocIdx;
 
-        int globalEmbIdx = localEmbIdx + params.compressibleEmbDimBegin;
-        int centroidIdx = params.d_centroidIdx[docIdx];
+        int globalEmbIdx = localEmbIdx + params.embDimToCopyBeginIncl;
+        int centroidIdx = params.d_srcCentroidIdx[docIdx];
 
         // Get centroid value and stdDev
         size_t centroidMemAddr
-            = getMemAddrRowMajor(centroidIdx, globalEmbIdx * 2, params.numCentroids, params.globalEmbDim * 2);
+            = getMemAddrRowMajor(centroidIdx, globalEmbIdx * 2, params.numCentroids, params.srcEmbDim * 2);
         T_EMB centroid = params.d_centroidEmb[centroidMemAddr];
         float stdDev = static_cast<float>(params.d_centroidEmb[centroidMemAddr + 1]);
 
         // Get quantized residual and dequantize
         int rqIdx = getRqIdx(globalEmbIdx, params.numBitsPerDim, kBitsPerRqInt);
-        size_t rqMemAddr = getMemAddrRowMajor(docIdx, rqIdx, params.numDocsTotal, params.rqDim);
-        T_RQ quantRes = params.d_residual[rqMemAddr];
+        size_t rqMemAddr = getMemAddrRowMajor(docIdx, rqIdx, params.srcNumDocs, params.rqDim);
+        T_RQ quantRes = params.d_srcResidual[rqMemAddr];
         float residual = dequantize(params.numBitsPerDim, kBitsPerRqInt, stdDev, quantRes, globalEmbIdx);
 
         // Reconstruct: centroid + residual
@@ -70,10 +69,10 @@ __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params
 
         // Write to working index
         size_t dstMemAddr = getMemAddrRowMajor(toScoreIdx,
-                                               localEmbIdx + params.embOffsetDst,
-                                               params.numDocsToDensify,
-                                               params.embDimWorking);
-        params.d_workingEmbDataset[dstMemAddr] = rst;
+                                               localEmbIdx + params.dstEmbOffset,
+                                               params.dstNumDocs,
+                                               params.dstEmbDim);
+        params.d_dstEmbData[dstMemAddr] = rst;
     }
 }
 
@@ -102,18 +101,18 @@ void ResQuantDataset::densifyCompressible(const DensificationTask& densification
         DensifyFromResQuantKernelParams params;
         params.d_centroidEmb = m_d_centroidEmb.data();
         params.numCentroids = m_numCentroids;
-        params.globalEmbDim = globalEmbDim;
-        params.d_centroidIdx = m_d_centroidIdx.data();
-        params.d_residual = m_d_residual.data();
-        params.numDocsTotal = m_d_centroidIdx.getArraySize();
+        params.srcEmbDim = globalEmbDim;
+        params.d_srcCentroidIdx = m_d_centroidIdx.data();
+        params.d_srcResidual = m_d_residual.data();
+        params.srcNumDocs = m_d_centroidIdx.getArraySize();
         params.rqDim = m_rqDim;
         params.numBitsPerDim = m_numBitsPerDim;
-        params.numDocsToDensify = densificationTask.desiredDocIdxList.size();
-        params.d_workingEmbDataset = densificationTask.d_workingEmbDataset;
-        params.embDimWorking = densificationTask.globalEmbIdxEndExcl - densificationTask.globalEmbIdxBeginIncl;
-        params.compressibleEmbDimBegin = embDimBeginReal;
-        params.compressibleEmbDimEnd = embDimEndReal;
-        params.embOffsetDst = embDimBeginReal - densificationTask.globalEmbIdxBeginIncl;
+        params.dstNumDocs = densificationTask.desiredDocIdxList.size();
+        params.d_dstEmbData = densificationTask.d_workingEmbDataset;
+        params.dstEmbDim = densificationTask.globalEmbIdxEndExcl - densificationTask.globalEmbIdxBeginIncl;
+        params.embDimToCopyBeginIncl = embDimBeginReal;
+        params.embDimToCopyEndExcl = embDimEndReal;
+        params.dstEmbOffset = embDimBeginReal - densificationTask.globalEmbIdxBeginIncl;
         params.d_copyTasks = densificationTask.d_copyTasks;
         params.numCopyTasks = densificationTask.numCopyTasks;
 
