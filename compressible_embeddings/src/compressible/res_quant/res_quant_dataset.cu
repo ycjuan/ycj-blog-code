@@ -1,4 +1,6 @@
 
+#include <algorithm>
+#include <cstring>
 #include <omp.h>
 #include <sstream>
 
@@ -26,7 +28,9 @@ ResQuantDataset::ResQuantDataset(T_DOC_IDX numDocs,
     , m_d_centroidIdx(numDocs, "m_d_centroidIdx")
     , m_h_residual(numDocs * m_rqDim, "m_h_residual")
     , m_h_centroidEmb(m_numCentroids * globalEmbDim * 2, "m_h_centroidEmb")
-    , m_h_centroidIdx(numDocs, "m_h_centroidIdx")
+    , m_h_docIdxChunk(kMaxUpdateBatchSize, "m_h_docIdxChunk")
+    , m_h_centroidIdxChunk(kMaxUpdateBatchSize, "m_h_centroidIdxChunk")
+    , m_h_residualChunk(kMaxUpdateBatchSize * m_rqDim, "m_h_residualChunk")
 {
     // --------------------
     // Validate inputs
@@ -65,6 +69,22 @@ int ResQuantDataset::getNumBitsPerDim() const { return m_numBitsPerDim; }
 int ResQuantDataset::getRqDimPerDoc() const { return m_rqDim; }
 
 // ============================================================================
+// update kernel
+// ============================================================================
+
+__global__ void updateResQuantCentroidKernel(const T_DOC_IDX* h_docIdxChunk,
+                                             const int* h_centroidIdxChunk,
+                                             int numDocsInChunk,
+                                             int* d_centroidIdx)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < numDocsInChunk)
+    {
+        d_centroidIdx[h_docIdxChunk[i]] = h_centroidIdxChunk[i];
+    }
+}
+
+// ============================================================================
 // update
 // ============================================================================
 
@@ -72,60 +92,63 @@ void ResQuantDataset::update(const std::vector<T_DOC_IDX>& docIdxList,
                              const std::vector<std::vector<T_EMB>>& emb2D,
                              const std::vector<int>& centroidIdxList)
 {
-    size_t globalEmbDim = m_rqDim * kBitsPerRqInt / m_numBitsPerDim;
+    int globalEmbDim = m_rqDim * kBitsPerRqInt / m_numBitsPerDim;
+    int numDocs = (int)docIdxList.size();
 
-#pragma omp parallel for schedule(static)
-    for (size_t i = 0; i < docIdxList.size(); i++)
+    // Loop over docs chunk by chunk.
+    for (int chunkBeginIncl = 0; chunkBeginIncl < numDocs; chunkBeginIncl += kMaxUpdateBatchSize)
     {
-        T_DOC_IDX docIdx = docIdxList.at(i);
+        // -----------
+        // Handle corner case to get the end index, and calculate real number of docs in this chunk.
+        int chunkEndExcl = std::min(chunkBeginIncl + kMaxUpdateBatchSize, numDocs);
+        int numDocsInChunk = chunkEndExcl - chunkBeginIncl;
 
-        // This is too slow with CPU. We will use GPU for nearest centroid assignment.
-        // Before we have that, we temporarily assume the centroid index is already computed outside.
-        // // Centroid assignment: find nearest centroid by L2 distance
-        // float bestDist = std::numeric_limits<float>::max();
-        // int centroidIdx = 0;
-        // for (size_t c = 0; c < m_numCentroids; ++c)
-        // {
-        //     float dist = 0.0f;
-        //     for (size_t d = 0; d < globalEmbDim; ++d)
-        //     {
-        //         size_t addr = getMemAddrRowMajor(c, d * 2, m_numCentroids, globalEmbDim * 2);
-        //         float centroidVal = static_cast<float>(m_centroidEmbHost.data()[addr]);
-        //         float diff = static_cast<float>(emb2D.at(i).at(d)) - centroidVal;
-        //         dist += diff * diff;
-        //     }
-        //     if (dist < bestDist)
-        //     {
-        //         bestDist = dist;
-        //         centroidIdx = static_cast<int>(c);
-        //     }
-        // }
+        // -----------
+        // Zero out the residual chunk buffer (quantize uses |= so must start from 0)
+        memset(m_h_residualChunk.data(), 0, numDocsInChunk * m_rqDim * sizeof(T_RQ));
 
-        int centroidIdx = centroidIdxList.at(i);
-
-        // Store centroid index
-        m_h_centroidIdx.data()[docIdx] = centroidIdx;
-
-        // Compute and quantize residuals for all dimensions
-        for (size_t embIdx = 0; embIdx < globalEmbDim; embIdx++)
+        // -----------
+        // Fill chunk buffers: docIdx, centroidIdx, and quantized residuals
+#pragma omp parallel for schedule(static)
+        for (int i = 0; i < numDocsInChunk; i++)
         {
-            size_t centroidAddr = getMemAddrRowMajor(centroidIdx, embIdx * 2, m_numCentroids, globalEmbDim * 2);
-            float centroidVal = static_cast<float>(m_h_centroidEmb.data()[centroidAddr]);
-            float stdDev = static_cast<float>(m_h_centroidEmb.data()[centroidAddr + 1]);
-            float embVal = static_cast<float>(emb2D.at(i).at(embIdx));
-            float residual = embVal - centroidVal;
+            T_DOC_IDX docIdx = docIdxList.at(chunkBeginIncl + i);
+            int centroidIdx = centroidIdxList.at(chunkBeginIncl + i);
 
-            int rqIdx = getRqIdx(embIdx, m_numBitsPerDim, kBitsPerRqInt);
-            size_t rqMemAddr = getMemAddrRowMajor(docIdx, rqIdx, m_h_residual.getArraySize() / m_rqDim, m_rqDim);
-            quantize(m_numBitsPerDim, kBitsPerRqInt, stdDev, residual, m_h_residual.data()[rqMemAddr], embIdx);
+            m_h_docIdxChunk.data()[i] = docIdx;
+            m_h_centroidIdxChunk.data()[i] = centroidIdx;
+
+            for (int embIdx = 0; embIdx < globalEmbDim; embIdx++)
+            {
+                size_t centroidAddr = getMemAddrRowMajor(centroidIdx, embIdx * 2, m_numCentroids, globalEmbDim * 2);
+                float centroidVal = static_cast<float>(m_h_centroidEmb.data()[centroidAddr]);
+                float stdDev = static_cast<float>(m_h_centroidEmb.data()[centroidAddr + 1]);
+                float residual = static_cast<float>(emb2D.at(chunkBeginIncl + i).at(embIdx)) - centroidVal;
+
+                int rqIdx = getRqIdx(embIdx, m_numBitsPerDim, kBitsPerRqInt);
+                size_t rqMemAddr = getMemAddrRowMajor(i, rqIdx, numDocsInChunk, m_rqDim);
+                quantize(m_numBitsPerDim, kBitsPerRqInt, stdDev, residual, m_h_residualChunk.data()[rqMemAddr], embIdx);
+            }
         }
+
+        // -----------
+        // Scatter centroid indices to device via kernel
+        constexpr int kBlockSize = 1024;
+        int gridSize = (numDocsInChunk + kBlockSize - 1) / kBlockSize;
+        updateResQuantCentroidKernel<<<gridSize, kBlockSize, 0, m_cudaStream.get()>>>(
+            m_h_docIdxChunk.data(), m_h_centroidIdxChunk.data(), numDocsInChunk, m_d_centroidIdx.data());
+
+        // -----------
+        // Scatter residuals from chunk buffer to the full host residual buffer
+        for (int i = 0; i < numDocsInChunk; i++)
+        {
+            T_DOC_IDX docIdx = m_h_docIdxChunk.data()[i];
+            memcpy(m_h_residual.data() + (size_t)docIdx * m_rqDim,
+                   m_h_residualChunk.data() + (size_t)i * m_rqDim,
+                   m_rqDim * sizeof(T_RQ));
+        }
+
+        CHECK_CUDA(cudaStreamSynchronize(m_cudaStream.get()));
     }
-
-    // Copy centroid indices to device
-    CHECK_CUDA(cudaMemcpy(m_d_centroidIdx.data(),
-                          m_h_centroidIdx.data(),
-                          m_d_centroidIdx.getArraySizeInBytes(),
-                          cudaMemcpyHostToDevice));
-
 }
 

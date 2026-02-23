@@ -32,6 +32,9 @@ public:
     int getRqDimPerDoc() const;
 
 private:
+    // Constants
+    static constexpr int kMaxUpdateBatchSize = 10000;
+
     // RQ configuration
     int m_numCentroids;
     int m_numBitsPerDim; // How many bits we use to quantize each dimension
@@ -49,6 +52,11 @@ private:
     CudaDeviceArray<int> m_d_centroidIdx; // numDocs x 1 (on device)
     CudaHostArray<T_RQ> m_h_residual; // numDocs x rqDim (on host)
 
-    // Host buffers for updates
-    CudaHostArray<int> m_h_centroidIdx;
+    // Update chunk buffers (pre-allocated to avoid repeated allocation)
+    CudaHostArray<T_DOC_IDX> m_h_docIdxChunk;
+    CudaHostArray<int> m_h_centroidIdxChunk;
+    CudaHostArray<T_RQ> m_h_residualChunk;
+
+    // Stream
+    CudaStream m_cudaStream;
 };
