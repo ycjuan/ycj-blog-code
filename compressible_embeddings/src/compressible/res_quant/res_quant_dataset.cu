@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <iostream>
-#include <limits>
 #include <omp.h>
 #include <sstream>
 
@@ -152,7 +151,6 @@ struct DensifyFromResQuantKernelParams
     int numBitsPerDim;
 
     // Densification task
-    T_DOC_IDX* d_docIdxList;
     int numDocsToDensify;
     T_EMB* d_workingEmbDataset;
     size_t embDimWorking;
@@ -237,7 +235,6 @@ void ResQuantDataset::densifyCompressible(const DensificationTask& densification
         params.numDocsTotal = m_d_centroidIdx.getArraySize();
         params.rqDim = m_rqDim;
         params.numBitsPerDim = m_numBitsPerDim;
-        params.d_docIdxList = densificationTask.d_docIdxList;
         params.numDocsToDensify = densificationTask.numDocsToDensify;
         params.d_workingEmbDataset = densificationTask.d_workingEmbDataset;
         params.embDimWorking = densificationTask.globalEmbIdxEndExcl - densificationTask.globalEmbIdxBeginIncl;

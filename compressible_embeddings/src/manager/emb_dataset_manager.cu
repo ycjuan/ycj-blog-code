@@ -184,7 +184,6 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
         densificationTask.globalEmbIdxBeginIncl = embIdxBeginIncl;
         densificationTask.globalEmbIdxEndExcl = embIdxEndExcl;
         densificationTask.d_workingEmbDataset = m_workingEmbDataset.data();
-        densificationTask.d_docIdxList = m_d_docIdxListToDensify.data();
         densificationTask.d_copyTasks = m_d_copyTasks.data();
     }
 
