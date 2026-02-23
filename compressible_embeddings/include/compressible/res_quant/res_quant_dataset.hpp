@@ -40,15 +40,14 @@ private:
     // Compressible partition configs (complement of resident partitions)
     std::vector<CompressiblePartitionConfig> m_compressiblePartitionConfigs;
 
-    // Centroid data on device: numCentroids x globalEmbDim x 2 (interleaved [emb, stdDev] per dim)
+    // Centroid data: numCentroids x globalEmbDim x 2 (interleaved [emb, stdDev] per dim)
+    // Current we do quant in host and dequant in device, so we need to keep two copies.
     CudaDeviceArray<T_EMB> m_d_centroidEmb;
-
-    // Per-document data on device
-    CudaDeviceArray<int> m_d_centroidIdx; // numDocs x 1
-    CudaHostArray<T_RQ> m_h_residual; // numDocs x rqDim
-
-    // Host-side copy of centroid embeddings (needed for computing residuals in update)
     CudaHostArray<T_EMB> m_h_centroidEmb;
+
+    // Per-document data
+    CudaDeviceArray<int> m_d_centroidIdx; // numDocs x 1 (on device)
+    CudaHostArray<T_RQ> m_h_residual; // numDocs x rqDim (on host)
 
     // Host buffers for updates
     CudaHostArray<int> m_h_centroidIdx;
