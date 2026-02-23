@@ -31,6 +31,7 @@ bool CompressiblePartitionConfig::operator<(const CompressiblePartitionConfig& o
     }
 }
 
+// Any dims that are not covered by the resident partitions are compressible.
 std::vector<CompressiblePartitionConfig> findCompressiblePartitionConfigs(std::vector<ResidentPartitionConfig> residentPartitionConfigs, size_t totalEmbDim)
 {
     std::sort(residentPartitionConfigs.begin(), residentPartitionConfigs.end());

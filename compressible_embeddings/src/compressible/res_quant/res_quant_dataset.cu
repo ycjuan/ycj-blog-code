@@ -79,6 +79,8 @@ void ResQuantDataset::update(const std::vector<T_DOC_IDX>& docIdxList,
     {
         T_DOC_IDX docIdx = docIdxList.at(i);
 
+        // This is too slow with CPU. We will use GPU for nearest centroid assignment.
+        // Before we have that, we temporarily assume the centroid index is already computed outside.
         // // Centroid assignment: find nearest centroid by L2 distance
         // float bestDist = std::numeric_limits<float>::max();
         // int centroidIdx = 0;
@@ -126,8 +128,10 @@ void ResQuantDataset::update(const std::vector<T_DOC_IDX>& docIdxList,
                           cudaMemcpyHostToDevice));
 
     // Copy residuals to device
-    CHECK_CUDA(
-        cudaMemcpy(m_d_residual.data(), m_h_residual.data(), m_d_residual.getArraySizeInBytes(), cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMemcpy(m_d_residual.data(),
+                          m_h_residual.data(),
+                          m_d_residual.getArraySizeInBytes(),
+                          cudaMemcpyHostToDevice));
 }
 
 // ============================================================================
