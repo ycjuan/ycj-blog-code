@@ -43,6 +43,7 @@ struct DensifyFromResQuantKernelParams
     const int* d_srcCentroidIdx; // 10M (numDocs) x 1
     const T_RQ* h_srcResidual; // 10M (numDocs) x 64 (rqDim)
     int srcEmbDim; // 1024 (globalEmbDim)
+    int srcEmbOffset; // first partition: 64, second partition: 512
     T_DOC_IDX srcNumDocs; // 10M (numDocs)
 
     // Destination
@@ -52,8 +53,7 @@ struct DensifyFromResQuantKernelParams
     int dstEmbDim; // always 768 - 64 = 704
 
     // Copy tasks
-    int embDimToCopyBeginIncl; // always 64
-    int embDimToCopyEndExcl; // always 768
+    int embDimToCopy; // first partition: 128 - 64 = 64, second partition: 768 - 512 = 256
     CopyTask* d_copyTasks; // [(srcDocIdx=13, dstDocIdx=1), (srcDocIdx=9, dstDocIdx=3)]
     int numCopyTasks; // 2
 };
@@ -61,37 +61,34 @@ struct DensifyFromResQuantKernelParams
 __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params)
 {
     size_t tidx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
-    int compressibleEmbDim = params.embDimToCopyEndExcl - params.embDimToCopyBeginIncl;
-    int copyIdx = tidx / compressibleEmbDim;
-    int localEmbIdx = tidx % compressibleEmbDim;
+    int copyIdx = tidx / params.embDimToCopy;
+    int embIdxToCopy = tidx % params.embDimToCopy;
 
     if (copyIdx < params.numCopyTasks)
     {
         CopyTask task = params.d_copyTasks[copyIdx];
-        T_DOC_IDX docIdx = task.srcDocIdx;
-        int toScoreIdx = task.dstDocIdx;
 
-        int globalEmbIdx = localEmbIdx + params.embDimToCopyBeginIncl;
-        int centroidIdx = params.d_srcCentroidIdx[docIdx];
+        int srcEmbIdx = embIdxToCopy + params.srcEmbOffset;
+        int centroidIdx = params.d_srcCentroidIdx[task.srcDocIdx];
 
         // Get centroid value and stdDev
         size_t centroidMemAddr
-            = getMemAddrRowMajor(centroidIdx, globalEmbIdx * 2, params.numCentroids, params.srcEmbDim * 2);
+            = getMemAddrRowMajor(centroidIdx, srcEmbIdx * 2, params.numCentroids, params.srcEmbDim * 2);
         T_EMB centroid = params.d_centroidEmb[centroidMemAddr];
         float stdDev = static_cast<float>(params.d_centroidEmb[centroidMemAddr + 1]);
 
         // Get quantized residual and dequantize
-        int rqIdx = getRqIdx(globalEmbIdx, params.numBitsPerDim, kBitsPerRqInt);
-        size_t rqMemAddr = getMemAddrRowMajor(docIdx, rqIdx, params.srcNumDocs, params.rqDim);
+        int rqIdx = getRqIdx(srcEmbIdx, params.numBitsPerDim, kBitsPerRqInt);
+        size_t rqMemAddr = getMemAddrRowMajor(task.srcDocIdx, rqIdx, params.srcNumDocs, params.rqDim);
         T_RQ quantRes = params.h_srcResidual[rqMemAddr];
-        float residual = dequantize(params.numBitsPerDim, kBitsPerRqInt, stdDev, quantRes, globalEmbIdx);
+        float residual = dequantize(params.numBitsPerDim, kBitsPerRqInt, stdDev, quantRes, srcEmbIdx);
 
         // Reconstruct: centroid + residual
         T_EMB rst = static_cast<T_EMB>(static_cast<float>(centroid) + residual);
 
         // Write to working index
-        size_t dstMemAddr = getMemAddrRowMajor(toScoreIdx,
-                                               localEmbIdx + params.dstEmbOffset,
+        size_t dstMemAddr = getMemAddrRowMajor(task.dstDocIdx,
+                                               embIdxToCopy + params.dstEmbOffset,
                                                params.dstNumDocs,
                                                params.dstEmbDim);
         params.d_dstEmbData[dstMemAddr] = rst;
@@ -114,32 +111,43 @@ void ResQuantDataset::densifyCompressible(const DensificationTask& densification
             continue; // No overlap
         }
 
-        int compressibleEmbDim = embDimEndReal - embDimBeginReal;
-
         DensifyFromResQuantKernelParams params;
-        params.d_centroidEmb = m_d_centroidEmb.data();
-        params.numCentroids = m_numCentroids;
-        params.srcEmbDim = globalEmbDim;
-        params.d_srcCentroidIdx = m_d_centroidIdx.data();
-        params.h_srcResidual = m_h_residual.data();
-        params.srcNumDocs = m_d_centroidIdx.getArraySize();
-        params.rqDim = m_rqDim;
-        params.numBitsPerDim = m_numBitsPerDim;
-        params.dstNumDocs = densificationTask.desiredDocIdxList.size();
-        params.d_dstEmbData = densificationTask.d_workingEmbDataset;
-        params.dstEmbDim = densificationTask.globalEmbIdxEndExcl - densificationTask.globalEmbIdxBeginIncl;
-        params.embDimToCopyBeginIncl = embDimBeginReal;
-        params.embDimToCopyEndExcl = embDimEndReal;
-        params.dstEmbOffset = embDimBeginReal - densificationTask.globalEmbIdxBeginIncl;
-        params.d_copyTasks = densificationTask.d_copyTasks;
-        params.numCopyTasks = densificationTask.numCopyTasks;
+        {
+            // --------
+            // Centroid data
+            params.d_centroidEmb = m_d_centroidEmb.data();
+            params.numCentroids = m_numCentroids;
+            params.rqDim = m_rqDim;
+            params.numBitsPerDim = m_numBitsPerDim;
+
+            // --------
+            // Source
+            params.srcEmbDim = globalEmbDim;
+            params.d_srcCentroidIdx = m_d_centroidIdx.data();
+            params.h_srcResidual = m_h_residual.data();
+            params.srcNumDocs = m_d_centroidIdx.getArraySize();
+            params.srcEmbOffset = embDimBeginReal;
+
+            // --------
+            // Destination
+            params.dstNumDocs = densificationTask.desiredDocIdxList.size();
+            params.d_dstEmbData = densificationTask.d_workingEmbDataset;
+            params.dstEmbDim = densificationTask.globalEmbIdxEndExcl - densificationTask.globalEmbIdxBeginIncl;
+            params.dstEmbOffset = embDimBeginReal - densificationTask.globalEmbIdxBeginIncl;
+
+            // --------
+            // Copy tasks
+            params.embDimToCopy = embDimEndReal - embDimBeginReal;
+            params.d_copyTasks = densificationTask.d_copyTasks;
+            params.numCopyTasks = densificationTask.numCopyTasks;
+        }
 
         if (densificationTask.numCopyTasks == 0)
         {
             continue;
         }
         constexpr int kBlockSize = 1024;
-        int numTasks = densificationTask.numCopyTasks * compressibleEmbDim;
+        int numTasks = densificationTask.numCopyTasks * params.embDimToCopy;
         int gridSize = (numTasks + kBlockSize - 1) / kBlockSize;
         densifyFromResQuantKernel<<<gridSize, kBlockSize>>>(params);
         CHECK_CUDA(cudaGetLastError());
