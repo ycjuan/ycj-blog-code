@@ -95,22 +95,34 @@ __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params
     }
 }
 
-void ResQuantDataset::densifyCompressible(const DensificationTask& densificationTask) const
+void ResQuantDataset::densifyCompressible(const DensificationTask& task) const
 {
-    int globalEmbDim = m_rqDim * kBitsPerRqInt / m_numBitsPerDim;
-
-    for (const auto& compressibleConfig : m_compressiblePartitionConfigs)
+    // -----------------
+    // If there are no copy tasks, then just return.
+    if (task.numCopyTasks == 0)
     {
-        // Compute the overlap between this compressible partition and the requested range.
-        int embDimBeginReal
-            = std::max(densificationTask.globalEmbIdxBeginIncl, (int)compressibleConfig.getEmbDimBeginIncl());
-        int embDimEndReal = std::min(densificationTask.globalEmbIdxEndExcl, (int)compressibleConfig.getEmbDimEndExcl());
+        return;
+    }
 
+    for (const auto& partitionCfg : m_compressiblePartitionConfigs)
+    {
+        // -----------------
+        // For example, if this partition has [64:192], but the desired emb dims are [128:256], then for this partition,
+        // we should do:
+        //   - begin = max(64, 128) = 128
+        //   - end = min(192, 256) = 192
+        int embDimBeginReal = std::max(task.globalEmbIdxBeginIncl, partitionCfg.getEmbDimBeginIncl());
+        int embDimEndReal = std::min(task.globalEmbIdxEndExcl, partitionCfg.getEmbDimEndExcl());
+
+        // -----------------
+        // Nothing to copy for this partition if the following condition is met:
         if (embDimBeginReal >= embDimEndReal)
         {
-            continue; // No overlap
+            continue;
         }
 
+        // -----------------
+        // Prepare the parameters for the kernel.
         DensifyFromResQuantKernelParams params;
         {
             // --------
@@ -122,7 +134,7 @@ void ResQuantDataset::densifyCompressible(const DensificationTask& densification
 
             // --------
             // Source
-            params.srcEmbDim = globalEmbDim;
+            params.srcEmbDim = m_embDim;
             params.d_srcCentroidIdx = m_d_centroidIdx.data();
             params.h_srcResidual = m_h_residual.data();
             params.srcNumDocs = m_d_centroidIdx.getArraySize();
@@ -130,27 +142,25 @@ void ResQuantDataset::densifyCompressible(const DensificationTask& densification
 
             // --------
             // Destination
-            params.dstNumDocs = densificationTask.desiredDocIdxList.size();
-            params.d_dstEmbData = densificationTask.d_workingEmbDataset;
-            params.dstEmbDim = densificationTask.globalEmbIdxEndExcl - densificationTask.globalEmbIdxBeginIncl;
-            params.dstEmbOffset = embDimBeginReal - densificationTask.globalEmbIdxBeginIncl;
+            params.dstNumDocs = task.desiredDocIdxList.size();
+            params.d_dstEmbData = task.d_workingEmbDataset;
+            params.dstEmbDim = task.globalEmbIdxEndExcl - task.globalEmbIdxBeginIncl;
+            params.dstEmbOffset = embDimBeginReal - task.globalEmbIdxBeginIncl;
 
             // --------
             // Copy tasks
             params.embDimToCopy = embDimEndReal - embDimBeginReal;
-            params.d_copyTasks = densificationTask.d_copyTasks;
-            params.numCopyTasks = densificationTask.numCopyTasks;
+            params.d_copyTasks = task.d_copyTasks;
+            params.numCopyTasks = task.numCopyTasks;
         }
 
-        if (densificationTask.numCopyTasks == 0)
-        {
-            continue;
-        }
+        // -----------------
+        // Launch the kernel.
         constexpr int kBlockSize = 1024;
-        int numTasks = densificationTask.numCopyTasks * params.embDimToCopy;
+        int numTasks = task.numCopyTasks * params.embDimToCopy;
         int gridSize = (numTasks + kBlockSize - 1) / kBlockSize;
-        densifyFromResQuantKernel<<<gridSize, kBlockSize>>>(params);
+        densifyFromResQuantKernel<<<gridSize, kBlockSize, 0, m_cudaStreamRead.get()>>>(params);
         CHECK_CUDA(cudaGetLastError());
-        CHECK_CUDA(cudaDeviceSynchronize());
+        CHECK_CUDA(cudaStreamSynchronize(m_cudaStreamRead.get()));
     }
 }

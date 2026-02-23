@@ -35,6 +35,10 @@ private:
     // Constants
     static constexpr int kMaxUpdateBatchSize = 10000;
 
+    // General meta data
+    int m_embDim;
+    T_DOC_IDX m_numDocs;
+
     // RQ configuration
     int m_numCentroids;
     int m_numBitsPerDim; // How many bits we use to quantize each dimension
@@ -58,5 +62,6 @@ private:
     CudaHostArray<T_RQ> m_h_residualChunk;
 
     // Stream
-    CudaStream m_cudaStream;
+    CudaStream m_cudaStreamWrite;
+    CudaStream m_cudaStreamRead;
 };

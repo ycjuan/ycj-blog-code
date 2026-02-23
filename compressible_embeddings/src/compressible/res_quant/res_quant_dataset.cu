@@ -20,7 +20,9 @@ ResQuantDataset::ResQuantDataset(T_DOC_IDX numDocs,
                                  int numBitsPerDim,
                                  const std::vector<std::vector<float>>& centroidEmbs,
                                  const std::vector<std::vector<float>>& centroidStdDevs)
-    : m_numCentroids(centroidEmbs.size())
+    : m_numDocs(numDocs)
+    , m_embDim(globalEmbDim)
+    , m_numCentroids(centroidEmbs.size())
     , m_numBitsPerDim(numBitsPerDim)
     , m_rqDim(getRqDim(globalEmbDim, numBitsPerDim))
     , m_compressiblePartitionConfigs(std::move(compressiblePartitionConfigs))
@@ -135,7 +137,7 @@ void ResQuantDataset::update(const std::vector<T_DOC_IDX>& docIdxList,
         // Scatter centroid indices to device via kernel
         constexpr int kBlockSize = 1024;
         int gridSize = (numDocsInChunk + kBlockSize - 1) / kBlockSize;
-        updateResQuantCentroidKernel<<<gridSize, kBlockSize, 0, m_cudaStream.get()>>>(
+        updateResQuantCentroidKernel<<<gridSize, kBlockSize, 0, m_cudaStreamWrite.get()>>>(
             m_h_docIdxChunk.data(), m_h_centroidIdxChunk.data(), numDocsInChunk, m_d_centroidIdx.data());
 
         // -----------
@@ -148,7 +150,7 @@ void ResQuantDataset::update(const std::vector<T_DOC_IDX>& docIdxList,
                    m_rqDim * sizeof(T_RQ));
         }
 
-        CHECK_CUDA(cudaStreamSynchronize(m_cudaStream.get()));
+        CHECK_CUDA(cudaStreamSynchronize(m_cudaStreamWrite.get()));
     }
 }
 
