@@ -16,14 +16,14 @@ constexpr bool kVerbose = false;
 
 struct ExpSetting
 {
-    size_t numDocs = 50000;
-    size_t totalEmbDim = 128;
-    size_t maxWorkingSetSize = 50000;
-    size_t numDocsToDensify = 10000;
-    size_t densifiedEmbIdxBeginIncl = 3;
-    size_t densifiedEmbIdxEndExcl = 125;
-    size_t numCentroids = 16;
-    size_t numBitsPerDim = 2;
+    int numDocs = 50000;
+    int totalEmbDim = 128;
+    int maxWorkingSetSize = 50000;
+    int numDocsToDensify = 10000;
+    int densifiedEmbIdxBeginIncl = 3;
+    int densifiedEmbIdxEndExcl = 125;
+    int numCentroids = 16;
+    int numBitsPerDim = 2;
     std::vector<ResidentPartitionConfig> residentPartitionConfigs
         = { ResidentPartitionConfig(0, 48, MemLayout::ROW_MAJOR),
             ResidentPartitionConfig(64, 96, MemLayout::ROW_MAJOR) };
@@ -44,7 +44,7 @@ struct ExpSetting
                   << "numCentroids: " << numCentroids << "\n"
                   << "numBitsPerDim: " << numBitsPerDim << "\n"
                   << "residentPartitionConfigs: [";
-        for (size_t i = 0; i < residentPartitionConfigs.size(); ++i)
+        for (int i = 0; i < (int)residentPartitionConfigs.size(); ++i)
         {
             if (i > 0)
             {
@@ -67,7 +67,7 @@ std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<
     const std::vector<std::vector<float>>& centroidEmbs,
     const std::vector<std::vector<float>>& centroidStdDevs)
 {
-    size_t numCentroids = centroidEmbs.size();
+    int numCentroids = centroidEmbs.size();
     std::vector<T_DOC_IDX> docIdxList(s.numDocs);
     std::vector<std::vector<T_EMB>> emb2D(s.numDocs);
     std::vector<int> centroidIdxList(s.numDocs);
@@ -78,14 +78,14 @@ std::tuple<std::vector<T_DOC_IDX>, std::vector<std::vector<T_EMB>>, std::vector<
         generators.at(t).seed(t);
     }
 #pragma omp parallel for schedule(static)
-    for (size_t docIdx = 0; docIdx < s.numDocs; ++docIdx)
+    for (int docIdx = 0; docIdx < s.numDocs; ++docIdx)
     {
         std::default_random_engine& generator = generators.at(omp_get_thread_num());
         docIdxList.at(docIdx) = docIdx;
         emb2D.at(docIdx).resize(s.totalEmbDim);
         int centroidIdx = docIdx % numCentroids;
         centroidIdxList.at(docIdx) = centroidIdx;
-        for (size_t embIdx = 0; embIdx < s.totalEmbDim; ++embIdx)
+        for (int embIdx = 0; embIdx < s.totalEmbDim; ++embIdx)
         {
             float centroid = centroidEmbs.at(centroidIdx).at(embIdx);
             float stdDev = centroidStdDevs.at(centroidIdx).at(embIdx);
@@ -107,17 +107,17 @@ std::pair<std::vector<T_DOC_IDX>, float> genNextDocIdxList(const ExpSetting& s,
                                                            int trial)
 {
     static std::default_random_engine generator(trial);
-    size_t numToKeep = static_cast<size_t>(s.numDocsToDensify * s.cacheRate);
+    int numToKeep = (int)(s.numDocsToDensify * s.cacheRate);
     std::uniform_int_distribution<T_DOC_IDX> dist(0, s.numDocs - 1);
 
     std::unordered_set<T_DOC_IDX> nextSet(current.begin(), current.begin() + numToKeep);
-    while (nextSet.size() < s.numDocsToDensify)
+    while ((int)nextSet.size() < s.numDocsToDensify)
     {
         nextSet.insert(dist(generator));
     }
 
     std::unordered_set<T_DOC_IDX> prevSet(current.begin(), current.end());
-    size_t overlapCount = 0;
+    int overlapCount = 0;
     for (T_DOC_IDX idx : nextSet)
     {
         if (prevSet.count(idx))
@@ -139,7 +139,7 @@ std::vector<T_DOC_IDX> genRandomDocIdxList(const ExpSetting& s)
     std::unordered_set<T_DOC_IDX> docIdxSet;
     std::default_random_engine generator;
     std::uniform_int_distribution<T_DOC_IDX> distribution(0, s.numDocs - 1);
-    while (docIdxSet.size() < s.numDocsToDensify)
+    while ((int)docIdxSet.size() < s.numDocsToDensify)
     {
         docIdxSet.insert(distribution(generator));
     }
@@ -156,9 +156,9 @@ std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> genR
     std::vector<std::vector<float>> centroidEmbs(s.numCentroids, std::vector<float>(s.totalEmbDim));
     std::vector<std::vector<float>> centroidStdDevs(s.numCentroids,
                                                     std::vector<float>(s.totalEmbDim, s.centroidStdDev));
-    for (size_t c = 0; c < s.numCentroids; c++)
+    for (int c = 0; c < s.numCentroids; c++)
     {
-        for (size_t d = 0; d < s.totalEmbDim; d++)
+        for (int d = 0; d < s.totalEmbDim; d++)
         {
             centroidEmbs.at(c).at(d) = std::min(100.0f, std::max(-100.0f, distribution(generator)));
         }
@@ -166,7 +166,7 @@ std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> genR
     return std::make_pair(centroidEmbs, centroidStdDevs);
 }
 
-bool isCompressibleDim(const ExpSetting& s, size_t embIdx)
+bool isCompressibleDim(const ExpSetting& s, int embIdx)
 {
     for (const auto& config : s.residentPartitionConfigs)
     {
@@ -184,7 +184,7 @@ float verifyDensification(const ExpSetting& s,
                           const std::vector<T_DOC_IDX>& docIdxList,
                           const std::vector<std::vector<T_EMB>>& emb2D)
 {
-    size_t densifiedEmbDim = s.densifiedEmbIdxEndExcl - s.densifiedEmbIdxBeginIncl;
+    int densifiedEmbDim = s.densifiedEmbIdxEndExcl - s.densifiedEmbIdxBeginIncl;
     std::vector<T_EMB> v_workingEmbDataset(s.maxWorkingSetSize * s.totalEmbDim);
     CHECK_CUDA(cudaMemcpy(v_workingEmbDataset.data(),
                           workingEmbDataset.data(),
@@ -192,15 +192,15 @@ float verifyDensification(const ExpSetting& s,
                           cudaMemcpyDeviceToHost));
 
     float compressibleErrorSum = 0.0f;
-    size_t compressibleCount = 0;
+    int compressibleCount = 0;
     std::string errorMsg;
 
 #pragma omp parallel for schedule(static) reduction(+:compressibleErrorSum, compressibleCount)
-    for (size_t docIdx = 0; docIdx < docIdxList.size(); ++docIdx)
+    for (int docIdx = 0; docIdx < (int)docIdxList.size(); ++docIdx)
     {
-        for (size_t embIdx = s.densifiedEmbIdxBeginIncl; embIdx < s.densifiedEmbIdxEndExcl; ++embIdx)
+        for (int embIdx = s.densifiedEmbIdxBeginIncl; embIdx < s.densifiedEmbIdxEndExcl; ++embIdx)
         {
-            size_t memAddr
+            int memAddr
                 = getMemAddrRowMajor(docIdx, embIdx - s.densifiedEmbIdxBeginIncl, s.numDocsToDensify, densifiedEmbDim);
             float val = static_cast<float>(v_workingEmbDataset.at(memAddr));
             float ref = static_cast<float>(emb2D.at(docIdxList.at(docIdx)).at(embIdx));
