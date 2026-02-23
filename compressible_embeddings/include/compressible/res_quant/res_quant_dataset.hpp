@@ -35,8 +35,8 @@ public:
 private:
     // RQ configuration
     int m_numCentroids;
-    int m_numBitsPerDim;
-    int m_rqDim; // number of T_RQ elements per document
+    int m_numBitsPerDim; // How many bits we use to quantize each dimension
+    int m_rqDim; // This equals to globalEmbDim * numBitsPerDim / kBitsPerRqInt
 
     // Compressible partition configs (complement of resident partitions)
     std::vector<CompressiblePartitionConfig> m_compressiblePartitionConfigs;

@@ -1,12 +1,9 @@
 #pragma once
 
-#include <cstdint>
 #include <cmath>
 #include <cuda_runtime.h>
 
-typedef uint64_t T_RQ;
-
-constexpr int kBitsPerRqInt = 8 * sizeof(T_RQ);
+#include "common/const.hpp"
 
 inline __device__ __host__ size_t getRqDim(size_t embDim, size_t numBitsPerDim)
 {
