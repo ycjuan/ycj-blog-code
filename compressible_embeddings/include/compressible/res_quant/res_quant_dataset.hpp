@@ -4,7 +4,7 @@
 
 #include "compressible/compressible_emb_dataset.hpp"
 #include "compressible/compressible_partition_config.hpp"
-#include "compressible/res_quant/residual_quantization.hpp"
+#include "compressible/res_quant/res_quant_utils.hpp"
 #include "common/typedef.hpp"
 #include "common/densification_task.hpp"
 #include "utils/cuda_raii.hpp"
