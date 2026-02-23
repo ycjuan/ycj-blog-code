@@ -44,7 +44,6 @@ EmbDatasetManager::EmbDatasetManager(T_DOC_IDX numDocs,
     , m_maxNumWorkingDocs(maxNumWorkingDocs)
     , m_resQuantDataset(numDocs,
                         totalEmbDim,
-                        maxNumWorkingDocs,
                         findCompressiblePartitionConfigs(residentPartitionConfigs, totalEmbDim),
                         numBitsPerDim,
                         centroidEmbs,

@@ -11,13 +11,9 @@
 class ResQuantDataset
 {
 public:
-    // centroidEmbs: numCentroids x globalEmbDim (centroid mean values)
-    // centroidStdDevs: numCentroids x globalEmbDim (per-dimension standard deviations)
-    // centroidIdxList: numDocs (centroid assignment for each document)
-    // residuals: numDocs x rqDim (pre-quantized residuals, packed into T_RQ)
+
     ResQuantDataset(T_DOC_IDX numDocs,
                     int globalEmbDim,
-                    int maxNumDocsInWorkingDataset,
                     std::vector<CompressiblePartitionConfig> compressiblePartitionConfigs,
                     int numBitsPerDim,
                     const std::vector<std::vector<float>>& centroidEmbs,
