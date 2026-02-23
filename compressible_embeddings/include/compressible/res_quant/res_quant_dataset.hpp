@@ -46,12 +46,11 @@ private:
 
     // Per-document data on device
     CudaDeviceArray<int> m_d_centroidIdx; // numDocs x 1
-    CudaDeviceArray<T_RQ> m_d_residual; // numDocs x rqDim
+    CudaHostArray<T_RQ> m_h_residual; // numDocs x rqDim
 
     // Host-side copy of centroid embeddings (needed for computing residuals in update)
     CudaHostArray<T_EMB> m_h_centroidEmb;
 
     // Host buffers for updates
     CudaHostArray<int> m_h_centroidIdx;
-    CudaHostArray<T_RQ> m_h_residual;
 };

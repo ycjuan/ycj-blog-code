@@ -20,12 +20,11 @@ ResQuantDataset::ResQuantDataset(T_DOC_IDX numDocs,
     , m_numBitsPerDim(numBitsPerDim)
     , m_rqDim(getRqDim(globalEmbDim, numBitsPerDim))
     , m_compressiblePartitionConfigs(std::move(compressiblePartitionConfigs))
-    , m_d_centroidEmb(m_numCentroids * globalEmbDim * 2, "m_centroidEmb")
-    , m_d_centroidIdx(numDocs, "m_centroidIdx")
-    , m_d_residual(numDocs * m_rqDim, "m_residual")
-    , m_h_centroidEmb(m_numCentroids * globalEmbDim * 2, "m_centroidEmbHost")
-    , m_h_centroidIdx(numDocs, "m_centroidIdxHost")
-    , m_h_residual(numDocs * m_rqDim, "m_residualHost")
+    , m_d_centroidEmb(m_numCentroids * globalEmbDim * 2, "m_d_centroidEmb")
+    , m_d_centroidIdx(numDocs, "m_d_centroidIdx")
+    , m_h_residual(numDocs * m_rqDim, "m_h_residual")
+    , m_h_centroidEmb(m_numCentroids * globalEmbDim * 2, "m_h_centroidEmb")
+    , m_h_centroidIdx(numDocs, "m_h_centroidIdx")
 {
     if (kBitsPerRqInt % numBitsPerDim != 0)
     {
@@ -124,10 +123,5 @@ void ResQuantDataset::update(const std::vector<T_DOC_IDX>& docIdxList,
                           m_d_centroidIdx.getArraySizeInBytes(),
                           cudaMemcpyHostToDevice));
 
-    // Copy residuals to device
-    CHECK_CUDA(cudaMemcpy(m_d_residual.data(),
-                          m_h_residual.data(),
-                          m_d_residual.getArraySizeInBytes(),
-                          cudaMemcpyHostToDevice));
 }
 

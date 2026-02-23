@@ -16,7 +16,7 @@ struct DensifyFromResQuantKernelParams
 
     // Source
     const int* d_srcCentroidIdx;
-    const T_RQ* d_srcResidual;
+    const T_RQ* h_srcResidual;
     int srcEmbDim;
     T_DOC_IDX srcNumDocs;
 
@@ -58,7 +58,7 @@ __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params
         // Get quantized residual and dequantize
         int rqIdx = getRqIdx(globalEmbIdx, params.numBitsPerDim, kBitsPerRqInt);
         size_t rqMemAddr = getMemAddrRowMajor(docIdx, rqIdx, params.srcNumDocs, params.rqDim);
-        T_RQ quantRes = params.d_srcResidual[rqMemAddr];
+        T_RQ quantRes = params.h_srcResidual[rqMemAddr];
         float residual = dequantize(params.numBitsPerDim, kBitsPerRqInt, stdDev, quantRes, globalEmbIdx);
 
         // Reconstruct: centroid + residual
@@ -96,7 +96,7 @@ void ResQuantDataset::densifyCompressible(const DensificationTask& densification
         params.numCentroids = m_numCentroids;
         params.srcEmbDim = globalEmbDim;
         params.d_srcCentroidIdx = m_d_centroidIdx.data();
-        params.d_srcResidual = m_d_residual.data();
+        params.h_srcResidual = m_h_residual.data();
         params.srcNumDocs = m_d_centroidIdx.getArraySize();
         params.rqDim = m_rqDim;
         params.numBitsPerDim = m_numBitsPerDim;
