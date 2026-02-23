@@ -1,5 +1,6 @@
 #include <algorithm>
 
+#include "common/typedef.hpp"
 #include "compressible/res_quant/res_quant_dataset.hpp"
 #include "utils/util.hpp"
 
@@ -11,27 +12,27 @@ struct DensifyFromResQuantKernelParams
 {
     // Centroid data
     const T_EMB* d_centroidEmb;
-    size_t numCentroids;
+    int numCentroids;
 
     // RQ config
     int numBitsPerDim;
-    size_t rqDim;
+    int rqDim;
 
     // Source
     const int* d_srcCentroidIdx;
     const T_RQ* d_srcResidual;
-    size_t srcEmbDim;
-    size_t srcNumDocs;
+    int srcEmbDim;
+    T_DOC_IDX srcNumDocs;
 
     // Destination
     T_EMB* d_dstEmbData;
-    size_t dstEmbOffset;
-    int dstNumDocs;
-    size_t dstEmbDim;
+    int dstEmbOffset;
+    T_DOC_IDX dstNumDocs;
+    int dstEmbDim;
 
     // Copy tasks
-    size_t embDimToCopyBeginIncl;
-    size_t embDimToCopyEndExcl;
+    int embDimToCopyBeginIncl;
+    int embDimToCopyEndExcl;
     CopyTask* d_copyTasks;
     int numCopyTasks;
 };
