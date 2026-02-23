@@ -216,6 +216,12 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& desiredDocIdxList)
             oss << "cntUncached != 0: " << cntUncached;
             throw std::runtime_error(oss.str());
         }
+        if (reorderedDocIdxList.size() != desiredDocIdxList.size())
+        {
+            std::ostringstream oss;
+            oss << "reorderedDocIdxList.size() != desiredDocIdxList.size(): " << reorderedDocIdxList.size() << " != " << desiredDocIdxList.size();
+            throw std::runtime_error(oss.str());
+        }
     }
 
     // ------------
