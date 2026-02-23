@@ -229,7 +229,7 @@ void EmbDatasetManager::cache(std::vector<T_DOC_IDX>& desiredDocIdxList)
     {
         Timer timer;
         timer.tic();
-        desiredDocIdxList = reorderedDocIdxList;
+        desiredDocIdxList = std::move(reorderedDocIdxList);
         m_lastTimeRecord.cacheReassignMs += timer.tocMs();
     }
 
