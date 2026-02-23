@@ -4,10 +4,6 @@
 #include "compressible/res_quant/res_quant_dataset.hpp"
 #include "utils/util.hpp"
 
-// ============================================================================
-// Densification kernel
-// ============================================================================
-
 struct DensifyFromResQuantKernelParams
 {
     // Centroid data
@@ -76,10 +72,6 @@ __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params
         params.d_dstEmbData[dstMemAddr] = rst;
     }
 }
-
-// ============================================================================
-// densifyCompressible
-// ============================================================================
 
 void ResQuantDataset::densifyCompressible(const DensificationTask& densificationTask) const
 {
