@@ -3,6 +3,8 @@
 #include "common/typedef.hpp"
 #include "compressible/res_quant/res_quant_dataset.hpp"
 #include "utils/util.hpp"
+#include "common/const.hpp"
+#include "compressible/res_quant/res_quant_utils.hpp"
 
 struct DensifyFromResQuantKernelParams
 {

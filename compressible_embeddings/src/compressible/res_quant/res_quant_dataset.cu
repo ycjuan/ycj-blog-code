@@ -1,10 +1,12 @@
+
+#include <omp.h>
+#include <sstream>
+
 #include "common/memory_layout.hpp"
 #include "compressible/res_quant/res_quant_dataset.hpp"
 #include "utils/util.hpp"
-
-#include <iostream>
-#include <omp.h>
-#include <sstream>
+#include "common/const.hpp"
+#include "compressible/res_quant/res_quant_utils.hpp"
 
 // ============================================================================
 // Constructor
@@ -26,6 +28,8 @@ ResQuantDataset::ResQuantDataset(T_DOC_IDX numDocs,
     , m_h_centroidEmb(m_numCentroids * globalEmbDim * 2, "m_h_centroidEmb")
     , m_h_centroidIdx(numDocs, "m_h_centroidIdx")
 {
+    // --------------------
+    // Validate inputs
     if (kBitsPerRqInt % numBitsPerDim != 0)
     {
         std::ostringstream oss;
@@ -33,7 +37,7 @@ ResQuantDataset::ResQuantDataset(T_DOC_IDX numDocs,
         throw std::runtime_error(oss.str());
     }
 
-    // -------------------------------------------------------------------------
+    // --------------------
     // Copy centroid embeddings to host buffer and device (interleaved [emb, stdDev] per dim)
     {
         for (size_t c = 0; c < m_numCentroids; c++)

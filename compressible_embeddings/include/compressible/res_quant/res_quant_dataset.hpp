@@ -5,7 +5,6 @@
 #include "common/densification_task.hpp"
 #include "common/typedef.hpp"
 #include "compressible/compressible_partition_config.hpp"
-#include "compressible/res_quant/res_quant_utils.hpp"
 #include "utils/cuda_raii.hpp"
 
 class ResQuantDataset
