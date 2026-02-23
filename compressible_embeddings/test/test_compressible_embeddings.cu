@@ -316,7 +316,7 @@ void runExp(ExpSetting s)
         Timer timer;
         timer.tic();
         DensificationTask densificationTask;
-        densificationTask.docIdxList = docIdxListToDensify;
+        densificationTask.desiredDocIdxList = docIdxListToDensify;
         densificationTask.globalEmbIdxBeginIncl = s.densifiedEmbIdxBeginIncl;
         densificationTask.globalEmbIdxEndExcl = s.densifiedEmbIdxEndExcl;
         densificationTask.memLayout = MemLayout::ROW_MAJOR;
@@ -327,7 +327,7 @@ void runExp(ExpSetting s)
         // --------
         // Verify the result
         timer.tic();
-        float compressibleError = verifyDensification(s, workingEmbDataset, densificationTask.docIdxList, emb2D);
+        float compressibleError = verifyDensification(s, workingEmbDataset, densificationTask.desiredDocIdxList, emb2D);
         float verifyMs = timer.tocMs();
         totalCompressibleError += compressibleError;
 

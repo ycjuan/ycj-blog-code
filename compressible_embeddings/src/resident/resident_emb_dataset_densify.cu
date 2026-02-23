@@ -116,7 +116,7 @@ void ResidentEmbDataset::densify(const DensificationTask& densificationTask) con
         // --------
         // Destination
         params.d_dstEmbData = densificationTask.d_workingEmbDataset;
-        params.dstNumDocs = densificationTask.numDocsToDensify;
+        params.dstNumDocs = densificationTask.desiredDocIdxList.size();
         params.dstEmbDim = densificationTask.globalEmbIdxEndExcl - densificationTask.globalEmbIdxBeginIncl;
         params.dstEmbOffset = embDimToCopyBeginIncl - densificationTask.globalEmbIdxBeginIncl;
 

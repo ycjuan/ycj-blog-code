@@ -14,13 +14,12 @@ struct CopyTask
 struct DensificationTask
 {
     // Caller-provided
-    std::vector<T_DOC_IDX> docIdxList;
+    std::vector<T_DOC_IDX> desiredDocIdxList;
     size_t globalEmbIdxBeginIncl;
     size_t globalEmbIdxEndExcl;
     MemLayout memLayout;
 
     // Filled in by manager
-    size_t numDocsToDensify;
     size_t numCopyTasks;
     T_EMB* d_workingEmbDataset;
     CopyTask* d_copyTasks;

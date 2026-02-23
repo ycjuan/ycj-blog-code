@@ -235,7 +235,7 @@ void ResQuantDataset::densifyCompressible(const DensificationTask& densification
         params.numDocsTotal = m_d_centroidIdx.getArraySize();
         params.rqDim = m_rqDim;
         params.numBitsPerDim = m_numBitsPerDim;
-        params.numDocsToDensify = densificationTask.numDocsToDensify;
+        params.numDocsToDensify = densificationTask.desiredDocIdxList.size();
         params.d_workingEmbDataset = densificationTask.d_workingEmbDataset;
         params.embDimWorking = densificationTask.globalEmbIdxEndExcl - densificationTask.globalEmbIdxBeginIncl;
         params.compressibleEmbDimBegin = embDimBeginReal;

@@ -119,10 +119,10 @@ const WorkingEmbDataset& EmbDatasetManager::densify(DensificationTask& task)
 {
     // --------------
     // Input sanity checks.
-    if (task.docIdxList.size() > m_maxNumWorkingDocs)
+    if (task.desiredDocIdxList.size() > m_maxNumWorkingDocs)
     {
         std::ostringstream oss;
-        oss << "docIdxList.size() > m_maxNumWorkingDocs: " << task.docIdxList.size() << " > " << m_maxNumWorkingDocs;
+        oss << "docIdxList.size() > m_maxNumWorkingDocs: " << task.desiredDocIdxList.size() << " > " << m_maxNumWorkingDocs;
         throw std::runtime_error(oss.str());
     }
 
@@ -139,7 +139,7 @@ const WorkingEmbDataset& EmbDatasetManager::densify(DensificationTask& task)
     {
         Timer timer;
         timer.tic();
-        cache(task.docIdxList);
+        cache(task.desiredDocIdxList);
         m_lastTimeRecord.densifyCacheMs += timer.tocMs();
     }
 
@@ -158,8 +158,8 @@ const WorkingEmbDataset& EmbDatasetManager::densify(DensificationTask& task)
         Timer timer;
         timer.tic();
         CHECK_CUDA(cudaMemcpy(m_d_docIdxListToDensify.data(),
-                              task.docIdxList.data(),
-                              task.docIdxList.size() * sizeof(T_DOC_IDX),
+                              task.desiredDocIdxList.data(),
+                              task.desiredDocIdxList.size() * sizeof(T_DOC_IDX),
                               cudaMemcpyHostToDevice));
         m_lastTimeRecord.densifyMemcpyH2DMs += timer.tocMs();
     }
@@ -175,7 +175,6 @@ const WorkingEmbDataset& EmbDatasetManager::densify(DensificationTask& task)
     // --------------
     // Fill in the manager-side fields of the densification task.
     {
-        task.numDocsToDensify = task.docIdxList.size();
         task.numCopyTasks = m_numCopyTasks;
         task.d_workingEmbDataset = m_workingEmbDataset.data();
         task.d_copyTasks = m_d_copyTasks.data();
