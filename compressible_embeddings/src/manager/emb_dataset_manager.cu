@@ -117,17 +117,12 @@ void EmbDatasetManager::update(const std::vector<T_DOC_IDX>& docIdxList,
 
 const WorkingEmbDataset& EmbDatasetManager::densify(DensificationTask& task)
 {
-    std::vector<T_DOC_IDX>& docIdxList = task.docIdxList;
-    const size_t embIdxBeginIncl = task.globalEmbIdxBeginIncl;
-    const size_t embIdxEndExcl = task.globalEmbIdxEndExcl;
-    const MemLayout memLayout = task.memLayout;
-
     // --------------
     // Input sanity checks.
-    if (docIdxList.size() > m_maxNumWorkingDocs)
+    if (task.docIdxList.size() > m_maxNumWorkingDocs)
     {
         std::ostringstream oss;
-        oss << "docIdxList.size() > m_maxNumWorkingDocs: " << docIdxList.size() << " > " << m_maxNumWorkingDocs;
+        oss << "docIdxList.size() > m_maxNumWorkingDocs: " << task.docIdxList.size() << " > " << m_maxNumWorkingDocs;
         throw std::runtime_error(oss.str());
     }
 
@@ -144,7 +139,7 @@ const WorkingEmbDataset& EmbDatasetManager::densify(DensificationTask& task)
     {
         Timer timer;
         timer.tic();
-        cache(docIdxList);
+        cache(task.docIdxList);
         m_lastTimeRecord.densifyCacheMs += timer.tocMs();
     }
 
@@ -163,8 +158,8 @@ const WorkingEmbDataset& EmbDatasetManager::densify(DensificationTask& task)
         Timer timer;
         timer.tic();
         CHECK_CUDA(cudaMemcpy(m_d_docIdxListToDensify.data(),
-                              docIdxList.data(),
-                              docIdxList.size() * sizeof(T_DOC_IDX),
+                              task.docIdxList.data(),
+                              task.docIdxList.size() * sizeof(T_DOC_IDX),
                               cudaMemcpyHostToDevice));
         m_lastTimeRecord.densifyMemcpyH2DMs += timer.tocMs();
     }
@@ -172,15 +167,15 @@ const WorkingEmbDataset& EmbDatasetManager::densify(DensificationTask& task)
     // --------------
     // Set the working dataset properties.
     {
-        m_workingEmbDataset.setMemLayout(memLayout);
-        m_workingEmbDataset.setEmbDimBeginIncl(embIdxBeginIncl);
-        m_workingEmbDataset.setEmbDimEndExcl(embIdxEndExcl);
+        m_workingEmbDataset.setMemLayout(task.memLayout);
+        m_workingEmbDataset.setEmbDimBeginIncl(task.globalEmbIdxBeginIncl);
+        m_workingEmbDataset.setEmbDimEndExcl(task.globalEmbIdxEndExcl);
     }
 
     // --------------
     // Fill in the manager-side fields of the densification task.
     {
-        task.numDocsToDensify = docIdxList.size();
+        task.numDocsToDensify = task.docIdxList.size();
         task.numCopyTasks = m_numCopyTasks;
         task.d_workingEmbDataset = m_workingEmbDataset.data();
         task.d_copyTasks = m_d_copyTasks.data();
