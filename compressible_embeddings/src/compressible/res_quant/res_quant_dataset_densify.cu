@@ -6,33 +6,56 @@
 #include "common/const.hpp"
 #include "compressible/res_quant/res_quant_utils.hpp"
 
+/*
+Please first read the comments in the resident/resident_emb_dataset_densify.cu file, we will use the same example to
+explain how this works here. Also we assume there are 2048 centroids.
+
+Take the same example as in the resident/resident_emb_dataset_densify.cu file, but let's slightly change it to - we want to 
+densify the following dims: [64, 768] (704d)
+
+This will transform into the following copies:
+  1. Copy  CompressibleEmbDataset[13][64:128] to WorkingEmbDataset[1][0:64]
+  2. Copy  CompressibleEmbDataset[ 9][64:128] to WorkingEmbDataset[3][0:64]
+  3. Copy       ResidentEmbDataset[13][0:384] to WorkingEmbDataset[1][64:448]
+  4. Copy       ResidentEmbDataset[ 9][0:384] to WorkingEmbDataset[3][64:448]
+  5. Copy CompressibleEmbDataset[13][512:768] to WorkingEmbDataset[1][448:704]
+  6. Copy CompressibleEmbDataset[ 9][512:768] to WorkingEmbDataset[3][448:704]
+
+The kernel in this file will perform 1, 2, 5, 6, while 3 and 4 are performed in the resident/resident_emb_dataset_densify.cu.
+
+Note that 1 + 2 are considered as the same partition will be performed together, so as 5 + 6. That's why we have the following loop:
+```
+for (const auto& compressibleConfig : m_compressiblePartitionConfigs)
+```
+*/
+
 struct DensifyFromResQuantKernelParams
 {
     // Centroid data
-    const T_EMB* d_centroidEmb;
-    int numCentroids;
+    const T_EMB* d_centroidEmb; // 2048 (numCentroids) x 1024 (globalEmbDim) x 2 (interleaved [emb, stdDev] per dim)
+    int numCentroids; // 2048
 
     // RQ config
-    int numBitsPerDim;
-    int rqDim;
+    int numBitsPerDim; // 2
+    int rqDim; // 1024 (globalEmbDim) * 2 (numBitsPerDim) / 32 (kBitsPerRqInt) = 64
 
     // Source
-    const int* d_srcCentroidIdx;
-    const T_RQ* h_srcResidual;
-    int srcEmbDim;
-    T_DOC_IDX srcNumDocs;
+    const int* d_srcCentroidIdx; // 10M (numDocs) x 1
+    const T_RQ* h_srcResidual; // 10M (numDocs) x 64 (rqDim)
+    int srcEmbDim; // 1024 (globalEmbDim)
+    T_DOC_IDX srcNumDocs; // 10M (numDocs)
 
     // Destination
-    T_EMB* d_dstEmbData;
-    int dstEmbOffset;
-    T_DOC_IDX dstNumDocs;
-    int dstEmbDim;
+    T_EMB* d_dstEmbData; // 4 (dstNumDocs) x 704 (dstEmbDim)
+    int dstEmbOffset; // first partition: 0, second partition: 448
+    T_DOC_IDX dstNumDocs; // always 4
+    int dstEmbDim; // always 768 - 64 = 704
 
     // Copy tasks
-    int embDimToCopyBeginIncl;
-    int embDimToCopyEndExcl;
-    CopyTask* d_copyTasks;
-    int numCopyTasks;
+    int embDimToCopyBeginIncl; // always 64
+    int embDimToCopyEndExcl; // always 768
+    CopyTask* d_copyTasks; // [(srcDocIdx=13, dstDocIdx=1), (srcDocIdx=9, dstDocIdx=3)]
+    int numCopyTasks; // 2
 };
 
 __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params)

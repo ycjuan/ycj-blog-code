@@ -17,13 +17,13 @@ Let's explain how this works by an example. Let's say we have:
 
 So conceptually, we want to perform the following copies:
   - Copy GlobalEmbDataset[13][192:768] to WorkingEmbDataset[1][0:576]
-  - Copy GlobalEmbDataset[9][192:768] to WorkingEmbDataset[3][0:576]
+  - Copy GlobalEmbDataset[ 9][192:768] to WorkingEmbDataset[3][0:576]
 
 However, in practice, since [128:512] are "resident" embeddings, we actually need to split the copy into the following tasks:
-  1. Copy ResidentEmbDataset[13][64:384] to WorkingEmbDataset[1][0:320]
-  2. Copy ResidentEmbDataset[9][64:384] to WorkingEmbDataset[3][0:320]
+  1. Copy      ResidentEmbDataset[13][64:384] to WorkingEmbDataset[1][0:320]
+  2. Copy      ResidentEmbDataset[ 9][64:384] to WorkingEmbDataset[3][0:320]
   3. Copy CompressibleEmbDataset[13][512:768] to WorkingEmbDataset[1][320:576]
-  4. Copy CompressibleEmbDataset[9][512:768] to WorkingEmbDataset[3][320:576]
+  4. Copy CompressibleEmbDataset[ 9][512:768] to WorkingEmbDataset[3][320:576]
 
 The kernel in this file, performs (1) and (2), while (3) and (4) are performed in the compressible/res_quant/res_quant_dataset.cu.
 
@@ -37,10 +37,9 @@ Now let's say the dims to copy is [64:256] (192d) instead, while keeping everyth
 
 We will perform the following copies:
   1. Copy CompressibleEmbDataset[13][64:128] to WorkingEmbDataset[1][0:64]
-  2. Copy CompressibleEmbDataset[9][64:128] to WorkingEmbDataset[3][0:64]
-  3. Copy ResidentEmbDataset[13][0:128] to WorkingEmbDataset[1][64:192]
-  4. Copy ResidentEmbDataset[9][0:128] to WorkingEmbDataset[3][64:192]
-
+  2. Copy CompressibleEmbDataset[ 9][64:128] to WorkingEmbDataset[3][0:64]
+  3. Copy      ResidentEmbDataset[13][0:128] to WorkingEmbDataset[1][64:192]
+  4. Copy      ResidentEmbDataset[ 9][0:128] to WorkingEmbDataset[3][64:192]
 
 */
 
