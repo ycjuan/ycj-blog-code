@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/densification_task.hpp"
 #include "common/typedef.hpp"
 #include "compressible/res_quant/res_quant_dataset.hpp"
 #include "resident/resident_emb_dataset.hpp"
@@ -48,10 +49,7 @@ public:
                 const std::vector<std::vector<T_EMB>>& emb2D,
                 const std::vector<int>& centroidIdxList);
 
-    const WorkingEmbDataset& densify(std::vector<T_DOC_IDX>& docIdxList,
-                                     size_t globalEmbIdxBeginIncl,
-                                     size_t globalEmbIdxEndExcl,
-                                     MemLayout memLayout);
+    const WorkingEmbDataset& densify(DensificationTask& task);
 
     TimeRecord getLastTimeRecordAndReset();
 

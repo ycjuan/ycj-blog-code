@@ -8,6 +8,7 @@
 
 constexpr bool kVerbose = false;
 
+#include "common/densification_task.hpp"
 #include "manager/emb_dataset_manager.hpp"
 #include "resident/resident_partition_config.hpp"
 #include "utils/util.hpp"
@@ -314,17 +315,19 @@ void runExp(ExpSetting s)
         // Densification
         Timer timer;
         timer.tic();
-        const WorkingEmbDataset& workingEmbDataset = embDatasetManager.densify(docIdxListToDensify,
-                                                                               s.densifiedEmbIdxBeginIncl,
-                                                                               s.densifiedEmbIdxEndExcl,
-                                                                               MemLayout::ROW_MAJOR);
+        DensificationTask densificationTask;
+        densificationTask.docIdxList = docIdxListToDensify;
+        densificationTask.globalEmbIdxBeginIncl = s.densifiedEmbIdxBeginIncl;
+        densificationTask.globalEmbIdxEndExcl = s.densifiedEmbIdxEndExcl;
+        densificationTask.memLayout = MemLayout::ROW_MAJOR;
+        const WorkingEmbDataset& workingEmbDataset = embDatasetManager.densify(densificationTask);
         float densifyMs = timer.tocMs();
         totalDensifyTimeMs += densifyMs;
 
         // --------
         // Verify the result
         timer.tic();
-        float compressibleError = verifyDensification(s, workingEmbDataset, docIdxListToDensify, emb2D);
+        float compressibleError = verifyDensification(s, workingEmbDataset, densificationTask.docIdxList, emb2D);
         float verifyMs = timer.tocMs();
         totalCompressibleError += compressibleError;
 

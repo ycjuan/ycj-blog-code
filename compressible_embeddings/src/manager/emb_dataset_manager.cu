@@ -115,11 +115,13 @@ void EmbDatasetManager::update(const std::vector<T_DOC_IDX>& docIdxList,
     m_resQuantDataset.update(docIdxList, emb2D, centroidIdxList);
 }
 
-const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docIdxList,
-                                                    size_t embIdxBeginIncl,
-                                                    size_t embIdxEndExcl,
-                                                    MemLayout memLayout)
+const WorkingEmbDataset& EmbDatasetManager::densify(DensificationTask& task)
 {
+    std::vector<T_DOC_IDX>& docIdxList = task.docIdxList;
+    const size_t embIdxBeginIncl = task.globalEmbIdxBeginIncl;
+    const size_t embIdxEndExcl = task.globalEmbIdxEndExcl;
+    const MemLayout memLayout = task.memLayout;
+
     // --------------
     // Input sanity checks.
     if (docIdxList.size() > m_maxNumWorkingDocs)
@@ -176,15 +178,12 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
     }
 
     // --------------
-    // Prepare the densification task.
-    DensificationTask densificationTask;
+    // Fill in the manager-side fields of the densification task.
     {
-        densificationTask.numDocsToDensify = docIdxList.size();
-        densificationTask.numCopyTasks = m_numCopyTasks;
-        densificationTask.globalEmbIdxBeginIncl = embIdxBeginIncl;
-        densificationTask.globalEmbIdxEndExcl = embIdxEndExcl;
-        densificationTask.d_workingEmbDataset = m_workingEmbDataset.data();
-        densificationTask.d_copyTasks = m_d_copyTasks.data();
+        task.numDocsToDensify = docIdxList.size();
+        task.numCopyTasks = m_numCopyTasks;
+        task.d_workingEmbDataset = m_workingEmbDataset.data();
+        task.d_copyTasks = m_d_copyTasks.data();
     }
 
     // --------------
@@ -197,7 +196,7 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
             Timer timer;
             timer.tic();
             const auto& embDataset = m_residentEmbDatasets[residentPartitionIdx];
-            embDataset.densify(densificationTask);
+            embDataset.densify(task);
             m_lastTimeRecord.densifyResidentPartitionMs[residentPartitionIdx] += timer.tocMs();
         }
     }
@@ -206,7 +205,7 @@ const WorkingEmbDataset& EmbDatasetManager::densify(std::vector<T_DOC_IDX>& docI
     {
         Timer timer;
         timer.tic();
-        m_resQuantDataset.densifyCompressible(densificationTask);
+        m_resQuantDataset.densifyCompressible(task);
         m_lastTimeRecord.densifyCompressibleMs += timer.tocMs();
     }
 
