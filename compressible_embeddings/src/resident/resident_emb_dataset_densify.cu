@@ -69,18 +69,18 @@ __global__ void densifyFromResidentKernel(DensifyFromResidentKernelParams params
 {
     size_t cudaTaskId = blockIdx.x * blockDim.x + threadIdx.x;
     size_t copyTaskIdx = cudaTaskId / params.embDimToCopy;
-    size_t embIdx = cudaTaskId % params.embDimToCopy;
+    size_t embIdxToCopy = cudaTaskId % params.embDimToCopy;
 
     if (copyTaskIdx < params.numCopyTasks)
     {
         CopyTask task = params.d_copyTasks[copyTaskIdx];
 
         size_t memAddrSrc = getMemAddrRowMajor(task.srcDocIdx,
-                                               embIdx + params.srcEmbOffset,
+                                               embIdxToCopy + params.srcEmbOffset,
                                                params.srcNumDocs,
                                                params.srcEmbDim);
         size_t memAddrDst = getMemAddrRowMajor(task.dstDocIdx,
-                                               embIdx + params.dstEmbOffset,
+                                               embIdxToCopy + params.dstEmbOffset,
                                                params.dstNumDocs,
                                                params.dstEmbDim);
         params.d_dstEmbData[memAddrDst] = params.d_srcEmbData[memAddrSrc];
