@@ -29,7 +29,7 @@ struct ExpSetting
             ResidentPartitionConfig(64, 96, MemLayout::ROW_MAJOR) };
     float centroidStdDev = 1.0f;
     float centroidMean = 0.0f;
-    std::vector<float> cacheRates = { 0.0f, 0.5f, 0.9f, 1.0f };
+    std::vector<float> cacheRates = { 0.0f, 0.2f, 0.4f, 0.6f, 0.8f, 1.0f };
     int numDensifyTrials = 20;
 
     void print() const

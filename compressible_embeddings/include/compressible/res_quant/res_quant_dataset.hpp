@@ -24,7 +24,7 @@ public:
                 const std::vector<int>& centroidIdxList);
 
     // Densify compressible partitions by reconstructing from centroid + dequantized residual.
-    void densifyCompressible(const DensificationTask& densificationTask) const;
+    void densify(const DensificationTask& densificationTask) const;
 
     // Getters
     int getNumCentroids() const;

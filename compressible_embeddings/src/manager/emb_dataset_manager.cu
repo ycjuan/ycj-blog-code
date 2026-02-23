@@ -177,7 +177,7 @@ const WorkingEmbDataset& EmbDatasetManager::densify(DensificationTask& task)
     {
         Timer timer;
         timer.tic();
-        m_resQuantDataset.densifyCompressible(task);
+        m_resQuantDataset.densify(task);
         m_lastTimeRecord.densifyCompressibleMs += timer.tocMs();
     }
 

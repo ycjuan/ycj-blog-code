@@ -95,7 +95,7 @@ __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params
     }
 }
 
-void ResQuantDataset::densifyCompressible(const DensificationTask& task) const
+void ResQuantDataset::densify(const DensificationTask& task) const
 {
     // -----------------
     // If there are no copy tasks, then just return.
