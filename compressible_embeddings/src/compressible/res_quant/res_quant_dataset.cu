@@ -17,8 +17,7 @@ ResQuantDataset::ResQuantDataset(T_DOC_IDX numDocs,
                                  int numBitsPerDim,
                                  const std::vector<std::vector<float>>& centroidEmbs,
                                  const std::vector<std::vector<float>>& centroidStdDevs)
-    : CompressibleEmbDataset(numDocs, globalEmbDim, {}, maxNumDocsInWorkingDataset)
-    , m_numCentroids(centroidEmbs.size())
+    : m_numCentroids(centroidEmbs.size())
     , m_numBitsPerDim(numBitsPerDim)
     , m_rqDim(getRqDim(globalEmbDim, numBitsPerDim))
     , m_compressiblePartitionConfigs(std::move(compressiblePartitionConfigs))

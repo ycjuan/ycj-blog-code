@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cstddef>
-
 #include "common/memory_layout.hpp"
 
 class ResidentPartitionConfig
