@@ -302,7 +302,7 @@ void runExp(ExpSetting s)
     // Loop over cache rates
     for (float targetCacheRate : s.cacheRates)
     {
-        std::cout << "\n===== Cache rate: " << targetCacheRate << " =====\n";
+        std::cout << "\n\n\n============= Cache rate: " << targetCacheRate << " =============\n";
 
         // --------
         // Some statistics
