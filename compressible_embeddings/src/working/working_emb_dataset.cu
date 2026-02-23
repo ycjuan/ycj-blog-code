@@ -1,6 +1,6 @@
 #include "working/working_emb_dataset.hpp"
 
-WorkingEmbDataset::WorkingEmbDataset(size_t maxNumDocs, size_t totalEmbDim)
+WorkingEmbDataset::WorkingEmbDataset(int maxNumDocs, int totalEmbDim)
     : m_maxNumDocs(maxNumDocs)
     , m_totalEmbDim(totalEmbDim)
     , m_workingEmbDataset(maxNumDocs * totalEmbDim, "m_workingSetEmbDataset")
@@ -23,22 +23,22 @@ MemLayout WorkingEmbDataset::getMemLayout() const
 }
 
 
-void WorkingEmbDataset::setEmbDimBeginIncl(size_t embDimBeginIncl)
+void WorkingEmbDataset::setEmbDimBeginIncl(int embDimBeginIncl)
 {
     m_embDimBeginIncl = embDimBeginIncl;
 }
 
-size_t WorkingEmbDataset::getEmbDimBeginIncl() const
+int WorkingEmbDataset::getEmbDimBeginIncl() const
 {
     return m_embDimBeginIncl;
 }
 
-void WorkingEmbDataset::setEmbDimEndExcl(size_t embDimEndExcl)
+void WorkingEmbDataset::setEmbDimEndExcl(int embDimEndExcl)
 {
     m_embDimEndExcl = embDimEndExcl;
 }
 
-size_t WorkingEmbDataset::getEmbDimEndExcl() const
+int WorkingEmbDataset::getEmbDimEndExcl() const
 {
     return m_embDimEndExcl;
 }

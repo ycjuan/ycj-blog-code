@@ -36,7 +36,7 @@ struct DensifyFromResQuantKernelParams
 __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params)
 {
     size_t tidx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
-    size_t compressibleEmbDim = params.embDimToCopyEndExcl - params.embDimToCopyBeginIncl;
+    int compressibleEmbDim = params.embDimToCopyEndExcl - params.embDimToCopyBeginIncl;
     int copyIdx = tidx / compressibleEmbDim;
     int localEmbIdx = tidx % compressibleEmbDim;
 
@@ -75,21 +75,21 @@ __global__ void densifyFromResQuantKernel(DensifyFromResQuantKernelParams params
 
 void ResQuantDataset::densifyCompressible(const DensificationTask& densificationTask) const
 {
-    size_t globalEmbDim = m_rqDim * kBitsPerRqInt / m_numBitsPerDim;
+    int globalEmbDim = m_rqDim * kBitsPerRqInt / m_numBitsPerDim;
 
     for (const auto& compressibleConfig : m_compressiblePartitionConfigs)
     {
         // Compute the overlap between this compressible partition and the requested range.
-        size_t embDimBeginReal
-            = std::max(densificationTask.globalEmbIdxBeginIncl, compressibleConfig.getEmbDimBeginIncl());
-        size_t embDimEndReal = std::min(densificationTask.globalEmbIdxEndExcl, compressibleConfig.getEmbDimEndExcl());
+        int embDimBeginReal
+            = std::max(densificationTask.globalEmbIdxBeginIncl, (int)compressibleConfig.getEmbDimBeginIncl());
+        int embDimEndReal = std::min(densificationTask.globalEmbIdxEndExcl, (int)compressibleConfig.getEmbDimEndExcl());
 
         if (embDimBeginReal >= embDimEndReal)
         {
             continue; // No overlap
         }
 
-        size_t compressibleEmbDim = embDimEndReal - embDimBeginReal;
+        int compressibleEmbDim = embDimEndReal - embDimBeginReal;
 
         DensifyFromResQuantKernelParams params;
         params.d_centroidEmb = m_d_centroidEmb.data();
@@ -113,9 +113,9 @@ void ResQuantDataset::densifyCompressible(const DensificationTask& densification
         {
             continue;
         }
-        constexpr size_t kBlockSize = 1024;
-        size_t numTasks = densificationTask.numCopyTasks * compressibleEmbDim;
-        size_t gridSize = (numTasks + kBlockSize - 1) / kBlockSize;
+        constexpr int kBlockSize = 1024;
+        int numTasks = densificationTask.numCopyTasks * compressibleEmbDim;
+        int gridSize = (numTasks + kBlockSize - 1) / kBlockSize;
         densifyFromResQuantKernel<<<gridSize, kBlockSize>>>(params);
         CHECK_CUDA(cudaGetLastError());
         CHECK_CUDA(cudaDeviceSynchronize());

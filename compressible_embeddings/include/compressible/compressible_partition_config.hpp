@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstddef>
 #include <vector>
 
 class ResidentPartitionConfig;
@@ -8,15 +7,15 @@ class ResidentPartitionConfig;
 class CompressiblePartitionConfig
 {
 public:
-    CompressiblePartitionConfig(size_t embDimBeginIncl, size_t embDimEndExcl);
+    CompressiblePartitionConfig(int embDimBeginIncl, int embDimEndExcl);
 
-    size_t getEmbDimBeginIncl() const;
-    size_t getEmbDimEndExcl() const;
+    int getEmbDimBeginIncl() const;
+    int getEmbDimEndExcl() const;
     bool operator<(const CompressiblePartitionConfig& other) const;
 
 private:
-    size_t m_embDimBeginIncl;
-    size_t m_embDimEndExcl;
+    int m_embDimBeginIncl;
+    int m_embDimEndExcl;
 };
 
 /*
@@ -25,4 +24,4 @@ then the compressiblePartitionConfigs will be {{0, 2}, {7, 10}, {13, 16}}.
 */
 std::vector<CompressiblePartitionConfig> findCompressiblePartitionConfigs(
     std::vector<ResidentPartitionConfig> residentPartitionConfigs,
-    size_t globalEmbDim);
+    int globalEmbDim);

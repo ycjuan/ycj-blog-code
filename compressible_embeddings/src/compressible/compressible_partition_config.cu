@@ -3,18 +3,18 @@
 #include "compressible/compressible_partition_config.hpp"
 #include "resident/resident_partition_config.hpp"
 
-CompressiblePartitionConfig::CompressiblePartitionConfig(size_t embDimBeginIncl, size_t embDimEndExcl)
+CompressiblePartitionConfig::CompressiblePartitionConfig(int embDimBeginIncl, int embDimEndExcl)
     : m_embDimBeginIncl(embDimBeginIncl)
     , m_embDimEndExcl(embDimEndExcl)
 {
 }
 
-size_t CompressiblePartitionConfig::getEmbDimBeginIncl() const
+int CompressiblePartitionConfig::getEmbDimBeginIncl() const
 {
     return m_embDimBeginIncl;
 }
 
-size_t CompressiblePartitionConfig::getEmbDimEndExcl() const
+int CompressiblePartitionConfig::getEmbDimEndExcl() const
 {
     return m_embDimEndExcl;
 }
@@ -32,7 +32,7 @@ bool CompressiblePartitionConfig::operator<(const CompressiblePartitionConfig& o
 }
 
 // Any dims that are not covered by the resident partitions are compressible.
-std::vector<CompressiblePartitionConfig> findCompressiblePartitionConfigs(std::vector<ResidentPartitionConfig> residentPartitionConfigs, size_t totalEmbDim)
+std::vector<CompressiblePartitionConfig> findCompressiblePartitionConfigs(std::vector<ResidentPartitionConfig> residentPartitionConfigs, int totalEmbDim)
 {
     std::sort(residentPartitionConfigs.begin(), residentPartitionConfigs.end());
     std::vector<CompressiblePartitionConfig> compressiblePartitionConfigs;

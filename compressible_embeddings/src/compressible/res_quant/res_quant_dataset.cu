@@ -10,11 +10,11 @@
 // Constructor
 // ============================================================================
 
-ResQuantDataset::ResQuantDataset(size_t numDocs,
-                                 size_t globalEmbDim,
-                                 size_t maxNumDocsInWorkingDataset,
+ResQuantDataset::ResQuantDataset(T_DOC_IDX numDocs,
+                                 int globalEmbDim,
+                                 int maxNumDocsInWorkingDataset,
                                  std::vector<CompressiblePartitionConfig> compressiblePartitionConfigs,
-                                 size_t numBitsPerDim,
+                                 int numBitsPerDim,
                                  const std::vector<std::vector<float>>& centroidEmbs,
                                  const std::vector<std::vector<float>>& centroidStdDevs)
     : CompressibleEmbDataset(numDocs, globalEmbDim, {}, maxNumDocsInWorkingDataset)
@@ -59,9 +59,9 @@ ResQuantDataset::ResQuantDataset(size_t numDocs,
 // Getters
 // ============================================================================
 
-size_t ResQuantDataset::getNumCentroids() const { return m_numCentroids; }
-size_t ResQuantDataset::getNumBitsPerDim() const { return m_numBitsPerDim; }
-size_t ResQuantDataset::getRqDimPerDoc() const { return m_rqDim; }
+int ResQuantDataset::getNumCentroids() const { return m_numCentroids; }
+int ResQuantDataset::getNumBitsPerDim() const { return m_numBitsPerDim; }
+int ResQuantDataset::getRqDimPerDoc() const { return m_rqDim; }
 
 // ============================================================================
 // update

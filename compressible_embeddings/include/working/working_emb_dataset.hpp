@@ -9,24 +9,24 @@
 class WorkingEmbDataset
 {
 public:
-    WorkingEmbDataset(size_t maxNumDocs, size_t totalEmbDim);
+    WorkingEmbDataset(int maxNumDocs, int totalEmbDim);
     T_EMB* data() const;
 
     // Setters and getters
     void setMemLayout(MemLayout memLayout);
     MemLayout getMemLayout() const;
 
-    void setEmbDimBeginIncl(size_t embDimBeginIncl);
-    size_t getEmbDimBeginIncl() const;
+    void setEmbDimBeginIncl(int embDimBeginIncl);
+    int getEmbDimBeginIncl() const;
 
-    void setEmbDimEndExcl(size_t embDimEndExcl);
-    size_t getEmbDimEndExcl() const;
+    void setEmbDimEndExcl(int embDimEndExcl);
+    int getEmbDimEndExcl() const;
 
 private:
-    size_t m_maxNumDocs;
-    size_t m_totalEmbDim;
+    int m_maxNumDocs;
+    int m_totalEmbDim;
     MemLayout m_memLayout;
-    size_t m_embDimBeginIncl;
-    size_t m_embDimEndExcl;
+    int m_embDimBeginIncl;
+    int m_embDimEndExcl;
     CudaDeviceArray<T_EMB> m_workingEmbDataset;
 };

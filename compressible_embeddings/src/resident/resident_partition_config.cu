@@ -1,6 +1,6 @@
 #include "resident/resident_partition_config.hpp"
 
-ResidentPartitionConfig::ResidentPartitionConfig(size_t embDimBeginIncl, size_t embDimEndExcl, MemLayout memLayout)
+ResidentPartitionConfig::ResidentPartitionConfig(int embDimBeginIncl, int embDimEndExcl, MemLayout memLayout)
     : m_embDimBeginIncl(embDimBeginIncl)
     , m_embDimEndExcl(embDimEndExcl)
     , m_memLayout(memLayout)

@@ -15,12 +15,12 @@ struct DensificationTask
 {
     // Caller-provided
     std::vector<T_DOC_IDX> desiredDocIdxList;
-    size_t globalEmbIdxBeginIncl;
-    size_t globalEmbIdxEndExcl;
+    int globalEmbIdxBeginIncl;
+    int globalEmbIdxEndExcl;
     MemLayout memLayout;
 
     // Filled in by manager
-    size_t numCopyTasks;
+    int numCopyTasks;
     T_EMB* d_workingEmbDataset;
     CopyTask* d_copyTasks;
 };

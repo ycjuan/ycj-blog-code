@@ -1,12 +1,12 @@
 #pragma once
 
-#include <cstddef>
 #include <vector>
 
 #include "resident/resident_partition_config.hpp"
+#include "common/typedef.hpp"
 
 class CompressibleEmbDataset
 {
 public:
-    CompressibleEmbDataset(size_t numDocs, size_t globalEmbDim, std::vector<ResidentPartitionConfig> residentIndexConfigs, size_t maxNumDocsInWorkingDataset);
+    CompressibleEmbDataset(T_DOC_IDX numDocs, int globalEmbDim, std::vector<ResidentPartitionConfig> residentIndexConfigs, int maxNumDocsInWorkingDataset);
 };

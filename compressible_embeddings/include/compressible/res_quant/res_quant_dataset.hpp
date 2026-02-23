@@ -2,11 +2,11 @@
 
 #include <vector>
 
+#include "common/densification_task.hpp"
+#include "common/typedef.hpp"
 #include "compressible/compressible_emb_dataset.hpp"
 #include "compressible/compressible_partition_config.hpp"
 #include "compressible/res_quant/res_quant_utils.hpp"
-#include "common/typedef.hpp"
-#include "common/densification_task.hpp"
 #include "utils/cuda_raii.hpp"
 
 class ResQuantDataset : public CompressibleEmbDataset
@@ -16,13 +16,13 @@ public:
     // centroidStdDevs: numCentroids x globalEmbDim (per-dimension standard deviations)
     // centroidIdxList: numDocs (centroid assignment for each document)
     // residuals: numDocs x rqDim (pre-quantized residuals, packed into T_RQ)
-    ResQuantDataset(size_t numDocs,
-                  size_t globalEmbDim,
-                  size_t maxNumDocsInWorkingDataset,
-                  std::vector<CompressiblePartitionConfig> compressiblePartitionConfigs,
-                  size_t numBitsPerDim,
-                  const std::vector<std::vector<float>>& centroidEmbs,
-                  const std::vector<std::vector<float>>& centroidStdDevs);
+    ResQuantDataset(T_DOC_IDX numDocs,
+                    int globalEmbDim,
+                    int maxNumDocsInWorkingDataset,
+                    std::vector<CompressiblePartitionConfig> compressiblePartitionConfigs,
+                    int numBitsPerDim,
+                    const std::vector<std::vector<float>>& centroidEmbs,
+                    const std::vector<std::vector<float>>& centroidStdDevs);
 
     // Update per-document data: centroid assignment and quantized residuals.
     void update(const std::vector<T_DOC_IDX>& docIdxList,
@@ -33,15 +33,15 @@ public:
     void densifyCompressible(const DensificationTask& densificationTask) const;
 
     // Getters
-    size_t getNumCentroids() const;
-    size_t getNumBitsPerDim() const;
-    size_t getRqDimPerDoc() const;
+    int getNumCentroids() const;
+    int getNumBitsPerDim() const;
+    int getRqDimPerDoc() const;
 
 private:
     // RQ configuration
-    size_t m_numCentroids;
-    size_t m_numBitsPerDim;
-    size_t m_rqDim; // number of T_RQ elements per document
+    int m_numCentroids;
+    int m_numBitsPerDim;
+    int m_rqDim; // number of T_RQ elements per document
 
     // Compressible partition configs (complement of resident partitions)
     std::vector<CompressiblePartitionConfig> m_compressiblePartitionConfigs;
@@ -50,8 +50,8 @@ private:
     CudaDeviceArray<T_EMB> m_d_centroidEmb;
 
     // Per-document data on device
-    CudaDeviceArray<int> m_d_centroidIdx;   // numDocs x 1
-    CudaDeviceArray<T_RQ> m_d_residual;     // numDocs x rqDim
+    CudaDeviceArray<int> m_d_centroidIdx; // numDocs x 1
+    CudaDeviceArray<T_RQ> m_d_residual; // numDocs x rqDim
 
     // Host-side copy of centroid embeddings (needed for computing residuals in update)
     CudaHostArray<T_EMB> m_h_centroidEmb;
