@@ -17,8 +17,7 @@ void TimeRecord::print() const
               << "          [cache] first scan: " << cacheFirstScanMs / n << " ms avg\n"
               << "          [cache] second scan: " << cacheSecondScanMs / n << " ms avg\n"
               << "          [cache] reassign: " << cacheReassignMs / n << " ms avg\n"
-              << "[densify] copy tasks: " << densifyCopyTasksMs / n << " ms avg\n"
-              << "[densify] cudaMemcpy docIdxList H2D: " << densifyMemcpyH2DMs / n << " ms avg\n";
+              << "[densify] copy tasks: " << densifyCopyTasksMs / n << " ms avg\n";
     for (size_t i = 0; i < densifyResidentPartitionMs.size(); ++i)
     {
         std::cout << "[densify] residentPartition[" << i << "]: " << densifyResidentPartitionMs[i] / n << " ms avg\n";
@@ -51,7 +50,6 @@ EmbDatasetManager::EmbDatasetManager(size_t numDocs,
                         centroidEmbs,
                         centroidStdDevs)
     , m_workingEmbDataset(maxNumWorkingDocs, totalEmbDim)
-    , m_d_docIdxListToDensify(maxNumWorkingDocs, "m_docIdxListToDensify")
     , m_h_copyTasks(maxNumWorkingDocs, "m_h_copyTasks")
     , m_d_copyTasks(maxNumWorkingDocs, "m_d_copyTasks")
     , m_currDocIdxListInWorkingDataset(maxNumWorkingDocs, kInvalidDocIdx)
@@ -143,18 +141,6 @@ const WorkingEmbDataset& EmbDatasetManager::densify(DensificationTask& task)
         timer.tic();
         CHECK_CUDA(cudaMemcpy(m_d_copyTasks.data(), m_h_copyTasks.data(), m_numCopyTasks * sizeof(CopyTask), cudaMemcpyHostToDevice));
         m_lastTimeRecord.densifyCopyTasksMs += timer.tocMs();
-    }
-
-    // --------------
-    // Copy the docIdxList to the device.
-    {
-        Timer timer;
-        timer.tic();
-        CHECK_CUDA(cudaMemcpy(m_d_docIdxListToDensify.data(),
-                              task.desiredDocIdxList.data(),
-                              task.desiredDocIdxList.size() * sizeof(T_DOC_IDX),
-                              cudaMemcpyHostToDevice));
-        m_lastTimeRecord.densifyMemcpyH2DMs += timer.tocMs();
     }
 
     // --------------

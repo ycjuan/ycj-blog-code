@@ -23,7 +23,6 @@ struct TimeRecord
     float densifyTotalMs = 0.0f;
     float densifyCacheMs = 0.0f;
     float densifyCopyTasksMs = 0.0f;
-    float densifyMemcpyH2DMs = 0.0f;
     std::vector<float> densifyResidentPartitionMs;
     float densifyCompressibleMs = 0.0f;
 
@@ -67,9 +66,6 @@ protected:
 
     // Working set dataset
     WorkingEmbDataset m_workingEmbDataset;
-
-    // Densification
-    CudaDeviceArray<T_DOC_IDX> m_d_docIdxListToDensify;
 
     // Cuda stream
     cudaStream_t m_cudaStreamRead;
