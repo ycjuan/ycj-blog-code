@@ -1,5 +1,32 @@
 BasedOnStyle: WebKit
-BreakBeforeBraces: Allman
+
+# Spaces
 ColumnLimit: 120
-BinPackParameters: false # Force only one parameter per line
-AlignAfterOpenBracket: Align # When there are multiple parameters in multiple lines, align the parameters
+AlwaysBreakTemplateDeclarations: Yes
+
+# Function calls
+AlignAfterOpenBracket: Align
+BinPackParameters: false
+BinPackArguments: false
+AllowAllArgumentsOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+
+# Curly Braces
+BreakBeforeBraces: Allman
+
+# Alignment
+AlignOperands: true
+
+# One-line statements
+AllowShortBlocksOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: false
+
+
+# Special
+# This will make 
+# void longFunc(int a,
+#               int b)
+# instead of
+# void 
+# longFunc(int a, int b)
+PenaltyReturnTypeOnItsOwnLine: 1000

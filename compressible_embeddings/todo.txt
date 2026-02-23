@@ -1,0 +1,11 @@
+* get memory address polymorphism
+* revisit copy kernel
+* handle data type template
+* handle versioning
+* handle the logic that update should invalid cache
+* think about if 1.1 * kStdDev makes sense or not
+* handle compressed polymorphism
+* use GPU for nearest centroid assignment
+* find a better way than using isCached
+* add a special optimization to handle if the desired doc is at working set size - desired set size
+* make ResQuant also partitioned
