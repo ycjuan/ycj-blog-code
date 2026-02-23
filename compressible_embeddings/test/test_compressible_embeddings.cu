@@ -195,7 +195,7 @@ float verifyDensification(const ExpSetting& s,
     int compressibleCount = 0;
     std::string errorMsg;
 
-#pragma omp parallel for schedule(static) reduction(+:compressibleErrorSum, compressibleCount)
+#pragma omp parallel for schedule(static) reduction(+ : compressibleErrorSum, compressibleCount)
     for (int docIdx = 0; docIdx < (int)docIdxList.size(); ++docIdx)
     {
         for (int embIdx = s.densifiedEmbIdxBeginIncl; embIdx < s.densifiedEmbIdxEndExcl; ++embIdx)
@@ -343,13 +343,11 @@ void runExp(ExpSetting s)
         // Per-trial verbose output
         if (kVerbose)
         {
-            std::cout << std::fixed << std::setprecision(3)
-                      << "[trial " << trial << "]"
+            std::cout << std::fixed << std::setprecision(3) << "[trial " << trial << "]"
                       << "  densify: " << densifyMs << " ms"
                       << "  verify: " << verifyMs << " ms"
                       << "  gen_next: " << genNextMs << " ms"
-                      << "  cache_rate: " << cacheRate
-                      << "\n";
+                      << "  cache_rate: " << cacheRate << "\n";
         }
     }
 
