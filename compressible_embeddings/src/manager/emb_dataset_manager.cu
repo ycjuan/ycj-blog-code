@@ -32,11 +32,11 @@ TimeRecord EmbDatasetManager::getLastTimeRecordAndReset()
     return record;
 }
 
-EmbDatasetManager::EmbDatasetManager(size_t numDocs,
-                                     size_t totalEmbDim,
+EmbDatasetManager::EmbDatasetManager(T_DOC_IDX numDocs,
+                                     int totalEmbDim,
                                      std::vector<ResidentPartitionConfig> residentPartitionConfigs,
-                                     size_t maxNumWorkingDocs,
-                                     size_t numBitsPerDim,
+                                     int maxNumWorkingDocs,
+                                     int numBitsPerDim,
                                      const std::vector<std::vector<float>>& centroidEmbs,
                                      const std::vector<std::vector<float>>& centroidStdDevs)
     : m_numDocs(numDocs)

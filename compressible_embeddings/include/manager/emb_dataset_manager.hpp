@@ -36,11 +36,11 @@ class EmbDatasetManager
 {
 public:
 
-    EmbDatasetManager(size_t numDocs,
-                      size_t globalEmbDim,
+    EmbDatasetManager(T_DOC_IDX numDocs,
+                      int globalEmbDim,
                       std::vector<ResidentPartitionConfig> residentPartitionConfigs,
-                      size_t maxNumWorkingDocs,
-                      size_t numBitsPerDim,
+                      int maxNumWorkingDocs,
+                      int numBitsPerDim,
                       const std::vector<std::vector<float>>& centroidEmbs,
                       const std::vector<std::vector<float>>& centroidStdDevs);
 
@@ -54,9 +54,9 @@ public:
 
 protected:
     // General meta data
-    size_t m_numDocs;
-    size_t m_totalEmbDim;
-    size_t m_maxNumWorkingDocs;
+    T_DOC_IDX m_numDocs;
+    int m_totalEmbDim;
+    int m_maxNumWorkingDocs;
 
     // Resident datasets
     std::vector<ResidentEmbDataset> m_residentEmbDatasets;
@@ -72,12 +72,12 @@ protected:
     cudaStream_t m_cudaStreamWrite;
 
     // For caching
-    std::unordered_map<T_DOC_IDX, T_DOC_IDX> m_currDocIdxToWorkingIdx;
+    std::unordered_map<T_DOC_IDX, int> m_currDocIdxToWorkingIdx;
     std::vector<T_DOC_IDX> m_currDocIdxListInWorkingDataset;
     void cache(std::vector<T_DOC_IDX>& docIdxList);
     CudaHostArray<CopyTask> m_h_copyTasks;
     CudaDeviceArray<CopyTask> m_d_copyTasks;
-    size_t m_numCopyTasks = 0;
+    int m_numCopyTasks = 0;
 
     // Time record
     TimeRecord m_lastTimeRecord;
