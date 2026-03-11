@@ -48,7 +48,7 @@ target_compile_options(${LIB_NAME} PRIVATE
 )
 
 # Add executable
-add_executable(test_${LIB_NAME} test/test_compressible_embeddings.cu)
+add_executable(test_${LIB_NAME} test/test_async_memcpy_benchmark.cu)
 
 # Link library
 target_link_libraries(test_${LIB_NAME} ${LIB_NAME})
