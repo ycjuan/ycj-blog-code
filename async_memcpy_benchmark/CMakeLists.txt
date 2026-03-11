@@ -1,0 +1,61 @@
+cmake_minimum_required(VERSION 3.18)
+
+# Library name
+set(LIB_NAME compressible_embeddings)
+
+# Export compile_commands.json
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Project name
+project(${LIB_NAME} LANGUAGES CXX CUDA)
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Set CUDA standard
+set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
+# Find CUDA
+find_package(CUDA REQUIRED)
+
+# Add library
+file(GLOB_RECURSE LIB_HEADER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
+file(GLOB_RECURSE LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cu)
+
+add_library(${LIB_NAME} SHARED
+    ${LIB_HEADER_FILES}
+    ${LIB_SOURCE_FILES}
+)
+
+# Include directories
+target_include_directories(${LIB_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+# Link CUDA libraries
+target_link_libraries(${LIB_NAME}
+    ${CUDA_LIBRARIES}
+    cublas
+    gomp
+)
+
+# Compiler flags
+target_compile_options(${LIB_NAME} PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:-O3 -Wno-deprecated-gpu-targets>
+    $<$<COMPILE_LANGUAGE:CXX>:-O3>
+    $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
+    $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler -fopenmp>
+)
+
+# Add executable
+add_executable(test_${LIB_NAME} test/test_compressible_embeddings.cu)
+
+# Link library
+target_link_libraries(test_${LIB_NAME} ${LIB_NAME})
+
+target_compile_options(test_${LIB_NAME} PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:-Wno-deprecated-gpu-targets -Xcompiler -fopenmp>
+)
+
+# Set linker language to CUDA
+set_target_properties(${LIB_NAME} PROPERTIES LINKER_LANGUAGE CUDA)
