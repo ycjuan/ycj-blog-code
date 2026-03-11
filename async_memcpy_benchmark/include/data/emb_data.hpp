@@ -5,11 +5,7 @@
 
 class EmbData {
 public:
-    EmbData(int numDocs, int embDim)
-        : numDocs(numDocs)
-        , embDim(embDim)
-        , data(numDocs * embDim, "EmbData")
-    {}
+    EmbData(int numDocs, int embDim);
 
 private:
     int numDocs;
