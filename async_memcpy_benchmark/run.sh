@@ -9,4 +9,4 @@ mkdir -p build
 cd build
 cmake ..
 make -j $(nproc)
-./test_compressible_embeddings
+./test_async_memcpy_benchmark

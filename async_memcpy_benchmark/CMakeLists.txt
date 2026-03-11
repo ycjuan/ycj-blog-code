@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 # Library name
-set(LIB_NAME compressible_embeddings)
+set(LIB_NAME async_memcpy_benchmark)
 
 # Export compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
