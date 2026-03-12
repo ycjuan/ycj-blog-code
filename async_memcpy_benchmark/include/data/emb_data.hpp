@@ -13,8 +13,8 @@ public:
     const T_EMB* data() const;
 
 private:
-    int numDocs;
-    int embDim;
-    CudaDeviceArray<T_EMB> d_data;
-    std::unordered_map<long, int> docId2Idx;
+    int m_numDocs;
+    int m_embDim;
+    CudaDeviceArray<T_EMB> m_data;
+    std::unordered_map<long, int> m_docId2Idx;
 };

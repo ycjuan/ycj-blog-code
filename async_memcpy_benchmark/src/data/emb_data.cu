@@ -5,9 +5,9 @@
 #include <vector>
 
 EmbData::EmbData(int numDocs, int embDim)
-    : numDocs(numDocs)
-    , embDim(embDim)
-    , d_data(numDocs * embDim, "EmbData")
+    : m_numDocs(numDocs)
+    , m_embDim(embDim)
+    , m_data(numDocs * embDim, "EmbData")
 {
     const int totalSize = numDocs * embDim;
 
@@ -20,7 +20,7 @@ EmbData::EmbData(int numDocs, int embDim)
         val = static_cast<T_EMB>(dist(rng));
     }
 
-    CHECK_CUDA(cudaMemcpy(d_data.data(), hostData.data(), totalSize * sizeof(T_EMB), cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMemcpy(m_data.data(), hostData.data(), totalSize * sizeof(T_EMB), cudaMemcpyHostToDevice));
 
     std::uniform_int_distribution<long> idDist(0, std::numeric_limits<long>::max());
     for (int i = 0; i < numDocs; i++)
@@ -29,9 +29,9 @@ EmbData::EmbData(int numDocs, int embDim)
         do
         {
             docId = idDist(rng);
-        } while (docId2Idx.count(docId));
-        docId2Idx[docId] = i;
+        } while (m_docId2Idx.count(docId));
+        m_docId2Idx[docId] = i;
     }
 }
 
-const T_EMB* EmbData::data() const { return d_data.data(); }
+const T_EMB* EmbData::data() const { return m_data.data(); }
