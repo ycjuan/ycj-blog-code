@@ -4,6 +4,9 @@
 #include <algorithm>
 #include <cublas_v2.h>
 #include <numeric>
+#include <thrust/device_ptr.h>
+#include <thrust/sequence.h>
+#include <thrust/sort.h>
 #include <vector>
 
 struct CopyElement
@@ -26,6 +29,7 @@ EmbData::EmbData(int maxNumDocs, int embDim)
     : m_maxNumDocs(maxNumDocs)
     , m_embDim(embDim)
     , m_data(maxNumDocs * embDim, "EmbData")
+    , m_idxToDocId(maxNumDocs, -1)
 {
 }
 
@@ -69,13 +73,6 @@ std::vector<std::vector<long>> EmbData::score(const std::vector<std::vector<T_EM
     const int numReqs = reqEmb.size();
     const int numDocs = m_docId2Idx.size();
 
-    // Build idx -> docId reverse map
-    std::vector<long> idxToDocId(numDocs);
-    for (const auto& [docId, idx] : m_docId2Idx)
-    {
-        idxToDocId[idx] = docId;
-    }
-
     // Flatten reqEmb to host array and copy to device
     std::vector<T_EMB> hostReqEmb(numReqs * m_embDim);
     for (int i = 0; i < numReqs; i++)
@@ -108,25 +105,47 @@ std::vector<std::vector<long>> EmbData::score(const std::vector<std::vector<T_EM
 
     cublasDestroy(handle);
 
-    // Copy scores back to host
-    std::vector<float> hostScores(numReqs * numDocs);
-    CHECK_CUDA(cudaMemcpy(hostScores.data(), d_scores.data(), numReqs * numDocs * sizeof(float), cudaMemcpyDeviceToHost));
-
-    // For each request, partial sort to find top k
-    std::vector<std::vector<long>> results(numReqs);
-    std::vector<int> indices(numDocs);
+    // Allocate d_indices[numReqs x numDocs] and initialize each row as [0..numDocs-1]
+    CudaDeviceArray<int> d_indices(numReqs * numDocs, "indices");
     for (int i = 0; i < numReqs; i++)
     {
-        const float* rowScores = hostScores.data() + i * numDocs;
-        std::iota(indices.begin(), indices.end(), 0);
-        const int topK = std::min(k, numDocs);
-        std::partial_sort(indices.begin(), indices.begin() + topK, indices.end(), [&](int a, int b) {
-            return rowScores[a] > rowScores[b];
-        });
+        thrust::sequence(
+            thrust::device,
+            thrust::device_ptr<int>(d_indices.data() + i * numDocs),
+            thrust::device_ptr<int>(d_indices.data() + (i + 1) * numDocs));
+    }
+
+    // Sort each row by score descending, carrying indices along
+    for (int i = 0; i < numReqs; i++)
+    {
+        thrust::sort_by_key(
+            thrust::device,
+            thrust::device_ptr<float>(d_scores.data() + i * numDocs),
+            thrust::device_ptr<float>(d_scores.data() + (i + 1) * numDocs),
+            thrust::device_ptr<int>(d_indices.data() + i * numDocs),
+            thrust::greater<float>());
+    }
+
+    // Copy top-k indices per request back to host
+    const int topK = std::min(k, numDocs);
+    std::vector<int> hostTopIndices(numReqs * topK);
+    for (int i = 0; i < numReqs; i++)
+    {
+        CHECK_CUDA(cudaMemcpy(
+            hostTopIndices.data() + i * topK,
+            d_indices.data() + i * numDocs,
+            topK * sizeof(int),
+            cudaMemcpyDeviceToHost));
+    }
+
+    // Map indices to docIds
+    std::vector<std::vector<long>> results(numReqs);
+    for (int i = 0; i < numReqs; i++)
+    {
         results[i].resize(topK);
         for (int j = 0; j < topK; j++)
         {
-            results[i][j] = idxToDocId[indices[j]];
+            results[i][j] = m_idxToDocId[hostTopIndices[i * topK + j]];
         }
     }
 
