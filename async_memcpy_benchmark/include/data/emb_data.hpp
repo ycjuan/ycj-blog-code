@@ -4,6 +4,7 @@
 #include "utils/cuda_raii.hpp"
 
 #include <unordered_map>
+#include <vector>
 
 class EmbData
 {
@@ -11,6 +12,8 @@ public:
     EmbData(int maxNumDocs, int embDim);
 
     const T_EMB* data() const;
+
+    void update(const std::vector<long>& jobIds, const std::vector<std::vector<T_EMB>>& embData2D);
 
 private:
     int m_maxNumDocs;
