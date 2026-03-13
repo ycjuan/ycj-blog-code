@@ -1,4 +1,4 @@
-#include "data/emb_data.hpp"
+#include "worker.hpp"
 #include "utils/util.hpp"
 
 #include <algorithm>
@@ -25,17 +25,17 @@ __global__ void scatterKernel(T_EMB* dst, const CopyElement* elements, int embDi
     dst[elements[t].docIdx * embDim + t % embDim] = elements[t].val;
 }
 
-EmbData::EmbData(int maxNumDocs, int embDim)
+Worker::Worker(int maxNumDocs, int embDim)
     : m_maxNumDocs(maxNumDocs)
     , m_embDim(embDim)
-    , m_data(maxNumDocs * embDim, "EmbData")
+    , m_data(maxNumDocs * embDim, "Worker")
     , m_idxToDocId(maxNumDocs, -1)
 {
 }
 
-const T_EMB* EmbData::data() const { return m_data.data(); }
+const T_EMB* Worker::data() const { return m_data.data(); }
 
-void EmbData::update(const std::vector<long>& jobIds, const std::vector<std::vector<T_EMB>>& embData2D)
+void Worker::update(const std::vector<long>& jobIds, const std::vector<std::vector<T_EMB>>& embData2D)
 {
     std::vector<CopyElement> hostElements;
     hostElements.reserve(jobIds.size() * m_embDim);
@@ -68,7 +68,7 @@ void EmbData::update(const std::vector<long>& jobIds, const std::vector<std::vec
     CHECK_CUDA(cudaGetLastError());
 }
 
-std::vector<std::vector<long>> EmbData::score(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const
+std::vector<std::vector<long>> Worker::score(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const
 {
     const int numReqs = reqEmb.size();
     const int numDocs = m_docId2Idx.size();

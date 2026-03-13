@@ -6,10 +6,10 @@
 #include <unordered_map>
 #include <vector>
 
-class EmbData
+class Worker
 {
 public:
-    EmbData(int maxNumDocs, int embDim);
+    Worker(int maxNumDocs, int embDim);
 
     const T_EMB* data() const;
 
