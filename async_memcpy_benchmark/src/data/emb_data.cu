@@ -1,6 +1,9 @@
 #include "data/emb_data.hpp"
 #include "utils/util.hpp"
 
+#include <algorithm>
+#include <cublas_v2.h>
+#include <numeric>
 #include <vector>
 
 struct CopyElement
@@ -59,4 +62,73 @@ void EmbData::update(const std::vector<long>& jobIds, const std::vector<std::vec
     const int gridSize = (hostElements.size() + blockSize - 1) / blockSize;
     scatterKernel<<<gridSize, blockSize>>>(m_data.data(), d_elements.data(), m_embDim, hostElements.size());
     CHECK_CUDA(cudaGetLastError());
+}
+
+std::vector<std::vector<long>> EmbData::score(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const
+{
+    const int numReqs = reqEmb.size();
+    const int numDocs = m_docId2Idx.size();
+
+    // Build idx -> docId reverse map
+    std::vector<long> idxToDocId(numDocs);
+    for (const auto& [docId, idx] : m_docId2Idx)
+    {
+        idxToDocId[idx] = docId;
+    }
+
+    // Flatten reqEmb to host array and copy to device
+    std::vector<T_EMB> hostReqEmb(numReqs * m_embDim);
+    for (int i = 0; i < numReqs; i++)
+    {
+        std::copy(reqEmb[i].begin(), reqEmb[i].end(), hostReqEmb.begin() + i * m_embDim);
+    }
+    CudaDeviceArray<T_EMB> d_reqEmb(numReqs * m_embDim, "reqEmb");
+    CHECK_CUDA(cudaMemcpy(d_reqEmb.data(), hostReqEmb.data(), numReqs * m_embDim * sizeof(T_EMB), cudaMemcpyHostToDevice));
+
+    // GEMM: scores[numReqs x numDocs] = reqEmb[numReqs x embDim] * docEmb[numDocs x embDim]^T
+    CudaDeviceArray<float> d_scores(numReqs * numDocs, "scores");
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+
+    const float alpha = 1.0f;
+    const float beta = 0.0f;
+    // cuBLAS is column-major. To compute C(M x N) = A(M x K) * B(N x K)^T in row-major:
+    // call with (CUBLAS_OP_T, CUBLAS_OP_N, N, M, K, B, K, A, K, C, N)
+    cublasGemmEx(
+        handle,
+        CUBLAS_OP_T, CUBLAS_OP_N,
+        numDocs, numReqs, m_embDim,
+        &alpha,
+        m_data.data(), CUDA_R_16BF, m_embDim,
+        d_reqEmb.data(), CUDA_R_16BF, m_embDim,
+        &beta,
+        d_scores.data(), CUDA_R_32F, numDocs,
+        CUBLAS_COMPUTE_32F,
+        CUBLAS_GEMM_DEFAULT);
+
+    cublasDestroy(handle);
+
+    // Copy scores back to host
+    std::vector<float> hostScores(numReqs * numDocs);
+    CHECK_CUDA(cudaMemcpy(hostScores.data(), d_scores.data(), numReqs * numDocs * sizeof(float), cudaMemcpyDeviceToHost));
+
+    // For each request, partial sort to find top k
+    std::vector<std::vector<long>> results(numReqs);
+    std::vector<int> indices(numDocs);
+    for (int i = 0; i < numReqs; i++)
+    {
+        const float* rowScores = hostScores.data() + i * numDocs;
+        std::iota(indices.begin(), indices.end(), 0);
+        const int topK = std::min(k, numDocs);
+        std::partial_sort(indices.begin(), indices.begin() + topK, indices.end(), [&](int a, int b) {
+            return rowScores[a] > rowScores[b];
+        });
+        results[i].resize(topK);
+        for (int j = 0; j < topK; j++)
+        {
+            results[i][j] = idxToDocId[indices[j]];
+        }
+    }
+
+    return results;
 }
