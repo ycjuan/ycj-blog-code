@@ -3,7 +3,6 @@
 
 #include <algorithm>
 #include <cublas_v2.h>
-#include <numeric>
 #include <thrust/device_ptr.h>
 #include <thrust/sequence.h>
 #include <thrust/sort.h>
@@ -35,14 +34,14 @@ Worker::Worker(int maxNumDocs, int embDim)
 
 const T_EMB* Worker::data() const { return m_data.data(); }
 
-void Worker::update(const std::vector<long>& jobIds, const std::vector<std::vector<T_EMB>>& embData2D)
+void Worker::update(const std::vector<long>& v_jobIds, const std::vector<std::vector<T_EMB>>& embData2D)
 {
-    std::vector<CopyElement> hostElements;
-    hostElements.reserve(jobIds.size() * m_embDim);
+    std::vector<CopyElement> v_elements;
+    v_elements.reserve(v_jobIds.size() * m_embDim);
 
-    for (int i = 0; i < (int)jobIds.size(); i++)
+    for (int i = 0; i < (int)v_jobIds.size(); i++)
     {
-        auto it = m_docId2Idx.find(jobIds[i]);
+        auto it = m_docId2Idx.find(v_jobIds[i]);
         if (it == m_docId2Idx.end())
         {
             continue;
@@ -50,21 +49,21 @@ void Worker::update(const std::vector<long>& jobIds, const std::vector<std::vect
         int docIdx = it->second;
         for (int j = 0; j < m_embDim; j++)
         {
-            hostElements.push_back({ docIdx, embData2D[i][j] });
+            v_elements.push_back({ docIdx, embData2D[i][j] });
         }
     }
 
-    if (hostElements.empty())
+    if (v_elements.empty())
     {
         return;
     }
 
-    CudaDeviceArray<CopyElement> d_elements(hostElements.size(), "CopyElements");
-    CHECK_CUDA(cudaMemcpyAsync(d_elements.data(), hostElements.data(), hostElements.size() * sizeof(CopyElement), cudaMemcpyHostToDevice, m_stream.get()));
+    CudaDeviceArray<CopyElement> d_elements(v_elements.size(), "CopyElements");
+    CHECK_CUDA(cudaMemcpyAsync(d_elements.data(), v_elements.data(), v_elements.size() * sizeof(CopyElement), cudaMemcpyHostToDevice, m_stream.get()));
 
-    const int blockSize = 256;
-    const int gridSize = (hostElements.size() + blockSize - 1) / blockSize;
-    scatterKernel<<<gridSize, blockSize, 0, m_stream.get()>>>(m_data.data(), d_elements.data(), m_embDim, hostElements.size());
+    const int kBlockSize = 256;
+    const int gridSize = (v_elements.size() + kBlockSize - 1) / kBlockSize;
+    scatterKernel<<<gridSize, kBlockSize, 0, m_stream.get()>>>(m_data.data(), d_elements.data(), m_embDim, v_elements.size());
     CHECK_CUDA(cudaStreamSynchronize(m_stream.get()));
 }
 
