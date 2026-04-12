@@ -23,4 +23,5 @@ private:
     CudaDeviceArray<T_EMB> m_data;
     std::unordered_map<long, int> m_docId2Idx;
     std::vector<long> m_idxToDocId;
+    CudaStream m_stream;
 };

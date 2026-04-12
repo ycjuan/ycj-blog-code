@@ -60,12 +60,12 @@ void Worker::update(const std::vector<long>& jobIds, const std::vector<std::vect
     }
 
     CudaDeviceArray<CopyElement> d_elements(hostElements.size(), "CopyElements");
-    CHECK_CUDA(cudaMemcpy(d_elements.data(), hostElements.data(), hostElements.size() * sizeof(CopyElement), cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMemcpyAsync(d_elements.data(), hostElements.data(), hostElements.size() * sizeof(CopyElement), cudaMemcpyHostToDevice, m_stream.get()));
 
     const int blockSize = 256;
     const int gridSize = (hostElements.size() + blockSize - 1) / blockSize;
-    scatterKernel<<<gridSize, blockSize>>>(m_data.data(), d_elements.data(), m_embDim, hostElements.size());
-    CHECK_CUDA(cudaGetLastError());
+    scatterKernel<<<gridSize, blockSize, 0, m_stream.get()>>>(m_data.data(), d_elements.data(), m_embDim, hostElements.size());
+    CHECK_CUDA(cudaStreamSynchronize(m_stream.get()));
 }
 
 std::vector<std::vector<long>> Worker::score(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const
