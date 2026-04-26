@@ -34,60 +34,6 @@ Worker::Worker(int maxNumDocs, int embDim)
 
 const T_EMB* Worker::data() const { return m_data.data(); }
 
-WorkerNaive::WorkerNaive(int maxNumDocs, int embDim)
-    : Worker(maxNumDocs, embDim)
-{
-}
-
-void WorkerNaive::update(const std::vector<long>& v_jobIds, const std::vector<std::vector<T_EMB>>& embData2D)
-{
-    std::vector<CopyElement> v_elements;
-    v_elements.reserve(v_jobIds.size() * m_embDim);
-
-    for (int i = 0; i < (int)v_jobIds.size(); i++)
-    {
-        auto it = m_docId2Idx.find(v_jobIds[i]);
-        if (it == m_docId2Idx.end())
-        {
-            continue;
-        }
-        int docIdx = it->second;
-        for (int j = 0; j < m_embDim; j++)
-        {
-            v_elements.push_back({ docIdx, embData2D[i][j] });
-        }
-    }
-
-    if (v_elements.empty())
-    {
-        return;
-    }
-
-    CudaDeviceArray<CopyElement> d_elements(v_elements.size(), "CopyElements");
-    CHECK_CUDA(cudaMemcpyAsync(d_elements.data(), v_elements.data(), v_elements.size() * sizeof(CopyElement), cudaMemcpyHostToDevice, m_stream.get()));
-
-    const int kBlockSize = 256;
-    const int gridSize = (v_elements.size() + kBlockSize - 1) / kBlockSize;
-    scatterKernel<<<gridSize, kBlockSize, 0, m_stream.get()>>>(m_data.data(), d_elements.data(), m_embDim, v_elements.size());
-    CHECK_CUDA(cudaStreamSynchronize(m_stream.get()));
-}
-
-std::vector<std::vector<long>> WorkerNaive::score(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const
-{
-    auto [numReqs, topK, hostTopIndices] = scoreCore(reqEmb, k);
-
-    // Map indices to docIds
-    std::vector<std::vector<long>> results(numReqs);
-    for (int i = 0; i < numReqs; i++)
-    {
-        results[i].resize(topK);
-        for (int j = 0; j < topK; j++)
-        {
-            results[i][j] = m_idxToDocId[hostTopIndices[i * topK + j]];
-        }
-    }
-    return results;
-}
 
 std::tuple<int, int, std::vector<int>> Worker::scoreCore(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const
 {
