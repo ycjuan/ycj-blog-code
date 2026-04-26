@@ -3,6 +3,7 @@
 #include "common/typedef.hpp"
 #include "utils/cuda_raii.hpp"
 
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -16,6 +17,9 @@ public:
     void update(const std::vector<long>& jobIds, const std::vector<std::vector<T_EMB>>& embData2D);
 
     std::vector<std::vector<long>> score(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const;
+
+protected:
+    std::tuple<int, int, std::vector<int>> scoreCore(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const;
 
 private:
     int m_maxNumDocs;

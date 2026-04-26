@@ -69,6 +69,23 @@ void Worker::update(const std::vector<long>& v_jobIds, const std::vector<std::ve
 
 std::vector<std::vector<long>> Worker::score(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const
 {
+    auto [numReqs, topK, hostTopIndices] = scoreCore(reqEmb, k);
+
+    // Map indices to docIds
+    std::vector<std::vector<long>> results(numReqs);
+    for (int i = 0; i < numReqs; i++)
+    {
+        results[i].resize(topK);
+        for (int j = 0; j < topK; j++)
+        {
+            results[i][j] = m_idxToDocId[hostTopIndices[i * topK + j]];
+        }
+    }
+    return results;
+}
+
+std::tuple<int, int, std::vector<int>> Worker::scoreCore(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const
+{
     const int numReqs = reqEmb.size();
     const int numDocs = m_docId2Idx.size();
 
@@ -137,16 +154,5 @@ std::vector<std::vector<long>> Worker::score(const std::vector<std::vector<T_EMB
             cudaMemcpyDeviceToHost));
     }
 
-    // Map indices to docIds
-    std::vector<std::vector<long>> results(numReqs);
-    for (int i = 0; i < numReqs; i++)
-    {
-        results[i].resize(topK);
-        for (int j = 0; j < topK; j++)
-        {
-            results[i][j] = m_idxToDocId[hostTopIndices[i * topK + j]];
-        }
-    }
-
-    return results;
+    return { numReqs, topK, hostTopIndices };
 }
