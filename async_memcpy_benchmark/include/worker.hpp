@@ -11,21 +11,31 @@ class Worker
 {
 public:
     Worker(int maxNumDocs, int embDim);
+    virtual ~Worker() = default;
 
     const T_EMB* data() const;
 
-    void update(const std::vector<long>& jobIds, const std::vector<std::vector<T_EMB>>& embData2D);
+    virtual void update(const std::vector<long>& jobIds, const std::vector<std::vector<T_EMB>>& embData2D) = 0;
 
-    std::vector<std::vector<long>> score(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const;
+    virtual std::vector<std::vector<long>> score(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const = 0;
 
 protected:
     std::tuple<int, int, std::vector<int>> scoreCore(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const;
 
-private:
     int m_maxNumDocs;
     int m_embDim;
     CudaDeviceArray<T_EMB> m_data;
     std::unordered_map<long, int> m_docId2Idx;
     std::vector<long> m_idxToDocId;
     CudaStream m_stream;
+};
+
+class WorkerNaive : public Worker
+{
+public:
+    WorkerNaive(int maxNumDocs, int embDim);
+
+    void update(const std::vector<long>& jobIds, const std::vector<std::vector<T_EMB>>& embData2D) override;
+
+    std::vector<std::vector<long>> score(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const override;
 };

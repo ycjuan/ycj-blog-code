@@ -34,7 +34,12 @@ Worker::Worker(int maxNumDocs, int embDim)
 
 const T_EMB* Worker::data() const { return m_data.data(); }
 
-void Worker::update(const std::vector<long>& v_jobIds, const std::vector<std::vector<T_EMB>>& embData2D)
+WorkerNaive::WorkerNaive(int maxNumDocs, int embDim)
+    : Worker(maxNumDocs, embDim)
+{
+}
+
+void WorkerNaive::update(const std::vector<long>& v_jobIds, const std::vector<std::vector<T_EMB>>& embData2D)
 {
     std::vector<CopyElement> v_elements;
     v_elements.reserve(v_jobIds.size() * m_embDim);
@@ -67,7 +72,7 @@ void Worker::update(const std::vector<long>& v_jobIds, const std::vector<std::ve
     CHECK_CUDA(cudaStreamSynchronize(m_stream.get()));
 }
 
-std::vector<std::vector<long>> Worker::score(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const
+std::vector<std::vector<long>> WorkerNaive::score(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const
 {
     auto [numReqs, topK, hostTopIndices] = scoreCore(reqEmb, k);
 
