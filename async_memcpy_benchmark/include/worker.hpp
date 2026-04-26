@@ -3,7 +3,6 @@
 #include "common/typedef.hpp"
 #include "utils/cuda_raii.hpp"
 
-#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -17,14 +16,15 @@ public:
 
     virtual void update(const std::vector<long>& jobIds, const std::vector<std::vector<T_EMB>>& embData2D) = 0;
 
-    virtual std::vector<std::vector<long>> score(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const = 0;
+    virtual void score(const std::vector<std::vector<T_EMB>>& reqEmb) const = 0;
 
 protected:
-    std::tuple<int, int, std::vector<int>> scoreCore(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const;
+    void scoreCore(const std::vector<std::vector<T_EMB>>& reqEmb) const;
 
     int m_maxNumDocs;
     int m_embDim;
     CudaDeviceArray<T_EMB> m_data;
+    mutable CudaDeviceArray<float> m_d_scores;
     std::unordered_map<long, int> m_docId2Idx;
     std::vector<long> m_idxToDocId;
     CudaStream m_stream;

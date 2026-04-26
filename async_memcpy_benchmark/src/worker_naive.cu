@@ -57,19 +57,8 @@ void WorkerNaive::update(const std::vector<long>& v_jobIds, const std::vector<st
     CHECK_CUDA(cudaStreamSynchronize(m_stream.get()));
 }
 
-std::vector<std::vector<long>> WorkerNaive::score(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const
+void WorkerNaive::score(const std::vector<std::vector<T_EMB>>& reqEmb) const
 {
-    auto [numReqs, topK, hostTopIndices] = scoreCore(reqEmb, k);
-
-    // Map indices to docIds
-    std::vector<std::vector<long>> results(numReqs);
-    for (int i = 0; i < numReqs; i++)
-    {
-        results[i].resize(topK);
-        for (int j = 0; j < topK; j++)
-        {
-            results[i][j] = m_idxToDocId[hostTopIndices[i * topK + j]];
-        }
-    }
-    return results;
+    scoreCore(reqEmb);
 }
+

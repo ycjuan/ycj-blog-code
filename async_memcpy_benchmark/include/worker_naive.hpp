@@ -9,5 +9,5 @@ public:
 
     void update(const std::vector<long>& jobIds, const std::vector<std::vector<T_EMB>>& embData2D) override;
 
-    std::vector<std::vector<long>> score(const std::vector<std::vector<T_EMB>>& reqEmb, int k) const override;
+    void score(const std::vector<std::vector<T_EMB>>& reqEmb) const override;
 };
