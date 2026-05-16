@@ -1,6 +1,8 @@
 #include <cassert>
 #include <atomic>
+#include <chrono>
 #include <iostream>
+#include <optional>
 #include <thread>
 #include <vector>
 #include "universal_buffer.cuh"
@@ -115,6 +117,65 @@ int main()
         assert(successCount == kNumThreads);
         // All slices released — buffer should be fully reclaimed
         assert(buf.getFreeBytes() == buf.getTotalBytes());
+    }
+
+    // --------------
+    // Test OomPolicy::kThrow (explicit)
+    {
+        std::cout << "======== Test OomPolicy::kThrow ========" << std::endl;
+        UniversalDeviceBuffer buf(512, "buf", OomPolicy::kThrow);
+        auto s1 = buf.getBuffer(512);
+        bool threw = false;
+        try { buf.getBuffer(1); }
+        catch (const std::runtime_error&) { threw = true; }
+        assert(threw);
+    }
+
+    // --------------
+    // Test OomPolicy::kWaitSome
+    // Main thread fills the buffer, then a background thread releases the slice after a delay.
+    // getBuffer on the main thread should block and succeed once the slice is returned.
+    {
+        std::cout << "======== Test OomPolicy::kWaitSome ========" << std::endl;
+        const uint64_t kBufBytes = 1024;
+        UniversalDeviceBuffer buf(kBufBytes, "buf", OomPolicy::kWaitSome);
+
+        std::optional<CudaDeviceArray<char>> s1 = buf.getBuffer(kBufBytes); // fills the buffer
+
+        std::thread releaser([&]()
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            s1.reset(); // release s1
+        });
+
+        auto s2 = buf.getBuffer(kBufBytes); // should block until releaser runs
+        assert(s2.data() != nullptr);
+        releaser.join();
+    }
+
+    // --------------
+    // Test OomPolicy::kWaitAll
+    // Main thread fills the buffer, background thread holds a slice then releases.
+    // getBuffer with kWaitAll should block until all slices are returned, grow the buffer, then succeed.
+    {
+        std::cout << "======== Test OomPolicy::kWaitAll ========" << std::endl;
+        const uint64_t kBufBytes   = 1024;
+        const uint64_t kExtraBytes = 512;
+        UniversalDeviceBuffer buf(kBufBytes, "buf", OomPolicy::kWaitAll);
+
+        std::optional<CudaDeviceArray<char>> s1 = buf.getBuffer(kBufBytes); // fills the buffer
+
+        std::thread releaser([&]()
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            s1.reset(); // release s1
+        });
+
+        // This should block until s1 is released, then grow buffer and allocate
+        auto s2 = buf.getBuffer(kExtraBytes);
+        assert(s2.data() != nullptr);
+        assert(buf.getTotalBytes() == kBufBytes + kExtraBytes);
+        releaser.join();
     }
 
     std::cout << "All tests passed." << std::endl;
