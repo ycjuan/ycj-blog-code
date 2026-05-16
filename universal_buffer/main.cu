@@ -82,5 +82,41 @@ int main()
         assert(freeMemAfterArr1Free == freeMemBeforeMalloc); // arr1 is out of scope too, so the memory should be freed
     }
 
+    // --------------
+    // Test external-pointer constructor (CudaDeviceArray)
+    // Verify that the wrapper does not free the memory when it goes out of scope.
+    {
+        std::cout << "======== Test external-pointer ctor (CudaDeviceArray) ========" << std::endl;
+        size_t freeMemBeforeMalloc = getFreeMemoryInBytes();
+        float* rawPtr = nullptr;
+        cudaMalloc(&rawPtr, kArraySize * sizeof(float));
+        {
+            CudaDeviceArray<float> arr(rawPtr, kArraySize, "arr_ext");
+            assert(arr.data() == rawPtr);
+            assert(arr.getArraySize() == kArraySize);
+        }
+        // arr is out of scope but rawPtr should NOT have been freed
+        size_t freeMemAfterWrapperFree = getFreeMemoryInBytes();
+        assert(freeMemAfterWrapperFree < freeMemBeforeMalloc); // memory still allocated
+        cudaFree(rawPtr);
+        size_t freeMemAfterManualFree = getFreeMemoryInBytes();
+        assert(freeMemAfterManualFree == freeMemBeforeMalloc);
+    }
+
+    // --------------
+    // Test external-pointer constructor (CudaHostArray)
+    {
+        std::cout << "======== Test external-pointer ctor (CudaHostArray) ========" << std::endl;
+        float* rawPtr = nullptr;
+        cudaMallocHost(&rawPtr, kArraySize * sizeof(float));
+        {
+            CudaHostArray<float> arr(rawPtr, kArraySize, "arr_host_ext");
+            assert(arr.data() == rawPtr);
+            assert(arr.getArraySize() == kArraySize);
+        }
+        // arr is out of scope but rawPtr should still be valid — free it manually
+        cudaFreeHost(rawPtr);
+    }
+
     return 0;
 }
