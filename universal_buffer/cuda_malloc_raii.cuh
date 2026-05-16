@@ -9,6 +9,11 @@
 
 constexpr bool kPrintDebug = true;
 
+template <typename T> struct CudaNullDeleter
+{
+    void operator()(T* /*ptr*/) const {}
+};
+
 template <typename T> struct CudaDeviceDeleter
 {
     void operator()(T* ptr) const 
@@ -53,6 +58,16 @@ protected: // Making the constructor protected will make this class non-instanti
     {
     }
 
+    // Constructor for wrapping an externally managed pointer. The shared_ptr uses a no-op deleter
+    // so it never frees the memory — the caller owns the lifetime.
+    CudaArray(T* ptr, uint64_t size, std::string name)
+        : m_size(size)
+        , m_name(name)
+        , m_p_dataRawPtr(ptr)
+        , m_p_dataSmartPtr(ptr, CudaNullDeleter<T>())
+    {
+    }
+
     uint64_t m_size;
     std::string m_name;
     T* m_p_dataRawPtr = nullptr;
@@ -88,6 +103,11 @@ public:
         // Create smart pointer
         this->m_p_dataSmartPtr.reset(this->m_p_dataRawPtr, CudaDeviceDeleter<T>());
     }
+
+    CudaDeviceArray(T* ptr, uint64_t size, std::string name)
+        : CudaArray<T>(ptr, size, name)
+    {
+    }
 };
 
 template <typename T> class CudaHostArray : public CudaArray<T>
@@ -114,5 +134,10 @@ public:
         // --------------
         // Create smart pointer
         this->m_p_dataSmartPtr.reset(this->m_p_dataRawPtr, CudaHostDeleter<T>());
+    }
+
+    CudaHostArray(T* ptr, uint64_t size, std::string name)
+        : CudaArray<T>(ptr, size, name)
+    {
     }
 };
