@@ -52,7 +52,7 @@ target_compile_options(${LIB_NAME} PRIVATE
 )
 
 # Add executable
-add_executable(test_${LIB_NAME} test/main.cu)
+add_executable(test_${LIB_NAME} test/test_cuda_raii.cu)
 
 # Include src so test can find the headers
 target_include_directories(test_${LIB_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
