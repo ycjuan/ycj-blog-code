@@ -70,6 +70,8 @@ protected: // Making the constructor protected will make this class non-instanti
 
     uint64_t m_size;
     std::string m_name;
+    // We need a separate raw pointer (instead of just calling m_p_dataSmartPtr.get()) because
+    // shared_ptr cannot be used in device code. m_p_dataRawPtr is what gets passed into CUDA kernels.
     T* m_p_dataRawPtr = nullptr;
 
     // It is very important to note that we use shared_ptr here to release memory, instead of just call cudaFree / cudaFreeHost in the destructor.
