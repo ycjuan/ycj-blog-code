@@ -1,5 +1,8 @@
 #include <cassert>
+#include <atomic>
 #include <iostream>
+#include <thread>
+#include <vector>
 #include "universal_buffer.cuh"
 
 int main()
@@ -69,6 +72,50 @@ int main()
         try { buf.getBuffer(1); }
         catch (const std::runtime_error&) { threw = true; }
         assert(threw);
+    }
+
+    // --------------
+    // Test thread safety: 256 threads each call getBuffer and release concurrently.
+    // Each thread gets its own 256-byte slice, writes to m_usedBytes must not race.
+    {
+        std::cout << "======== Test thread safety (256 threads) ========" << std::endl;
+        const int      kNumThreads = 256;
+        const uint64_t kSliceBytes = 256;
+        // Buffer large enough for all threads to hold a slice simultaneously
+        UniversalDeviceBuffer buf(kNumThreads * kSliceBytes * 2, "buf");
+
+        std::atomic<int> successCount{0};
+        std::atomic<int> errorCount{0};
+
+        auto worker = [&]()
+        {
+            try
+            {
+                auto slice = buf.getBuffer(kSliceBytes);
+                assert(slice.data() != nullptr);
+                assert(reinterpret_cast<uintptr_t>(slice.data()) % 256 == 0);
+                ++successCount;
+                // slice released here
+            }
+            catch (const std::exception& e)
+            {
+                std::cerr << "Thread error: " << e.what() << std::endl;
+                ++errorCount;
+            }
+        };
+
+        std::vector<std::thread> threads;
+        threads.reserve(kNumThreads);
+        for (int i = 0; i < kNumThreads; ++i)
+            threads.emplace_back(worker);
+        for (auto& t : threads)
+            t.join();
+
+        assert(errorCount == 0);
+        assert(successCount == kNumThreads);
+        // All slices released — buffer should be fully free again
+        buf.getBuffer(1); // triggers prune
+        assert(buf.getFreeBytes() == buf.getTotalBytes() - 1);
     }
 
     std::cout << "All tests passed." << std::endl;
