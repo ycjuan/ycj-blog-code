@@ -72,9 +72,9 @@ public:
             {
                 // Wait until all slices are returned, then grow the buffer
                 m_cv.wait(lock, [this]() { return m_usedSegments.empty(); });
-                uint64_t newSize = m_buffer.getArraySize() + sizeInBytes;
-                m_buffer   = CudaDeviceArray<char>(newSize, m_name);
-                m_usedBytes = 0;
+                uint64_t newSize    = static_cast<uint64_t>(m_buffer.getArraySize() * m_kGrowthFactor);
+                m_buffer            = CudaDeviceArray<char>(newSize, m_name);
+                m_usedBytes         = 0;
             }
         }
     }
@@ -91,6 +91,7 @@ private:
     // CUDA requires data to be aligned to 256 bytes for optimal memory access.
     // See https://leimao.github.io/blog/CUDA-Data-Alignment/
     static constexpr uint64_t m_kMemAlignmentInByte = 256;
+    static constexpr double   m_kGrowthFactor        = 1.1;
 
     mutable std::mutex      m_mutex;
     std::condition_variable m_cv;

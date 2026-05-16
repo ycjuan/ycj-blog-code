@@ -174,7 +174,7 @@ int main()
         // This should block until s1 is released, then grow buffer and allocate
         auto s2 = buf.getBuffer(kExtraBytes);
         assert(s2.data() != nullptr);
-        assert(buf.getTotalBytes() == kBufBytes + kExtraBytes);
+        assert(buf.getTotalBytes() == static_cast<uint64_t>(kBufBytes * 1.1));
         releaser.join();
     }
 
