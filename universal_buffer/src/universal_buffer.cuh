@@ -79,7 +79,11 @@ public:
         }
     }
 
-    uint64_t getTotalBytes() const { return m_buffer.getArraySize(); }
+    uint64_t getTotalBytes() const
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return m_buffer.getArraySize();
+    }
     uint64_t getFreeBytes()
     {
         std::lock_guard<std::mutex> lock(m_mutex);
