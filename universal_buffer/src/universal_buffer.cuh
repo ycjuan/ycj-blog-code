@@ -17,6 +17,7 @@ class UniversalDeviceBuffer
 public:
     UniversalDeviceBuffer(uint64_t sizeInBytes, std::string name)
         : m_buffer(sizeInBytes, name)
+        , m_usedBytes(0)
     {
     }
 
@@ -32,11 +33,13 @@ public:
         std::sort(m_usedSegments.begin(), m_usedSegments.end(),
                   [](const MemSegment& a, const MemSegment& b) { return a.addrBeginIncl < b.addrBeginIncl; });
 
+        m_usedBytes += sizeInBytes;
         char* ptr = m_buffer.data() + offset;
         return CudaDeviceArray<char>(ptr, sizeInBytes, "", isReleased);
     }
 
-    uint64_t getSize() const { return m_buffer.getArraySize(); }
+    uint64_t getTotalBytes() const { return m_buffer.getArraySize(); }
+    uint64_t getFreeBytes() const { return m_buffer.getArraySize() - m_usedBytes; }
 
 private:
     // CUDA requires data to be aligned to 256 bytes for optimal memory access.
@@ -45,9 +48,14 @@ private:
 
     CudaDeviceArray<char> m_buffer;
     std::vector<MemSegment> m_usedSegments;
+    uint64_t m_usedBytes;
 
     void pruneReleasedSegments()
     {
+        for (const MemSegment& seg : m_usedSegments)
+            if (*seg.isReleased)
+                m_usedBytes -= (seg.addrEndExcl - seg.addrBeginIncl);
+
         m_usedSegments.erase(
             std::remove_if(m_usedSegments.begin(), m_usedSegments.end(),
                            [](const MemSegment& s) { return *s.isReleased; }),
