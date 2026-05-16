@@ -22,7 +22,7 @@ find_package(CUDA REQUIRED)
 
 # Add library
 set(LIB_HEADER_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/cuda_malloc_raii.cuh
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/cuda_malloc_raii.cuh
 )
 
 #set(LIB_SOURCE_FILES
@@ -34,7 +34,7 @@ add_library(${LIB_NAME} SHARED
 )
 
 # Include directories
-target_include_directories(${LIB_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(${LIB_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # Link CUDA libraries
 target_link_libraries(${LIB_NAME}
@@ -52,7 +52,10 @@ target_compile_options(${LIB_NAME} PRIVATE
 )
 
 # Add executable
-add_executable(test_${LIB_NAME} main.cu)
+add_executable(test_${LIB_NAME} test/main.cu)
+
+# Include src so test can find the headers
+target_include_directories(test_${LIB_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # Link library
 target_link_libraries(test_${LIB_NAME} ${LIB_NAME})
