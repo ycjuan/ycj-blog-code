@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <ostream>
 #include <sstream>
@@ -15,12 +16,21 @@ template <typename T> struct CudaNullDeleter
 };
 
 // Deleter that signals release by setting *isReleased = true instead of freeing memory.
-// Used when CudaArray wraps a slice of a larger buffer managed by UniversalDeviceBuffer.
+// Optionally calls onRelease() after signalling — used by UniversalDeviceBuffer to notify
+// waiting threads (e.g. condition variable) when a slice is returned.
 template <typename T> struct CudaReleaseSignalDeleter
 {
     std::shared_ptr<bool> m_isReleased;
-    CudaReleaseSignalDeleter(std::shared_ptr<bool> isReleased) : m_isReleased(std::move(isReleased)) {}
-    void operator()(T* /*ptr*/) const { *m_isReleased = true; }
+    std::function<void()> m_onRelease;
+    CudaReleaseSignalDeleter(std::shared_ptr<bool> isReleased, std::function<void()> onRelease = nullptr)
+        : m_isReleased(std::move(isReleased))
+        , m_onRelease(std::move(onRelease))
+    {}
+    void operator()(T* /*ptr*/) const
+    {
+        *m_isReleased = true;
+        if (m_onRelease) m_onRelease();
+    }
 };
 
 template <typename T> struct CudaDeviceDeleter
@@ -78,12 +88,14 @@ protected: // Making the constructor protected will make this class non-instanti
     }
 
     // Constructor for wrapping a slice of a larger buffer. When the last copy goes out of scope,
-    // the deleter sets *isReleased = true so the owning buffer can reclaim the segment.
-    CudaArray(T* ptr, uint64_t size, std::string name, std::shared_ptr<bool> isReleased)
+    // the deleter sets *isReleased = true and calls onRelease() (if provided) so the owning
+    // buffer can reclaim the segment and wake waiting threads.
+    CudaArray(T* ptr, uint64_t size, std::string name, std::shared_ptr<bool> isReleased,
+              std::function<void()> onRelease = nullptr)
         : m_size(size)
         , m_name(name)
         , m_p_dataRawPtr(ptr)
-        , m_p_dataSmartPtr(ptr, CudaReleaseSignalDeleter<T>(std::move(isReleased)))
+        , m_p_dataSmartPtr(ptr, CudaReleaseSignalDeleter<T>(std::move(isReleased), std::move(onRelease)))
     {
     }
 
@@ -130,8 +142,9 @@ public:
     {
     }
 
-    CudaDeviceArray(T* ptr, uint64_t size, std::string name, std::shared_ptr<bool> isReleased)
-        : CudaArray<T>(ptr, size, name, std::move(isReleased))
+    CudaDeviceArray(T* ptr, uint64_t size, std::string name, std::shared_ptr<bool> isReleased,
+                    std::function<void()> onRelease = nullptr)
+        : CudaArray<T>(ptr, size, name, std::move(isReleased), std::move(onRelease))
     {
     }
 };
@@ -167,8 +180,9 @@ public:
     {
     }
 
-    CudaHostArray(T* ptr, uint64_t size, std::string name, std::shared_ptr<bool> isReleased)
-        : CudaArray<T>(ptr, size, name, std::move(isReleased))
+    CudaHostArray(T* ptr, uint64_t size, std::string name, std::shared_ptr<bool> isReleased,
+                  std::function<void()> onRelease = nullptr)
+        : CudaArray<T>(ptr, size, name, std::move(isReleased), std::move(onRelease))
     {
     }
 };
