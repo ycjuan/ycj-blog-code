@@ -7,4 +7,5 @@ mkdir -p build
 cd build
 cmake ..
 make -j 4
-./test_universalbuffer
+./test_cuda_malloc_raii
+./test_universal_buffer

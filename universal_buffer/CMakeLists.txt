@@ -52,14 +52,14 @@ target_compile_options(${LIB_NAME} PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler -fopenmp>
 )
 
-# Add executable
-add_executable(test_${LIB_NAME} test/test_cuda_malloc_raii.cu)
+# Add executables
+add_executable(test_cuda_malloc_raii test/test_cuda_malloc_raii.cu)
+target_include_directories(test_cuda_malloc_raii PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(test_cuda_malloc_raii ${LIB_NAME})
 
-# Include src so test can find the headers
-target_include_directories(test_${LIB_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-
-# Link library
-target_link_libraries(test_${LIB_NAME} ${LIB_NAME})
+add_executable(test_universal_buffer test/test_universal_buffer.cu)
+target_include_directories(test_universal_buffer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(test_universal_buffer ${LIB_NAME})
 
 # Set linker language to CUDA
 set_target_properties(${LIB_NAME} PROPERTIES LINKER_LANGUAGE CUDA)
