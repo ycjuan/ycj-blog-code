@@ -35,8 +35,17 @@ public:
     uint64_t getSize() const { return m_buffer.getArraySize(); }
 
 private:
+    // CUDA requires data to be aligned to 256 bytes for optimal memory access.
+    // See https://leimao.github.io/blog/CUDA-Data-Alignment/
+    static constexpr uint64_t m_kMemAlignmentInByte = 256;
+
     CudaDeviceArray<char> m_buffer;
     std::vector<MemSegment> m_usedSegments;
+
+    static uint64_t alignUp(uint64_t offset)
+    {
+        return (offset + m_kMemAlignmentInByte - 1) / m_kMemAlignmentInByte * m_kMemAlignmentInByte;
+    }
 
     uint64_t findFreeOffset(uint64_t sizeInBytes) const
     {
@@ -46,14 +55,16 @@ private:
         uint64_t candidateBegin = 0;
         for (const MemSegment& seg : m_usedSegments)
         {
-            if (seg.addrBeginIncl - candidateBegin >= sizeInBytes)
-                return candidateBegin;
+            uint64_t alignedBegin = alignUp(candidateBegin);
+            if (alignedBegin + sizeInBytes <= seg.addrBeginIncl)
+                return alignedBegin;
             candidateBegin = seg.addrEndExcl;
         }
 
         // Check gap after the last used segment (or the whole buffer if empty)
-        if (totalSize - candidateBegin >= sizeInBytes)
-            return candidateBegin;
+        uint64_t alignedBegin = alignUp(candidateBegin);
+        if (alignedBegin + sizeInBytes <= totalSize)
+            return alignedBegin;
 
         throw std::runtime_error("UniversalDeviceBuffer: no free contiguous space of " +
                                  std::to_string(sizeInBytes) + " bytes");
