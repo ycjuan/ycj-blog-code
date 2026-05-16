@@ -23,6 +23,7 @@ find_package(CUDA REQUIRED)
 # Add library
 set(LIB_HEADER_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/cuda_malloc_raii.cuh
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/universal_buffer.cuh
 )
 
 #set(LIB_SOURCE_FILES
