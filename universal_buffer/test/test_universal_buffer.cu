@@ -113,9 +113,8 @@ int main()
 
         assert(errorCount == 0);
         assert(successCount == kNumThreads);
-        // All slices released — buffer should be fully free again
-        buf.getBuffer(1); // triggers prune
-        assert(buf.getFreeBytes() == buf.getTotalBytes() - 1);
+        // All slices released — buffer should be fully reclaimed
+        assert(buf.getFreeBytes() == buf.getTotalBytes());
     }
 
     std::cout << "All tests passed." << std::endl;

@@ -41,9 +41,10 @@ public:
     }
 
     uint64_t getTotalBytes() const { return m_buffer.getArraySize(); }
-    uint64_t getFreeBytes() const
+    uint64_t getFreeBytes()
     {
         std::lock_guard<std::mutex> lock(m_mutex);
+        pruneReleasedSegments();
         return m_buffer.getArraySize() - m_usedBytes;
     }
 
