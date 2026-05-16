@@ -7,8 +7,9 @@
 
 struct MemSegment
 {
-    uint64_t addrBeginIncl; // byte offset from buffer base, inclusive
-    uint64_t addrEndExcl;   // byte offset from buffer base, exclusive
+    uint64_t addrBeginIncl;        // byte offset from buffer base, inclusive
+    uint64_t addrEndExcl;          // byte offset from buffer base, exclusive
+    std::shared_ptr<bool> isReleased;
 };
 
 class UniversalDeviceBuffer
@@ -23,13 +24,16 @@ public:
     // Throws if no contiguous free space of the requested size exists.
     CudaDeviceArray<char> getBuffer(uint64_t sizeInBytes)
     {
+        pruneReleasedSegments();
+
         uint64_t offset = findFreeOffset(sizeInBytes);
-        m_usedSegments.push_back({offset, offset + sizeInBytes});
+        auto isReleased = std::make_shared<bool>(false);
+        m_usedSegments.push_back({offset, offset + sizeInBytes, isReleased});
         std::sort(m_usedSegments.begin(), m_usedSegments.end(),
                   [](const MemSegment& a, const MemSegment& b) { return a.addrBeginIncl < b.addrBeginIncl; });
 
         char* ptr = m_buffer.data() + offset;
-        return CudaDeviceArray<char>(ptr, sizeInBytes, "");
+        return CudaDeviceArray<char>(ptr, sizeInBytes, "", isReleased);
     }
 
     uint64_t getSize() const { return m_buffer.getArraySize(); }
@@ -41,6 +45,14 @@ private:
 
     CudaDeviceArray<char> m_buffer;
     std::vector<MemSegment> m_usedSegments;
+
+    void pruneReleasedSegments()
+    {
+        m_usedSegments.erase(
+            std::remove_if(m_usedSegments.begin(), m_usedSegments.end(),
+                           [](const MemSegment& s) { return *s.isReleased; }),
+            m_usedSegments.end());
+    }
 
     static uint64_t alignUp(uint64_t offset)
     {

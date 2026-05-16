@@ -14,6 +14,15 @@ template <typename T> struct CudaNullDeleter
     void operator()(T* /*ptr*/) const {}
 };
 
+// Deleter that signals release by setting *isReleased = true instead of freeing memory.
+// Used when CudaArray wraps a slice of a larger buffer managed by UniversalDeviceBuffer.
+template <typename T> struct CudaReleaseSignalDeleter
+{
+    std::shared_ptr<bool> m_isReleased;
+    CudaReleaseSignalDeleter(std::shared_ptr<bool> isReleased) : m_isReleased(std::move(isReleased)) {}
+    void operator()(T* /*ptr*/) const { *m_isReleased = true; }
+};
+
 template <typename T> struct CudaDeviceDeleter
 {
     void operator()(T* ptr) const 
@@ -68,6 +77,16 @@ protected: // Making the constructor protected will make this class non-instanti
     {
     }
 
+    // Constructor for wrapping a slice of a larger buffer. When the last copy goes out of scope,
+    // the deleter sets *isReleased = true so the owning buffer can reclaim the segment.
+    CudaArray(T* ptr, uint64_t size, std::string name, std::shared_ptr<bool> isReleased)
+        : m_size(size)
+        , m_name(name)
+        , m_p_dataRawPtr(ptr)
+        , m_p_dataSmartPtr(ptr, CudaReleaseSignalDeleter<T>(std::move(isReleased)))
+    {
+    }
+
     uint64_t m_size;
     std::string m_name;
     // We need a separate raw pointer (instead of just calling m_p_dataSmartPtr.get()) because
@@ -110,6 +129,11 @@ public:
         : CudaArray<T>(ptr, size, name)
     {
     }
+
+    CudaDeviceArray(T* ptr, uint64_t size, std::string name, std::shared_ptr<bool> isReleased)
+        : CudaArray<T>(ptr, size, name, std::move(isReleased))
+    {
+    }
 };
 
 template <typename T> class CudaHostArray : public CudaArray<T>
@@ -140,6 +164,11 @@ public:
 
     CudaHostArray(T* ptr, uint64_t size, std::string name)
         : CudaArray<T>(ptr, size, name)
+    {
+    }
+
+    CudaHostArray(T* ptr, uint64_t size, std::string name, std::shared_ptr<bool> isReleased)
+        : CudaArray<T>(ptr, size, name, std::move(isReleased))
     {
     }
 };
