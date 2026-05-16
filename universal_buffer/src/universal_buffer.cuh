@@ -2,6 +2,7 @@
 
 #include "cuda_malloc_raii.cuh"
 #include <algorithm>
+#include <mutex>
 #include <stdexcept>
 #include <vector>
 
@@ -25,6 +26,7 @@ public:
     // Throws if no contiguous free space of the requested size exists.
     CudaDeviceArray<char> getBuffer(uint64_t sizeInBytes)
     {
+        std::lock_guard<std::mutex> lock(m_mutex);
         pruneReleasedSegments();
 
         uint64_t offset = findFreeOffset(sizeInBytes);
@@ -39,13 +41,18 @@ public:
     }
 
     uint64_t getTotalBytes() const { return m_buffer.getArraySize(); }
-    uint64_t getFreeBytes() const { return m_buffer.getArraySize() - m_usedBytes; }
+    uint64_t getFreeBytes() const
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return m_buffer.getArraySize() - m_usedBytes;
+    }
 
 private:
     // CUDA requires data to be aligned to 256 bytes for optimal memory access.
     // See https://leimao.github.io/blog/CUDA-Data-Alignment/
     static constexpr uint64_t m_kMemAlignmentInByte = 256;
 
+    mutable std::mutex m_mutex;
     CudaDeviceArray<char> m_buffer;
     std::vector<MemSegment> m_usedSegments;
     uint64_t m_usedBytes;
