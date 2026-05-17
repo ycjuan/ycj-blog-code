@@ -51,9 +51,25 @@ buf.getTotalBytes(); // total size of the buffer
 buf.getFreeBytes();  // currently available bytes
 ```
 
+**OOM policies:**
+
+The `OomPolicy` parameter controls what `getBuffer` does when no contiguous free slice of the requested size exists:
+
+| Policy | Behaviour |
+|---|---|
+| `OomPolicy::kThrow` (default) | Throws `std::runtime_error` immediately. |
+| `OomPolicy::kWaitSome` | Blocks until at least one outstanding slice is returned, then retries. |
+| `OomPolicy::kWaitAll` | Blocks until **all** outstanding slices are returned, grows the buffer by 10%, then retries. |
+
+```cpp
+UniversalDeviceBuffer buf(totalBytes, "name");                          // kThrow (default)
+UniversalDeviceBuffer buf(totalBytes, "name", OomPolicy::kWaitSome);
+UniversalDeviceBuffer buf(totalBytes, "name", OomPolicy::kWaitAll);
+```
+
 **Notes:**
 - All allocations are aligned to 256 bytes for optimal CUDA memory access (see [CUDA Data Alignment](https://leimao.github.io/blog/CUDA-Data-Alignment/))
-- `getBuffer` throws `std::runtime_error` if no contiguous free space of the requested size exists
+- `kWaitSome` and `kWaitAll` are thread-safe — `getBuffer` re-acquires the lock and re-checks free space after each wakeup
 
 ## Build
 
