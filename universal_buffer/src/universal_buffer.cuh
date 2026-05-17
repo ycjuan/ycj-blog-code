@@ -49,7 +49,11 @@ public:
             if (found)
             {
                 auto isReleased = std::make_shared<bool>(false);
-                auto onRelease  = [this]() { m_cv.notify_all(); };
+                auto onRelease  = [this]()
+                {
+                    std::lock_guard<std::mutex> lk(m_mutex);
+                    m_cv.notify_all();
+                };
                 m_usedSegments.push_back({offset, offset + sizeInBytes, isReleased});
                 std::sort(m_usedSegments.begin(), m_usedSegments.end(),
                           [](const MemSegment& a, const MemSegment& b)
@@ -95,7 +99,7 @@ private:
     // CUDA requires data to be aligned to 256 bytes for optimal memory access.
     // See https://leimao.github.io/blog/CUDA-Data-Alignment/
     static constexpr uint64_t m_kMemAlignmentInByte = 256;
-    static constexpr double   m_kGrowthFactor        = 1.1;
+    static constexpr double   m_kGrowthFactor       = 1.1;
 
     mutable std::mutex      m_mutex;
     std::condition_variable m_cv;
