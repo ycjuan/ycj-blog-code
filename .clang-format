@@ -1,32 +1,154 @@
 BasedOnStyle: WebKit
 
 # Spaces
+
+# ColumnLimit: 120
+# Before: (no wrap, line can be arbitrarily long)
+# After:
+#   (wraps only when line exceeds 120 chars)
 ColumnLimit: 120
+
+# AlwaysBreakTemplateDeclarations: Yes
+# Before:
+#   template <typename T> void foo();
+# After:
+#   template <typename T>
+#   void foo();
 AlwaysBreakTemplateDeclarations: Yes
 
 # Function calls
+
+# AlignAfterOpenBracket: Align
+# Before:
+#   foo(a,
+#     b, c);
+# After:
+#   foo(a,
+#       b, c);
 AlignAfterOpenBracket: Align
+
+# BinPackParameters: false
+# Before:
+#   void foo(int a, int b,
+#     int c, int d);
+# After:
+#   void foo(int a,
+#            int b,
+#            int c,
+#            int d);
 BinPackParameters: false
+
+# BinPackArguments: false
+# Before:
+#   foo(a, b,
+#     c, d);
+# After:
+#   foo(a,
+#       b,
+#       c,
+#       d);
 BinPackArguments: false
+
+# AllowAllArgumentsOnNextLine: false
+# Before:
+#   foo(
+#     a, b, c, d);
+# After:
+#   foo(a,
+#       b,
+#       c,
+#       d);
 AllowAllArgumentsOnNextLine: false
+
+# AllowAllParametersOfDeclarationOnNextLine: false
+# Before:
+#   void foo(
+#     int a, int b, int c);
+# After:
+#   void foo(int a,
+#            int b,
+#            int c);
 AllowAllParametersOfDeclarationOnNextLine: false
 
 # Curly Braces
+
+# BreakBeforeBraces: Allman
+# Before:
+#   if (x) {
+#     foo();
+#   }
+# After:
+#   if (x)
+#   {
+#     foo();
+#   }
 BreakBeforeBraces: Allman
 
 # Alignment
+
+# AlignOperands: true
+# Before:
+#   int x = 1 +
+#     2 + 3;
+# After:
+#   int x = 1 +
+#           2 + 3;
 AlignOperands: true
 
+# AlignConsecutiveAssignments: true
+# Before:
+#   int x = 1;
+#   int yy = 2;
+# After:
+#   int x  = 1;
+#   int yy = 2;
+AlignConsecutiveAssignments: true
+
+# AlignConsecutiveDeclarations: true
+# Before:
+#   int x = 1;
+#   double yy = 2;
+# After:
+#   int    x  = 1;
+#   double yy = 2;
+AlignConsecutiveDeclarations: true
+
+# AlignTrailingComments: true
+# Before:
+#   int x = 1; // foo
+#   int yy = 2; // bar
+# After:
+#   int x  = 1;  // foo
+#   int yy = 2;  // bar
+AlignTrailingComments: true
+
 # One-line statements
+
+# AllowShortBlocksOnASingleLine: false
+# Before:
+#   if (x) { return; }
+# After:
+#   if (x)
+#   {
+#     return;
+#   }
 AllowShortBlocksOnASingleLine: false
+
+# AllowShortIfStatementsOnASingleLine: false
+# Before:
+#   if (x) return;
+# After:
+#   if (x)
+#     return;
 AllowShortIfStatementsOnASingleLine: false
 
-
 # Special
-# This will make 
-# void longFunc(int a,
-#               int b)
-# instead of
-# void 
-# longFunc(int a, int b)
+
+# PenaltyReturnTypeOnItsOwnLine: 1000
+# Before:
+#   void
+#   longFunc(int a, int b)
+# After:
+#   void longFunc(int a,
+#                 int b)
 PenaltyReturnTypeOnItsOwnLine: 1000
