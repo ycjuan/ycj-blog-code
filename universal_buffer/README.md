@@ -6,7 +6,7 @@ A header-only CUDA library for RAII-based GPU memory management and suballocatio
 
 **1. Runtime `cudaMalloc` introduces latency spikes**
 
-`cudaMalloc` and `cudaFree` are not free operations — they can block for several milliseconds, and the latency is unpredictable. In latency-sensitive systems (e.g. online inference), calling `cudaMalloc` on the hot path can cause request-level spikes. The solution is to pre-allocate a large buffer at startup and suballocate from it at runtime, eliminating driver-level allocation overhead entirely. See `test_cuda_malloc_latency` for a benchmark that demonstrates this effect.
+`cudaMalloc` and `cudaFree` are not free operations — they can block for several milliseconds, and the latency is unpredictable. In latency-sensitive systems (e.g. online inference), calling `cudaMalloc` on the hot path can cause request-level spikes. The solution is to pre-allocate a large buffer at startup and suballocate from it at runtime, eliminating driver-level allocation overhead entirely. See `test_cuda_malloc_latency` for a benchmark that demonstrates this effect. See also: [Thrust Custom Allocator](https://ycjuan.github.io/2024/11/08/2024-11-08-thrust-custom-allocator/) for a related discussion of this latency spike problem.
 
 **2. Memory can be shared across modules that are never active simultaneously**
 
