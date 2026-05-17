@@ -8,8 +8,6 @@
 #include <sstream>
 #include <stdexcept>
 
-constexpr bool kPrintDebug = true;
-
 template <typename T>
 struct CudaNullDeleter
 {
@@ -41,26 +39,32 @@ struct CudaReleaseSignalDeleter
 template <typename T>
 struct CudaDeviceDeleter
 {
+    bool m_debug;
+    CudaDeviceDeleter(bool debug = false)
+        : m_debug(debug)
+    {
+    }
     void operator()(T* ptr) const
     {
         cudaFree(ptr);
-        if (kPrintDebug)
-        {
+        if (m_debug)
             std::cout << "cudaFree(" << (void*)ptr << ")" << std::endl;
-        }
     }
 };
 
 template <typename T>
 struct CudaHostDeleter
 {
+    bool m_debug;
+    CudaHostDeleter(bool debug = false)
+        : m_debug(debug)
+    {
+    }
     void operator()(T* ptr) const
     {
         cudaFreeHost(ptr);
-        if (kPrintDebug)
-        {
+        if (m_debug)
             std::cout << "cudaFreeHost(" << (void*)ptr << ")" << std::endl;
-        }
     }
 };
 
@@ -81,18 +85,20 @@ public:
 
 protected: // Making the constructor protected will make this class
            // non-instantiable to the users
-    CudaArray(uint64_t size, std::string name)
+    CudaArray(uint64_t size, std::string name, bool debug = false)
         : m_size(size)
         , m_name(name)
+        , m_debug(debug)
     {
     }
 
     // Constructor for wrapping an externally managed pointer. The shared_ptr uses
     // a no-op deleter so it never frees the memory — the caller owns the
     // lifetime.
-    CudaArray(T* ptr, uint64_t size, std::string name)
+    CudaArray(T* ptr, uint64_t size, std::string name, bool debug = false)
         : m_size(size)
         , m_name(name)
+        , m_debug(debug)
         , m_p_dataRawPtr(ptr)
         , m_p_dataSmartPtr(ptr, CudaNullDeleter<T>())
     {
@@ -116,6 +122,7 @@ protected: // Making the constructor protected will make this class
 
     uint64_t    m_size;
     std::string m_name;
+    bool        m_debug = false;
     // We need a separate raw pointer (instead of just calling
     // m_p_dataSmartPtr.get()) because shared_ptr cannot be used in device code.
     // m_p_dataRawPtr is what gets passed into CUDA kernels.
@@ -134,8 +141,8 @@ template <typename T>
 class CudaDeviceArray : public CudaArray<T>
 {
 public:
-    CudaDeviceArray(uint64_t size, std::string name)
-        : CudaArray<T>(size, name)
+    CudaDeviceArray(uint64_t size, std::string name, bool debug = false)
+        : CudaArray<T>(size, name, debug)
     {
         // --------------
         // Allocate device memory
@@ -146,19 +153,17 @@ public:
             oss << "Failed to allocate device memory for " << this->m_name << ": " << cudaGetErrorString(cudaError);
             throw std::runtime_error(oss.str());
         }
-        if (kPrintDebug)
-        {
+        if (this->m_debug)
             std::cout << "cudaMalloc(" << (void*)this->m_p_dataRawPtr << ", " << this->m_size * sizeof(T) << ")"
                       << std::endl;
-        }
 
         // --------------
         // Create smart pointer
-        this->m_p_dataSmartPtr.reset(this->m_p_dataRawPtr, CudaDeviceDeleter<T>());
+        this->m_p_dataSmartPtr.reset(this->m_p_dataRawPtr, CudaDeviceDeleter<T>(this->m_debug));
     }
 
-    CudaDeviceArray(T* ptr, uint64_t size, std::string name)
-        : CudaArray<T>(ptr, size, name)
+    CudaDeviceArray(T* ptr, uint64_t size, std::string name, bool debug = false)
+        : CudaArray<T>(ptr, size, name, debug)
     {
     }
 
@@ -176,8 +181,8 @@ template <typename T>
 class CudaHostArray : public CudaArray<T>
 {
 public:
-    CudaHostArray(uint64_t size, std::string name)
-        : CudaArray<T>(size, name)
+    CudaHostArray(uint64_t size, std::string name, bool debug = false)
+        : CudaArray<T>(size, name, debug)
     {
         // --------------
         // Allocate host memory
@@ -188,19 +193,17 @@ public:
             oss << "Failed to allocate host memory for " << this->m_name << ": " << cudaGetErrorString(cudaError);
             throw std::runtime_error(oss.str());
         }
-        if (kPrintDebug)
-        {
+        if (this->m_debug)
             std::cout << "cudaMallocHost(" << (void*)this->m_p_dataRawPtr << ", " << this->m_size * sizeof(T) << ")"
                       << std::endl;
-        }
 
         // --------------
         // Create smart pointer
-        this->m_p_dataSmartPtr.reset(this->m_p_dataRawPtr, CudaHostDeleter<T>());
+        this->m_p_dataSmartPtr.reset(this->m_p_dataRawPtr, CudaHostDeleter<T>(this->m_debug));
     }
 
-    CudaHostArray(T* ptr, uint64_t size, std::string name)
-        : CudaArray<T>(ptr, size, name)
+    CudaHostArray(T* ptr, uint64_t size, std::string name, bool debug = false)
+        : CudaArray<T>(ptr, size, name, debug)
     {
     }
 

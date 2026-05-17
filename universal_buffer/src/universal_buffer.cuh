@@ -25,11 +25,15 @@ struct MemSegment
 class UniversalDeviceBuffer
 {
 public:
-    UniversalDeviceBuffer(uint64_t sizeInBytes, std::string name, OomPolicy oomPolicy = OomPolicy::kThrow)
-        : m_buffer(sizeInBytes, name)
+    UniversalDeviceBuffer(uint64_t    sizeInBytes,
+                          std::string name,
+                          OomPolicy   oomPolicy = OomPolicy::kThrow,
+                          bool        debug     = false)
+        : m_buffer(sizeInBytes, name, debug)
         , m_name(name)
         , m_usedBytes(0)
         , m_oomPolicy(oomPolicy)
+        , m_debug(debug)
     {
     }
 
@@ -83,7 +87,7 @@ public:
                               return m_usedSegments.empty();
                           });
                 uint64_t newSize = static_cast<uint64_t>(m_buffer.getArraySize() * m_kGrowthFactor);
-                m_buffer         = CudaDeviceArray<char>(newSize, m_name);
+                m_buffer         = CudaDeviceArray<char>(newSize, m_name, m_debug);
                 m_usedBytes      = 0;
             }
         }
@@ -114,6 +118,7 @@ private:
     std::vector<MemSegment> m_usedSegments;
     uint64_t                m_usedBytes;
     OomPolicy               m_oomPolicy;
+    bool                    m_debug;
 
     void pruneReleasedSegments()
     {
