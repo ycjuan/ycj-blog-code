@@ -1,11 +1,12 @@
 #pragma once
 
-#include "cuda_malloc_raii.cuh"
 #include <algorithm>
 #include <condition_variable>
 #include <mutex>
 #include <stdexcept>
 #include <vector>
+
+#include "cuda_malloc_raii.cuh"
 
 enum class OomPolicy
 {
@@ -16,16 +17,15 @@ enum class OomPolicy
 
 struct MemSegment
 {
-    uint64_t addrBeginIncl;        // byte offset from buffer base, inclusive
-    uint64_t addrEndExcl;          // byte offset from buffer base, exclusive
+    uint64_t              addrBeginIncl; // byte offset from buffer base, inclusive
+    uint64_t              addrEndExcl;   // byte offset from buffer base, exclusive
     std::shared_ptr<bool> isReleased;
 };
 
 class UniversalDeviceBuffer
 {
 public:
-    UniversalDeviceBuffer(uint64_t sizeInBytes, std::string name,
-                          OomPolicy oomPolicy = OomPolicy::kThrow)
+    UniversalDeviceBuffer(uint64_t sizeInBytes, std::string name, OomPolicy oomPolicy = OomPolicy::kThrow)
         : m_buffer(sizeInBytes, name)
         , m_name(name)
         , m_usedBytes(0)
@@ -33,8 +33,9 @@ public:
     {
     }
 
-    // Find a free segment of sizeInBytes and return a non-owning CudaDeviceArray<char> wrapping it.
-    // Behaviour on OOM is controlled by the OomPolicy set at construction.
+    // Find a free segment of sizeInBytes and return a non-owning
+    // CudaDeviceArray<char> wrapping it. Behaviour on OOM is controlled by the
+    // OomPolicy set at construction.
     CudaDeviceArray<char> getBuffer(uint64_t sizeInBytes)
     {
         std::unique_lock<std::mutex> lock(m_mutex);
@@ -44,7 +45,7 @@ public:
             pruneReleasedSegments();
 
             uint64_t offset;
-            bool found = tryFindFreeOffset(sizeInBytes, offset);
+            bool     found = tryFindFreeOffset(sizeInBytes, offset);
 
             if (found)
             {
@@ -54,10 +55,10 @@ public:
                     std::lock_guard<std::mutex> lk(m_mutex);
                     m_cv.notify_all();
                 };
-                m_usedSegments.push_back({offset, offset + sizeInBytes, isReleased});
-                std::sort(m_usedSegments.begin(), m_usedSegments.end(),
-                          [](const MemSegment& a, const MemSegment& b)
-                          { return a.addrBeginIncl < b.addrBeginIncl; });
+                m_usedSegments.push_back({ offset, offset + sizeInBytes, isReleased });
+                std::sort(m_usedSegments.begin(),
+                          m_usedSegments.end(),
+                          [](const MemSegment& a, const MemSegment& b) { return a.addrBeginIncl < b.addrBeginIncl; });
                 m_usedBytes += sizeInBytes;
                 char* ptr = m_buffer.data() + offset;
                 return CudaDeviceArray<char>(ptr, sizeInBytes, "", isReleased, onRelease);
@@ -65,8 +66,8 @@ public:
 
             if (m_oomPolicy == OomPolicy::kThrow)
             {
-                throw std::runtime_error("UniversalDeviceBuffer: no free contiguous space of " +
-                                         std::to_string(sizeInBytes) + " bytes");
+                throw std::runtime_error("UniversalDeviceBuffer: no free contiguous space of "
+                                         + std::to_string(sizeInBytes) + " bytes");
             }
             else if (m_oomPolicy == OomPolicy::kWaitSome)
             {
@@ -75,10 +76,15 @@ public:
             else // kWaitAll
             {
                 // Wait until all slices are returned, then grow the buffer
-                m_cv.wait(lock, [this]() { pruneReleasedSegments(); return m_usedSegments.empty(); });
+                m_cv.wait(lock,
+                          [this]()
+                          {
+                              pruneReleasedSegments();
+                              return m_usedSegments.empty();
+                          });
                 uint64_t newSize = static_cast<uint64_t>(m_buffer.getArraySize() * m_kGrowthFactor);
-                m_buffer = CudaDeviceArray<char>(newSize, m_name);
-                m_usedBytes = 0;
+                m_buffer         = CudaDeviceArray<char>(newSize, m_name);
+                m_usedBytes      = 0;
             }
         }
     }
@@ -115,10 +121,10 @@ private:
             if (*seg.isReleased)
                 m_usedBytes -= (seg.addrEndExcl - seg.addrBeginIncl);
 
-        m_usedSegments.erase(
-            std::remove_if(m_usedSegments.begin(), m_usedSegments.end(),
-                           [](const MemSegment& s) { return *s.isReleased; }),
-            m_usedSegments.end());
+        m_usedSegments.erase(std::remove_if(m_usedSegments.begin(),
+                                            m_usedSegments.end(),
+                                            [](const MemSegment& s) { return *s.isReleased; }),
+                             m_usedSegments.end());
     }
 
     static uint64_t alignUp(uint64_t offset)

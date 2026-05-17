@@ -16,6 +16,9 @@ BreakBeforeBraces: Allman
 
 # Alignment
 AlignOperands: true
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+AlignTrailingComments: true
 
 # One-line statements
 AllowShortBlocksOnASingleLine: false
