@@ -71,7 +71,7 @@ public:
             else // kWaitAll
             {
                 // Wait until all slices are returned, then grow the buffer
-                m_cv.wait(lock, [this]() { return m_usedSegments.empty(); });
+                m_cv.wait(lock, [this]() { pruneReleasedSegments(); return m_usedSegments.empty(); });
                 uint64_t newSize = static_cast<uint64_t>(m_buffer.getArraySize() * m_kGrowthFactor);
                 m_buffer = CudaDeviceArray<char>(newSize, m_name);
                 m_usedBytes = 0;

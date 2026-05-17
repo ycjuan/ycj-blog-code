@@ -144,7 +144,7 @@ int main()
 
         std::thread releaser([&]()
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
             s1.reset(); // release s1
         });
 
@@ -167,7 +167,7 @@ int main()
 
         std::thread releaser([&]()
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
             s1.reset(); // release s1
         });
 
