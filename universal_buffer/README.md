@@ -34,6 +34,7 @@ CudaDeviceArray<float>(size, "name", /*debug=*/true);
 
 // Wrapping — borrows an external pointer, never frees
 CudaDeviceArray<float>(ptr, size, "name");
+CudaDeviceArray<float>(ptr, size, "name", /*debug=*/true);
 
 // Wrapping with release signal — sets *isReleased = true on last copy destruction
 // onRelease (optional) is called after signalling, e.g. to wake a condition variable
@@ -43,11 +44,14 @@ CudaDeviceArray<float>(ptr, size, "name", isReleased, onRelease);
 
 **Accessors (available on all array types):**
 ```cpp
-T*          data()               // raw pointer (usable in device code)
-uint64_t    getElementSize()     // sizeof(T)
-uint64_t    getArraySize()       // number of elements
-uint64_t    getArraySizeInBytes() // total bytes
-std::string getName()            // name passed at construction
+// __device__ __host__ — usable in both host and device code
+T*       data()                // raw pointer
+uint64_t getElementSize()      // sizeof(T)
+uint64_t getArraySize()        // number of elements (not bytes)
+uint64_t getArraySizeInBytes() // total bytes = getArraySize() * getElementSize()
+
+// host only
+std::string getName()          // name passed at construction
 ```
 
 ### `universal_buffer.cuh`
@@ -77,10 +81,14 @@ The `OomPolicy` parameter controls what `getBuffer` does when no contiguous free
 | `OomPolicy::kWaitAll` | Blocks until **all** outstanding slices are returned, grows the buffer by 10%, then retries. |
 
 ```cpp
-UniversalDeviceBuffer buf(totalBytes, "name");                                     // kThrow (default)
+UniversalDeviceBuffer buf(totalBytes, "name");                                          // kThrow (default)
 UniversalDeviceBuffer buf(totalBytes, "name", OomPolicy::kWaitSome);
 UniversalDeviceBuffer buf(totalBytes, "name", OomPolicy::kWaitAll);
-UniversalDeviceBuffer buf(totalBytes, "name", OomPolicy::kThrow, /*debug=*/true);  // prints cudaMalloc/cudaFree to stdout
+
+// debug is orthogonal to OomPolicy — prints cudaMalloc/cudaFree to stdout
+UniversalDeviceBuffer buf(totalBytes, "name", OomPolicy::kThrow,    /*debug=*/true);
+UniversalDeviceBuffer buf(totalBytes, "name", OomPolicy::kWaitSome, /*debug=*/true);
+UniversalDeviceBuffer buf(totalBytes, "name", OomPolicy::kWaitAll,  /*debug=*/true);
 ```
 
 **Notes:**
