@@ -40,7 +40,7 @@ template <typename T> struct CudaDeviceDeleter
         cudaFree(ptr); 
         if (kPrintDebug)
         {
-            std::cout << "cudaFree(" << ptr << ")" << std::endl;
+            std::cout << "cudaFree(" << (void*)ptr << ")" << std::endl;
         }
     }
 };
@@ -52,7 +52,7 @@ template <typename T> struct CudaHostDeleter
         cudaFreeHost(ptr); 
         if (kPrintDebug)
         {
-            std::cout << "cudaFreeHost(" << ptr << ")" << std::endl;
+            std::cout << "cudaFreeHost(" << (void*)ptr << ")" << std::endl;
         }
     }
 };
@@ -129,7 +129,7 @@ public:
         }
         if (kPrintDebug)
         {
-            std::cout << "cudaMalloc(" << this->m_p_dataRawPtr << ", " << this->m_size * sizeof(T) << ")" << std::endl;
+            std::cout << "cudaMalloc(" << (void*)this->m_p_dataRawPtr << ", " << this->m_size * sizeof(T) << ")" << std::endl;
         }
 
         // --------------
@@ -167,7 +167,7 @@ public:
         }
         if (kPrintDebug)
         {
-            std::cout << "cudaMallocHost(" << this->m_p_dataRawPtr << ", " << this->m_size * sizeof(T) << ")" << std::endl;
+            std::cout << "cudaMallocHost(" << (void*)this->m_p_dataRawPtr << ", " << this->m_size * sizeof(T) << ")" << std::endl;
         }
 
         // --------------
