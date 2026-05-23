@@ -14,8 +14,8 @@ public:
 
     const T_EMB* data() const;
 
-    virtual void update(const std::vector<long>& jobIds, const std::vector<std::vector<T_EMB>>& embData2D) = 0;
-    void setScalars(const std::vector<long>& jobIds, const std::vector<float>& scalars);
+    virtual void updateEmbData(const std::vector<long>& jobIds, const std::vector<std::vector<T_EMB>>& embData2D) = 0;
+    virtual void updateScalarData(const std::vector<long>& jobIds, const std::vector<float>& scalars) = 0;
 
     void score(const std::vector<std::vector<T_EMB>>& reqEmb) const;
 
