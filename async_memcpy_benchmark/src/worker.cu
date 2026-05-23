@@ -18,19 +18,6 @@ Worker::Worker(int maxNumDocs, int embDim)
 
 const T_EMB* Worker::data() const { return m_data.data(); }
 
-void Worker::setScalars(const std::vector<long>& jobIds, const std::vector<float>& scalars)
-{
-    for (int i = 0; i < (int)jobIds.size(); i++)
-    {
-        auto it = m_docId2Idx.find(jobIds[i]);
-        if (it == m_docId2Idx.end())
-        {
-            continue;
-        }
-        int docIdx = it->second;
-        CHECK_CUDA(cudaMemcpy(m_d_scalars.data() + docIdx, &scalars[i], sizeof(float), cudaMemcpyHostToDevice));
-    }
-}
 
 __global__ void applyScalarsKernel(float* scores, const float* scalars, int numReqs, int numDocs)
 {
