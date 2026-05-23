@@ -24,7 +24,21 @@ WorkerNaive::WorkerNaive(int maxNumDocs, int embDim)
 {
 }
 
-void WorkerNaive::update(const std::vector<long>& v_jobIds, const std::vector<std::vector<T_EMB>>& embData2D)
+void WorkerNaive::updateScalarData(const std::vector<long>& jobIds, const std::vector<float>& scalars)
+{
+    for (int i = 0; i < (int)jobIds.size(); i++)
+    {
+        auto it = m_docId2Idx.find(jobIds[i]);
+        if (it == m_docId2Idx.end())
+        {
+            continue;
+        }
+        int docIdx = it->second;
+        CHECK_CUDA(cudaMemcpy(m_d_scalars.data() + docIdx, &scalars[i], sizeof(float), cudaMemcpyHostToDevice));
+    }
+}
+
+void WorkerNaive::updateEmbData(const std::vector<long>& v_jobIds, const std::vector<std::vector<T_EMB>>& embData2D)
 {
     std::vector<CopyElement> v_elements;
     v_elements.reserve(v_jobIds.size() * m_embDim);
