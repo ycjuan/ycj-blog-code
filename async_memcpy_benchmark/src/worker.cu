@@ -1,7 +1,6 @@
 #include "worker.hpp"
 #include "utils/util.hpp"
 
-#include <cublas_v2.h>
 #include <vector>
 
 
@@ -18,59 +17,70 @@ Worker::Worker(int maxNumDocs, int embDim)
 
 const T_EMB* Worker::data() const { return m_data.data(); }
 
-
-__global__ void applyScalarsKernel(float* scores, const float* scalars, int numReqs, int numDocs)
+__global__ void scoreKernel(
+    float* scores,
+    const T_EMB* reqEmb,
+    const T_EMB* docData,
+    const float* scalars,
+    const int* docIndices,
+    int embDim,
+    int numTargets)
 {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= numReqs * numDocs)
+    int t = blockIdx.x * blockDim.x + threadIdx.x;
+    if (t >= numTargets)
     {
         return;
     }
-    int docIdx = idx % numDocs;
-    scores[idx] *= scalars[docIdx];
+    int docIdx = docIndices[t];
+    const T_EMB* doc = docData + docIdx * embDim;
+    float dot = 0.0f;
+    for (int i = 0; i < embDim; i++)
+    {
+        dot += __bfloat162float(reqEmb[i]) * __bfloat162float(doc[i]);
+    }
+    scores[t] = dot * scalars[docIdx];
 }
 
-void Worker::score(const std::vector<std::vector<T_EMB>>& reqEmb) const
+void Worker::score(const std::vector<T_EMB>& reqEmb, const std::vector<long>& targetJobIds) const
 {
-    const int numReqs = reqEmb.size();
-    const int numDocs = m_docId2Idx.size();
+    const int numTargets = targetJobIds.size();
 
-    // Flatten reqEmb to host array and copy to device
-    std::vector<T_EMB> hostReqEmb(numReqs * m_embDim);
-    for (int i = 0; i < numReqs; i++)
+    // Resolve job IDs to doc indices, skip unknown IDs
+    std::vector<int> docIndices;
+    docIndices.reserve(numTargets);
+    for (long jobId : targetJobIds)
     {
-        std::copy(reqEmb[i].begin(), reqEmb[i].end(), hostReqEmb.begin() + i * m_embDim);
+        auto it = m_docId2Idx.find(jobId);
+        if (it != m_docId2Idx.end())
+        {
+            docIndices.push_back(it->second);
+        }
     }
-    CudaDeviceArray<T_EMB> d_reqEmb(numReqs * m_embDim, "reqEmb");
-    CHECK_CUDA(cudaMemcpy(d_reqEmb.data(), hostReqEmb.data(), numReqs * m_embDim * sizeof(T_EMB), cudaMemcpyHostToDevice));
-
-    // GEMM: scores[numReqs x numDocs] = reqEmb[numReqs x embDim] * docEmb[numDocs x embDim]^T
-    if (m_d_scores.getArraySize() < (uint64_t)(numReqs * numDocs))
+    if (docIndices.empty())
     {
-        m_d_scores = CudaDeviceArray<float>(numReqs * numDocs, "scores");
+        return;
     }
-    cublasHandle_t handle;
-    cublasCreate(&handle);
+    const int numValid = docIndices.size();
 
-    const float alpha = 1.0f;
-    const float beta = 0.0f;
-    // cuBLAS is column-major. To compute C(M x N) = A(M x K) * B(N x K)^T in row-major:
-    // call with (CUBLAS_OP_T, CUBLAS_OP_N, N, M, K, B, K, A, K, C, N)
-    cublasGemmEx(
-        handle,
-        CUBLAS_OP_T, CUBLAS_OP_N,
-        numDocs, numReqs, m_embDim,
-        &alpha,
-        m_data.data(), CUDA_R_16BF, m_embDim,
-        d_reqEmb.data(), CUDA_R_16BF, m_embDim,
-        &beta,
-        m_d_scores.data(), CUDA_R_32F, numDocs,
-        CUBLAS_COMPUTE_32F,
-        CUBLAS_GEMM_DEFAULT);
+    CudaDeviceArray<T_EMB> d_reqEmb(m_embDim, "reqEmb");
+    CHECK_CUDA(cudaMemcpy(d_reqEmb.data(), reqEmb.data(), m_embDim * sizeof(T_EMB), cudaMemcpyHostToDevice));
 
-    cublasDestroy(handle);
+    CudaDeviceArray<int> d_docIndices(numValid, "docIndices");
+    CHECK_CUDA(cudaMemcpy(d_docIndices.data(), docIndices.data(), numValid * sizeof(int), cudaMemcpyHostToDevice));
+
+    if (m_d_scores.getArraySize() < (uint64_t)numValid)
+    {
+        m_d_scores = CudaDeviceArray<float>(numValid, "scores");
+    }
 
     const int kBlockSize = 256;
-    const int gridSize = (numReqs * numDocs + kBlockSize - 1) / kBlockSize;
-    applyScalarsKernel<<<gridSize, kBlockSize>>>(m_d_scores.data(), m_d_scalars.data(), numReqs, numDocs);
+    const int gridSize = (numValid + kBlockSize - 1) / kBlockSize;
+    scoreKernel<<<gridSize, kBlockSize>>>(
+        m_d_scores.data(),
+        d_reqEmb.data(),
+        m_data.data(),
+        m_d_scalars.data(),
+        d_docIndices.data(),
+        m_embDim,
+        numValid);
 }
