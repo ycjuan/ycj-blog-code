@@ -20,7 +20,7 @@ __global__ void scoreKernel(float* scores,
                             const T_EMB* reqEmb,
                             const T_EMB* docData,
                             const float* scalars,
-                            const int* docIndices,
+                            const int* rowIds,
                             int embDim,
                             int numTargets)
 {
@@ -29,55 +29,42 @@ __global__ void scoreKernel(float* scores,
     {
         return;
     }
-    int docIdx = docIndices[t];
-    const T_EMB* doc = docData + docIdx * embDim;
+    int rowId = rowIds[t];
+    const T_EMB* doc = docData + rowId * embDim;
     float dot = 0.0f;
     for (int i = 0; i < embDim; i++)
     {
         dot += __bfloat162float(reqEmb[i]) * __bfloat162float(doc[i]);
     }
-    scores[t] = dot * scalars[docIdx];
+    scores[t] = dot * scalars[rowId];
 }
 
-void Worker::score(const std::vector<T_EMB>& reqEmb, const std::vector<long>& targetJobIds) const
+void Worker::score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIds) const
 {
-    const int numTargets = targetJobIds.size();
-
-    // Resolve job IDs to doc indices, skip unknown IDs
-    std::vector<int> docIndices;
-    docIndices.reserve(numTargets);
-    for (long jobId : targetJobIds)
-    {
-        auto it = m_docId2Idx.find(jobId);
-        if (it != m_docId2Idx.end())
-        {
-            docIndices.push_back(it->second);
-        }
-    }
-    if (docIndices.empty())
+    const int numTargets = targetRowIds.size();
+    if (numTargets == 0)
     {
         return;
     }
-    const int numValid = docIndices.size();
 
     CudaDeviceArray<T_EMB> d_reqEmb(m_embDim, "reqEmb");
     CHECK_CUDA(cudaMemcpy(d_reqEmb.data(), reqEmb.data(), m_embDim * sizeof(T_EMB), cudaMemcpyHostToDevice));
 
-    CudaDeviceArray<int> d_docIndices(numValid, "docIndices");
-    CHECK_CUDA(cudaMemcpy(d_docIndices.data(), docIndices.data(), numValid * sizeof(int), cudaMemcpyHostToDevice));
+    CudaDeviceArray<int> d_rowIds(numTargets, "rowIds");
+    CHECK_CUDA(cudaMemcpy(d_rowIds.data(), targetRowIds.data(), numTargets * sizeof(int), cudaMemcpyHostToDevice));
 
-    if (m_d_scores.getArraySize() < (uint64_t)numValid)
+    if (m_d_scores.getArraySize() < (uint64_t)numTargets)
     {
-        m_d_scores = CudaDeviceArray<float>(numValid, "scores");
+        m_d_scores = CudaDeviceArray<float>(numTargets, "scores");
     }
 
     const int kBlockSize = 256;
-    const int gridSize = (numValid + kBlockSize - 1) / kBlockSize;
+    const int gridSize = (numTargets + kBlockSize - 1) / kBlockSize;
     scoreKernel<<<gridSize, kBlockSize>>>(m_d_scores.data(),
                                           d_reqEmb.data(),
                                           m_data.data(),
                                           m_d_scalars.data(),
-                                          d_docIndices.data(),
+                                          d_rowIds.data(),
                                           m_embDim,
-                                          numValid);
+                                          numTargets);
 }
