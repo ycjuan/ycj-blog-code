@@ -57,8 +57,3 @@ void WorkerNaive::update(const std::vector<long>& v_jobIds, const std::vector<st
     CHECK_CUDA(cudaStreamSynchronize(m_stream.get()));
 }
 
-void WorkerNaive::score(const std::vector<std::vector<T_EMB>>& reqEmb) const
-{
-    scoreCore(reqEmb);
-}
-

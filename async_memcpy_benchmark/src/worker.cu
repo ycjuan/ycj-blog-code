@@ -43,7 +43,7 @@ __global__ void applyScalarsKernel(float* scores, const float* scalars, int numR
     scores[idx] *= scalars[docIdx];
 }
 
-void Worker::scoreCore(const std::vector<std::vector<T_EMB>>& reqEmb) const
+void Worker::score(const std::vector<std::vector<T_EMB>>& reqEmb) const
 {
     const int numReqs = reqEmb.size();
     const int numDocs = m_docId2Idx.size();
