@@ -1,8 +1,7 @@
-#include "worker.hpp"
 #include "utils/util.hpp"
+#include "worker.hpp"
 
 #include <vector>
-
 
 Worker::Worker(int maxNumDocs, int embDim)
     : m_maxNumDocs(maxNumDocs)
@@ -17,14 +16,13 @@ Worker::Worker(int maxNumDocs, int embDim)
 
 const T_EMB* Worker::data() const { return m_data.data(); }
 
-__global__ void scoreKernel(
-    float* scores,
-    const T_EMB* reqEmb,
-    const T_EMB* docData,
-    const float* scalars,
-    const int* docIndices,
-    int embDim,
-    int numTargets)
+__global__ void scoreKernel(float* scores,
+                            const T_EMB* reqEmb,
+                            const T_EMB* docData,
+                            const float* scalars,
+                            const int* docIndices,
+                            int embDim,
+                            int numTargets)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numTargets)
@@ -75,12 +73,11 @@ void Worker::score(const std::vector<T_EMB>& reqEmb, const std::vector<long>& ta
 
     const int kBlockSize = 256;
     const int gridSize = (numValid + kBlockSize - 1) / kBlockSize;
-    scoreKernel<<<gridSize, kBlockSize>>>(
-        m_d_scores.data(),
-        d_reqEmb.data(),
-        m_data.data(),
-        m_d_scalars.data(),
-        d_docIndices.data(),
-        m_embDim,
-        numValid);
+    scoreKernel<<<gridSize, kBlockSize>>>(m_d_scores.data(),
+                                          d_reqEmb.data(),
+                                          m_data.data(),
+                                          m_d_scalars.data(),
+                                          d_docIndices.data(),
+                                          m_embDim,
+                                          numValid);
 }
