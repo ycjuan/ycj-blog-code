@@ -1,5 +1,5 @@
-#include "worker_naive.hpp"
 #include "utils/util.hpp"
+#include "worker_naive.hpp"
 
 #include <vector>
 
@@ -63,11 +63,17 @@ void WorkerNaive::updateEmbData(const std::vector<long>& v_jobIds, const std::ve
     }
 
     CudaDeviceArray<CopyElement> d_elements(v_elements.size(), "CopyElements");
-    CHECK_CUDA(cudaMemcpyAsync(d_elements.data(), v_elements.data(), v_elements.size() * sizeof(CopyElement), cudaMemcpyHostToDevice, m_stream.get()));
+    CHECK_CUDA(cudaMemcpyAsync(d_elements.data(),
+                               v_elements.data(),
+                               v_elements.size() * sizeof(CopyElement),
+                               cudaMemcpyHostToDevice,
+                               m_stream.get()));
 
     const int kBlockSize = 256;
     const int gridSize = (v_elements.size() + kBlockSize - 1) / kBlockSize;
-    scatterKernel<<<gridSize, kBlockSize, 0, m_stream.get()>>>(m_data.data(), d_elements.data(), m_embDim, v_elements.size());
+    scatterKernel<<<gridSize, kBlockSize, 0, m_stream.get()>>>(m_data.data(),
+                                                               d_elements.data(),
+                                                               m_embDim,
+                                                               v_elements.size());
     CHECK_CUDA(cudaStreamSynchronize(m_stream.get()));
 }
-

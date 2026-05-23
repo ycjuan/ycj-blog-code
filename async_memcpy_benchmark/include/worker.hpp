@@ -20,7 +20,6 @@ public:
     void score(const std::vector<T_EMB>& reqEmb, const std::vector<long>& targetJobIds) const;
 
 protected:
-
     int m_maxNumDocs;
     int m_embDim;
     CudaDeviceArray<T_EMB> m_data;
@@ -30,5 +29,3 @@ protected:
     std::vector<long> m_idxToDocId;
     CudaStream m_stream;
 };
-
-

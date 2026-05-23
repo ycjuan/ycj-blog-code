@@ -1,12 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <cuda_runtime.h>
+#include <iostream>
 #include <memory>
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
-#include <iostream>
-#include <cuda_runtime.h>
 
 constexpr bool kPrintDebug = false;
 
@@ -37,11 +37,12 @@ private:
     std::unique_ptr<CUstream_st, CudaStreamDeleter> m_stream;
 };
 
-template <typename T> struct CudaDeviceDeleter
+template <typename T>
+struct CudaDeviceDeleter
 {
-    void operator()(T* ptr) const 
-    { 
-        cudaFree(ptr); 
+    void operator()(T* ptr) const
+    {
+        cudaFree(ptr);
         if (kPrintDebug)
         {
             std::cout << "cudaFree(" << ptr << ")" << std::endl;
@@ -49,11 +50,12 @@ template <typename T> struct CudaDeviceDeleter
     }
 };
 
-template <typename T> struct CudaHostDeleter
+template <typename T>
+struct CudaHostDeleter
 {
-    void operator()(T* ptr) const 
-    { 
-        cudaFreeHost(ptr); 
+    void operator()(T* ptr) const
+    {
+        cudaFreeHost(ptr);
         if (kPrintDebug)
         {
             std::cout << "cudaFreeHost(" << ptr << ")" << std::endl;
@@ -61,7 +63,8 @@ template <typename T> struct CudaHostDeleter
     }
 };
 
-template <typename T> class CudaArray
+template <typename T>
+class CudaArray
 {
 public:
     // See https://leimao.github.io/blog/CPP-Base-Class-Destructors/ for why we need to make this virtual
@@ -85,14 +88,15 @@ protected: // Making the constructor protected will make this class non-instanti
     std::string m_name;
     T* m_p_dataRawPtr = nullptr;
 
-    // It is very important to note that we use shared_ptr here to release memory, instead of just call cudaFree / cudaFreeHost in the destructor.
-    // This is because we want to make this class copyable, but when we copy, we only want to copy the pointer, not the entire memory.
-    // This implies that we need some reference counting mechanism to release the memory when the last copy is out of scope.
-    // shared_ptr is a good choise for this purpose.
+    // It is very important to note that we use shared_ptr here to release memory, instead of just call cudaFree /
+    // cudaFreeHost in the destructor. This is because we want to make this class copyable, but when we copy, we only
+    // want to copy the pointer, not the entire memory. This implies that we need some reference counting mechanism to
+    // release the memory when the last copy is out of scope. shared_ptr is a good choise for this purpose.
     std::shared_ptr<T> m_p_dataSmartPtr;
 };
 
-template <typename T> class CudaDeviceArray : public CudaArray<T>
+template <typename T>
+class CudaDeviceArray : public CudaArray<T>
 {
 public:
     CudaDeviceArray(uint64_t size, std::string name)
@@ -118,7 +122,8 @@ public:
     }
 };
 
-template <typename T> class CudaHostArray : public CudaArray<T>
+template <typename T>
+class CudaHostArray : public CudaArray<T>
 {
 public:
     CudaHostArray(uint64_t size, std::string name)
@@ -136,7 +141,8 @@ public:
         }
         if (kPrintDebug)
         {
-            std::cout << "cudaMallocHost(" << this->m_p_dataRawPtr << ", " << this->m_size * sizeof(T) << ")" << std::endl;
+            std::cout << "cudaMallocHost(" << this->m_p_dataRawPtr << ", " << this->m_size * sizeof(T) << ")"
+                      << std::endl;
         }
 
         // --------------
