@@ -17,7 +17,7 @@ public:
     virtual void updateEmbData(const std::vector<long>& jobIds, const std::vector<std::vector<T_EMB>>& embData2D) = 0;
     virtual void updateScalarData(const std::vector<long>& jobIds, const std::vector<float>& scalars) = 0;
 
-    void score(const std::vector<std::vector<T_EMB>>& reqEmb) const;
+    void score(const std::vector<T_EMB>& reqEmb, const std::vector<long>& targetJobIds) const;
 
 protected:
 
