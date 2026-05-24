@@ -10,6 +10,8 @@ Read [CODING_STYLE.md](CODING_STYLE.md) for naming conventions used in this proj
 
 Always create new commits. Never amend existing commits.
 
+When creating a new file, immediately `git add` it.
+
 ## Shortcuts
 
 - **cmc** — "check my comments": fetch and display all unresolved PR review comments on the current branch, then ask the user which ones to act on.
