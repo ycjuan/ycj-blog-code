@@ -90,6 +90,7 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
                                    v_element.size() * sizeof(EmbElement),
                                    cudaMemcpyHostToDevice,
                                    m_writeStream.get()));
+        CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 
     // --- set dirty=1 before scatter ---

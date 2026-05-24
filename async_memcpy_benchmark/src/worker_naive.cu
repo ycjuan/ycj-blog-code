@@ -45,10 +45,7 @@ void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::
     std::lock_guard<std::mutex> lock(m_mutex);
 
     // --- resolve docId -> rowIdx and build scalar elements ---
-    std::vector<ScalarElement> v_scalarElement;
-    {
-        v_scalarElement = resolveScalarElements(v_docId, v_scalar);
-    }
+    std::vector<ScalarElement> v_scalarElement = resolveScalarElements(v_docId, v_scalar);
 
     if (v_scalarElement.empty())
     {
@@ -78,10 +75,7 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector
     std::lock_guard<std::mutex> lock(m_mutex);
 
     // --- resolve docId -> rowIdx and build copy elements ---
-    std::vector<EmbElement> v_element;
-    {
-        v_element = resolveAndBuildEmbElements(v_docId, v2_embData);
-    }
+    std::vector<EmbElement> v_element = resolveAndBuildEmbElements(v_docId, v2_embData);
 
     if (v_element.empty())
     {
@@ -112,10 +106,7 @@ void WorkerNaive::deleteDocs(const std::vector<long>& v_docId)
     std::lock_guard<std::mutex> lock(m_mutex);
 
     // --- update maps, collect deleted rowIdxs ---
-    std::vector<int> v_deletedRowIdx;
-    {
-        v_deletedRowIdx = resolveDeletedRowIdxs(v_docId);
-    }
+    std::vector<int> v_deletedRowIdx = resolveDeletedRowIdxs(v_docId);
 
     if (v_deletedRowIdx.empty())
     {
