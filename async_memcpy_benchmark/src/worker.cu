@@ -9,9 +9,11 @@ Worker::Worker(int maxNumDocs, int embDim)
     , m_data(maxNumDocs * embDim, "Worker")
     , m_d_scalars(maxNumDocs, "scalars")
     , m_d_scores(maxNumDocs, "scores")
+    , m_d_dirty(maxNumDocs, "dirty")
     , m_rowIdx2DocId(maxNumDocs, -1)
 {
     CHECK_CUDA(cudaMemset(m_d_scalars.data(), 0, maxNumDocs * sizeof(float)));
+    CHECK_CUDA(cudaMemset(m_d_dirty.data(), 0, maxNumDocs * sizeof(char)));
 }
 
 const T_EMB* Worker::data() const { return m_data.data(); }
@@ -21,6 +23,7 @@ __global__ void scoreKernel(float* scores,
                             const T_EMB* docData,
                             const float* scalars,
                             const int* rowIdxs,
+                            const char* dirty,
                             int embDim,
                             int numTargets)
 {
@@ -30,6 +33,11 @@ __global__ void scoreKernel(float* scores,
         return;
     }
     int rowIdx = rowIdxs[t];
+    if (dirty[rowIdx])
+    {
+        scores[t] = 0.0f;
+        return;
+    }
     const T_EMB* doc = docData + rowIdx * embDim;
     T_EMB dot = __float2bfloat16(0.0f);
     for (int i = 0; i < embDim; i++)
@@ -73,6 +81,7 @@ void Worker::scoreImpl(const std::vector<T_EMB>& reqEmb, const std::vector<int>&
                                                                  m_data.data(),
                                                                  m_d_scalars.data(),
                                                                  d_rowIdx.data(),
+                                                                 m_d_dirty.data(),
                                                                  m_embDim,
                                                                  numTargets);
     CHECK_CUDA(cudaStreamSynchronize(m_readStream.get()));

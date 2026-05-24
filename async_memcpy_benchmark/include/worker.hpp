@@ -27,6 +27,7 @@ protected:
     CudaDeviceArray<T_EMB> m_data;
     CudaDeviceArray<float> m_d_scalars;
     CudaDeviceArray<float> m_d_scores;
+    CudaDeviceArray<char> m_d_dirty;
     std::unordered_map<long, int> m_docId2rowIdx;
     std::vector<long> m_rowIdx2DocId;
     CudaStream m_readStream;
