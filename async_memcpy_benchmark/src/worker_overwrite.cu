@@ -223,8 +223,8 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
 
     // --- H2D: deleted rowIdxs, set dirty=1 ---
     {
-        CudaDeviceArray<int> d_deletedRowIdx(v_deletedRowIdx.size(), "deletedRowIdx");
-        CHECK_CUDA(cudaMemcpyAsync(d_deletedRowIdx.data(),
+        CudaDeviceArray<int> d_rowIdx(v_deletedRowIdx.size(), "deletedRowIdx");
+        CHECK_CUDA(cudaMemcpyAsync(d_rowIdx.data(),
                                    v_deletedRowIdx.data(),
                                    v_deletedRowIdx.size() * sizeof(int),
                                    cudaMemcpyHostToDevice,
@@ -233,7 +233,7 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
             // --- lock: protect dirty bits from concurrent score reads ---
             std::lock_guard<std::mutex> lock(m_readMutex);
             kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
-                                                                          d_deletedRowIdx.data(),
+                                                                          d_rowIdx.data(),
                                                                           v_deletedRowIdx.size(),
                                                                           1);
         }
