@@ -102,10 +102,10 @@ std::vector<ScalarElement> Worker::resolveScalarElements(const std::vector<long>
     return v_scalarElement;
 }
 
-COWUpsertData Worker::resolveAndBuildEmbElementsCOW(const std::vector<long>& v_docId,
+CopyOnWriteUpsertData Worker::resolveAndBuildEmbElementsCopyOnWrite(const std::vector<long>& v_docId,
                                                     const std::vector<std::vector<T_EMB>>& v2_embData)
 {
-    COWUpsertData result;
+    CopyOnWriteUpsertData result;
     result.v_embElement.reserve(v_docId.size() * m_embDim);
     result.v_newRowIdx.reserve(v_docId.size());
 

@@ -9,10 +9,10 @@
 // and atomically flips dirty bits, so concurrent readers never see partial writes.
 // Scalars are always mirrored in m_docId2scalar (CPU) so upsertDocs can carry
 // them to the new rowIdx regardless of which scalar variant is used.
-class WorkerCOW : public Worker
+class WorkerCopyOnWrite : public Worker
 {
 public:
-    WorkerCOW(int maxNumDocs, int embDim);
+    WorkerCopyOnWrite(int maxNumDocs, int embDim);
 
     void upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData) override;
 
@@ -27,10 +27,10 @@ protected:
 
 // Eager variant: updateScalarData scatters scalars to GPU immediately.
 // score() calls scoreImpl() directly — m_d_scalars is always up to date.
-class WorkerCOWEager : public WorkerCOW
+class WorkerCopyOnWriteEager : public WorkerCopyOnWrite
 {
 public:
-    WorkerCOWEager(int maxNumDocs, int embDim);
+    WorkerCopyOnWriteEager(int maxNumDocs, int embDim);
 
     void updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar) override;
 
@@ -39,10 +39,10 @@ public:
 
 // Lazy variant: updateScalarData stores scalars on CPU only.
 // score() syncs CPU scalars to GPU for the target rows, then scores.
-class WorkerCOWLazy : public WorkerCOW
+class WorkerCopyOnWriteLazy : public WorkerCopyOnWrite
 {
 public:
-    WorkerCOWLazy(int maxNumDocs, int embDim);
+    WorkerCopyOnWriteLazy(int maxNumDocs, int embDim);
 
     void updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar) override;
 

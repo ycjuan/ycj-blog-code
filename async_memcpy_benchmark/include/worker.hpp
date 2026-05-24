@@ -20,7 +20,7 @@ struct ScalarElement
     float val;
 };
 
-struct COWUpsertData
+struct CopyOnWriteUpsertData
 {
     std::vector<EmbElement> v_embElement;
     std::vector<int> v_newRowIdx; // new rowIdx per doc
@@ -62,7 +62,7 @@ protected:
     // Copy-on-write variant: always allocates a new rowIdx per doc (never reuses existing).
     // For existing docs, records old rowIdx in v_oldDirtyRowIdx for later dirtying.
     // Must be called under the write mutex.
-    COWUpsertData resolveAndBuildEmbElementsCOW(const std::vector<long>& v_docId,
+    CopyOnWriteUpsertData resolveAndBuildEmbElementsCopyOnWrite(const std::vector<long>& v_docId,
                                                 const std::vector<std::vector<T_EMB>>& v2_embData);
 
     // meta data

@@ -33,22 +33,22 @@ __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements,
     d_dirty[d_rowIdx[t]] = val;
 }
 
-// ---- WorkerCOW ----
+// ---- WorkerCopyOnWrite ----
 
-WorkerCOW::WorkerCOW(int maxNumDocs, int embDim)
+WorkerCopyOnWrite::WorkerCopyOnWrite(int maxNumDocs, int embDim)
     : Worker(maxNumDocs, embDim)
 {
 }
 
-void WorkerCOW::upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData)
+void WorkerCopyOnWrite::upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData)
 {
     // --- resolve: always allocate new rowIdx (copy-on-write) ---
-    COWUpsertData upsertData;
+    CopyOnWriteUpsertData upsertData;
     std::vector<ScalarElement> v_scalarElement;
     {
         // --- lock: protect docId<>rowIdx map and scalar map ---
         std::lock_guard<std::mutex> lock(m_writeMutex);
-        upsertData = resolveAndBuildEmbElementsCOW(v_docId, v2_embData);
+        upsertData = resolveAndBuildEmbElementsCopyOnWrite(v_docId, v2_embData);
 
         // carry scalar to new rowIdx for docs that have one
         for (int i = 0; i < (int)v_docId.size(); i++)
@@ -149,7 +149,7 @@ void WorkerCOW::upsertDocs(const std::vector<long>& v_docId, const std::vector<s
     }
 }
 
-void WorkerCOW::deleteDocs(const std::vector<long>& v_docId)
+void WorkerCopyOnWrite::deleteDocs(const std::vector<long>& v_docId)
 {
     // --- update maps, collect deleted rowIdxs ---
     std::vector<int> v_deletedRowIdx;
@@ -192,14 +192,14 @@ void WorkerCOW::deleteDocs(const std::vector<long>& v_docId)
     }
 }
 
-// ---- WorkerCOWEager ----
+// ---- WorkerCopyOnWriteEager ----
 
-WorkerCOWEager::WorkerCOWEager(int maxNumDocs, int embDim)
-    : WorkerCOW(maxNumDocs, embDim)
+WorkerCopyOnWriteEager::WorkerCopyOnWriteEager(int maxNumDocs, int embDim)
+    : WorkerCopyOnWrite(maxNumDocs, embDim)
 {
 }
 
-void WorkerCOWEager::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
+void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
 {
     // --- resolve docId -> rowIdx and build scalar elements ---
     std::vector<ScalarElement> v_scalarElement;
@@ -240,21 +240,21 @@ void WorkerCOWEager::updateScalarData(const std::vector<long>& v_docId, const st
     }
 }
 
-void WorkerCOWEager::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
+void WorkerCopyOnWriteEager::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
 {
     // --- lock: protect dirty bits from concurrent write ops ---
     std::lock_guard<std::mutex> lock(m_readMutex);
     scoreImpl(v_reqEmb, v_targetRowIdx);
 }
 
-// ---- WorkerCOWLazy ----
+// ---- WorkerCopyOnWriteLazy ----
 
-WorkerCOWLazy::WorkerCOWLazy(int maxNumDocs, int embDim)
-    : WorkerCOW(maxNumDocs, embDim)
+WorkerCopyOnWriteLazy::WorkerCopyOnWriteLazy(int maxNumDocs, int embDim)
+    : WorkerCopyOnWrite(maxNumDocs, embDim)
 {
 }
 
-void WorkerCOWLazy::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
+void WorkerCopyOnWriteLazy::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
 {
     // --- lock: protect scalar map ---
     std::lock_guard<std::mutex> lock(m_writeMutex);
@@ -265,7 +265,7 @@ void WorkerCOWLazy::updateScalarData(const std::vector<long>& v_docId, const std
     }
 }
 
-void WorkerCOWLazy::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
+void WorkerCopyOnWriteLazy::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
 {
     // --- lock: protect dirty bits from concurrent write ops ---
     std::lock_guard<std::mutex> lock(m_readMutex);
