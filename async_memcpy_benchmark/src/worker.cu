@@ -9,7 +9,7 @@ Worker::Worker(int maxNumDocs, int embDim)
     , m_data(maxNumDocs * embDim, "Worker")
     , m_d_scalars(maxNumDocs, "scalars")
     , m_d_scores(maxNumDocs, "scores")
-    , m_idxToDocId(maxNumDocs, -1)
+    , m_rowId2DocId(maxNumDocs, -1)
 {
     CHECK_CUDA(cudaMemset(m_d_scalars.data(), 0, maxNumDocs * sizeof(float)));
 }

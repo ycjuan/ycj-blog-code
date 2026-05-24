@@ -26,6 +26,6 @@ protected:
     CudaDeviceArray<float> m_d_scalars;
     mutable CudaDeviceArray<float> m_d_scores;
     std::unordered_map<long, int> m_docId2rowId;
-    std::vector<long> m_idxToDocId;
+    std::vector<long> m_rowId2DocId;
     CudaStream m_stream;
 };
