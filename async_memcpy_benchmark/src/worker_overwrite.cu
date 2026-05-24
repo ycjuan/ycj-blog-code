@@ -140,10 +140,12 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
 
 void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
 {
+    std::vector<int> v_rowIdx;
     std::vector<ScalarElement> v_scalarElement;
 
     {
         std::lock_guard<std::mutex> lock(m_writeMutex);
+        v_rowIdx.reserve(v_docId.size());
         v_scalarElement.reserve(v_docId.size());
 
         for (int i = 0; i < (int)v_docId.size(); i++)
@@ -153,6 +155,7 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId, const s
             {
                 continue;
             }
+            v_rowIdx.push_back(it->second);
             v_scalarElement.push_back({ it->second, v_scalar[i] });
         }
     }
@@ -162,6 +165,25 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId, const s
         return;
     }
 
+    const int kBlockSize = 256;
+
+    CudaDeviceArray<int> d_rowIdx(v_rowIdx.size(), "rowIdx");
+    CHECK_CUDA(cudaMemcpyAsync(d_rowIdx.data(),
+                               v_rowIdx.data(),
+                               v_rowIdx.size() * sizeof(int),
+                               cudaMemcpyHostToDevice,
+                               m_writeStream.get()));
+
+    int dirtyGridSize = (v_rowIdx.size() + kBlockSize - 1) / kBlockSize;
+
+    {
+        std::lock_guard<std::mutex> lock(m_readMutex);
+        setDirtyKernel<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
+                                                                              d_rowIdx.data(),
+                                                                              v_rowIdx.size(),
+                                                                              1);
+    }
+
     CudaDeviceArray<ScalarElement> d_scalarElement(v_scalarElement.size(), "scalarElements");
     CHECK_CUDA(cudaMemcpyAsync(d_scalarElement.data(),
                                v_scalarElement.data(),
@@ -169,11 +191,18 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId, const s
                                cudaMemcpyHostToDevice,
                                m_writeStream.get()));
 
-    const int kBlockSize = 256;
-    const int gridSize = (v_scalarElement.size() + kBlockSize - 1) / kBlockSize;
-    scatterScalarKernel<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
-                                                                          d_scalarElement.data(),
-                                                                          v_scalarElement.size());
+    int scatterGridSize = (v_scalarElement.size() + kBlockSize - 1) / kBlockSize;
+    scatterScalarKernel<<<scatterGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
+                                                                                 d_scalarElement.data(),
+                                                                                 v_scalarElement.size());
+
+    {
+        std::lock_guard<std::mutex> lock(m_readMutex);
+        setDirtyKernel<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
+                                                                              d_rowIdx.data(),
+                                                                              v_rowIdx.size(),
+                                                                              0);
+    }
 
     CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
 }
@@ -229,6 +258,6 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
 
 void WorkerOverwrite::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
 {
-    // no lock needed - dirty bits on GPU ensure correctness
+    std::lock_guard<std::mutex> lock(m_readMutex);
     scoreImpl(v_reqEmb, v_targetRowIdx);
 }
