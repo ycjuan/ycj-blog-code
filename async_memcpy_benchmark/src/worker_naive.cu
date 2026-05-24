@@ -4,14 +4,14 @@
 #include <tuple>
 #include <vector>
 
-static __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int numElements)
+static __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int numScalars, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
     {
         return;
     }
-    d_dst[d_elements[t].rowIdx] = d_elements[t].val;
+    d_dst[d_elements[t].rowIdx * numScalars + d_elements[t].scalarIdx] = d_elements[t].val;
 }
 
 static __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements)
@@ -34,18 +34,18 @@ static __global__ void kn_scatter(T_EMB* d_dst, const EmbElement* d_elements, in
     d_dst[d_elements[t].rowIdx * embDim + t % embDim] = d_elements[t].val;
 }
 
-WorkerNaive::WorkerNaive(int maxNumDocs, int embDim)
-    : Worker(maxNumDocs, embDim)
+WorkerNaive::WorkerNaive(int maxNumDocs, int embDim, int numScalars)
+    : Worker(maxNumDocs, embDim, numScalars)
 {
 }
 
-void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
+void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::vector<std::vector<float>>& v2_scalar)
 {
     // --- lock: serialize all GPU ops and map access ---
     std::lock_guard<std::mutex> lock(m_mutex);
 
     // --- resolve docId -> rowIdx and build scalar elements ---
-    std::vector<ScalarElement> v_scalarElement = resolveScalarElements(v_docId, v_scalar);
+    std::vector<ScalarElement> v_scalarElement = resolveScalarElements(v_docId, v2_scalar);
 
     if (v_scalarElement.empty())
     {
@@ -64,6 +64,7 @@ void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::
         const int gridSize = (v_scalarElement.size() + kBlockSize - 1) / kBlockSize;
         kn_scatter<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
                                                                      d_scalarElement.data(),
+                                                                     m_numScalars,
                                                                      v_scalarElement.size());
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
@@ -130,9 +131,9 @@ void WorkerNaive::deleteDocs(const std::vector<long>& v_docId)
     }
 }
 
-void WorkerNaive::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
+void WorkerNaive::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx, int targetScalarIdx)
 {
     // --- lock: serialize all GPU ops and map access ---
     std::lock_guard<std::mutex> lock(m_mutex);
-    scoreImpl(v_reqEmb, v_targetRowIdx);
+    scoreImpl(v_reqEmb, v_targetRowIdx, targetScalarIdx);
 }

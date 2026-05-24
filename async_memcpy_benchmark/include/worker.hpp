@@ -17,6 +17,7 @@ struct EmbElement
 struct ScalarElement
 {
     int rowIdx;
+    int scalarIdx;
     float val;
 };
 
@@ -30,20 +31,22 @@ struct CopyOnWriteUpsertData
 class Worker
 {
 public:
-    Worker(int maxNumDocs, int embDim);
+    Worker(int maxNumDocs, int embDim, int numScalars);
     virtual ~Worker() = default;
 
     const T_EMB* data() const;
 
     virtual void upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData) = 0;
-    virtual void updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar) = 0;
+    virtual void updateScalarData(const std::vector<long>& v_docId, const std::vector<std::vector<float>>& v2_scalar)
+        = 0;
     virtual void deleteDocs(const std::vector<long>& v_docId) = 0;
 
     // Caller is assumed to already know the rowIdxs to score, so no docId->rowIdx conversion is needed.
-    virtual void score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx) = 0;
+    virtual void score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx, int targetScalarIdx)
+        = 0;
 
 protected:
-    void scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx);
+    void scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx, int targetScalarIdx);
 
     // Resolves docIds to rowIdxs (inserting new docs into maps) and builds
     // a flat list of EmbElements. Must be called under the write mutex.
@@ -54,25 +57,26 @@ protected:
     // Must be called under the write mutex.
     std::vector<int> resolveDeletedRowIdxs(const std::vector<long>& v_docId);
 
-    // Resolves docIds to rowIdxs and builds a list of ScalarElements.
+    // Resolves docIds to rowIdxs and builds a flat list of ScalarElements (one per doc per scalar).
     // Must be called under the write mutex.
     std::vector<ScalarElement> resolveScalarElements(const std::vector<long>& v_docId,
-                                                     const std::vector<float>& v_scalar);
+                                                     const std::vector<std::vector<float>>& v2_scalar);
 
     // Copy-on-write variant: always allocates a new rowIdx per doc (never reuses existing).
     // For existing docs, records old rowIdx in v_oldDirtyRowIdx for later dirtying.
     // Must be called under the write mutex.
     CopyOnWriteUpsertData resolveAndBuildEmbElementsCopyOnWrite(const std::vector<long>& v_docId,
-                                                const std::vector<std::vector<T_EMB>>& v2_embData);
+                                                                const std::vector<std::vector<T_EMB>>& v2_embData);
 
     // meta data
     int m_maxNumDocs;
     int m_embDim;
+    int m_numScalars;
     int m_headRowIdx;
 
     // cuda arrays
     CudaDeviceArray<T_EMB> m_data;
-    CudaDeviceArray<float> m_d_scalars;
+    CudaDeviceArray<float> m_d_scalars; // row-major: [rowIdx * m_numScalars + scalarIdx]
     CudaDeviceArray<float> m_d_scores;
     CudaDeviceArray<char> m_d_dirty;
 

@@ -3,17 +3,18 @@
 
 #include <vector>
 
-Worker::Worker(int maxNumDocs, int embDim)
+Worker::Worker(int maxNumDocs, int embDim, int numScalars)
     : m_maxNumDocs(maxNumDocs)
     , m_embDim(embDim)
+    , m_numScalars(numScalars)
     , m_headRowIdx(0)
     , m_data(maxNumDocs * embDim, "Worker")
-    , m_d_scalars(maxNumDocs, "scalars")
+    , m_d_scalars(maxNumDocs * numScalars, "scalars")
     , m_d_scores(maxNumDocs, "scores")
     , m_d_dirty(maxNumDocs, "dirty")
     , m_rowIdx2DocId(maxNumDocs, -1)
 {
-    CHECK_CUDA(cudaMemset(m_d_scalars.data(), 0, maxNumDocs * sizeof(float)));
+    CHECK_CUDA(cudaMemset(m_d_scalars.data(), 0, maxNumDocs * numScalars * sizeof(float)));
     CHECK_CUDA(cudaMemset(m_d_dirty.data(), 0, maxNumDocs * sizeof(char)));
 }
 
@@ -31,25 +32,20 @@ std::vector<EmbElement> Worker::resolveAndBuildEmbElements(const std::vector<lon
         int rowIdx;
         if (it == m_docId2rowIdx.end())
         {
-            // new doc: assign a rowIdx
             if (!m_emptyRowIdxSet.empty())
             {
-                // reuse a freed slot
                 rowIdx = *m_emptyRowIdxSet.begin();
                 m_emptyRowIdxSet.erase(m_emptyRowIdxSet.begin());
             }
             else
             {
-                // allocate next slot
                 rowIdx = m_headRowIdx++;
             }
-            // update maps
             m_docId2rowIdx[v_docId[i]] = rowIdx;
             m_rowIdx2DocId[rowIdx] = v_docId[i];
         }
         else
         {
-            // existing doc: reuse its rowIdx
             rowIdx = it->second;
         }
         for (int j = 0; j < m_embDim; j++)
@@ -84,10 +80,10 @@ std::vector<int> Worker::resolveDeletedRowIdxs(const std::vector<long>& v_docId)
 }
 
 std::vector<ScalarElement> Worker::resolveScalarElements(const std::vector<long>& v_docId,
-                                                         const std::vector<float>& v_scalar)
+                                                         const std::vector<std::vector<float>>& v2_scalar)
 {
     std::vector<ScalarElement> v_scalarElement;
-    v_scalarElement.reserve(v_docId.size());
+    v_scalarElement.reserve(v_docId.size() * m_numScalars);
 
     for (int i = 0; i < (int)v_docId.size(); i++)
     {
@@ -96,14 +92,17 @@ std::vector<ScalarElement> Worker::resolveScalarElements(const std::vector<long>
         {
             continue;
         }
-        v_scalarElement.push_back({ it->second, v_scalar[i] });
+        for (int j = 0; j < (int)v2_scalar[i].size(); j++)
+        {
+            v_scalarElement.push_back({ it->second, j, v2_scalar[i][j] });
+        }
     }
 
     return v_scalarElement;
 }
 
 CopyOnWriteUpsertData Worker::resolveAndBuildEmbElementsCopyOnWrite(const std::vector<long>& v_docId,
-                                                    const std::vector<std::vector<T_EMB>>& v2_embData)
+                                                                    const std::vector<std::vector<T_EMB>>& v2_embData)
 {
     CopyOnWriteUpsertData result;
     result.v_embElement.reserve(v_docId.size() * m_embDim);
@@ -111,7 +110,6 @@ CopyOnWriteUpsertData Worker::resolveAndBuildEmbElementsCopyOnWrite(const std::v
 
     for (int i = 0; i < (int)v_docId.size(); i++)
     {
-        // always allocate a fresh rowIdx
         int newRowIdx;
         if (!m_emptyRowIdxSet.empty())
         {
@@ -126,7 +124,6 @@ CopyOnWriteUpsertData Worker::resolveAndBuildEmbElementsCopyOnWrite(const std::v
         auto it = m_docId2rowIdx.find(v_docId[i]);
         if (it != m_docId2rowIdx.end())
         {
-            // existing doc: record old rowIdx for dirtying, recycle it
             result.v_oldDirtyRowIdx.push_back(it->second);
             m_emptyRowIdxSet.insert(it->second);
             it->second = newRowIdx;
@@ -148,13 +145,15 @@ CopyOnWriteUpsertData Worker::resolveAndBuildEmbElementsCopyOnWrite(const std::v
 }
 
 static __global__ void kn_score(float* d_scores,
-                         const T_EMB* d_reqEmb,
-                         const T_EMB* d_docData,
-                         const float* d_scalars,
-                         const int* d_rowIdx,
-                         const char* d_dirty,
-                         int embDim,
-                         int numTargets)
+                                const T_EMB* d_reqEmb,
+                                const T_EMB* d_docData,
+                                const float* d_scalars,
+                                const int* d_rowIdx,
+                                const char* d_dirty,
+                                int embDim,
+                                int numScalars,
+                                int targetScalarIdx,
+                                int numTargets)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numTargets)
@@ -173,10 +172,10 @@ static __global__ void kn_score(float* d_scores,
     {
         dot = __hadd(dot, __hmul(d_reqEmb[i], doc[i]));
     }
-    d_scores[t] = __bfloat162float(dot) * d_scalars[r];
+    d_scores[t] = __bfloat162float(dot) * d_scalars[r * numScalars + targetScalarIdx];
 }
 
-void Worker::scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
+void Worker::scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx, int targetScalarIdx)
 {
     const int numTargets = v_targetRowIdx.size();
     if (numTargets == 0)
@@ -212,6 +211,8 @@ void Worker::scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int
                                                               d_rowIdx.data(),
                                                               m_d_dirty.data(),
                                                               m_embDim,
+                                                              m_numScalars,
+                                                              targetScalarIdx,
                                                               numTargets);
     CHECK_CUDA(cudaStreamSynchronize(m_readStream.get()));
 }

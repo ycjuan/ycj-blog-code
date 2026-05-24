@@ -3,20 +3,20 @@
 
 #include <vector>
 
-static __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int numElements)
+static __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int numScalars, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
     {
         return;
     }
-    d_dst[d_elements[t].rowIdx] = d_elements[t].val;
+    d_dst[d_elements[t].rowIdx * numScalars + d_elements[t].scalarIdx] = d_elements[t].val;
 }
 
 // ---- WorkerCopyOnWriteEager ----
 
-WorkerCopyOnWriteEager::WorkerCopyOnWriteEager(int maxNumDocs, int embDim)
-    : WorkerCopyOnWrite(maxNumDocs, embDim)
+WorkerCopyOnWriteEager::WorkerCopyOnWriteEager(int maxNumDocs, int embDim, int numScalars)
+    : WorkerCopyOnWrite(maxNumDocs, embDim, numScalars)
 {
 }
 
@@ -27,9 +27,13 @@ void WorkerCopyOnWriteEager::carryScalarsToNewRowIdx(const std::vector<long>& v_
     for (int i = 0; i < (int)v_docId.size(); i++)
     {
         auto it = m_docId2scalar.find(v_docId[i]);
-        if (it != m_docId2scalar.end())
+        if (it == m_docId2scalar.end())
         {
-            v_scalarElement.push_back({ v_newRowIdx[i], it->second });
+            continue;
+        }
+        for (int j = 0; j < (int)it->second.size(); j++)
+        {
+            v_scalarElement.push_back({ v_newRowIdx[i], j, it->second[j] });
         }
     }
 
@@ -49,6 +53,7 @@ void WorkerCopyOnWriteEager::carryScalarsToNewRowIdx(const std::vector<long>& v_
     int gridSize = (v_scalarElement.size() + kBlockSize - 1) / kBlockSize;
     kn_scatter<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
                                                                  d_scalarElement.data(),
+                                                                 m_numScalars,
                                                                  v_scalarElement.size());
     CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
 }
@@ -70,18 +75,19 @@ void WorkerCopyOnWriteEager::upsertDocs(const std::vector<long>& v_docId,
     commitDirtyBitFlip(upsertData, d_newRowIdx, numDocs);
 }
 
-void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
+void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>& v_docId,
+                                              const std::vector<std::vector<float>>& v2_scalar)
 {
     // --- resolve docId -> rowIdx and build scalar elements ---
     std::vector<ScalarElement> v_scalarElement;
     {
         // --- lock: protect docId<>rowIdx map and scalar map ---
         std::lock_guard<std::mutex> lock(m_writeMutex);
-        v_scalarElement = resolveScalarElements(v_docId, v_scalar);
+        v_scalarElement = resolveScalarElements(v_docId, v2_scalar);
 
         for (int i = 0; i < (int)v_docId.size(); i++)
         {
-            m_docId2scalar[v_docId[i]] = v_scalar[i];
+            m_docId2scalar[v_docId[i]] = v2_scalar[i];
         }
     }
 
@@ -91,28 +97,31 @@ void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>& v_docId, 
     }
 
     const int kBlockSize = 256;
-    const int numDocs = (int)v_scalarElement.size();
+    const int numElements = (int)v_scalarElement.size();
 
     // --- H2D: scalar data, scatter to GPU immediately ---
     {
-        CudaDeviceArray<ScalarElement> d_scalarElement(numDocs, "scalarElements");
+        CudaDeviceArray<ScalarElement> d_scalarElement(numElements, "scalarElements");
         CHECK_CUDA(cudaMemcpyAsync(d_scalarElement.data(),
                                    v_scalarElement.data(),
-                                   numDocs * sizeof(ScalarElement),
+                                   numElements * sizeof(ScalarElement),
                                    cudaMemcpyHostToDevice,
                                    m_writeStream.get()));
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
-        int gridSize = (numDocs + kBlockSize - 1) / kBlockSize;
+        int gridSize = (numElements + kBlockSize - 1) / kBlockSize;
         kn_scatter<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
                                                                      d_scalarElement.data(),
-                                                                     numDocs);
+                                                                     m_numScalars,
+                                                                     numElements);
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 }
 
-void WorkerCopyOnWriteEager::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
+void WorkerCopyOnWriteEager::score(const std::vector<T_EMB>& v_reqEmb,
+                                   const std::vector<int>& v_targetRowIdx,
+                                   int targetScalarIdx)
 {
     // --- lock: protect dirty bits from concurrent write ops ---
     std::lock_guard<std::mutex> lock(m_readMutex);
-    scoreImpl(v_reqEmb, v_targetRowIdx);
+    scoreImpl(v_reqEmb, v_targetRowIdx, targetScalarIdx);
 }

@@ -4,6 +4,7 @@
 
 #include <mutex>
 #include <unordered_map>
+#include <vector>
 
 // Base class for copy-on-write workers. Provides shared helpers for the emb
 // scatter and dirty-bit flip phases. Subclasses own their full upsertDocs
@@ -11,7 +12,7 @@
 class WorkerCopyOnWrite : public Worker
 {
 public:
-    WorkerCopyOnWrite(int maxNumDocs, int embDim);
+    WorkerCopyOnWrite(int maxNumDocs, int embDim, int numScalars);
 
     void deleteDocs(const std::vector<long>& v_docId) override;
 
@@ -31,23 +32,25 @@ protected:
     std::mutex m_readMutex; // locked only when dirty bits are modified or read
     std::mutex m_writeMutex; // locked when rowIdx<>docId map or scalar map is modified
 
-    std::unordered_map<long, float> m_docId2scalar; // CPU-side scalar store
+    std::unordered_map<long, std::vector<float>> m_docId2scalar; // CPU-side scalar store
 };
 
 // Eager variant: updateScalarData scatters scalars to GPU immediately and updates
-// the CPU mirror. upsertDocs carries the scalar to the new rowIdx between the emb
+// the CPU mirror. upsertDocs carries the scalars to the new rowIdx between the emb
 // scatter and the dirty-bit flip.
 // score() calls scoreImpl() directly — m_d_scalars is always up to date.
 class WorkerCopyOnWriteEager : public WorkerCopyOnWrite
 {
 public:
-    WorkerCopyOnWriteEager(int maxNumDocs, int embDim);
+    WorkerCopyOnWriteEager(int maxNumDocs, int embDim, int numScalars);
 
     void upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData) override;
 
-    void updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar) override;
+    void updateScalarData(const std::vector<long>& v_docId, const std::vector<std::vector<float>>& v2_scalar) override;
 
-    void score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx) override;
+    void score(const std::vector<T_EMB>& v_reqEmb,
+               const std::vector<int>& v_targetRowIdx,
+               int targetScalarIdx) override;
 
 private:
     void carryScalarsToNewRowIdx(const std::vector<long>& v_docId, const std::vector<int>& v_newRowIdx);
@@ -58,11 +61,13 @@ private:
 class WorkerCopyOnWriteLazy : public WorkerCopyOnWrite
 {
 public:
-    WorkerCopyOnWriteLazy(int maxNumDocs, int embDim);
+    WorkerCopyOnWriteLazy(int maxNumDocs, int embDim, int numScalars);
 
     void upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData) override;
 
-    void updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar) override;
+    void updateScalarData(const std::vector<long>& v_docId, const std::vector<std::vector<float>>& v2_scalar) override;
 
-    void score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx) override;
+    void score(const std::vector<T_EMB>& v_reqEmb,
+               const std::vector<int>& v_targetRowIdx,
+               int targetScalarIdx) override;
 };

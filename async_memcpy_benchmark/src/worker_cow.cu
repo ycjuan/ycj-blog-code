@@ -25,8 +25,8 @@ static __global__ void kn_scatter(T_EMB* d_dst, const EmbElement* d_elements, in
 
 // ---- WorkerCopyOnWrite ----
 
-WorkerCopyOnWrite::WorkerCopyOnWrite(int maxNumDocs, int embDim)
-    : Worker(maxNumDocs, embDim)
+WorkerCopyOnWrite::WorkerCopyOnWrite(int maxNumDocs, int embDim, int numScalars)
+    : Worker(maxNumDocs, embDim, numScalars)
 {
 }
 

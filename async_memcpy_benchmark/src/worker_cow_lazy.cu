@@ -3,20 +3,20 @@
 
 #include <vector>
 
-static __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int numElements)
+static __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int numScalars, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
     {
         return;
     }
-    d_dst[d_elements[t].rowIdx] = d_elements[t].val;
+    d_dst[d_elements[t].rowIdx * numScalars + d_elements[t].scalarIdx] = d_elements[t].val;
 }
 
 // ---- WorkerCopyOnWriteLazy ----
 
-WorkerCopyOnWriteLazy::WorkerCopyOnWriteLazy(int maxNumDocs, int embDim)
-    : WorkerCopyOnWrite(maxNumDocs, embDim)
+WorkerCopyOnWriteLazy::WorkerCopyOnWriteLazy(int maxNumDocs, int embDim, int numScalars)
+    : WorkerCopyOnWrite(maxNumDocs, embDim, numScalars)
 {
 }
 
@@ -35,34 +35,40 @@ void WorkerCopyOnWriteLazy::upsertDocs(const std::vector<long>& v_docId,
     commitDirtyBitFlip(upsertData, d_newRowIdx, numDocs);
 }
 
-void WorkerCopyOnWriteLazy::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
+void WorkerCopyOnWriteLazy::updateScalarData(const std::vector<long>& v_docId,
+                                             const std::vector<std::vector<float>>& v2_scalar)
 {
     // --- lock: protect scalar map ---
     std::lock_guard<std::mutex> lock(m_writeMutex);
 
     for (int i = 0; i < (int)v_docId.size(); i++)
     {
-        m_docId2scalar[v_docId[i]] = v_scalar[i];
+        m_docId2scalar[v_docId[i]] = v2_scalar[i];
     }
 }
 
-void WorkerCopyOnWriteLazy::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
+void WorkerCopyOnWriteLazy::score(const std::vector<T_EMB>& v_reqEmb,
+                                  const std::vector<int>& v_targetRowIdx,
+                                  int targetScalarIdx)
 {
     // --- lock: protect dirty bits from concurrent write ops ---
     std::lock_guard<std::mutex> lock(m_readMutex);
 
-    // --- sync CPU scalars to GPU for target rows (rowIdx -> docId -> scalar) ---
+    // --- sync CPU scalars to GPU for target rows (rowIdx -> docId -> scalars) ---
     {
         const int kBlockSize = 256;
 
         std::vector<ScalarElement> v_scalarElement;
-        v_scalarElement.reserve(v_targetRowIdx.size());
+        v_scalarElement.reserve(v_targetRowIdx.size() * m_numScalars);
         for (int rowIdx : v_targetRowIdx)
         {
             long docId = m_rowIdx2DocId[rowIdx];
             auto it = m_docId2scalar.find(docId);
-            float scalar = (it != m_docId2scalar.end()) ? it->second : 0.0f;
-            v_scalarElement.push_back({ rowIdx, scalar });
+            for (int j = 0; j < m_numScalars; j++)
+            {
+                float val = (it != m_docId2scalar.end() && j < (int)it->second.size()) ? it->second[j] : 0.0f;
+                v_scalarElement.push_back({ rowIdx, j, val });
+            }
         }
 
         CudaDeviceArray<ScalarElement> d_scalarElement(v_scalarElement.size(), "scalarElements");
@@ -74,9 +80,10 @@ void WorkerCopyOnWriteLazy::score(const std::vector<T_EMB>& v_reqEmb, const std:
         int gridSize = (v_scalarElement.size() + kBlockSize - 1) / kBlockSize;
         kn_scatter<<<gridSize, kBlockSize, 0, m_readStream.get()>>>(m_d_scalars.data(),
                                                                     d_scalarElement.data(),
+                                                                    m_numScalars,
                                                                     v_scalarElement.size());
         // no sync here — scoreImpl launches on the same stream, ordering is guaranteed
     }
 
-    scoreImpl(v_reqEmb, v_targetRowIdx);
+    scoreImpl(v_reqEmb, v_targetRowIdx, targetScalarIdx);
 }
