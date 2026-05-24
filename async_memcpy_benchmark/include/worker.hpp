@@ -38,6 +38,10 @@ protected:
         const std::vector<long>& v_docId,
         const std::vector<std::vector<T_EMB>>& v2_embData);
 
+    // Removes docIds from maps and returns the freed rowIdxs.
+    // Must be called under the write mutex.
+    std::vector<int> resolveDeletedRowIdxs(const std::vector<long>& v_docId);
+
     // meta data
     int m_maxNumDocs;
     int m_embDim;

@@ -205,21 +205,7 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
     std::vector<int> v_deletedRowIdx;
     {
         std::lock_guard<std::mutex> lock(m_writeMutex);
-        v_deletedRowIdx.reserve(v_docId.size());
-
-        for (long docId : v_docId)
-        {
-            auto it = m_docId2rowIdx.find(docId);
-            if (it == m_docId2rowIdx.end())
-            {
-                continue;
-            }
-            int rowIdx = it->second;
-            m_docId2rowIdx.erase(it);
-            m_rowIdx2DocId[rowIdx] = -1;
-            m_emptyRowIdxSet.insert(rowIdx);
-            v_deletedRowIdx.push_back(rowIdx);
-        }
+        v_deletedRowIdx = resolveDeletedRowIdxs(v_docId);
     }
 
     if (v_deletedRowIdx.empty())

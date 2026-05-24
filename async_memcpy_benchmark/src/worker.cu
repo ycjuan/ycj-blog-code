@@ -67,6 +67,28 @@ std::pair<std::vector<int>, std::vector<CopyElement>> Worker::resolveAndBuildCop
     return { v_rowIdx, v_element };
 }
 
+std::vector<int> Worker::resolveDeletedRowIdxs(const std::vector<long>& v_docId)
+{
+    std::vector<int> v_deletedRowIdx;
+    v_deletedRowIdx.reserve(v_docId.size());
+
+    for (long docId : v_docId)
+    {
+        auto it = m_docId2rowIdx.find(docId);
+        if (it == m_docId2rowIdx.end())
+        {
+            continue;
+        }
+        int rowIdx = it->second;
+        m_docId2rowIdx.erase(it);
+        m_rowIdx2DocId[rowIdx] = -1;
+        m_emptyRowIdxSet.insert(rowIdx);
+        v_deletedRowIdx.push_back(rowIdx);
+    }
+
+    return v_deletedRowIdx;
+}
+
 __global__ void kn_score(float* scores,
                          const T_EMB* reqEmb,
                          const T_EMB* docData,
