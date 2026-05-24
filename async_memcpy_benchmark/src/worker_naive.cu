@@ -20,14 +20,14 @@ __global__ void kn_scatter(float* dst, const ScalarElement* elements, int numEle
     dst[elements[t].rowIdx] = elements[t].val;
 }
 
-__global__ void kn_setDirty(char* dirty, const int* rowIdxs, int numElements)
+__global__ void kn_setDirty(char* dirty, const int* rowIdx, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
     {
         return;
     }
-    dirty[rowIdxs[t]] = 1;
+    dirty[rowIdx[t]] = 1;
 }
 
 __global__ void kn_scatter(T_EMB* dst, const CopyElement* elements, int embDim, int numElements)
@@ -139,8 +139,8 @@ void WorkerNaive::deleteDocs(const std::vector<long>& v_docId)
 
     // --- H2D: deleted rowIdxs, set dirty=1 ---
     {
-        CudaDeviceArray<int> d_rowIdx(v_deletedRowIdx.size(), "deletedRowIdx");
-        CHECK_CUDA(cudaMemcpyAsync(d_rowIdx.data(),
+        CudaDeviceArray<int> d_deletedRowIdx(v_deletedRowIdx.size(), "deletedRowIdx");
+        CHECK_CUDA(cudaMemcpyAsync(d_deletedRowIdx.data(),
                                    v_deletedRowIdx.data(),
                                    v_deletedRowIdx.size() * sizeof(int),
                                    cudaMemcpyHostToDevice,
@@ -148,7 +148,7 @@ void WorkerNaive::deleteDocs(const std::vector<long>& v_docId)
         const int kBlockSize = 256;
         const int gridSize = (v_deletedRowIdx.size() + kBlockSize - 1) / kBlockSize;
         kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
-                                                                      d_rowIdx.data(),
+                                                                      d_deletedRowIdx.data(),
                                                                       v_deletedRowIdx.size());
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }

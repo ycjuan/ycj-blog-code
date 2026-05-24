@@ -30,14 +30,14 @@ __global__ void kn_scatter(float* dst, const ScalarElement* elements, int numEle
     dst[elements[t].rowIdx] = elements[t].val;
 }
 
-__global__ void kn_setDirty(char* dirty, const int* rowIdxs, int numElements, char val)
+__global__ void kn_setDirty(char* dirty, const int* rowIdx, int numElements, char val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
     {
         return;
     }
-    dirty[rowIdxs[t]] = val;
+    dirty[rowIdx[t]] = val;
 }
 
 __global__ void kn_setDirty(char* dirty, const CopyElement* elements, int embDim, int numDocs, char val)
@@ -223,8 +223,8 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
 
     // --- H2D: deleted rowIdxs, set dirty=1 ---
     {
-        CudaDeviceArray<int> d_rowIdx(v_deletedRowIdx.size(), "deletedRowIdx");
-        CHECK_CUDA(cudaMemcpyAsync(d_rowIdx.data(),
+        CudaDeviceArray<int> d_deletedRowIdx(v_deletedRowIdx.size(), "deletedRowIdx");
+        CHECK_CUDA(cudaMemcpyAsync(d_deletedRowIdx.data(),
                                    v_deletedRowIdx.data(),
                                    v_deletedRowIdx.size() * sizeof(int),
                                    cudaMemcpyHostToDevice,
@@ -233,7 +233,7 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
             // --- lock: protect dirty bits from concurrent score reads ---
             std::lock_guard<std::mutex> lock(m_readMutex);
             kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
-                                                                          d_rowIdx.data(),
+                                                                          d_deletedRowIdx.data(),
                                                                           v_deletedRowIdx.size(),
                                                                           1);
         }

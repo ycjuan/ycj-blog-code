@@ -87,7 +87,7 @@ __global__ void kn_score(float* scores,
                          const T_EMB* reqEmb,
                          const T_EMB* docData,
                          const float* scalars,
-                         const int* rowIdxs,
+                         const int* rowIdx,
                          const char* dirty,
                          int embDim,
                          int numTargets)
@@ -97,19 +97,19 @@ __global__ void kn_score(float* scores,
     {
         return;
     }
-    int rowIdx = rowIdxs[t];
-    if (dirty[rowIdx])
+    int r = rowIdx[t];
+    if (dirty[r])
     {
         scores[t] = 0.0f;
         return;
     }
-    const T_EMB* doc = docData + rowIdx * embDim;
+    const T_EMB* doc = docData + r * embDim;
     T_EMB dot = __float2bfloat16(0.0f);
     for (int i = 0; i < embDim; i++)
     {
         dot = __hadd(dot, __hmul(reqEmb[i], doc[i]));
     }
-    scores[t] = __bfloat162float(dot) * scalars[rowIdx];
+    scores[t] = __bfloat162float(dot) * scalars[r];
 }
 
 void Worker::scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
