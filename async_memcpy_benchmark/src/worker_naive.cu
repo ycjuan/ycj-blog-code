@@ -39,7 +39,7 @@ void WorkerNaive::updateScalarData(const std::vector<long>& docIds, const std::v
     }
 }
 
-void WorkerNaive::updateEmbData(const std::vector<long>& v_docIds, const std::vector<std::vector<T_EMB>>& embData2D)
+void WorkerNaive::upsertDoc(const std::vector<long>& v_docIds, const std::vector<std::vector<T_EMB>>& embData2D)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     std::vector<CopyElement> v_elements;
@@ -48,11 +48,17 @@ void WorkerNaive::updateEmbData(const std::vector<long>& v_docIds, const std::ve
     for (int i = 0; i < (int)v_docIds.size(); i++)
     {
         auto it = m_docId2rowIdx.find(v_docIds[i]);
+        int rowIdx;
         if (it == m_docId2rowIdx.end())
         {
-            continue;
+            rowIdx = m_headRowIdx++;
+            m_docId2rowIdx[v_docIds[i]] = rowIdx;
+            m_rowIdx2DocId[rowIdx] = v_docIds[i];
         }
-        int rowIdx = it->second;
+        else
+        {
+            rowIdx = it->second;
+        }
         for (int j = 0; j < m_embDim; j++)
         {
             v_elements.push_back({ rowIdx, embData2D[i][j] });

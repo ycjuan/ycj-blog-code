@@ -6,6 +6,7 @@
 Worker::Worker(int maxNumDocs, int embDim)
     : m_maxNumDocs(maxNumDocs)
     , m_embDim(embDim)
+    , m_headRowIdx(0)
     , m_data(maxNumDocs * embDim, "Worker")
     , m_d_scalars(maxNumDocs, "scalars")
     , m_d_scores(maxNumDocs, "scores")

@@ -14,7 +14,7 @@ public:
 
     const T_EMB* data() const;
 
-    virtual void updateEmbData(const std::vector<long>& docIds, const std::vector<std::vector<T_EMB>>& embData2D) = 0;
+    virtual void upsertDoc(const std::vector<long>& docIds, const std::vector<std::vector<T_EMB>>& embData2D) = 0;
     virtual void updateScalarData(const std::vector<long>& docIds, const std::vector<float>& scalars) = 0;
 
     // Caller is assumed to already know the rowIdxs to score, so no docId->rowIdx conversion is needed.
@@ -24,6 +24,7 @@ protected:
     void scoreImpl(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxVec);
     int m_maxNumDocs;
     int m_embDim;
+    int m_headRowIdx;
     CudaDeviceArray<T_EMB> m_data;
     CudaDeviceArray<float> m_d_scalars;
     CudaDeviceArray<float> m_d_scores;
