@@ -1,6 +1,7 @@
 #include "utils/util.hpp"
 #include "worker_naive.hpp"
 
+#include <tuple>
 #include <vector>
 
 struct ScalarElement
@@ -92,8 +93,8 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector
     // --- resolve docId -> rowIdx and build copy elements ---
     std::vector<CopyElement> v_element;
     {
-        const std::vector<int> v_rowIdx = resolveRowIdxs(v_docId);
-        v_element = buildCopyElements(v_rowIdx, v2_embData);
+        auto [v_rowIdx, v_elem] = resolveAndBuildCopyElements(v_docId, v2_embData);
+        v_element = std::move(v_elem);
     }
 
     if (v_element.empty())

@@ -5,6 +5,7 @@
 
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 struct CopyElement
@@ -31,13 +32,11 @@ public:
 protected:
     void scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx);
 
-    // Resolves each docId to a rowIdx, inserting new docs into the maps.
-    // Must be called under the write mutex.
-    std::vector<int> resolveRowIdxs(const std::vector<long>& v_docId);
-
-    // Builds a flat list of CopyElements from resolved rowIdxs and emb data.
-    std::vector<CopyElement> buildCopyElements(const std::vector<int>& v_rowIdx,
-                                               const std::vector<std::vector<T_EMB>>& v2_embData);
+    // Resolves docIds to rowIdxs (inserting new docs into maps) and builds
+    // a flat list of CopyElements. Must be called under the write mutex.
+    std::pair<std::vector<int>, std::vector<CopyElement>> resolveAndBuildCopyElements(
+        const std::vector<long>& v_docId,
+        const std::vector<std::vector<T_EMB>>& v2_embData);
 
     // meta data
     int m_maxNumDocs;

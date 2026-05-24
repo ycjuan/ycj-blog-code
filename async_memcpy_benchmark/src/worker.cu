@@ -1,6 +1,8 @@
 #include "utils/util.hpp"
 #include "worker.hpp"
 
+#include <tuple>
+#include <utility>
 #include <vector>
 
 Worker::Worker(int maxNumDocs, int embDim)
@@ -19,14 +21,18 @@ Worker::Worker(int maxNumDocs, int embDim)
 
 const T_EMB* Worker::data() const { return m_data.data(); }
 
-std::vector<int> Worker::resolveRowIdxs(const std::vector<long>& v_docId)
+std::pair<std::vector<int>, std::vector<CopyElement>> Worker::resolveAndBuildCopyElements(
+    const std::vector<long>& v_docId,
+    const std::vector<std::vector<T_EMB>>& v2_embData)
 {
     std::vector<int> v_rowIdx;
+    std::vector<CopyElement> v_element;
     v_rowIdx.reserve(v_docId.size());
+    v_element.reserve(v_docId.size() * m_embDim);
 
-    for (long docId : v_docId)
+    for (int i = 0; i < (int)v_docId.size(); i++)
     {
-        auto it = m_docId2rowIdx.find(docId);
+        auto it = m_docId2rowIdx.find(v_docId[i]);
         int rowIdx;
         if (it == m_docId2rowIdx.end())
         {
@@ -43,8 +49,8 @@ std::vector<int> Worker::resolveRowIdxs(const std::vector<long>& v_docId)
                 rowIdx = m_headRowIdx++;
             }
             // update maps
-            m_docId2rowIdx[docId] = rowIdx;
-            m_rowIdx2DocId[rowIdx] = docId;
+            m_docId2rowIdx[v_docId[i]] = rowIdx;
+            m_rowIdx2DocId[rowIdx] = v_docId[i];
         }
         else
         {
@@ -52,24 +58,13 @@ std::vector<int> Worker::resolveRowIdxs(const std::vector<long>& v_docId)
             rowIdx = it->second;
         }
         v_rowIdx.push_back(rowIdx);
-    }
-
-    return v_rowIdx;
-}
-
-std::vector<CopyElement> Worker::buildCopyElements(const std::vector<int>& v_rowIdx,
-                                                   const std::vector<std::vector<T_EMB>>& v2_embData)
-{
-    std::vector<CopyElement> v_element;
-    v_element.reserve(v_rowIdx.size() * m_embDim);
-    for (int i = 0; i < (int)v_rowIdx.size(); i++)
-    {
         for (int j = 0; j < m_embDim; j++)
         {
-            v_element.push_back({ v_rowIdx[i], v2_embData[i][j] });
+            v_element.push_back({ rowIdx, v2_embData[i][j] });
         }
     }
-    return v_element;
+
+    return { v_rowIdx, v_element };
 }
 
 __global__ void scoreKernel(float* scores,

@@ -1,6 +1,7 @@
 #include "utils/util.hpp"
 #include "worker_overwrite.hpp"
 
+#include <tuple>
 #include <vector>
 
 struct ScalarElement
@@ -51,8 +52,7 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
     std::vector<CopyElement> v_element;
     {
         std::lock_guard<std::mutex> lock(m_writeMutex);
-        v_rowIdx = resolveRowIdxs(v_docId);
-        v_element = buildCopyElements(v_rowIdx, v2_embData);
+        std::tie(v_rowIdx, v_element) = resolveAndBuildCopyElements(v_docId, v2_embData);
     }
 
     if (v_element.empty())
