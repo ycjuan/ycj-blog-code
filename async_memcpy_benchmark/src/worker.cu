@@ -39,7 +39,7 @@ __global__ void scoreKernel(float* scores,
     scores[t] = __bfloat162float(dot) * scalars[rowIdx];
 }
 
-void Worker::score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxs) const
+void Worker::score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxs)
 {
     const int numTargets = targetRowIdxs.size();
     if (numTargets == 0)
