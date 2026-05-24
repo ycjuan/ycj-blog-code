@@ -24,22 +24,22 @@ WorkerNaive::WorkerNaive(int maxNumDocs, int embDim)
 {
 }
 
-void WorkerNaive::updateScalarData(const std::vector<long>& docIds, const std::vector<float>& scalars)
+void WorkerNaive::updateScalarData(const std::vector<long>& v_docIds, const std::vector<float>& v_scalars)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    for (int i = 0; i < (int)docIds.size(); i++)
+    for (int i = 0; i < (int)v_docIds.size(); i++)
     {
-        auto it = m_docId2rowIdx.find(docIds[i]);
+        auto it = m_docId2rowIdx.find(v_docIds[i]);
         if (it == m_docId2rowIdx.end())
         {
             continue;
         }
         int rowIdx = it->second;
-        CHECK_CUDA(cudaMemcpy(m_d_scalars.data() + rowIdx, &scalars[i], sizeof(float), cudaMemcpyHostToDevice));
+        CHECK_CUDA(cudaMemcpy(m_d_scalars.data() + rowIdx, &v_scalars[i], sizeof(float), cudaMemcpyHostToDevice));
     }
 }
 
-void WorkerNaive::upsertDocs(const std::vector<long>& v_docIds, const std::vector<std::vector<T_EMB>>& embData2D)
+void WorkerNaive::upsertDocs(const std::vector<long>& v_docIds, const std::vector<std::vector<T_EMB>>& v_embData2D)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     std::vector<CopyElement> v_elements;
@@ -69,7 +69,7 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docIds, const std::vecto
         }
         for (int j = 0; j < m_embDim; j++)
         {
-            v_elements.push_back({ rowIdx, embData2D[i][j] });
+            v_elements.push_back({ rowIdx, v_embData2D[i][j] });
         }
     }
 
@@ -94,10 +94,10 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docIds, const std::vecto
     CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
 }
 
-void WorkerNaive::deleteDocs(const std::vector<long>& docIds)
+void WorkerNaive::deleteDocs(const std::vector<long>& v_docIds)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    for (long docId : docIds)
+    for (long docId : v_docIds)
     {
         auto it = m_docId2rowIdx.find(docId);
         if (it == m_docId2rowIdx.end())
@@ -113,8 +113,8 @@ void WorkerNaive::deleteDocs(const std::vector<long>& docIds)
     }
 }
 
-void WorkerNaive::score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxVec)
+void WorkerNaive::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdxVec)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    scoreImpl(reqEmb, targetRowIdxVec);
+    scoreImpl(v_reqEmb, v_targetRowIdxVec);
 }
