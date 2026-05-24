@@ -15,6 +15,6 @@ public:
     void score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx) override;
 
 private:
-    // only held during map and dirty-bit updates, never during GPU sync
-    std::mutex m_mutex;
+    std::mutex m_readMutex; // locked only when dirty bits are modified
+    std::mutex m_writeMutex; // locked when rowIdx<>docId map is modified
 };
