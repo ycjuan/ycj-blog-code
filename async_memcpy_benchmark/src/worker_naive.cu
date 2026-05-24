@@ -28,8 +28,8 @@ void WorkerNaive::updateScalarData(const std::vector<long>& jobIds, const std::v
 {
     for (int i = 0; i < (int)jobIds.size(); i++)
     {
-        auto it = m_docId2rowIdxx.find(jobIds[i]);
-        if (it == m_docId2rowIdxx.end())
+        auto it = m_docId2rowIdx.find(jobIds[i]);
+        if (it == m_docId2rowIdx.end())
         {
             continue;
         }
@@ -45,8 +45,8 @@ void WorkerNaive::updateEmbData(const std::vector<long>& v_jobIds, const std::ve
 
     for (int i = 0; i < (int)v_jobIds.size(); i++)
     {
-        auto it = m_docId2rowIdxx.find(v_jobIds[i]);
-        if (it == m_docId2rowIdxx.end())
+        auto it = m_docId2rowIdx.find(v_jobIds[i]);
+        if (it == m_docId2rowIdx.end())
         {
             continue;
         }
