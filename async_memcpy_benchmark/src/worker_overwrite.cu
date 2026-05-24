@@ -10,54 +10,54 @@ struct ScalarElement
     float val;
 };
 
-__global__ void kn_scatter(T_EMB* dst, const CopyElement* elements, int embDim, int numElements)
+__global__ void kn_scatter(T_EMB* d_dst, const CopyElement* d_elements, int embDim, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
     {
         return;
     }
-    dst[elements[t].rowIdx * embDim + t % embDim] = elements[t].val;
+    d_dst[d_elements[t].rowIdx * embDim + t % embDim] = d_elements[t].val;
 }
 
-__global__ void kn_scatter(float* dst, const ScalarElement* elements, int numElements)
+__global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
     {
         return;
     }
-    dst[elements[t].rowIdx] = elements[t].val;
+    d_dst[d_elements[t].rowIdx] = d_elements[t].val;
 }
 
-__global__ void kn_setDirty(char* dirty, const int* rowIdx, int numElements, char val)
+__global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements, char val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
     {
         return;
     }
-    dirty[rowIdx[t]] = val;
+    d_dirty[d_rowIdx[t]] = val;
 }
 
-__global__ void kn_setDirty(char* dirty, const CopyElement* elements, int embDim, int numDocs, char val)
+__global__ void kn_setDirty(char* d_dirty, const CopyElement* d_elements, int embDim, int numDocs, char val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numDocs)
     {
         return;
     }
-    dirty[elements[t * embDim].rowIdx] = val;
+    d_dirty[d_elements[t * embDim].rowIdx] = val;
 }
 
-__global__ void kn_setDirty(char* dirty, const ScalarElement* elements, int numDocs, char val)
+__global__ void kn_setDirty(char* d_dirty, const ScalarElement* d_elements, int numDocs, char val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numDocs)
     {
         return;
     }
-    dirty[elements[t].rowIdx] = val;
+    d_dirty[d_elements[t].rowIdx] = val;
 }
 
 WorkerOverwrite::WorkerOverwrite(int maxNumDocs, int embDim)

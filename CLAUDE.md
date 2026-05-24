@@ -2,6 +2,10 @@
 
 Read [CODING_STYLE.md](CODING_STYLE.md) for naming conventions used in this project.
 
+## Naming Conventions
+
+- Device array variables and kernel parameters pointing to GPU memory must be prefixed with `d_` (e.g., `d_rowIdx`, `d_dirty`, `d_elements`).
+
 ## Git
 
 Always create new commits. Never amend existing commits.

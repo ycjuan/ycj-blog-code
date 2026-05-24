@@ -83,12 +83,12 @@ std::vector<int> Worker::resolveDeletedRowIdxs(const std::vector<long>& v_docId)
     return v_deletedRowIdx;
 }
 
-__global__ void kn_score(float* scores,
-                         const T_EMB* reqEmb,
-                         const T_EMB* docData,
-                         const float* scalars,
-                         const int* rowIdx,
-                         const char* dirty,
+__global__ void kn_score(float* d_scores,
+                         const T_EMB* d_reqEmb,
+                         const T_EMB* d_docData,
+                         const float* d_scalars,
+                         const int* d_rowIdx,
+                         const char* d_dirty,
                          int embDim,
                          int numTargets)
 {
@@ -97,19 +97,19 @@ __global__ void kn_score(float* scores,
     {
         return;
     }
-    int r = rowIdx[t];
-    if (dirty[r])
+    int r = d_rowIdx[t];
+    if (d_dirty[r])
     {
-        scores[t] = 0.0f;
+        d_scores[t] = 0.0f;
         return;
     }
-    const T_EMB* doc = docData + r * embDim;
+    const T_EMB* doc = d_docData + r * embDim;
     T_EMB dot = __float2bfloat16(0.0f);
     for (int i = 0; i < embDim; i++)
     {
-        dot = __hadd(dot, __hmul(reqEmb[i], doc[i]));
+        dot = __hadd(dot, __hmul(d_reqEmb[i], doc[i]));
     }
-    scores[t] = __bfloat162float(dot) * scalars[r];
+    d_scores[t] = __bfloat162float(dot) * d_scalars[r];
 }
 
 void Worker::scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
