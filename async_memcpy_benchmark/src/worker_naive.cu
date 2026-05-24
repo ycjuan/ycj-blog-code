@@ -26,6 +26,7 @@ WorkerNaive::WorkerNaive(int maxNumDocs, int embDim)
 
 void WorkerNaive::updateScalarData(const std::vector<long>& docIds, const std::vector<float>& scalars)
 {
+    std::lock_guard<std::mutex> lock(m_mutex);
     for (int i = 0; i < (int)docIds.size(); i++)
     {
         auto it = m_docId2rowIdx.find(docIds[i]);
@@ -40,6 +41,7 @@ void WorkerNaive::updateScalarData(const std::vector<long>& docIds, const std::v
 
 void WorkerNaive::updateEmbData(const std::vector<long>& v_docIds, const std::vector<std::vector<T_EMB>>& embData2D)
 {
+    std::lock_guard<std::mutex> lock(m_mutex);
     std::vector<CopyElement> v_elements;
     v_elements.reserve(v_docIds.size() * m_embDim);
 
@@ -80,5 +82,6 @@ void WorkerNaive::updateEmbData(const std::vector<long>& v_docIds, const std::ve
 
 void WorkerNaive::score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxs)
 {
+    std::lock_guard<std::mutex> lock(m_mutex);
     scoreImpl(reqEmb, targetRowIdxs);
 }
