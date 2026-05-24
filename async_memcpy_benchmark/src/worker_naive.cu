@@ -24,11 +24,11 @@ WorkerNaive::WorkerNaive(int maxNumDocs, int embDim)
 {
 }
 
-void WorkerNaive::updateScalarData(const std::vector<long>& jobIds, const std::vector<float>& scalars)
+void WorkerNaive::updateScalarData(const std::vector<long>& docIds, const std::vector<float>& scalars)
 {
-    for (int i = 0; i < (int)jobIds.size(); i++)
+    for (int i = 0; i < (int)docIds.size(); i++)
     {
-        auto it = m_docId2rowIdx.find(jobIds[i]);
+        auto it = m_docId2rowIdx.find(docIds[i]);
         if (it == m_docId2rowIdx.end())
         {
             continue;
@@ -38,14 +38,14 @@ void WorkerNaive::updateScalarData(const std::vector<long>& jobIds, const std::v
     }
 }
 
-void WorkerNaive::updateEmbData(const std::vector<long>& v_jobIds, const std::vector<std::vector<T_EMB>>& embData2D)
+void WorkerNaive::updateEmbData(const std::vector<long>& v_docIds, const std::vector<std::vector<T_EMB>>& embData2D)
 {
     std::vector<CopyElement> v_elements;
-    v_elements.reserve(v_jobIds.size() * m_embDim);
+    v_elements.reserve(v_docIds.size() * m_embDim);
 
-    for (int i = 0; i < (int)v_jobIds.size(); i++)
+    for (int i = 0; i < (int)v_docIds.size(); i++)
     {
-        auto it = m_docId2rowIdx.find(v_jobIds[i]);
+        auto it = m_docId2rowIdx.find(v_docIds[i]);
         if (it == m_docId2rowIdx.end())
         {
             continue;
