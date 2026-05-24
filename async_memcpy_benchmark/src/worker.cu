@@ -19,6 +19,44 @@ Worker::Worker(int maxNumDocs, int embDim)
 
 const T_EMB* Worker::data() const { return m_data.data(); }
 
+std::vector<int> Worker::resolveRowIdxs(const std::vector<long>& v_docId)
+{
+    std::vector<int> v_rowIdx;
+    v_rowIdx.reserve(v_docId.size());
+
+    for (long docId : v_docId)
+    {
+        auto it = m_docId2rowIdx.find(docId);
+        int rowIdx;
+        if (it == m_docId2rowIdx.end())
+        {
+            // new doc: assign a rowIdx
+            if (!m_emptyRowIdxSet.empty())
+            {
+                // reuse a freed slot
+                rowIdx = *m_emptyRowIdxSet.begin();
+                m_emptyRowIdxSet.erase(m_emptyRowIdxSet.begin());
+            }
+            else
+            {
+                // allocate next slot
+                rowIdx = m_headRowIdx++;
+            }
+            // update maps
+            m_docId2rowIdx[docId] = rowIdx;
+            m_rowIdx2DocId[rowIdx] = docId;
+        }
+        else
+        {
+            // existing doc: reuse its rowIdx
+            rowIdx = it->second;
+        }
+        v_rowIdx.push_back(rowIdx);
+    }
+
+    return v_rowIdx;
+}
+
 __global__ void scoreKernel(float* scores,
                             const T_EMB* reqEmb,
                             const T_EMB* docData,

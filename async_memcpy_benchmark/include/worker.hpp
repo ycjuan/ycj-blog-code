@@ -25,6 +25,10 @@ public:
 protected:
     void scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx);
 
+    // Resolves each docId to a rowIdx, inserting new docs into the maps.
+    // Must be called under the write mutex.
+    std::vector<int> resolveRowIdxs(const std::vector<long>& v_docId);
+
     // meta data
     int m_maxNumDocs;
     int m_embDim;

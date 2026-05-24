@@ -57,35 +57,13 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
     std::vector<CopyElement> v_element;
     {
         std::lock_guard<std::mutex> lock(m_writeMutex);
-        v_rowIdx.reserve(v_docId.size());
+        v_rowIdx = resolveRowIdxs(v_docId);
         v_element.reserve(v_docId.size() * m_embDim);
-
         for (int i = 0; i < (int)v_docId.size(); i++)
         {
-            auto it = m_docId2rowIdx.find(v_docId[i]);
-            int rowIdx;
-            if (it == m_docId2rowIdx.end())
-            {
-                if (!m_emptyRowIdxSet.empty())
-                {
-                    rowIdx = *m_emptyRowIdxSet.begin();
-                    m_emptyRowIdxSet.erase(m_emptyRowIdxSet.begin());
-                }
-                else
-                {
-                    rowIdx = m_headRowIdx++;
-                }
-                m_docId2rowIdx[v_docId[i]] = rowIdx;
-                m_rowIdx2DocId[rowIdx] = v_docId[i];
-            }
-            else
-            {
-                rowIdx = it->second;
-            }
-            v_rowIdx.push_back(rowIdx);
             for (int j = 0; j < m_embDim; j++)
             {
-                v_element.push_back({ rowIdx, v2_embData[i][j] });
+                v_element.push_back({ v_rowIdx[i], v2_embData[i][j] });
             }
         }
     }
