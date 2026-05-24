@@ -105,20 +105,25 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector
             int rowIdx;
             if (it == m_docId2rowIdx.end())
             {
+                // new doc: assign a rowIdx
                 if (!m_emptyRowIdxSet.empty())
                 {
+                    // reuse a freed slot
                     rowIdx = *m_emptyRowIdxSet.begin();
                     m_emptyRowIdxSet.erase(m_emptyRowIdxSet.begin());
                 }
                 else
                 {
+                    // allocate next slot
                     rowIdx = m_headRowIdx++;
                 }
+                // update maps
                 m_docId2rowIdx[v_docId[i]] = rowIdx;
                 m_rowIdx2DocId[rowIdx] = v_docId[i];
             }
             else
             {
+                // existing doc: reuse its rowIdx
                 rowIdx = it->second;
             }
             for (int j = 0; j < m_embDim; j++)
