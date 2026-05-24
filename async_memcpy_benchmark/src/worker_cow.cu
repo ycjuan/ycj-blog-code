@@ -33,6 +33,8 @@ __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements,
     d_dirty[d_rowIdx[t]] = val;
 }
 
+// ---- WorkerCOW ----
+
 WorkerCOW::WorkerCOW(int maxNumDocs, int embDim)
     : Worker(maxNumDocs, embDim)
 {
@@ -40,7 +42,7 @@ WorkerCOW::WorkerCOW(int maxNumDocs, int embDim)
 
 void WorkerCOW::upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData)
 {
-    // --- resolve: always allocate new rowIdx (copy-on-write), carry scalar to new slot ---
+    // --- resolve: always allocate new rowIdx (copy-on-write) ---
     COWUpsertData upsertData;
     std::vector<ScalarElement> v_scalarElement;
     {
@@ -48,6 +50,7 @@ void WorkerCOW::upsertDocs(const std::vector<long>& v_docId, const std::vector<s
         std::lock_guard<std::mutex> lock(m_writeMutex);
         upsertData = resolveAndBuildEmbElementsCOW(v_docId, v2_embData);
 
+        // carry scalar to new rowIdx for docs that have one
         for (int i = 0; i < (int)v_docId.size(); i++)
         {
             auto it = m_docId2scalar.find(v_docId[i]);
@@ -95,7 +98,7 @@ void WorkerCOW::upsertDocs(const std::vector<long>& v_docId, const std::vector<s
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 
-    // --- carry scalars to new rowIdxs (for docs that have scalars in CPU map) ---
+    // --- carry scalars to new rowIdxs ---
     if (!v_scalarElement.empty())
     {
         CudaDeviceArray<ScalarElement> d_scalarElement(v_scalarElement.size(), "scalarElements");
@@ -146,17 +149,6 @@ void WorkerCOW::upsertDocs(const std::vector<long>& v_docId, const std::vector<s
     }
 }
 
-void WorkerCOW::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
-{
-    // --- lock: protect scalar map ---
-    std::lock_guard<std::mutex> lock(m_writeMutex);
-
-    for (int i = 0; i < (int)v_docId.size(); i++)
-    {
-        m_docId2scalar[v_docId[i]] = v_scalar[i];
-    }
-}
-
 void WorkerCOW::deleteDocs(const std::vector<long>& v_docId)
 {
     // --- update maps, collect deleted rowIdxs ---
@@ -200,7 +192,80 @@ void WorkerCOW::deleteDocs(const std::vector<long>& v_docId)
     }
 }
 
-void WorkerCOW::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
+// ---- WorkerCOWEager ----
+
+WorkerCOWEager::WorkerCOWEager(int maxNumDocs, int embDim)
+    : WorkerCOW(maxNumDocs, embDim)
+{
+}
+
+void WorkerCOWEager::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
+{
+    // --- resolve docId -> rowIdx and build scalar elements ---
+    std::vector<ScalarElement> v_scalarElement;
+    {
+        // --- lock: protect docId<>rowIdx map and scalar map ---
+        std::lock_guard<std::mutex> lock(m_writeMutex);
+        v_scalarElement = resolveScalarElements(v_docId, v_scalar);
+
+        // update CPU mirror
+        for (int i = 0; i < (int)v_docId.size(); i++)
+        {
+            m_docId2scalar[v_docId[i]] = v_scalar[i];
+        }
+    }
+
+    if (v_scalarElement.empty())
+    {
+        return;
+    }
+
+    const int kBlockSize = 256;
+    const int numDocs = (int)v_scalarElement.size();
+
+    // --- H2D: scalar data, scatter to GPU immediately ---
+    {
+        CudaDeviceArray<ScalarElement> d_scalarElement(numDocs, "scalarElements");
+        CHECK_CUDA(cudaMemcpyAsync(d_scalarElement.data(),
+                                   v_scalarElement.data(),
+                                   numDocs * sizeof(ScalarElement),
+                                   cudaMemcpyHostToDevice,
+                                   m_writeStream.get()));
+        CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
+        int gridSize = (numDocs + kBlockSize - 1) / kBlockSize;
+        kn_scatter<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
+                                                                     d_scalarElement.data(),
+                                                                     numDocs);
+        CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
+    }
+}
+
+void WorkerCOWEager::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
+{
+    // --- lock: protect dirty bits from concurrent write ops ---
+    std::lock_guard<std::mutex> lock(m_readMutex);
+    scoreImpl(v_reqEmb, v_targetRowIdx);
+}
+
+// ---- WorkerCOWLazy ----
+
+WorkerCOWLazy::WorkerCOWLazy(int maxNumDocs, int embDim)
+    : WorkerCOW(maxNumDocs, embDim)
+{
+}
+
+void WorkerCOWLazy::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
+{
+    // --- lock: protect scalar map ---
+    std::lock_guard<std::mutex> lock(m_writeMutex);
+
+    for (int i = 0; i < (int)v_docId.size(); i++)
+    {
+        m_docId2scalar[v_docId[i]] = v_scalar[i];
+    }
+}
+
+void WorkerCOWLazy::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
 {
     // --- lock: protect dirty bits from concurrent write ops ---
     std::lock_guard<std::mutex> lock(m_readMutex);
@@ -229,7 +294,7 @@ void WorkerCOW::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>
         kn_scatter<<<gridSize, kBlockSize, 0, m_readStream.get()>>>(m_d_scalars.data(),
                                                                     d_scalarElement.data(),
                                                                     v_scalarElement.size());
-        // no sync here — scoreImpl launches on the same stream, so ordering is guaranteed
+        // no sync here — scoreImpl launches on the same stream, ordering is guaranteed
     }
 
     scoreImpl(v_reqEmb, v_targetRowIdx);

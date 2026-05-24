@@ -5,25 +5,46 @@
 #include <mutex>
 #include <unordered_map>
 
+// Base class for copy-on-write workers. Every upsert writes to a fresh rowIdx
+// and atomically flips dirty bits, so concurrent readers never see partial writes.
+// Scalars are always mirrored in m_docId2scalar (CPU) so upsertDocs can carry
+// them to the new rowIdx regardless of which scalar variant is used.
 class WorkerCOW : public Worker
 {
 public:
     WorkerCOW(int maxNumDocs, int embDim);
 
-    // Always writes to a new rowIdx. Old rowIdx is marked dirty=1 and recycled.
     void upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData) override;
-
-    // Stores scalar on CPU only. No GPU copy until score() is called.
-    void updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar) override;
 
     void deleteDocs(const std::vector<long>& v_docId) override;
 
-    // Syncs CPU scalars to GPU for target rows, then scores.
-    void score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx) override;
-
-private:
+protected:
     std::mutex m_readMutex; // locked only when dirty bits are modified or read
     std::mutex m_writeMutex; // locked when rowIdx<>docId map or scalar map is modified
 
-    std::unordered_map<long, float> m_docId2scalar; // CPU-side scalar store
+    std::unordered_map<long, float> m_docId2scalar; // CPU-side scalar mirror
+};
+
+// Eager variant: updateScalarData scatters scalars to GPU immediately.
+// score() calls scoreImpl() directly — m_d_scalars is always up to date.
+class WorkerCOWEager : public WorkerCOW
+{
+public:
+    WorkerCOWEager(int maxNumDocs, int embDim);
+
+    void updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar) override;
+
+    void score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx) override;
+};
+
+// Lazy variant: updateScalarData stores scalars on CPU only.
+// score() syncs CPU scalars to GPU for the target rows, then scores.
+class WorkerCOWLazy : public WorkerCOW
+{
+public:
+    WorkerCOWLazy(int maxNumDocs, int embDim);
+
+    void updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar) override;
+
+    void score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx) override;
 };
