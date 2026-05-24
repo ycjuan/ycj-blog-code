@@ -17,7 +17,7 @@ public:
 
     virtual void upsertDoc(const std::vector<long>& docIds, const std::vector<std::vector<T_EMB>>& embData2D) = 0;
     virtual void updateScalarData(const std::vector<long>& docIds, const std::vector<float>& scalars) = 0;
-    virtual void deleteDoc(long docId) = 0;
+    virtual void deleteDocs(const std::vector<long>& docIds) = 0;
 
     // Caller is assumed to already know the rowIdxs to score, so no docId->rowIdx conversion is needed.
     virtual void score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxVec) = 0;

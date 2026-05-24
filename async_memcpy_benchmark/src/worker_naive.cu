@@ -94,20 +94,23 @@ void WorkerNaive::upsertDoc(const std::vector<long>& v_docIds, const std::vector
     CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
 }
 
-void WorkerNaive::deleteDoc(long docId)
+void WorkerNaive::deleteDocs(const std::vector<long>& docIds)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    auto it = m_docId2rowIdx.find(docId);
-    if (it == m_docId2rowIdx.end())
+    for (long docId : docIds)
     {
-        return;
+        auto it = m_docId2rowIdx.find(docId);
+        if (it == m_docId2rowIdx.end())
+        {
+            continue;
+        }
+        int rowIdx = it->second;
+        m_docId2rowIdx.erase(it);
+        m_rowIdx2DocId[rowIdx] = -1;
+        m_emptyRowIdxSet.insert(rowIdx);
+        char dirty = 1;
+        CHECK_CUDA(cudaMemcpy(m_d_dirty.data() + rowIdx, &dirty, sizeof(char), cudaMemcpyHostToDevice));
     }
-    int rowIdx = it->second;
-    m_docId2rowIdx.erase(it);
-    m_rowIdx2DocId[rowIdx] = -1;
-    m_emptyRowIdxSet.insert(rowIdx);
-    char dirty = 1;
-    CHECK_CUDA(cudaMemcpy(m_d_dirty.data() + rowIdx, &dirty, sizeof(char), cudaMemcpyHostToDevice));
 }
 
 void WorkerNaive::score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxVec)
