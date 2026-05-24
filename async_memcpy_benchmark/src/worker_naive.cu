@@ -9,6 +9,22 @@ struct CopyElement
     T_EMB val;
 };
 
+struct ScalarElement
+{
+    int rowIdx;
+    float val;
+};
+
+__global__ void scatterScalarKernel(float* dst, const ScalarElement* elements, int numElements)
+{
+    int t = blockIdx.x * blockDim.x + threadIdx.x;
+    if (t >= numElements)
+    {
+        return;
+    }
+    dst[elements[t].rowIdx] = elements[t].val;
+}
+
 __global__ void scatterKernel(T_EMB* dst, const CopyElement* elements, int embDim, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
@@ -27,6 +43,9 @@ WorkerNaive::WorkerNaive(int maxNumDocs, int embDim)
 void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
+    std::vector<ScalarElement> v_scalarElement;
+    v_scalarElement.reserve(v_docId.size());
+
     for (int i = 0; i < (int)v_docId.size(); i++)
     {
         auto it = m_docId2rowIdx.find(v_docId[i]);
@@ -34,9 +53,27 @@ void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::
         {
             continue;
         }
-        int rowIdx = it->second;
-        CHECK_CUDA(cudaMemcpy(m_d_scalars.data() + rowIdx, &v_scalar[i], sizeof(float), cudaMemcpyHostToDevice));
+        v_scalarElement.push_back({ it->second, v_scalar[i] });
     }
+
+    if (v_scalarElement.empty())
+    {
+        return;
+    }
+
+    CudaDeviceArray<ScalarElement> d_scalarElement(v_scalarElement.size(), "scalarElements");
+    CHECK_CUDA(cudaMemcpyAsync(d_scalarElement.data(),
+                               v_scalarElement.data(),
+                               v_scalarElement.size() * sizeof(ScalarElement),
+                               cudaMemcpyHostToDevice,
+                               m_writeStream.get()));
+
+    const int kBlockSize = 256;
+    const int gridSize = (v_scalarElement.size() + kBlockSize - 1) / kBlockSize;
+    scatterScalarKernel<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
+                                                                          d_scalarElement.data(),
+                                                                          v_scalarElement.size());
+    CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
 }
 
 void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData)
