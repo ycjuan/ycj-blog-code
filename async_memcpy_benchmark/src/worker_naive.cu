@@ -95,8 +95,7 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector
     // --- resolve docId -> rowIdx and build copy elements ---
     std::vector<CopyElement> v_element;
     {
-        auto [v_rowIdx, v_elem] = resolveAndBuildCopyElements(v_docId, v2_embData);
-        v_element = std::move(v_elem);
+        v_element = resolveAndBuildCopyElements(v_docId, v2_embData);
     }
 
     if (v_element.empty())

@@ -1,8 +1,6 @@
 #include "utils/util.hpp"
 #include "worker.hpp"
 
-#include <tuple>
-#include <utility>
 #include <vector>
 
 Worker::Worker(int maxNumDocs, int embDim)
@@ -21,13 +19,10 @@ Worker::Worker(int maxNumDocs, int embDim)
 
 const T_EMB* Worker::data() const { return m_data.data(); }
 
-std::pair<std::vector<int>, std::vector<CopyElement>> Worker::resolveAndBuildCopyElements(
-    const std::vector<long>& v_docId,
-    const std::vector<std::vector<T_EMB>>& v2_embData)
+std::vector<CopyElement> Worker::resolveAndBuildCopyElements(const std::vector<long>& v_docId,
+                                                             const std::vector<std::vector<T_EMB>>& v2_embData)
 {
-    std::vector<int> v_rowIdx;
     std::vector<CopyElement> v_element;
-    v_rowIdx.reserve(v_docId.size());
     v_element.reserve(v_docId.size() * m_embDim);
 
     for (int i = 0; i < (int)v_docId.size(); i++)
@@ -57,14 +52,13 @@ std::pair<std::vector<int>, std::vector<CopyElement>> Worker::resolveAndBuildCop
             // existing doc: reuse its rowIdx
             rowIdx = it->second;
         }
-        v_rowIdx.push_back(rowIdx);
         for (int j = 0; j < m_embDim; j++)
         {
             v_element.push_back({ rowIdx, v2_embData[i][j] });
         }
     }
 
-    return { v_rowIdx, v_element };
+    return v_element;
 }
 
 std::vector<int> Worker::resolveDeletedRowIdxs(const std::vector<long>& v_docId)

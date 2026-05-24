@@ -72,8 +72,7 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
     {
         // --- lock: protect docId<>rowIdx map ---
         std::lock_guard<std::mutex> lock(m_writeMutex);
-        auto [v_rowIdx, v_elem] = resolveAndBuildCopyElements(v_docId, v2_embData);
-        v_element = std::move(v_elem);
+        v_element = resolveAndBuildCopyElements(v_docId, v2_embData);
     }
 
     if (v_element.empty())

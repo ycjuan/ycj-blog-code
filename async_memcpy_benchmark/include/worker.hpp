@@ -34,9 +34,8 @@ protected:
 
     // Resolves docIds to rowIdxs (inserting new docs into maps) and builds
     // a flat list of CopyElements. Must be called under the write mutex.
-    std::pair<std::vector<int>, std::vector<CopyElement>> resolveAndBuildCopyElements(
-        const std::vector<long>& v_docId,
-        const std::vector<std::vector<T_EMB>>& v2_embData);
+    std::vector<CopyElement> resolveAndBuildCopyElements(const std::vector<long>& v_docId,
+                                                         const std::vector<std::vector<T_EMB>>& v2_embData);
 
     // Removes docIds from maps and returns the freed rowIdxs.
     // Must be called under the write mutex.
