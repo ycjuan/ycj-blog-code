@@ -4,7 +4,7 @@
 #include <tuple>
 #include <vector>
 
-__global__ void kn_scatter(T_EMB* d_dst, const CopyElement* d_elements, int embDim, int numElements)
+__global__ void kn_scatter(T_EMB* d_dst, const EmbElement* d_elements, int embDim, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -34,7 +34,7 @@ __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements,
     d_dirty[d_rowIdx[t]] = val;
 }
 
-__global__ void kn_setDirty(char* d_dirty, const CopyElement* d_elements, int embDim, int numDocs, char val)
+__global__ void kn_setDirty(char* d_dirty, const EmbElement* d_elements, int embDim, int numDocs, char val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numDocs)
@@ -62,11 +62,11 @@ WorkerOverwrite::WorkerOverwrite(int maxNumDocs, int embDim)
 void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData)
 {
     // --- resolve docId -> rowIdx and build copy elements ---
-    std::vector<CopyElement> v_element;
+    std::vector<EmbElement> v_element;
     {
         // --- lock: protect docId<>rowIdx map ---
         std::lock_guard<std::mutex> lock(m_writeMutex);
-        v_element = resolveAndBuildCopyElements(v_docId, v2_embData);
+        v_element = resolveAndBuildEmbElements(v_docId, v2_embData);
     }
 
     if (v_element.empty())
@@ -79,7 +79,7 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
 
     // d_element at function scope — shared across sections, must
     // outlive all kernel launches until the final sync in each section.
-    CudaDeviceArray<CopyElement> d_element(v_element.size(), "CopyElements");
+    CudaDeviceArray<EmbElement> d_element(v_element.size(), "EmbElements");
     int dirtyGridSize = (numDocs + kBlockSize - 1) / kBlockSize;
     int scatterGridSize = (v_element.size() + kBlockSize - 1) / kBlockSize;
 
@@ -87,7 +87,7 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
     {
         CHECK_CUDA(cudaMemcpyAsync(d_element.data(),
                                    v_element.data(),
-                                   v_element.size() * sizeof(CopyElement),
+                                   v_element.size() * sizeof(EmbElement),
                                    cudaMemcpyHostToDevice,
                                    m_writeStream.get()));
     }

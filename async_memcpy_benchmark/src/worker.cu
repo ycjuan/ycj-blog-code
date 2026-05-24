@@ -19,10 +19,10 @@ Worker::Worker(int maxNumDocs, int embDim)
 
 const T_EMB* Worker::data() const { return m_data.data(); }
 
-std::vector<CopyElement> Worker::resolveAndBuildCopyElements(const std::vector<long>& v_docId,
+std::vector<EmbElement> Worker::resolveAndBuildEmbElements(const std::vector<long>& v_docId,
                                                              const std::vector<std::vector<T_EMB>>& v2_embData)
 {
-    std::vector<CopyElement> v_element;
+    std::vector<EmbElement> v_element;
     v_element.reserve(v_docId.size() * m_embDim);
 
     for (int i = 0; i < (int)v_docId.size(); i++)

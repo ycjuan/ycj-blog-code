@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-struct CopyElement
+struct EmbElement
 {
     int rowIdx;
     T_EMB val;
@@ -39,8 +39,8 @@ protected:
     void scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx);
 
     // Resolves docIds to rowIdxs (inserting new docs into maps) and builds
-    // a flat list of CopyElements. Must be called under the write mutex.
-    std::vector<CopyElement> resolveAndBuildCopyElements(const std::vector<long>& v_docId,
+    // a flat list of EmbElements. Must be called under the write mutex.
+    std::vector<EmbElement> resolveAndBuildEmbElements(const std::vector<long>& v_docId,
                                                          const std::vector<std::vector<T_EMB>>& v2_embData);
 
     // Removes docIds from maps and returns the freed rowIdxs.

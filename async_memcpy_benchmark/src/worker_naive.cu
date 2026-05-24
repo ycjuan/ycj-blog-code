@@ -24,7 +24,7 @@ __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements)
     d_dirty[d_rowIdx[t]] = 1;
 }
 
-__global__ void kn_scatter(T_EMB* d_dst, const CopyElement* d_elements, int embDim, int numElements)
+__global__ void kn_scatter(T_EMB* d_dst, const EmbElement* d_elements, int embDim, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -78,9 +78,9 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector
     std::lock_guard<std::mutex> lock(m_mutex);
 
     // --- resolve docId -> rowIdx and build copy elements ---
-    std::vector<CopyElement> v_element;
+    std::vector<EmbElement> v_element;
     {
-        v_element = resolveAndBuildCopyElements(v_docId, v2_embData);
+        v_element = resolveAndBuildEmbElements(v_docId, v2_embData);
     }
 
     if (v_element.empty())
@@ -90,10 +90,10 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector
 
     // --- H2D: emb data, scatter ---
     {
-        CudaDeviceArray<CopyElement> d_elements(v_element.size(), "CopyElements");
+        CudaDeviceArray<EmbElement> d_elements(v_element.size(), "EmbElements");
         CHECK_CUDA(cudaMemcpyAsync(d_elements.data(),
                                    v_element.data(),
-                                   v_element.size() * sizeof(CopyElement),
+                                   v_element.size() * sizeof(EmbElement),
                                    cudaMemcpyHostToDevice,
                                    m_writeStream.get()));
         const int kBlockSize = 256;
