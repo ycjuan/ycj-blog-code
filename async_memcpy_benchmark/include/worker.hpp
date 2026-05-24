@@ -18,7 +18,7 @@ public:
     virtual void updateScalarData(const std::vector<long>& docIds, const std::vector<float>& scalars) = 0;
 
     // Caller is assumed to already know the rowIdxs to score, so no docId->rowIdx conversion is needed.
-    virtual void score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxs);
+    virtual void score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxs) = 0;
 
 protected:
     void scoreImpl(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxs);
