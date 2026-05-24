@@ -67,13 +67,18 @@ void WorkerNaive::updateEmbData(const std::vector<long>& v_docIds, const std::ve
                                v_elements.data(),
                                v_elements.size() * sizeof(CopyElement),
                                cudaMemcpyHostToDevice,
-                               m_stream.get()));
+                               m_writeStream.get()));
 
     const int kBlockSize = 256;
     const int gridSize = (v_elements.size() + kBlockSize - 1) / kBlockSize;
-    scatterKernel<<<gridSize, kBlockSize, 0, m_stream.get()>>>(m_data.data(),
-                                                               d_elements.data(),
-                                                               m_embDim,
-                                                               v_elements.size());
-    CHECK_CUDA(cudaStreamSynchronize(m_stream.get()));
+    scatterKernel<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_data.data(),
+                                                                    d_elements.data(),
+                                                                    m_embDim,
+                                                                    v_elements.size());
+    CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
+}
+
+void WorkerNaive::score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxs)
+{
+    scoreImpl(reqEmb, targetRowIdxs);
 }
