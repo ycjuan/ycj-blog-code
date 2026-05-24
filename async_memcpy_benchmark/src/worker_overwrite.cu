@@ -52,9 +52,9 @@ WorkerOverwrite::WorkerOverwrite(int maxNumDocs, int embDim)
 
 void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData)
 {
+    // --- resolve docId -> rowIdx and build copy elements ---
     std::vector<int> v_rowIdx;
     std::vector<CopyElement> v_element;
-
     {
         std::lock_guard<std::mutex> lock(m_writeMutex);
         v_rowIdx.reserve(v_docId.size());
@@ -97,6 +97,7 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
 
     const int kBlockSize = 256;
 
+    // --- H2D: rowIdxs ---
     CudaDeviceArray<int> d_rowIdx(v_rowIdx.size(), "rowIdx");
     CHECK_CUDA(cudaMemcpyAsync(d_rowIdx.data(),
                                v_rowIdx.data(),
@@ -104,8 +105,8 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
                                cudaMemcpyHostToDevice,
                                m_writeStream.get()));
 
+    // --- set dirty=1 before writing emb data ---
     int dirtyGridSize = (v_rowIdx.size() + kBlockSize - 1) / kBlockSize;
-
     {
         std::lock_guard<std::mutex> lock(m_readMutex);
         setDirtyKernel<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
@@ -114,19 +115,20 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
                                                                               1);
     }
 
+    // --- H2D: emb data, scatter ---
     CudaDeviceArray<CopyElement> d_element(v_element.size(), "CopyElements");
     CHECK_CUDA(cudaMemcpyAsync(d_element.data(),
                                v_element.data(),
                                v_element.size() * sizeof(CopyElement),
                                cudaMemcpyHostToDevice,
                                m_writeStream.get()));
-
     int scatterGridSize = (v_element.size() + kBlockSize - 1) / kBlockSize;
     scatterKernel<<<scatterGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_data.data(),
                                                                            d_element.data(),
                                                                            m_embDim,
                                                                            v_element.size());
 
+    // --- clear dirty=0 after scatter (ordered on same stream) ---
     {
         std::lock_guard<std::mutex> lock(m_readMutex);
         setDirtyKernel<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
@@ -135,14 +137,15 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
                                                                               0);
     }
 
+    // --- sync outside lock so score() can run concurrently on readStream ---
     CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
 }
 
 void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
 {
+    // --- resolve docId -> rowIdx and build scalar elements ---
     std::vector<int> v_rowIdx;
     std::vector<ScalarElement> v_scalarElement;
-
     {
         std::lock_guard<std::mutex> lock(m_writeMutex);
         v_rowIdx.reserve(v_docId.size());
@@ -167,6 +170,7 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId, const s
 
     const int kBlockSize = 256;
 
+    // --- H2D: rowIdxs ---
     CudaDeviceArray<int> d_rowIdx(v_rowIdx.size(), "rowIdx");
     CHECK_CUDA(cudaMemcpyAsync(d_rowIdx.data(),
                                v_rowIdx.data(),
@@ -174,8 +178,8 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId, const s
                                cudaMemcpyHostToDevice,
                                m_writeStream.get()));
 
+    // --- set dirty=1 before writing scalar data ---
     int dirtyGridSize = (v_rowIdx.size() + kBlockSize - 1) / kBlockSize;
-
     {
         std::lock_guard<std::mutex> lock(m_readMutex);
         setDirtyKernel<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
@@ -184,18 +188,19 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId, const s
                                                                               1);
     }
 
+    // --- H2D: scalar data, scatter ---
     CudaDeviceArray<ScalarElement> d_scalarElement(v_scalarElement.size(), "scalarElements");
     CHECK_CUDA(cudaMemcpyAsync(d_scalarElement.data(),
                                v_scalarElement.data(),
                                v_scalarElement.size() * sizeof(ScalarElement),
                                cudaMemcpyHostToDevice,
                                m_writeStream.get()));
-
     int scatterGridSize = (v_scalarElement.size() + kBlockSize - 1) / kBlockSize;
     scatterScalarKernel<<<scatterGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
                                                                                  d_scalarElement.data(),
                                                                                  v_scalarElement.size());
 
+    // --- clear dirty=0 after scatter (ordered on same stream) ---
     {
         std::lock_guard<std::mutex> lock(m_readMutex);
         setDirtyKernel<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
@@ -209,8 +214,8 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId, const s
 
 void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
 {
+    // --- update maps, collect deleted rowIdxs ---
     std::vector<int> v_deletedRowIdx;
-
     {
         std::lock_guard<std::mutex> lock(m_writeMutex);
         v_deletedRowIdx.reserve(v_docId.size());
@@ -235,16 +240,15 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
         return;
     }
 
+    // --- H2D: deleted rowIdxs, set dirty=1 ---
     CudaDeviceArray<int> d_deletedRowIdx(v_deletedRowIdx.size(), "deletedRowIdx");
     CHECK_CUDA(cudaMemcpyAsync(d_deletedRowIdx.data(),
                                v_deletedRowIdx.data(),
                                v_deletedRowIdx.size() * sizeof(int),
                                cudaMemcpyHostToDevice,
                                m_writeStream.get()));
-
     const int kBlockSize = 256;
     const int gridSize = (v_deletedRowIdx.size() + kBlockSize - 1) / kBlockSize;
-
     {
         std::lock_guard<std::mutex> lock(m_readMutex);
         setDirtyKernel<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),

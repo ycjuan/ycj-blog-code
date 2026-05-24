@@ -53,9 +53,10 @@ WorkerNaive::WorkerNaive(int maxNumDocs, int embDim)
 void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
+
+    // --- resolve docId -> rowIdx and build scalar elements ---
     std::vector<ScalarElement> v_scalarElement;
     v_scalarElement.reserve(v_docId.size());
-
     for (int i = 0; i < (int)v_docId.size(); i++)
     {
         auto it = m_docId2rowIdx.find(v_docId[i]);
@@ -71,13 +72,13 @@ void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::
         return;
     }
 
+    // --- H2D: scalar data, scatter ---
     CudaDeviceArray<ScalarElement> d_scalarElement(v_scalarElement.size(), "scalarElements");
     CHECK_CUDA(cudaMemcpyAsync(d_scalarElement.data(),
                                v_scalarElement.data(),
                                v_scalarElement.size() * sizeof(ScalarElement),
                                cudaMemcpyHostToDevice,
                                m_writeStream.get()));
-
     const int kBlockSize = 256;
     const int gridSize = (v_scalarElement.size() + kBlockSize - 1) / kBlockSize;
     scatterScalarKernel<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
@@ -89,9 +90,10 @@ void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::
 void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
+
+    // --- resolve docId -> rowIdx and build copy elements ---
     std::vector<CopyElement> v_element;
     v_element.reserve(v_docId.size() * m_embDim);
-
     for (int i = 0; i < (int)v_docId.size(); i++)
     {
         auto it = m_docId2rowIdx.find(v_docId[i]);
@@ -125,13 +127,13 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector
         return;
     }
 
+    // --- H2D: emb data, scatter ---
     CudaDeviceArray<CopyElement> d_elements(v_element.size(), "CopyElements");
     CHECK_CUDA(cudaMemcpyAsync(d_elements.data(),
                                v_element.data(),
                                v_element.size() * sizeof(CopyElement),
                                cudaMemcpyHostToDevice,
                                m_writeStream.get()));
-
     const int kBlockSize = 256;
     const int gridSize = (v_element.size() + kBlockSize - 1) / kBlockSize;
     scatterKernel<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_data.data(),
@@ -144,9 +146,10 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector
 void WorkerNaive::deleteDocs(const std::vector<long>& v_docId)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
+
+    // --- update maps, collect deleted rowIdxs ---
     std::vector<int> v_deletedRowIdx;
     v_deletedRowIdx.reserve(v_docId.size());
-
     for (long docId : v_docId)
     {
         auto it = m_docId2rowIdx.find(docId);
@@ -166,13 +169,13 @@ void WorkerNaive::deleteDocs(const std::vector<long>& v_docId)
         return;
     }
 
+    // --- H2D: deleted rowIdxs, set dirty=1 ---
     CudaDeviceArray<int> d_deletedRowIdx(v_deletedRowIdx.size(), "deletedRowIdx");
     CHECK_CUDA(cudaMemcpyAsync(d_deletedRowIdx.data(),
                                v_deletedRowIdx.data(),
                                v_deletedRowIdx.size() * sizeof(int),
                                cudaMemcpyHostToDevice,
                                m_writeStream.get()));
-
     const int kBlockSize = 256;
     const int gridSize = (v_deletedRowIdx.size() + kBlockSize - 1) / kBlockSize;
     setDirtyKernel<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
