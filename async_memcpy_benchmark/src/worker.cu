@@ -9,7 +9,7 @@ Worker::Worker(int maxNumDocs, int embDim)
     , m_data(maxNumDocs * embDim, "Worker")
     , m_d_scalars(maxNumDocs, "scalars")
     , m_d_scores(maxNumDocs, "scores")
-    , m_rowId2DocId(maxNumDocs, -1)
+    , m_rowIdx2DocId(maxNumDocs, -1)
 {
     CHECK_CUDA(cudaMemset(m_d_scalars.data(), 0, maxNumDocs * sizeof(float)));
 }
@@ -20,7 +20,7 @@ __global__ void scoreKernel(float* scores,
                             const T_EMB* reqEmb,
                             const T_EMB* docData,
                             const float* scalars,
-                            const int* rowIds,
+                            const int* rowIdxs,
                             int embDim,
                             int numTargets)
 {
@@ -29,19 +29,19 @@ __global__ void scoreKernel(float* scores,
     {
         return;
     }
-    int rowId = rowIds[t];
-    const T_EMB* doc = docData + rowId * embDim;
+    int rowIdx = rowIdxs[t];
+    const T_EMB* doc = docData + rowIdx * embDim;
     float dot = 0.0f;
     for (int i = 0; i < embDim; i++)
     {
         dot += __bfloat162float(reqEmb[i]) * __bfloat162float(doc[i]);
     }
-    scores[t] = dot * scalars[rowId];
+    scores[t] = dot * scalars[rowIdx];
 }
 
-void Worker::score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIds) const
+void Worker::score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxs) const
 {
-    const int numTargets = targetRowIds.size();
+    const int numTargets = targetRowIdxs.size();
     if (numTargets == 0)
     {
         return;
@@ -50,8 +50,8 @@ void Worker::score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& tar
     CudaDeviceArray<T_EMB> d_reqEmb(m_embDim, "reqEmb");
     CHECK_CUDA(cudaMemcpy(d_reqEmb.data(), reqEmb.data(), m_embDim * sizeof(T_EMB), cudaMemcpyHostToDevice));
 
-    CudaDeviceArray<int> d_rowIds(numTargets, "rowIds");
-    CHECK_CUDA(cudaMemcpy(d_rowIds.data(), targetRowIds.data(), numTargets * sizeof(int), cudaMemcpyHostToDevice));
+    CudaDeviceArray<int> d_rowIdxs(numTargets, "rowIdxs");
+    CHECK_CUDA(cudaMemcpy(d_rowIdxs.data(), targetRowIdxs.data(), numTargets * sizeof(int), cudaMemcpyHostToDevice));
 
     if (m_d_scores.getArraySize() < (uint64_t)numTargets)
     {
@@ -64,7 +64,7 @@ void Worker::score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& tar
                                           d_reqEmb.data(),
                                           m_data.data(),
                                           m_d_scalars.data(),
-                                          d_rowIds.data(),
+                                          d_rowIdxs.data(),
                                           m_embDim,
                                           numTargets);
 }

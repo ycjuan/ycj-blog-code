@@ -5,7 +5,7 @@
 
 struct CopyElement
 {
-    int rowId;
+    int rowIdx;
     T_EMB val;
 };
 
@@ -16,7 +16,7 @@ __global__ void scatterKernel(T_EMB* dst, const CopyElement* elements, int embDi
     {
         return;
     }
-    dst[elements[t].rowId * embDim + t % embDim] = elements[t].val;
+    dst[elements[t].rowIdx * embDim + t % embDim] = elements[t].val;
 }
 
 WorkerNaive::WorkerNaive(int maxNumDocs, int embDim)
@@ -28,13 +28,13 @@ void WorkerNaive::updateScalarData(const std::vector<long>& jobIds, const std::v
 {
     for (int i = 0; i < (int)jobIds.size(); i++)
     {
-        auto it = m_docId2rowId.find(jobIds[i]);
-        if (it == m_docId2rowId.end())
+        auto it = m_docId2rowIdxx.find(jobIds[i]);
+        if (it == m_docId2rowIdxx.end())
         {
             continue;
         }
-        int rowId = it->second;
-        CHECK_CUDA(cudaMemcpy(m_d_scalars.data() + rowId, &scalars[i], sizeof(float), cudaMemcpyHostToDevice));
+        int rowIdx = it->second;
+        CHECK_CUDA(cudaMemcpy(m_d_scalars.data() + rowIdx, &scalars[i], sizeof(float), cudaMemcpyHostToDevice));
     }
 }
 
@@ -45,15 +45,15 @@ void WorkerNaive::updateEmbData(const std::vector<long>& v_jobIds, const std::ve
 
     for (int i = 0; i < (int)v_jobIds.size(); i++)
     {
-        auto it = m_docId2rowId.find(v_jobIds[i]);
-        if (it == m_docId2rowId.end())
+        auto it = m_docId2rowIdxx.find(v_jobIds[i]);
+        if (it == m_docId2rowIdxx.end())
         {
             continue;
         }
-        int rowId = it->second;
+        int rowIdx = it->second;
         for (int j = 0; j < m_embDim; j++)
         {
-            v_elements.push_back({ rowId, embData2D[i][j] });
+            v_elements.push_back({ rowIdx, embData2D[i][j] });
         }
     }
 

@@ -17,7 +17,7 @@ public:
     virtual void updateEmbData(const std::vector<long>& jobIds, const std::vector<std::vector<T_EMB>>& embData2D) = 0;
     virtual void updateScalarData(const std::vector<long>& jobIds, const std::vector<float>& scalars) = 0;
 
-    void score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIds) const;
+    void score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxs) const;
 
 protected:
     int m_maxNumDocs;
@@ -25,7 +25,7 @@ protected:
     CudaDeviceArray<T_EMB> m_data;
     CudaDeviceArray<float> m_d_scalars;
     mutable CudaDeviceArray<float> m_d_scores;
-    std::unordered_map<long, int> m_docId2rowId;
-    std::vector<long> m_rowId2DocId;
+    std::unordered_map<long, int> m_docId2rowIdx;
+    std::vector<long> m_rowIdx2DocId;
     CudaStream m_stream;
 };
