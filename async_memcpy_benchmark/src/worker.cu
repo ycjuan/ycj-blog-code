@@ -57,6 +57,21 @@ std::vector<int> Worker::resolveRowIdxs(const std::vector<long>& v_docId)
     return v_rowIdx;
 }
 
+std::vector<CopyElement> Worker::buildCopyElements(const std::vector<int>& v_rowIdx,
+                                                   const std::vector<std::vector<T_EMB>>& v2_embData)
+{
+    std::vector<CopyElement> v_element;
+    v_element.reserve(v_rowIdx.size() * m_embDim);
+    for (int i = 0; i < (int)v_rowIdx.size(); i++)
+    {
+        for (int j = 0; j < m_embDim; j++)
+        {
+            v_element.push_back({ v_rowIdx[i], v2_embData[i][j] });
+        }
+    }
+    return v_element;
+}
+
 __global__ void scoreKernel(float* scores,
                             const T_EMB* reqEmb,
                             const T_EMB* docData,

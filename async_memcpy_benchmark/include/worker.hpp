@@ -7,6 +7,12 @@
 #include <unordered_set>
 #include <vector>
 
+struct CopyElement
+{
+    int rowIdx;
+    T_EMB val;
+};
+
 class Worker
 {
 public:
@@ -28,6 +34,10 @@ protected:
     // Resolves each docId to a rowIdx, inserting new docs into the maps.
     // Must be called under the write mutex.
     std::vector<int> resolveRowIdxs(const std::vector<long>& v_docId);
+
+    // Builds a flat list of CopyElements from resolved rowIdxs and emb data.
+    std::vector<CopyElement> buildCopyElements(const std::vector<int>& v_rowIdx,
+                                               const std::vector<std::vector<T_EMB>>& v2_embData);
 
     // meta data
     int m_maxNumDocs;

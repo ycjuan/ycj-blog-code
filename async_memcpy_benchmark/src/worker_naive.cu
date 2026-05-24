@@ -3,12 +3,6 @@
 
 #include <vector>
 
-struct CopyElement
-{
-    int rowIdx;
-    T_EMB val;
-};
-
 struct ScalarElement
 {
     int rowIdx;
@@ -99,14 +93,7 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector
     std::vector<CopyElement> v_element;
     {
         const std::vector<int> v_rowIdx = resolveRowIdxs(v_docId);
-        v_element.reserve(v_docId.size() * m_embDim);
-        for (int i = 0; i < (int)v_docId.size(); i++)
-        {
-            for (int j = 0; j < m_embDim; j++)
-            {
-                v_element.push_back({ v_rowIdx[i], v2_embData[i][j] });
-            }
-        }
+        v_element = buildCopyElements(v_rowIdx, v2_embData);
     }
 
     if (v_element.empty())
