@@ -15,7 +15,7 @@ public:
 
     const T_EMB* data() const;
 
-    virtual void upsertDoc(const std::vector<long>& docIds, const std::vector<std::vector<T_EMB>>& embData2D) = 0;
+    virtual void upsertDocs(const std::vector<long>& docIds, const std::vector<std::vector<T_EMB>>& embData2D) = 0;
     virtual void updateScalarData(const std::vector<long>& docIds, const std::vector<float>& scalars) = 0;
     virtual void deleteDocs(const std::vector<long>& docIds) = 0;
 

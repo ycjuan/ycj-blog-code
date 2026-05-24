@@ -39,7 +39,7 @@ void WorkerNaive::updateScalarData(const std::vector<long>& docIds, const std::v
     }
 }
 
-void WorkerNaive::upsertDoc(const std::vector<long>& v_docIds, const std::vector<std::vector<T_EMB>>& embData2D)
+void WorkerNaive::upsertDocs(const std::vector<long>& v_docIds, const std::vector<std::vector<T_EMB>>& embData2D)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     std::vector<CopyElement> v_elements;
