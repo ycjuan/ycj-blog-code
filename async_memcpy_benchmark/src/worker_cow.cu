@@ -44,21 +44,10 @@ void WorkerCopyOnWrite::upsertDocs(const std::vector<long>& v_docId, const std::
 {
     // --- resolve: always allocate new rowIdx (copy-on-write) ---
     CopyOnWriteUpsertData upsertData;
-    std::vector<ScalarElement> v_scalarElement;
     {
-        // --- lock: protect docId<>rowIdx map and scalar map ---
+        // --- lock: protect docId<>rowIdx map ---
         std::lock_guard<std::mutex> lock(m_writeMutex);
         upsertData = resolveAndBuildEmbElementsCopyOnWrite(v_docId, v2_embData);
-
-        // carry scalar to new rowIdx for docs that have one
-        for (int i = 0; i < (int)v_docId.size(); i++)
-        {
-            auto it = m_docId2scalar.find(v_docId[i]);
-            if (it != m_docId2scalar.end())
-            {
-                v_scalarElement.push_back({ upsertData.v_newRowIdx[i], it->second });
-            }
-        }
     }
 
     if (upsertData.v_embElement.empty())
@@ -98,22 +87,8 @@ void WorkerCopyOnWrite::upsertDocs(const std::vector<long>& v_docId, const std::
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 
-    // --- carry scalars to new rowIdxs ---
-    if (!v_scalarElement.empty())
-    {
-        CudaDeviceArray<ScalarElement> d_scalarElement(v_scalarElement.size(), "scalarElements");
-        CHECK_CUDA(cudaMemcpyAsync(d_scalarElement.data(),
-                                   v_scalarElement.data(),
-                                   v_scalarElement.size() * sizeof(ScalarElement),
-                                   cudaMemcpyHostToDevice,
-                                   m_writeStream.get()));
-        CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
-        int scatterGridSize = (v_scalarElement.size() + kBlockSize - 1) / kBlockSize;
-        kn_scatter<<<scatterGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
-                                                                            d_scalarElement.data(),
-                                                                            v_scalarElement.size());
-        CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
-    }
+    // --- subclass hook: carry scalars to new rowIdxs before dirty-bit flip ---
+    carryScalarsOnUpsert(v_docId, upsertData.v_newRowIdx);
 
     // --- flip dirty bits: hide old rowIdxs, reveal new rowIdxs ---
     {
@@ -199,6 +174,38 @@ WorkerCopyOnWriteEager::WorkerCopyOnWriteEager(int maxNumDocs, int embDim)
 {
 }
 
+void WorkerCopyOnWriteEager::carryScalarsOnUpsert(const std::vector<long>& v_docId, const std::vector<int>& v_newRowIdx)
+{
+    std::vector<ScalarElement> v_scalarElement;
+    for (int i = 0; i < (int)v_docId.size(); i++)
+    {
+        auto it = m_docId2scalar.find(v_docId[i]);
+        if (it != m_docId2scalar.end())
+        {
+            v_scalarElement.push_back({ v_newRowIdx[i], it->second });
+        }
+    }
+
+    if (v_scalarElement.empty())
+    {
+        return;
+    }
+
+    const int kBlockSize = 256;
+    CudaDeviceArray<ScalarElement> d_scalarElement(v_scalarElement.size(), "scalarElements");
+    CHECK_CUDA(cudaMemcpyAsync(d_scalarElement.data(),
+                               v_scalarElement.data(),
+                               v_scalarElement.size() * sizeof(ScalarElement),
+                               cudaMemcpyHostToDevice,
+                               m_writeStream.get()));
+    CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
+    int gridSize = (v_scalarElement.size() + kBlockSize - 1) / kBlockSize;
+    kn_scatter<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
+                                                                 d_scalarElement.data(),
+                                                                 v_scalarElement.size());
+    CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
+}
+
 void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
 {
     // --- resolve docId -> rowIdx and build scalar elements ---
@@ -208,7 +215,6 @@ void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>& v_docId, 
         std::lock_guard<std::mutex> lock(m_writeMutex);
         v_scalarElement = resolveScalarElements(v_docId, v_scalar);
 
-        // update CPU mirror
         for (int i = 0; i < (int)v_docId.size(); i++)
         {
             m_docId2scalar[v_docId[i]] = v_scalar[i];
