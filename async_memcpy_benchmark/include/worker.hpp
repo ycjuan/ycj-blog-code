@@ -24,16 +24,24 @@ public:
 
 protected:
     void scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx);
+
+    // meta data
     int m_maxNumDocs;
     int m_embDim;
     int m_headRowIdx;
+
+    // cuda arrays
     CudaDeviceArray<T_EMB> m_data;
     CudaDeviceArray<float> m_d_scalars;
     CudaDeviceArray<float> m_d_scores;
     CudaDeviceArray<char> m_d_dirty;
+
+    // docId <> rowIdx related
     std::unordered_map<long, int> m_docId2rowIdx;
     std::vector<long> m_rowIdx2DocId;
     std::unordered_set<int> m_emptyRowIdxSet;
+
+    // cuda streams
     CudaStream m_readStream;
     CudaStream m_writeStream;
 };
