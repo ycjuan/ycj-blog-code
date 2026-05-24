@@ -20,7 +20,7 @@ Worker::Worker(int maxNumDocs, int embDim)
 const T_EMB* Worker::data() const { return m_data.data(); }
 
 std::vector<EmbElement> Worker::resolveAndBuildEmbElements(const std::vector<long>& v_docId,
-                                                             const std::vector<std::vector<T_EMB>>& v2_embData)
+                                                           const std::vector<std::vector<T_EMB>>& v2_embData)
 {
     std::vector<EmbElement> v_element;
     v_element.reserve(v_docId.size() * m_embDim);
@@ -100,6 +100,51 @@ std::vector<ScalarElement> Worker::resolveScalarElements(const std::vector<long>
     }
 
     return v_scalarElement;
+}
+
+COWUpsertData Worker::resolveAndBuildEmbElementsCOW(const std::vector<long>& v_docId,
+                                                    const std::vector<std::vector<T_EMB>>& v2_embData)
+{
+    COWUpsertData result;
+    result.v_embElement.reserve(v_docId.size() * m_embDim);
+    result.v_newRowIdx.reserve(v_docId.size());
+
+    for (int i = 0; i < (int)v_docId.size(); i++)
+    {
+        // always allocate a fresh rowIdx
+        int newRowIdx;
+        if (!m_emptyRowIdxSet.empty())
+        {
+            newRowIdx = *m_emptyRowIdxSet.begin();
+            m_emptyRowIdxSet.erase(m_emptyRowIdxSet.begin());
+        }
+        else
+        {
+            newRowIdx = m_headRowIdx++;
+        }
+
+        auto it = m_docId2rowIdx.find(v_docId[i]);
+        if (it != m_docId2rowIdx.end())
+        {
+            // existing doc: record old rowIdx for dirtying, recycle it
+            result.v_oldDirtyRowIdx.push_back(it->second);
+            m_emptyRowIdxSet.insert(it->second);
+            it->second = newRowIdx;
+        }
+        else
+        {
+            m_docId2rowIdx[v_docId[i]] = newRowIdx;
+        }
+        m_rowIdx2DocId[newRowIdx] = v_docId[i];
+
+        result.v_newRowIdx.push_back(newRowIdx);
+        for (int j = 0; j < m_embDim; j++)
+        {
+            result.v_embElement.push_back({ newRowIdx, v2_embData[i][j] });
+        }
+    }
+
+    return result;
 }
 
 __global__ void kn_score(float* d_scores,

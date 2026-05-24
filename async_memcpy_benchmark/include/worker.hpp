@@ -20,6 +20,13 @@ struct ScalarElement
     float val;
 };
 
+struct COWUpsertData
+{
+    std::vector<EmbElement> v_embElement;
+    std::vector<int> v_newRowIdx; // new rowIdx per doc
+    std::vector<int> v_oldDirtyRowIdx; // old rowIdxs to mark dirty (existing docs only)
+};
+
 class Worker
 {
 public:
@@ -41,7 +48,7 @@ protected:
     // Resolves docIds to rowIdxs (inserting new docs into maps) and builds
     // a flat list of EmbElements. Must be called under the write mutex.
     std::vector<EmbElement> resolveAndBuildEmbElements(const std::vector<long>& v_docId,
-                                                         const std::vector<std::vector<T_EMB>>& v2_embData);
+                                                       const std::vector<std::vector<T_EMB>>& v2_embData);
 
     // Removes docIds from maps and returns the freed rowIdxs.
     // Must be called under the write mutex.
@@ -51,6 +58,12 @@ protected:
     // Must be called under the write mutex.
     std::vector<ScalarElement> resolveScalarElements(const std::vector<long>& v_docId,
                                                      const std::vector<float>& v_scalar);
+
+    // Copy-on-write variant: always allocates a new rowIdx per doc (never reuses existing).
+    // For existing docs, records old rowIdx in v_oldDirtyRowIdx for later dirtying.
+    // Must be called under the write mutex.
+    COWUpsertData resolveAndBuildEmbElementsCOW(const std::vector<long>& v_docId,
+                                                const std::vector<std::vector<T_EMB>>& v2_embData);
 
     // meta data
     int m_maxNumDocs;
