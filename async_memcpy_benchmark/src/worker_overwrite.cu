@@ -10,7 +10,7 @@ struct ScalarElement
     float val;
 };
 
-__global__ void scatterKernel(T_EMB* dst, const CopyElement* elements, int embDim, int numElements)
+__global__ void kn_scatter(T_EMB* dst, const CopyElement* elements, int embDim, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -20,7 +20,7 @@ __global__ void scatterKernel(T_EMB* dst, const CopyElement* elements, int embDi
     dst[elements[t].rowIdx * embDim + t % embDim] = elements[t].val;
 }
 
-__global__ void scatterScalarKernel(float* dst, const ScalarElement* elements, int numElements)
+__global__ void kn_scatterScalar(float* dst, const ScalarElement* elements, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -30,7 +30,7 @@ __global__ void scatterScalarKernel(float* dst, const ScalarElement* elements, i
     dst[elements[t].rowIdx] = elements[t].val;
 }
 
-__global__ void setDirtyKernel(char* dirty, const int* rowIdxs, int numElements, char val)
+__global__ void kn_setDirty(char* dirty, const int* rowIdxs, int numElements, char val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -40,7 +40,7 @@ __global__ void setDirtyKernel(char* dirty, const int* rowIdxs, int numElements,
     dirty[rowIdxs[t]] = val;
 }
 
-__global__ void setDirtyFromCopyElements(char* dirty, const CopyElement* elements, int embDim, int numDocs, char val)
+__global__ void kn_setDirtyFromCopyElements(char* dirty, const CopyElement* elements, int embDim, int numDocs, char val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numDocs)
@@ -50,7 +50,7 @@ __global__ void setDirtyFromCopyElements(char* dirty, const CopyElement* element
     dirty[elements[t * embDim].rowIdx] = val;
 }
 
-__global__ void setDirtyFromScalarElements(char* dirty, const ScalarElement* elements, int numDocs, char val)
+__global__ void kn_setDirtyFromScalarElements(char* dirty, const ScalarElement* elements, int numDocs, char val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numDocs)
@@ -101,31 +101,31 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
     // --- set dirty=1 before scatter ---
     {
         std::lock_guard<std::mutex> lock(m_readMutex);
-        setDirtyFromCopyElements<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
-                                                                                        d_element.data(),
-                                                                                        m_embDim,
-                                                                                        numDocs,
-                                                                                        1);
+        kn_setDirtyFromCopyElements<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
+                                                                                           d_element.data(),
+                                                                                           m_embDim,
+                                                                                           numDocs,
+                                                                                           1);
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 
     // --- scatter emb data ---
     {
-        scatterKernel<<<scatterGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_data.data(),
-                                                                               d_element.data(),
-                                                                               m_embDim,
-                                                                               v_element.size());
+        kn_scatter<<<scatterGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_data.data(),
+                                                                            d_element.data(),
+                                                                            m_embDim,
+                                                                            v_element.size());
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 
     // --- clear dirty=0 after scatter ---
     {
         std::lock_guard<std::mutex> lock(m_readMutex);
-        setDirtyFromCopyElements<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
-                                                                                        d_element.data(),
-                                                                                        m_embDim,
-                                                                                        numDocs,
-                                                                                        0);
+        kn_setDirtyFromCopyElements<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
+                                                                                           d_element.data(),
+                                                                                           m_embDim,
+                                                                                           numDocs,
+                                                                                           0);
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 }
@@ -173,28 +173,28 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId, const s
     // --- set dirty=1 before scatter ---
     {
         std::lock_guard<std::mutex> lock(m_readMutex);
-        setDirtyFromScalarElements<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
-                                                                                          d_scalarElement.data(),
-                                                                                          numDocs,
-                                                                                          1);
+        kn_setDirtyFromScalarElements<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
+                                                                                             d_scalarElement.data(),
+                                                                                             numDocs,
+                                                                                             1);
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 
     // --- scatter scalar data ---
     {
-        scatterScalarKernel<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
-                                                                                   d_scalarElement.data(),
-                                                                                   numDocs);
+        kn_scatterScalar<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
+                                                                                d_scalarElement.data(),
+                                                                                numDocs);
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 
     // --- clear dirty=0 after scatter ---
     {
         std::lock_guard<std::mutex> lock(m_readMutex);
-        setDirtyFromScalarElements<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
-                                                                                          d_scalarElement.data(),
-                                                                                          numDocs,
-                                                                                          0);
+        kn_setDirtyFromScalarElements<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
+                                                                                             d_scalarElement.data(),
+                                                                                             numDocs,
+                                                                                             0);
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 }
@@ -240,10 +240,10 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
                                    m_writeStream.get()));
         {
             std::lock_guard<std::mutex> lock(m_readMutex);
-            setDirtyKernel<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
-                                                                             d_deletedRowIdx.data(),
-                                                                             v_deletedRowIdx.size(),
-                                                                             1);
+            kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
+                                                                          d_deletedRowIdx.data(),
+                                                                          v_deletedRowIdx.size(),
+                                                                          1);
         }
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }

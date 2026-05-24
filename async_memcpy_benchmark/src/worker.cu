@@ -67,14 +67,14 @@ std::pair<std::vector<int>, std::vector<CopyElement>> Worker::resolveAndBuildCop
     return { v_rowIdx, v_element };
 }
 
-__global__ void scoreKernel(float* scores,
-                            const T_EMB* reqEmb,
-                            const T_EMB* docData,
-                            const float* scalars,
-                            const int* rowIdxs,
-                            const char* dirty,
-                            int embDim,
-                            int numTargets)
+__global__ void kn_score(float* scores,
+                         const T_EMB* reqEmb,
+                         const T_EMB* docData,
+                         const float* scalars,
+                         const int* rowIdxs,
+                         const char* dirty,
+                         int embDim,
+                         int numTargets)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numTargets)
@@ -125,13 +125,13 @@ void Worker::scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int
 
     const int kBlockSize = 256;
     const int gridSize = (numTargets + kBlockSize - 1) / kBlockSize;
-    scoreKernel<<<gridSize, kBlockSize, 0, m_readStream.get()>>>(m_d_scores.data(),
-                                                                 d_reqEmb.data(),
-                                                                 m_data.data(),
-                                                                 m_d_scalars.data(),
-                                                                 d_rowIdx.data(),
-                                                                 m_d_dirty.data(),
-                                                                 m_embDim,
-                                                                 numTargets);
+    kn_score<<<gridSize, kBlockSize, 0, m_readStream.get()>>>(m_d_scores.data(),
+                                                              d_reqEmb.data(),
+                                                              m_data.data(),
+                                                              m_d_scalars.data(),
+                                                              d_rowIdx.data(),
+                                                              m_d_dirty.data(),
+                                                              m_embDim,
+                                                              numTargets);
     CHECK_CUDA(cudaStreamSynchronize(m_readStream.get()));
 }

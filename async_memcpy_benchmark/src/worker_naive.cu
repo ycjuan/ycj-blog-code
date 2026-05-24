@@ -10,7 +10,7 @@ struct ScalarElement
     float val;
 };
 
-__global__ void scatterScalarKernel(float* dst, const ScalarElement* elements, int numElements)
+__global__ void kn_scatterScalar(float* dst, const ScalarElement* elements, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -20,7 +20,7 @@ __global__ void scatterScalarKernel(float* dst, const ScalarElement* elements, i
     dst[elements[t].rowIdx] = elements[t].val;
 }
 
-__global__ void setDirtyKernel(char* dirty, const int* rowIdxs, int numElements)
+__global__ void kn_setDirty(char* dirty, const int* rowIdxs, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -30,7 +30,7 @@ __global__ void setDirtyKernel(char* dirty, const int* rowIdxs, int numElements)
     dirty[rowIdxs[t]] = 1;
 }
 
-__global__ void scatterKernel(T_EMB* dst, const CopyElement* elements, int embDim, int numElements)
+__global__ void kn_scatter(T_EMB* dst, const CopyElement* elements, int embDim, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -79,9 +79,9 @@ void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::
                                    m_writeStream.get()));
         const int kBlockSize = 256;
         const int gridSize = (v_scalarElement.size() + kBlockSize - 1) / kBlockSize;
-        scatterScalarKernel<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
-                                                                              d_scalarElement.data(),
-                                                                              v_scalarElement.size());
+        kn_scatterScalar<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
+                                                                           d_scalarElement.data(),
+                                                                           v_scalarElement.size());
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 }
@@ -112,10 +112,10 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector
                                    m_writeStream.get()));
         const int kBlockSize = 256;
         const int gridSize = (v_element.size() + kBlockSize - 1) / kBlockSize;
-        scatterKernel<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_data.data(),
-                                                                        d_elements.data(),
-                                                                        m_embDim,
-                                                                        v_element.size());
+        kn_scatter<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_data.data(),
+                                                                     d_elements.data(),
+                                                                     m_embDim,
+                                                                     v_element.size());
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 }
@@ -158,9 +158,9 @@ void WorkerNaive::deleteDocs(const std::vector<long>& v_docId)
                                    m_writeStream.get()));
         const int kBlockSize = 256;
         const int gridSize = (v_deletedRowIdx.size() + kBlockSize - 1) / kBlockSize;
-        setDirtyKernel<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
-                                                                         d_deletedRowIdx.data(),
-                                                                         v_deletedRowIdx.size());
+        kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
+                                                                      d_deletedRowIdx.data(),
+                                                                      v_deletedRowIdx.size());
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 }
