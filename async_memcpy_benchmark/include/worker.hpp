@@ -15,15 +15,15 @@ public:
 
     const T_EMB* data() const;
 
-    virtual void upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v_embData2D) = 0;
+    virtual void upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData) = 0;
     virtual void updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar) = 0;
     virtual void deleteDocs(const std::vector<long>& v_docId) = 0;
 
     // Caller is assumed to already know the rowIdxs to score, so no docId->rowIdx conversion is needed.
-    virtual void score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdxVec) = 0;
+    virtual void score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx) = 0;
 
 protected:
-    void scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdxVec);
+    void scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx);
     int m_maxNumDocs;
     int m_embDim;
     int m_headRowIdx;

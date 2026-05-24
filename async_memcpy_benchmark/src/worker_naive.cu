@@ -39,7 +39,7 @@ void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::
     }
 }
 
-void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v_embData2D)
+void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     std::vector<CopyElement> v_element;
@@ -69,7 +69,7 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector
         }
         for (int j = 0; j < m_embDim; j++)
         {
-            v_element.push_back({ rowIdx, v_embData2D[i][j] });
+            v_element.push_back({ rowIdx, v2_embData[i][j] });
         }
     }
 
@@ -113,8 +113,8 @@ void WorkerNaive::deleteDocs(const std::vector<long>& v_docId)
     }
 }
 
-void WorkerNaive::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdxVec)
+void WorkerNaive::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    scoreImpl(v_reqEmb, v_targetRowIdxVec);
+    scoreImpl(v_reqEmb, v_targetRowIdx);
 }

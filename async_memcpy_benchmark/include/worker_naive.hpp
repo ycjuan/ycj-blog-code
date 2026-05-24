@@ -9,10 +9,10 @@ class WorkerNaive : public Worker
 public:
     WorkerNaive(int maxNumDocs, int embDim);
 
-    void upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v_embData2D) override;
+    void upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData) override;
     void updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar) override;
     void deleteDocs(const std::vector<long>& v_docId) override;
-    void score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdxVec) override;
+    void score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx) override;
 
 private:
     std::mutex m_mutex;

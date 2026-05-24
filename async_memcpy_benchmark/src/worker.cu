@@ -48,9 +48,9 @@ __global__ void scoreKernel(float* scores,
     scores[t] = __bfloat162float(dot) * scalars[rowIdx];
 }
 
-void Worker::scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdxVec)
+void Worker::scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
 {
-    const int numTargets = v_targetRowIdxVec.size();
+    const int numTargets = v_targetRowIdx.size();
     if (numTargets == 0)
     {
         return;
@@ -65,7 +65,7 @@ void Worker::scoreImpl(const std::vector<T_EMB>& v_reqEmb, const std::vector<int
 
     CudaDeviceArray<int> d_rowIdx(numTargets, "rowIdx");
     CHECK_CUDA(cudaMemcpyAsync(d_rowIdx.data(),
-                               v_targetRowIdxVec.data(),
+                               v_targetRowIdx.data(),
                                numTargets * sizeof(int),
                                cudaMemcpyHostToDevice,
                                m_readStream.get()));
