@@ -4,6 +4,7 @@
 #include "utils/cuda_raii.hpp"
 
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 class Worker
@@ -16,6 +17,7 @@ public:
 
     virtual void upsertDoc(const std::vector<long>& docIds, const std::vector<std::vector<T_EMB>>& embData2D) = 0;
     virtual void updateScalarData(const std::vector<long>& docIds, const std::vector<float>& scalars) = 0;
+    virtual void deleteDoc(long docId) = 0;
 
     // Caller is assumed to already know the rowIdxs to score, so no docId->rowIdx conversion is needed.
     virtual void score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxVec) = 0;
@@ -31,6 +33,7 @@ protected:
     CudaDeviceArray<char> m_d_dirty;
     std::unordered_map<long, int> m_docId2rowIdx;
     std::vector<long> m_rowIdx2DocId;
+    std::unordered_set<int> m_emptyRowIdxSet;
     CudaStream m_readStream;
     CudaStream m_writeStream;
 };
