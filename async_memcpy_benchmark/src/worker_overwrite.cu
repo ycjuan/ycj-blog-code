@@ -70,6 +70,7 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
     // --- resolve docId -> rowIdx and build copy elements ---
     std::vector<CopyElement> v_element;
     {
+        // --- lock: protect docId<>rowIdx map ---
         std::lock_guard<std::mutex> lock(m_writeMutex);
         auto [v_rowIdx, v_elem] = resolveAndBuildCopyElements(v_docId, v2_embData);
         v_element = std::move(v_elem);
@@ -100,6 +101,7 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
 
     // --- set dirty=1 before scatter ---
     {
+        // --- lock: protect dirty bits from concurrent score reads ---
         std::lock_guard<std::mutex> lock(m_readMutex);
         kn_setDirty<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                            d_element.data(),
@@ -120,6 +122,7 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
 
     // --- clear dirty=0 after scatter ---
     {
+        // --- lock: protect dirty bits from concurrent score reads ---
         std::lock_guard<std::mutex> lock(m_readMutex);
         kn_setDirty<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                            d_element.data(),
@@ -135,6 +138,7 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId, const s
     // --- resolve docId -> rowIdx and build scalar elements ---
     std::vector<ScalarElement> v_scalarElement;
     {
+        // --- lock: protect docId<>rowIdx map ---
         std::lock_guard<std::mutex> lock(m_writeMutex);
         v_scalarElement.reserve(v_docId.size());
 
@@ -172,6 +176,7 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId, const s
 
     // --- set dirty=1 before scatter ---
     {
+        // --- lock: protect dirty bits from concurrent score reads ---
         std::lock_guard<std::mutex> lock(m_readMutex);
         kn_setDirty<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                            d_scalarElement.data(),
@@ -204,6 +209,7 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
     // --- update maps, collect deleted rowIdxs ---
     std::vector<int> v_deletedRowIdx;
     {
+        // --- lock: protect docId<>rowIdx map ---
         std::lock_guard<std::mutex> lock(m_writeMutex);
         v_deletedRowIdx = resolveDeletedRowIdxs(v_docId);
     }
@@ -225,6 +231,7 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
                                    cudaMemcpyHostToDevice,
                                    m_writeStream.get()));
         {
+            // --- lock: protect dirty bits from concurrent score reads ---
             std::lock_guard<std::mutex> lock(m_readMutex);
             kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                           d_deletedRowIdx.data(),
@@ -237,6 +244,7 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
 
 void WorkerOverwrite::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
 {
+    // --- lock: protect dirty bits from concurrent write ops ---
     std::lock_guard<std::mutex> lock(m_readMutex);
     scoreImpl(v_reqEmb, v_targetRowIdx);
 }

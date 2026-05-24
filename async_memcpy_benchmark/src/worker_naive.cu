@@ -47,6 +47,7 @@ WorkerNaive::WorkerNaive(int maxNumDocs, int embDim)
 
 void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
 {
+    // --- lock: serialize all GPU ops and map access ---
     std::lock_guard<std::mutex> lock(m_mutex);
 
     // --- resolve docId -> rowIdx and build scalar elements ---
@@ -88,6 +89,7 @@ void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::
 
 void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData)
 {
+    // --- lock: serialize all GPU ops and map access ---
     std::lock_guard<std::mutex> lock(m_mutex);
 
     // --- resolve docId -> rowIdx and build copy elements ---
@@ -122,6 +124,7 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector
 
 void WorkerNaive::deleteDocs(const std::vector<long>& v_docId)
 {
+    // --- lock: serialize all GPU ops and map access ---
     std::lock_guard<std::mutex> lock(m_mutex);
 
     // --- update maps, collect deleted rowIdxs ---
@@ -154,6 +157,7 @@ void WorkerNaive::deleteDocs(const std::vector<long>& v_docId)
 
 void WorkerNaive::score(const std::vector<T_EMB>& v_reqEmb, const std::vector<int>& v_targetRowIdx)
 {
+    // --- lock: serialize all GPU ops and map access ---
     std::lock_guard<std::mutex> lock(m_mutex);
     scoreImpl(v_reqEmb, v_targetRowIdx);
 }
