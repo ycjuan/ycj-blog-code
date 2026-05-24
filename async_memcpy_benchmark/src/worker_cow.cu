@@ -3,7 +3,7 @@
 
 #include <vector>
 
-__global__ void kn_scatter(T_EMB* d_dst, const EmbElement* d_elements, int embDim, int numElements)
+static __global__ void kn_scatter(T_EMB* d_dst, const EmbElement* d_elements, int embDim, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -13,7 +13,7 @@ __global__ void kn_scatter(T_EMB* d_dst, const EmbElement* d_elements, int embDi
     d_dst[d_elements[t].rowIdx * embDim + t % embDim] = d_elements[t].val;
 }
 
-__global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int numElements)
+static __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -23,7 +23,7 @@ __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int nu
     d_dst[d_elements[t].rowIdx] = d_elements[t].val;
 }
 
-__global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements, char val)
+static __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements, char val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -40,9 +40,10 @@ WorkerCopyOnWrite::WorkerCopyOnWrite(int maxNumDocs, int embDim)
 {
 }
 
-void WorkerCopyOnWrite::upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData)
+CopyOnWriteUpsertData WorkerCopyOnWrite::resolveAndScatterEmb(const std::vector<long>& v_docId,
+                                                              const std::vector<std::vector<T_EMB>>& v2_embData,
+                                                              CudaDeviceArray<int>& d_newRowIdx)
 {
-    // --- resolve: always allocate new rowIdx (copy-on-write) ---
     CopyOnWriteUpsertData upsertData;
     {
         // --- lock: protect docId<>rowIdx map ---
@@ -52,15 +53,11 @@ void WorkerCopyOnWrite::upsertDocs(const std::vector<long>& v_docId, const std::
 
     if (upsertData.v_embElement.empty())
     {
-        return;
+        return upsertData;
     }
 
     const int kBlockSize = 256;
-    const int numDocs = (int)v_docId.size();
-
-    // d_element and d_newRowIdx at function scope — outlive all kernel launches
     CudaDeviceArray<EmbElement> d_element(upsertData.v_embElement.size(), "EmbElements");
-    CudaDeviceArray<int> d_newRowIdx(numDocs, "newRowIdx");
 
     // --- H2D: emb data and new rowIdxs ---
     {
@@ -71,7 +68,7 @@ void WorkerCopyOnWrite::upsertDocs(const std::vector<long>& v_docId, const std::
                                    m_writeStream.get()));
         CHECK_CUDA(cudaMemcpyAsync(d_newRowIdx.data(),
                                    upsertData.v_newRowIdx.data(),
-                                   numDocs * sizeof(int),
+                                   upsertData.v_newRowIdx.size() * sizeof(int),
                                    cudaMemcpyHostToDevice,
                                    m_writeStream.get()));
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
@@ -87,40 +84,40 @@ void WorkerCopyOnWrite::upsertDocs(const std::vector<long>& v_docId, const std::
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 
-    // --- subclass hook: carry scalars to new rowIdxs before dirty-bit flip ---
-    carryScalarsOnUpsert(v_docId, upsertData.v_newRowIdx);
+    return upsertData;
+}
 
-    // --- flip dirty bits: hide old rowIdxs, reveal new rowIdxs ---
+void WorkerCopyOnWrite::commitDirtyBitFlip(const CopyOnWriteUpsertData& upsertData,
+                                           const CudaDeviceArray<int>& d_newRowIdx,
+                                           int numDocs)
+{
+    const int kBlockSize = 256;
+
+    // --- lock: protect dirty bits from concurrent score reads ---
+    std::lock_guard<std::mutex> lock(m_readMutex);
+
+    // set dirty=1 on old rowIdxs (hide stale data)
+    if (!upsertData.v_oldDirtyRowIdx.empty())
     {
-        // --- lock: protect dirty bits from concurrent score reads ---
-        std::lock_guard<std::mutex> lock(m_readMutex);
+        CudaDeviceArray<int> d_oldDirtyRowIdx(upsertData.v_oldDirtyRowIdx.size(), "oldDirtyRowIdx");
+        CHECK_CUDA(cudaMemcpyAsync(d_oldDirtyRowIdx.data(),
+                                   upsertData.v_oldDirtyRowIdx.data(),
+                                   upsertData.v_oldDirtyRowIdx.size() * sizeof(int),
+                                   cudaMemcpyHostToDevice,
+                                   m_writeStream.get()));
+        int gridSize = (upsertData.v_oldDirtyRowIdx.size() + kBlockSize - 1) / kBlockSize;
+        kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
+                                                                      d_oldDirtyRowIdx.data(),
+                                                                      upsertData.v_oldDirtyRowIdx.size(),
+                                                                      1);
+        CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
+    }
 
-        // set dirty=1 on old rowIdxs (hide stale data)
-        if (!upsertData.v_oldDirtyRowIdx.empty())
-        {
-            CudaDeviceArray<int> d_oldDirtyRowIdx(upsertData.v_oldDirtyRowIdx.size(), "oldDirtyRowIdx");
-            CHECK_CUDA(cudaMemcpyAsync(d_oldDirtyRowIdx.data(),
-                                       upsertData.v_oldDirtyRowIdx.data(),
-                                       upsertData.v_oldDirtyRowIdx.size() * sizeof(int),
-                                       cudaMemcpyHostToDevice,
-                                       m_writeStream.get()));
-            int gridSize = (upsertData.v_oldDirtyRowIdx.size() + kBlockSize - 1) / kBlockSize;
-            kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
-                                                                          d_oldDirtyRowIdx.data(),
-                                                                          upsertData.v_oldDirtyRowIdx.size(),
-                                                                          1);
-            CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
-        }
-
-        // set dirty=0 on new rowIdxs (make new data visible to scorers)
-        {
-            int gridSize = (numDocs + kBlockSize - 1) / kBlockSize;
-            kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
-                                                                          d_newRowIdx.data(),
-                                                                          numDocs,
-                                                                          0);
-            CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
-        }
+    // set dirty=0 on new rowIdxs (make new data visible to scorers)
+    {
+        int gridSize = (numDocs + kBlockSize - 1) / kBlockSize;
+        kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(), d_newRowIdx.data(), numDocs, 0);
+        CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 }
 
@@ -174,7 +171,8 @@ WorkerCopyOnWriteEager::WorkerCopyOnWriteEager(int maxNumDocs, int embDim)
 {
 }
 
-void WorkerCopyOnWriteEager::carryScalarsOnUpsert(const std::vector<long>& v_docId, const std::vector<int>& v_newRowIdx)
+void WorkerCopyOnWriteEager::carryScalarsToNewRowIdx(const std::vector<long>& v_docId,
+                                                     const std::vector<int>& v_newRowIdx)
 {
     std::vector<ScalarElement> v_scalarElement;
     for (int i = 0; i < (int)v_docId.size(); i++)
@@ -204,6 +202,23 @@ void WorkerCopyOnWriteEager::carryScalarsOnUpsert(const std::vector<long>& v_doc
                                                                  d_scalarElement.data(),
                                                                  v_scalarElement.size());
     CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
+}
+
+void WorkerCopyOnWriteEager::upsertDocs(const std::vector<long>& v_docId,
+                                        const std::vector<std::vector<T_EMB>>& v2_embData)
+{
+    const int numDocs = (int)v_docId.size();
+    CudaDeviceArray<int> d_newRowIdx(numDocs, "newRowIdx");
+
+    CopyOnWriteUpsertData upsertData = resolveAndScatterEmb(v_docId, v2_embData, d_newRowIdx);
+    if (upsertData.v_embElement.empty())
+    {
+        return;
+    }
+
+    carryScalarsToNewRowIdx(v_docId, upsertData.v_newRowIdx);
+
+    commitDirtyBitFlip(upsertData, d_newRowIdx, numDocs);
 }
 
 void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
@@ -258,6 +273,21 @@ void WorkerCopyOnWriteEager::score(const std::vector<T_EMB>& v_reqEmb, const std
 WorkerCopyOnWriteLazy::WorkerCopyOnWriteLazy(int maxNumDocs, int embDim)
     : WorkerCopyOnWrite(maxNumDocs, embDim)
 {
+}
+
+void WorkerCopyOnWriteLazy::upsertDocs(const std::vector<long>& v_docId,
+                                       const std::vector<std::vector<T_EMB>>& v2_embData)
+{
+    const int numDocs = (int)v_docId.size();
+    CudaDeviceArray<int> d_newRowIdx(numDocs, "newRowIdx");
+
+    CopyOnWriteUpsertData upsertData = resolveAndScatterEmb(v_docId, v2_embData, d_newRowIdx);
+    if (upsertData.v_embElement.empty())
+    {
+        return;
+    }
+
+    commitDirtyBitFlip(upsertData, d_newRowIdx, numDocs);
 }
 
 void WorkerCopyOnWriteLazy::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)

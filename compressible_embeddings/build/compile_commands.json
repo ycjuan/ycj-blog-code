@@ -1,0 +1,52 @@
+[
+{
+  "directory": "/home/ec2-user/compressible_embeddings/build",
+  "command": "/usr/local/cuda/bin/nvcc -forward-unknown-to-host-compiler -Dcompressible_embeddings_EXPORTS -I/home/ec2-user/compressible_embeddings/include  --generate-code=arch=compute_75,code=[compute_75,sm_75] --generate-code=arch=compute_80,code=[compute_80,sm_80] --generate-code=arch=compute_90,code=[compute_90,sm_90] -Xcompiler=-fPIC -O3 -Wno-deprecated-gpu-targets -Xcompiler -fopenmp -std=c++17 -x cu -c /home/ec2-user/compressible_embeddings/src/compressible/compressible_partition_config.cu -o CMakeFiles/compressible_embeddings.dir/src/compressible/compressible_partition_config.cu.o",
+  "file": "/home/ec2-user/compressible_embeddings/src/compressible/compressible_partition_config.cu"
+},
+{
+  "directory": "/home/ec2-user/compressible_embeddings/build",
+  "command": "/usr/local/cuda/bin/nvcc -forward-unknown-to-host-compiler -Dcompressible_embeddings_EXPORTS -I/home/ec2-user/compressible_embeddings/include  --generate-code=arch=compute_75,code=[compute_75,sm_75] --generate-code=arch=compute_80,code=[compute_80,sm_80] --generate-code=arch=compute_90,code=[compute_90,sm_90] -Xcompiler=-fPIC -O3 -Wno-deprecated-gpu-targets -Xcompiler -fopenmp -std=c++17 -x cu -c /home/ec2-user/compressible_embeddings/src/compressible/res_quant/res_quant_dataset.cu -o CMakeFiles/compressible_embeddings.dir/src/compressible/res_quant/res_quant_dataset.cu.o",
+  "file": "/home/ec2-user/compressible_embeddings/src/compressible/res_quant/res_quant_dataset.cu"
+},
+{
+  "directory": "/home/ec2-user/compressible_embeddings/build",
+  "command": "/usr/local/cuda/bin/nvcc -forward-unknown-to-host-compiler -Dcompressible_embeddings_EXPORTS -I/home/ec2-user/compressible_embeddings/include  --generate-code=arch=compute_75,code=[compute_75,sm_75] --generate-code=arch=compute_80,code=[compute_80,sm_80] --generate-code=arch=compute_90,code=[compute_90,sm_90] -Xcompiler=-fPIC -O3 -Wno-deprecated-gpu-targets -Xcompiler -fopenmp -std=c++17 -x cu -c /home/ec2-user/compressible_embeddings/src/compressible/res_quant/res_quant_dataset_densify.cu -o CMakeFiles/compressible_embeddings.dir/src/compressible/res_quant/res_quant_dataset_densify.cu.o",
+  "file": "/home/ec2-user/compressible_embeddings/src/compressible/res_quant/res_quant_dataset_densify.cu"
+},
+{
+  "directory": "/home/ec2-user/compressible_embeddings/build",
+  "command": "/usr/local/cuda/bin/nvcc -forward-unknown-to-host-compiler -Dcompressible_embeddings_EXPORTS -I/home/ec2-user/compressible_embeddings/include  --generate-code=arch=compute_75,code=[compute_75,sm_75] --generate-code=arch=compute_80,code=[compute_80,sm_80] --generate-code=arch=compute_90,code=[compute_90,sm_90] -Xcompiler=-fPIC -O3 -Wno-deprecated-gpu-targets -Xcompiler -fopenmp -std=c++17 -x cu -c /home/ec2-user/compressible_embeddings/src/manager/emb_dataset_manager.cu -o CMakeFiles/compressible_embeddings.dir/src/manager/emb_dataset_manager.cu.o",
+  "file": "/home/ec2-user/compressible_embeddings/src/manager/emb_dataset_manager.cu"
+},
+{
+  "directory": "/home/ec2-user/compressible_embeddings/build",
+  "command": "/usr/local/cuda/bin/nvcc -forward-unknown-to-host-compiler -Dcompressible_embeddings_EXPORTS -I/home/ec2-user/compressible_embeddings/include  --generate-code=arch=compute_75,code=[compute_75,sm_75] --generate-code=arch=compute_80,code=[compute_80,sm_80] --generate-code=arch=compute_90,code=[compute_90,sm_90] -Xcompiler=-fPIC -O3 -Wno-deprecated-gpu-targets -Xcompiler -fopenmp -std=c++17 -x cu -c /home/ec2-user/compressible_embeddings/src/manager/emb_dataset_manager_cache.cu -o CMakeFiles/compressible_embeddings.dir/src/manager/emb_dataset_manager_cache.cu.o",
+  "file": "/home/ec2-user/compressible_embeddings/src/manager/emb_dataset_manager_cache.cu"
+},
+{
+  "directory": "/home/ec2-user/compressible_embeddings/build",
+  "command": "/usr/local/cuda/bin/nvcc -forward-unknown-to-host-compiler -Dcompressible_embeddings_EXPORTS -I/home/ec2-user/compressible_embeddings/include  --generate-code=arch=compute_75,code=[compute_75,sm_75] --generate-code=arch=compute_80,code=[compute_80,sm_80] --generate-code=arch=compute_90,code=[compute_90,sm_90] -Xcompiler=-fPIC -O3 -Wno-deprecated-gpu-targets -Xcompiler -fopenmp -std=c++17 -x cu -c /home/ec2-user/compressible_embeddings/src/resident/resident_emb_dataset.cu -o CMakeFiles/compressible_embeddings.dir/src/resident/resident_emb_dataset.cu.o",
+  "file": "/home/ec2-user/compressible_embeddings/src/resident/resident_emb_dataset.cu"
+},
+{
+  "directory": "/home/ec2-user/compressible_embeddings/build",
+  "command": "/usr/local/cuda/bin/nvcc -forward-unknown-to-host-compiler -Dcompressible_embeddings_EXPORTS -I/home/ec2-user/compressible_embeddings/include  --generate-code=arch=compute_75,code=[compute_75,sm_75] --generate-code=arch=compute_80,code=[compute_80,sm_80] --generate-code=arch=compute_90,code=[compute_90,sm_90] -Xcompiler=-fPIC -O3 -Wno-deprecated-gpu-targets -Xcompiler -fopenmp -std=c++17 -x cu -c /home/ec2-user/compressible_embeddings/src/resident/resident_emb_dataset_densify.cu -o CMakeFiles/compressible_embeddings.dir/src/resident/resident_emb_dataset_densify.cu.o",
+  "file": "/home/ec2-user/compressible_embeddings/src/resident/resident_emb_dataset_densify.cu"
+},
+{
+  "directory": "/home/ec2-user/compressible_embeddings/build",
+  "command": "/usr/local/cuda/bin/nvcc -forward-unknown-to-host-compiler -Dcompressible_embeddings_EXPORTS -I/home/ec2-user/compressible_embeddings/include  --generate-code=arch=compute_75,code=[compute_75,sm_75] --generate-code=arch=compute_80,code=[compute_80,sm_80] --generate-code=arch=compute_90,code=[compute_90,sm_90] -Xcompiler=-fPIC -O3 -Wno-deprecated-gpu-targets -Xcompiler -fopenmp -std=c++17 -x cu -c /home/ec2-user/compressible_embeddings/src/resident/resident_partition_config.cu -o CMakeFiles/compressible_embeddings.dir/src/resident/resident_partition_config.cu.o",
+  "file": "/home/ec2-user/compressible_embeddings/src/resident/resident_partition_config.cu"
+},
+{
+  "directory": "/home/ec2-user/compressible_embeddings/build",
+  "command": "/usr/local/cuda/bin/nvcc -forward-unknown-to-host-compiler -Dcompressible_embeddings_EXPORTS -I/home/ec2-user/compressible_embeddings/include  --generate-code=arch=compute_75,code=[compute_75,sm_75] --generate-code=arch=compute_80,code=[compute_80,sm_80] --generate-code=arch=compute_90,code=[compute_90,sm_90] -Xcompiler=-fPIC -O3 -Wno-deprecated-gpu-targets -Xcompiler -fopenmp -std=c++17 -x cu -c /home/ec2-user/compressible_embeddings/src/working/working_emb_dataset.cu -o CMakeFiles/compressible_embeddings.dir/src/working/working_emb_dataset.cu.o",
+  "file": "/home/ec2-user/compressible_embeddings/src/working/working_emb_dataset.cu"
+},
+{
+  "directory": "/home/ec2-user/compressible_embeddings/build",
+  "command": "/usr/local/cuda/bin/nvcc -forward-unknown-to-host-compiler  -I/home/ec2-user/compressible_embeddings/include  --generate-code=arch=compute_75,code=[compute_75,sm_75] --generate-code=arch=compute_80,code=[compute_80,sm_80] --generate-code=arch=compute_90,code=[compute_90,sm_90] -Wno-deprecated-gpu-targets -Xcompiler -fopenmp -std=c++17 -x cu -c /home/ec2-user/compressible_embeddings/test/test_compressible_embeddings.cu -o CMakeFiles/test_compressible_embeddings.dir/test/test_compressible_embeddings.cu.o",
+  "file": "/home/ec2-user/compressible_embeddings/test/test_compressible_embeddings.cu"
+}
+]

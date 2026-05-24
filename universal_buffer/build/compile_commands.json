@@ -1,0 +1,12 @@
+[
+{
+  "directory": "/home/ec2-user/git/ycj-blog-code/universal_buffer/build",
+  "command": "/usr/local/cuda/bin/nvcc -forward-unknown-to-host-compiler  -I/home/ec2-user/git/ycj-blog-code/universal_buffer/src  --generate-code=arch=compute_52,code=[compute_52,sm_52] -std=c++17 -x cu -c /home/ec2-user/git/ycj-blog-code/universal_buffer/test/test_cuda_malloc_raii.cu -o CMakeFiles/test_cuda_malloc_raii.dir/test/test_cuda_malloc_raii.cu.o",
+  "file": "/home/ec2-user/git/ycj-blog-code/universal_buffer/test/test_cuda_malloc_raii.cu"
+},
+{
+  "directory": "/home/ec2-user/git/ycj-blog-code/universal_buffer/build",
+  "command": "/usr/local/cuda/bin/nvcc -forward-unknown-to-host-compiler  -I/home/ec2-user/git/ycj-blog-code/universal_buffer/src  --generate-code=arch=compute_52,code=[compute_52,sm_52] -std=c++17 -x cu -c /home/ec2-user/git/ycj-blog-code/universal_buffer/test/test_universal_buffer.cu -o CMakeFiles/test_universal_buffer.dir/test/test_universal_buffer.cu.o",
+  "file": "/home/ec2-user/git/ycj-blog-code/universal_buffer/test/test_universal_buffer.cu"
+}
+]

@@ -147,7 +147,7 @@ CopyOnWriteUpsertData Worker::resolveAndBuildEmbElementsCopyOnWrite(const std::v
     return result;
 }
 
-__global__ void kn_score(float* d_scores,
+static __global__ void kn_score(float* d_scores,
                          const T_EMB* d_reqEmb,
                          const T_EMB* d_docData,
                          const float* d_scalars,

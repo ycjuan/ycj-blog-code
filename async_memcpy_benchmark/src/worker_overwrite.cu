@@ -4,7 +4,7 @@
 #include <tuple>
 #include <vector>
 
-__global__ void kn_scatter(T_EMB* d_dst, const EmbElement* d_elements, int embDim, int numElements)
+static __global__ void kn_scatter(T_EMB* d_dst, const EmbElement* d_elements, int embDim, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -14,7 +14,7 @@ __global__ void kn_scatter(T_EMB* d_dst, const EmbElement* d_elements, int embDi
     d_dst[d_elements[t].rowIdx * embDim + t % embDim] = d_elements[t].val;
 }
 
-__global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int numElements)
+static __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -24,7 +24,7 @@ __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int nu
     d_dst[d_elements[t].rowIdx] = d_elements[t].val;
 }
 
-__global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements, char val)
+static __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements, char val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -34,7 +34,7 @@ __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements,
     d_dirty[d_rowIdx[t]] = val;
 }
 
-__global__ void kn_setDirty(char* d_dirty, const EmbElement* d_elements, int embDim, int numDocs, char val)
+static __global__ void kn_setDirty(char* d_dirty, const EmbElement* d_elements, int embDim, int numDocs, char val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numDocs)
@@ -44,7 +44,7 @@ __global__ void kn_setDirty(char* d_dirty, const EmbElement* d_elements, int emb
     d_dirty[d_elements[t * embDim].rowIdx] = val;
 }
 
-__global__ void kn_setDirty(char* d_dirty, const ScalarElement* d_elements, int numDocs, char val)
+static __global__ void kn_setDirty(char* d_dirty, const ScalarElement* d_elements, int numDocs, char val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numDocs)
