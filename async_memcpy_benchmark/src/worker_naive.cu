@@ -10,7 +10,7 @@ struct ScalarElement
     float val;
 };
 
-__global__ void kn_scatterScalar(float* dst, const ScalarElement* elements, int numElements)
+__global__ void kn_scatter(float* dst, const ScalarElement* elements, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -79,9 +79,9 @@ void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::
                                    m_writeStream.get()));
         const int kBlockSize = 256;
         const int gridSize = (v_scalarElement.size() + kBlockSize - 1) / kBlockSize;
-        kn_scatterScalar<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
-                                                                           d_scalarElement.data(),
-                                                                           v_scalarElement.size());
+        kn_scatter<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
+                                                                     d_scalarElement.data(),
+                                                                     v_scalarElement.size());
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 }

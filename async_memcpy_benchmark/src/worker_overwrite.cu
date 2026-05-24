@@ -20,7 +20,7 @@ __global__ void kn_scatter(T_EMB* dst, const CopyElement* elements, int embDim, 
     dst[elements[t].rowIdx * embDim + t % embDim] = elements[t].val;
 }
 
-__global__ void kn_scatterScalar(float* dst, const ScalarElement* elements, int numElements)
+__global__ void kn_scatter(float* dst, const ScalarElement* elements, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -182,9 +182,9 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId, const s
 
     // --- scatter scalar data ---
     {
-        kn_scatterScalar<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
-                                                                                d_scalarElement.data(),
-                                                                                numDocs);
+        kn_scatter<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
+                                                                          d_scalarElement.data(),
+                                                                          numDocs);
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 
