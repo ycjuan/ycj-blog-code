@@ -24,30 +24,30 @@ WorkerNaive::WorkerNaive(int maxNumDocs, int embDim)
 {
 }
 
-void WorkerNaive::updateScalarData(const std::vector<long>& v_docIds, const std::vector<float>& v_scalars)
+void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::vector<float>& v_scalar)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    for (int i = 0; i < (int)v_docIds.size(); i++)
+    for (int i = 0; i < (int)v_docId.size(); i++)
     {
-        auto it = m_docId2rowIdx.find(v_docIds[i]);
+        auto it = m_docId2rowIdx.find(v_docId[i]);
         if (it == m_docId2rowIdx.end())
         {
             continue;
         }
         int rowIdx = it->second;
-        CHECK_CUDA(cudaMemcpy(m_d_scalars.data() + rowIdx, &v_scalars[i], sizeof(float), cudaMemcpyHostToDevice));
+        CHECK_CUDA(cudaMemcpy(m_d_scalars.data() + rowIdx, &v_scalar[i], sizeof(float), cudaMemcpyHostToDevice));
     }
 }
 
-void WorkerNaive::upsertDocs(const std::vector<long>& v_docIds, const std::vector<std::vector<T_EMB>>& v_embData2D)
+void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v_embData2D)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    std::vector<CopyElement> v_elements;
-    v_elements.reserve(v_docIds.size() * m_embDim);
+    std::vector<CopyElement> v_element;
+    v_element.reserve(v_docId.size() * m_embDim);
 
-    for (int i = 0; i < (int)v_docIds.size(); i++)
+    for (int i = 0; i < (int)v_docId.size(); i++)
     {
-        auto it = m_docId2rowIdx.find(v_docIds[i]);
+        auto it = m_docId2rowIdx.find(v_docId[i]);
         int rowIdx;
         if (it == m_docId2rowIdx.end())
         {
@@ -60,8 +60,8 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docIds, const std::vecto
             {
                 rowIdx = m_headRowIdx++;
             }
-            m_docId2rowIdx[v_docIds[i]] = rowIdx;
-            m_rowIdx2DocId[rowIdx] = v_docIds[i];
+            m_docId2rowIdx[v_docId[i]] = rowIdx;
+            m_rowIdx2DocId[rowIdx] = v_docId[i];
         }
         else
         {
@@ -69,35 +69,35 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docIds, const std::vecto
         }
         for (int j = 0; j < m_embDim; j++)
         {
-            v_elements.push_back({ rowIdx, v_embData2D[i][j] });
+            v_element.push_back({ rowIdx, v_embData2D[i][j] });
         }
     }
 
-    if (v_elements.empty())
+    if (v_element.empty())
     {
         return;
     }
 
-    CudaDeviceArray<CopyElement> d_elements(v_elements.size(), "CopyElements");
+    CudaDeviceArray<CopyElement> d_elements(v_element.size(), "CopyElements");
     CHECK_CUDA(cudaMemcpyAsync(d_elements.data(),
-                               v_elements.data(),
-                               v_elements.size() * sizeof(CopyElement),
+                               v_element.data(),
+                               v_element.size() * sizeof(CopyElement),
                                cudaMemcpyHostToDevice,
                                m_writeStream.get()));
 
     const int kBlockSize = 256;
-    const int gridSize = (v_elements.size() + kBlockSize - 1) / kBlockSize;
+    const int gridSize = (v_element.size() + kBlockSize - 1) / kBlockSize;
     scatterKernel<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_data.data(),
                                                                     d_elements.data(),
                                                                     m_embDim,
-                                                                    v_elements.size());
+                                                                    v_element.size());
     CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
 }
 
-void WorkerNaive::deleteDocs(const std::vector<long>& v_docIds)
+void WorkerNaive::deleteDocs(const std::vector<long>& v_docId)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    for (long docId : v_docIds)
+    for (long docId : v_docId)
     {
         auto it = m_docId2rowIdx.find(docId);
         if (it == m_docId2rowIdx.end())
