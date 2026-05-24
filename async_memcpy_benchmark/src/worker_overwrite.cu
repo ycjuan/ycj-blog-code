@@ -4,12 +4,6 @@
 #include <tuple>
 #include <vector>
 
-struct ScalarElement
-{
-    int rowIdx;
-    float val;
-};
-
 __global__ void kn_scatter(T_EMB* d_dst, const CopyElement* d_elements, int embDim, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
@@ -139,17 +133,7 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId, const s
     {
         // --- lock: protect docId<>rowIdx map ---
         std::lock_guard<std::mutex> lock(m_writeMutex);
-        v_scalarElement.reserve(v_docId.size());
-
-        for (int i = 0; i < (int)v_docId.size(); i++)
-        {
-            auto it = m_docId2rowIdx.find(v_docId[i]);
-            if (it == m_docId2rowIdx.end())
-            {
-                continue;
-            }
-            v_scalarElement.push_back({ it->second, v_scalar[i] });
-        }
+        v_scalarElement = resolveScalarElements(v_docId, v_scalar);
     }
 
     if (v_scalarElement.empty())

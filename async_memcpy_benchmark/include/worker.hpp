@@ -14,6 +14,12 @@ struct CopyElement
     T_EMB val;
 };
 
+struct ScalarElement
+{
+    int rowIdx;
+    float val;
+};
+
 class Worker
 {
 public:
@@ -40,6 +46,11 @@ protected:
     // Removes docIds from maps and returns the freed rowIdxs.
     // Must be called under the write mutex.
     std::vector<int> resolveDeletedRowIdxs(const std::vector<long>& v_docId);
+
+    // Resolves docIds to rowIdxs and builds a list of ScalarElements.
+    // Must be called under the write mutex.
+    std::vector<ScalarElement> resolveScalarElements(const std::vector<long>& v_docId,
+                                                     const std::vector<float>& v_scalar);
 
     // meta data
     int m_maxNumDocs;

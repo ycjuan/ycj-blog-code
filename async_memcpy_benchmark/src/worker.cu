@@ -83,6 +83,25 @@ std::vector<int> Worker::resolveDeletedRowIdxs(const std::vector<long>& v_docId)
     return v_deletedRowIdx;
 }
 
+std::vector<ScalarElement> Worker::resolveScalarElements(const std::vector<long>& v_docId,
+                                                         const std::vector<float>& v_scalar)
+{
+    std::vector<ScalarElement> v_scalarElement;
+    v_scalarElement.reserve(v_docId.size());
+
+    for (int i = 0; i < (int)v_docId.size(); i++)
+    {
+        auto it = m_docId2rowIdx.find(v_docId[i]);
+        if (it == m_docId2rowIdx.end())
+        {
+            continue;
+        }
+        v_scalarElement.push_back({ it->second, v_scalar[i] });
+    }
+
+    return v_scalarElement;
+}
+
 __global__ void kn_score(float* d_scores,
                          const T_EMB* d_reqEmb,
                          const T_EMB* d_docData,

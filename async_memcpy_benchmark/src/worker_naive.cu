@@ -4,12 +4,6 @@
 #include <tuple>
 #include <vector>
 
-struct ScalarElement
-{
-    int rowIdx;
-    float val;
-};
-
 __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
@@ -53,16 +47,7 @@ void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::
     // --- resolve docId -> rowIdx and build scalar elements ---
     std::vector<ScalarElement> v_scalarElement;
     {
-        v_scalarElement.reserve(v_docId.size());
-        for (int i = 0; i < (int)v_docId.size(); i++)
-        {
-            auto it = m_docId2rowIdx.find(v_docId[i]);
-            if (it == m_docId2rowIdx.end())
-            {
-                continue;
-            }
-            v_scalarElement.push_back({ it->second, v_scalar[i] });
-        }
+        v_scalarElement = resolveScalarElements(v_docId, v_scalar);
     }
 
     if (v_scalarElement.empty())
