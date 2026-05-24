@@ -80,8 +80,8 @@ void WorkerNaive::updateEmbData(const std::vector<long>& v_docIds, const std::ve
     CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
 }
 
-void WorkerNaive::score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxs)
+void WorkerNaive::score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxVec)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    scoreImpl(reqEmb, targetRowIdxs);
+    scoreImpl(reqEmb, targetRowIdxVec);
 }
