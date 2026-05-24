@@ -31,12 +31,12 @@ __global__ void scoreKernel(float* scores,
     }
     int rowIdx = rowIdxs[t];
     const T_EMB* doc = docData + rowIdx * embDim;
-    float dot = 0.0f;
+    T_EMB dot = __float2bfloat16(0.0f);
     for (int i = 0; i < embDim; i++)
     {
-        dot += __bfloat162float(reqEmb[i]) * __bfloat162float(doc[i]);
+        dot = __hadd(dot, __hmul(reqEmb[i], doc[i]));
     }
-    scores[t] = dot * scalars[rowIdx];
+    scores[t] = __bfloat162float(dot) * scalars[rowIdx];
 }
 
 void Worker::score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& targetRowIdxs) const
@@ -48,10 +48,18 @@ void Worker::score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& tar
     }
 
     CudaDeviceArray<T_EMB> d_reqEmb(m_embDim, "reqEmb");
-    CHECK_CUDA(cudaMemcpy(d_reqEmb.data(), reqEmb.data(), m_embDim * sizeof(T_EMB), cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMemcpyAsync(d_reqEmb.data(),
+                               reqEmb.data(),
+                               m_embDim * sizeof(T_EMB),
+                               cudaMemcpyHostToDevice,
+                               m_readStream.get()));
 
-    CudaDeviceArray<int> d_rowIdxs(numTargets, "rowIdxs");
-    CHECK_CUDA(cudaMemcpy(d_rowIdxs.data(), targetRowIdxs.data(), numTargets * sizeof(int), cudaMemcpyHostToDevice));
+    CudaDeviceArray<int> d_rowIdx(numTargets, "rowIdx");
+    CHECK_CUDA(cudaMemcpyAsync(d_rowIdx.data(),
+                               targetRowIdxs.data(),
+                               numTargets * sizeof(int),
+                               cudaMemcpyHostToDevice,
+                               m_readStream.get()));
 
     if (m_d_scores.getArraySize() < (uint64_t)numTargets)
     {
@@ -60,11 +68,12 @@ void Worker::score(const std::vector<T_EMB>& reqEmb, const std::vector<int>& tar
 
     const int kBlockSize = 256;
     const int gridSize = (numTargets + kBlockSize - 1) / kBlockSize;
-    scoreKernel<<<gridSize, kBlockSize>>>(m_d_scores.data(),
-                                          d_reqEmb.data(),
-                                          m_data.data(),
-                                          m_d_scalars.data(),
-                                          d_rowIdxs.data(),
-                                          m_embDim,
-                                          numTargets);
+    scoreKernel<<<gridSize, kBlockSize, 0, m_readStream.get()>>>(m_d_scores.data(),
+                                                                 d_reqEmb.data(),
+                                                                 m_data.data(),
+                                                                 m_d_scalars.data(),
+                                                                 d_rowIdx.data(),
+                                                                 m_embDim,
+                                                                 numTargets);
+    CHECK_CUDA(cudaStreamSynchronize(m_readStream.get()));
 }
