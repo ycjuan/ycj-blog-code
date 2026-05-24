@@ -1,4 +1,0 @@
-/home/ec2-user/compressible_embeddings/build/CMakeFiles/compressible_embeddings.dir
-/home/ec2-user/compressible_embeddings/build/CMakeFiles/test_compressible_embeddings.dir
-/home/ec2-user/compressible_embeddings/build/CMakeFiles/edit_cache.dir
-/home/ec2-user/compressible_embeddings/build/CMakeFiles/rebuild_cache.dir
