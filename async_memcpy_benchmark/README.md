@@ -70,6 +70,56 @@ The index is pre-loaded with 1M documents (out of a 2M capacity) before benchmar
 
 Reported metrics: mean / p50 / p99 latency per operation, and observed throughput (calls/sec for score, docs/sec for upsert/delete/updateScalar).
 
+## Sample Results
+
+Config: 2M max docs, 1M bootstrapped docs, embDim=512, numScalars=32, updateBatchSize=1000, durationSec=3.
+Score: 3000 calls/sec (10k rows each). Upsert: 70k docs/sec. UpdateScalar: 30k docs/sec.
+
+```
+=== WorkerNaive ===
+  headRowIdx: 1000000 -> 1000500
+  score             calls=6574    docs=6574        mean=0.456ms  p50=0.287ms  p99=4.947ms
+  upsert            calls=211     docs=211000      mean=13.255ms  p50=13.048ms  p99=15.973ms
+  delete            calls=211     docs=105500      mean=0.076ms  p50=0.074ms  p99=0.108ms
+  updateScalar      calls=91      docs=91000       mean=2.442ms  p50=1.573ms  p99=6.765ms
+  observed QPS (calls):  score=2191.3
+  observed doc QPS:  upsert=70333  delete=35167  updateScalar=30333
+
+=== WorkerOverwrite ===
+  headRowIdx: 1000000 -> 1000500
+  score             calls=8999    docs=8999        mean=0.321ms  p50=0.287ms  p99=1.252ms
+  upsert            calls=211     docs=211000      mean=13.404ms  p50=13.266ms  p99=15.715ms
+  delete            calls=211     docs=105500      mean=0.290ms  p50=0.264ms  p99=0.469ms
+  updateScalar      calls=91      docs=91000       mean=2.492ms  p50=1.754ms  p99=5.566ms
+  observed QPS (calls):  score=2999.7
+  observed doc QPS:  upsert=70333  delete=35167  updateScalar=30333
+
+=== WorkerCopyOnWriteEager ===
+  headRowIdx: 1000000 -> 1000500
+  score             calls=8875    docs=8875        mean=0.337ms  p50=0.288ms  p99=1.400ms
+  upsert            calls=199     docs=199000      mean=15.142ms  p50=14.615ms  p99=19.711ms
+  delete            calls=199     docs=99500       mean=0.301ms  p50=0.269ms  p99=1.168ms
+  updateScalar      calls=91      docs=91000       mean=2.496ms  p50=2.035ms  p99=6.511ms
+  observed QPS (calls):  score=2958.3
+  observed doc QPS:  upsert=66333  delete=33167  updateScalar=30333
+
+=== WorkerCopyOnWriteLazy ===
+  headRowIdx: 1000000 -> 1000500
+  score             calls=377     docs=377         mean=7.975ms  p50=7.867ms  p99=9.407ms
+  upsert            calls=125     docs=125000      mean=24.056ms  p50=23.682ms  p99=31.751ms
+  delete            calls=125     docs=62500       mean=8.040ms  p50=7.815ms  p99=15.438ms
+  updateScalar      calls=91      docs=91000       mean=1.042ms  p50=0.779ms  p99=4.620ms
+  observed QPS (calls):  score=125.7
+  observed doc QPS:  upsert=41667  delete=20833  updateScalar=30333
+```
+
+**Key observations:**
+
+- **WorkerNaive** hits a score bottleneck: the global mutex means upserts (13ms each) block score threads, limiting score to 2191 calls/sec vs the 3000 target.
+- **WorkerOverwrite** reaches full score throughput (3000/sec) by using two separate mutexes — score and upsert can now overlap. Upsert latency is similar to Naive since it still writes in-place with dirty-bit fencing.
+- **WorkerCopyOnWriteEager** also reaches near-full score throughput (2958/sec). Upsert is slightly slower than Overwrite (~15ms vs ~13ms) because it must carry scalars to the new rowIdx before flipping the dirty bit.
+- **WorkerCopyOnWriteLazy** suffers severely: `score` now syncs CPU scalars to GPU for all 10k target rows on every call, driving score latency to ~8ms and throughput to only 126 calls/sec — 24x slower than Overwrite/COWEager. Upsert is also slower because it must wait while score holds the read mutex during the scalar sync. `updateScalarData` is the fastest of all workers for that operation since it only touches CPU memory.
+
 ## Build
 
 ```bash
