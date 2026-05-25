@@ -19,16 +19,16 @@
 
 struct BenchConfig
 {
-    int maxNumDocs = 100000;
-    int numRealDocs = 50000;
-    int embDim = 128;
-    int numScalars = 4;
-    int numToScore = 1000;
-    int updateBatchSize = 64;
+    int maxNumDocs = 2000000;
+    int numRealDocs = 1000000;
+    int embDim = 512;
+    int numScalars = 32;
+    int numToScore = 10000;
+    int updateBatchSize = 1024;
 
-    double scoreQps = 100.0;
-    double upsertQps = 10.0; // each call = updateBatchSize docs
-    double updateScalarQps = 20.0;
+    double scoreQps = 4000.0;
+    double upsertQps = 10000.0; // each call = updateBatchSize docs
+    double updateScalarQps = 30000.0;
 
     double durationSec = 10.0;
 };
