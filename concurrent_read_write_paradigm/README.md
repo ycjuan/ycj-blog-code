@@ -8,12 +8,23 @@ A GPU vector index stores embedding vectors in device memory. Concurrent writes 
 
 ## The Data Model
 
+### docId and rowIdx
+
+Every document has two identifiers that serve different purposes:
+
+- **`docId`** (`long`) — the stable, caller-facing identity of a document. Assigned by the caller and never changes for the lifetime of the document. Used to upsert, delete, or update a specific document by name.
+- **`rowIdx`** (`int`) — the physical slot in the GPU arrays where the document's data currently lives. Assigned internally by the index and can change (in copy-on-write strategies, a re-upsert moves a document to a fresh `rowIdx`). The caller never sees `rowIdx` directly.
+
+The index maintains a CPU-side hash map `docId → rowIdx` to translate between the two. Freed `rowIdx` slots are recycled via a free-list so GPU memory stays compact.
+
+Scoring operates entirely in terms of `rowIdx`: the caller resolves which documents to score (and their current `rowIdx` values) before calling `score`, which then reads embeddings and scalars directly from the GPU arrays by index.
+
+### GPU Arrays
+
 All GPU arrays use **row-major** layout. Each document has:
 - An embedding vector (`bfloat16`, dimension 512) stored in a flat GPU array `m_data[rowIdx * embDim ... (rowIdx+1)*embDim]`
 - A list of scalar values (`float32`, 32 per doc) stored in `m_d_scalars[rowIdx * numScalars + scalarIdx]`
 - A dirty bit `m_d_dirty[rowIdx]` (`DirtyBit::CLEAN` or `DirtyBit::DIRTY`) that marks a row as invisible to scorers
-
-Documents are identified by a `long docId`. The index maps `docId -> rowIdx` (CPU-side hash map). Freed rowIdxs are recycled via a free-list.
 
 Scoring takes a query embedding and a list of target `rowIdx` values, skips rows where `dirty==1`, and returns dot-product scores weighted by a selected scalar dimension (`targetScalarIdx`).
 
