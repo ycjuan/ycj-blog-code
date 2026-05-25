@@ -74,9 +74,9 @@ Same copy-on-write approach for embeddings. The difference is in how scalars are
 
 - `updateScalarData` stores scalars on CPU only — no GPU scatter at all.
 - `upsertDocs` does not touch scalars; the new row's scalar slot in `m_d_scalars` is intentionally left stale.
-- `score` syncs the CPU scalars for the target rows to GPU (scatter kernel) immediately before calling the score kernel. Both launches go on the same CUDA stream so ordering is guaranteed without an explicit sync between them.
+- `score` first snapshots the CPU scalar maps under `m_writeMutex` (resolving `rowIdx → docId → scalar` for each target row), then H2D-syncs the snapshot to GPU and runs the score kernel under `m_readMutex`.
 
-This eliminates the scalar-carry step from the hot upsert path at the cost of doing a H2D scalar sync on every score call.
+This eliminates the scalar-carry step from the hot upsert path, but pushes significant cost into every score call: a CPU map walk under `m_writeMutex` plus an H2D transfer before each score kernel.
 
 ## Strategy Analysis
 
@@ -91,7 +91,7 @@ This eliminates the scalar-carry step from the hot upsert path at the cost of do
 
 **WorkerCopyOnWriteEager** eliminates the visibility problem for primary updates by writing to a fresh rowIdx and flipping atomically. For secondary (scalar) updates, it avoids dirty-bit fencing entirely — the document stays visible — but must hold `m_readMutex` during the scatter to prevent scorers from reading mid-write. The tradeoff is constant map churn: every primary upsert allocates a new rowIdx and frees the old one.
 
-**WorkerCopyOnWriteLazy** avoids the scalar-carry step on the upsert path by keeping scalars on CPU only. But this pushes the cost into every score call: `score` must walk `rowIdx → docId → scalar` for each of the 10k target rows, build a scatter buffer, and H2D-sync it before the score kernel can run. This CPU map lookup on the hot scoring path is the dominant bottleneck — it drives score latency from ~0.3ms to ~8ms and limits throughput to ~126 calls/sec.
+**WorkerCopyOnWriteLazy** avoids the scalar-carry step on the upsert path by keeping scalars on CPU only. But this pushes the cost into every score call: `score` must hold `m_writeMutex` to walk `rowIdx → docId → scalar` for each of the 10k target rows, build a scatter buffer, H2D-sync it, and only then run the score kernel. This map lookup and transfer on the hot scoring path is the dominant bottleneck — it drives score latency from ~0.3ms to ~10ms and limits throughput to ~103 calls/sec. Upsert and delete are also slower because they contend with score on `m_writeMutex`.
 
 ## Concurrency Summary
 
@@ -166,7 +166,7 @@ Score: 3000 calls/sec (10k rows each). Upsert: 70k docs/sec. UpdateScalar: 30k d
 - **WorkerNaive** hits a score bottleneck: the global mutex means upserts (14ms each) block score threads, limiting score to 2076 calls/sec vs the 3000 target.
 - **WorkerOverwrite** reaches near-full score throughput (2986/sec) by using two separate mutexes — score and upsert can now overlap. Upsert latency is similar to Naive since it still writes in-place with dirty-bit fencing.
 - **WorkerCopyOnWriteEager** also reaches near-full score throughput (2916/sec). Upsert is slightly slower than Overwrite (~16ms vs ~14ms) because it must carry scalars to the new rowIdx before flipping the dirty bit. UpdateScalar is also slightly slower (~3.2ms vs ~2.5ms) due to holding `m_readMutex` during the scatter to prevent scorers from reading mid-write.
-- **WorkerCopyOnWriteLazy** suffers severely: `score` must snapshot CPU scalars for all 10k target rows under `m_writeMutex`, then H2D-sync them before the score kernel, driving score latency to ~10ms and throughput to only 103 calls/sec — 29x slower than Overwrite/COWEager. Upsert and delete are also slower because they contend with score on `m_writeMutex`.
+- **WorkerCopyOnWriteLazy** suffers severely: `score` holds `m_writeMutex` to walk `rowIdx → docId → scalar` for all 10k target rows, H2D-syncs the result, then scores — driving score latency to ~10ms and throughput to only 103 calls/sec, 29x slower than Overwrite/COWEager. Upsert and delete are slower too because they contend with score on `m_writeMutex`.
 
 ## Build
 
