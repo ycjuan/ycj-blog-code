@@ -31,6 +31,8 @@ Splits locking into two mutexes:
 
 Upsert writes in-place to the existing rowIdx. To prevent a scorer from reading a half-written embedding, the dirty bit is set to 1 before the scatter and cleared to 0 after. This means score and upsert can overlap — the scorer sees the row as dirty and skips it — but two concurrent upserts to the same row are still safe because the dirty bit prevents the scorer from seeing a torn write.
 
+**Drawback:** during the scatter window (dirty=1), the document is invisible to scorers. For an embedding of dimension 512 this window is short, but it is nonzero. Any score request that arrives while the write is in flight simply omits that document from its results, as if it did not exist.
+
 ### WorkerCopyOnWriteEager
 
 Instead of overwriting the existing row, upsert always allocates a **new** rowIdx for the document, scatters the new embedding there, then atomically flips dirty bits: mark the old row dirty (hidden) and mark the new row clean (visible).
