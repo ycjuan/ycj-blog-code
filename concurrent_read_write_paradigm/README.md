@@ -97,7 +97,7 @@ This eliminates the scalar-carry step from the hot upsert path at the cost of do
 
 ## Benchmark
 
-The benchmark (`test/test_async_memcpy_benchmark.cu`) runs each worker under a mixed workload for 3 seconds using three concurrent threads:
+The benchmark (`test/test_concurrent_read_write_paradigm.cu`) runs each worker under a mixed workload for 15 seconds using three concurrent threads:
 
 - **Score thread**: issues scoring requests at 3000 calls/sec, each scoring 10k randomly selected rows
 - **Upsert+Delete thread**: upserts at 70k docs/sec in batches of 1000; half of each batch are existing docs (re-upserted) and half are new docs that are deleted immediately after to keep the index size stable
@@ -160,19 +160,19 @@ Score: 3000 calls/sec (10k rows each). Upsert: 70k docs/sec. UpdateScalar: 30k d
 ## Build
 
 ```bash
-mkdir -p async_memcpy_benchmark/build
-cmake -S async_memcpy_benchmark -B async_memcpy_benchmark/build
-cmake --build async_memcpy_benchmark/build
+mkdir -p concurrent_read_write_paradigm/build
+cmake -S concurrent_read_write_paradigm -B concurrent_read_write_paradigm/build
+cmake --build concurrent_read_write_paradigm/build
 ```
 
 ## Run
 
 ```bash
-./async_memcpy_benchmark/run.sh
+./concurrent_read_write_paradigm/run.sh
 ```
 
 or directly:
 
 ```bash
-./async_memcpy_benchmark/build/test_async_memcpy_benchmark
+./concurrent_read_write_paradigm/build/test_concurrent_read_write_paradigm
 ```

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 # Library name
-set(LIB_NAME async_memcpy_benchmark)
+set(LIB_NAME concurrent_read_write_paradigm)
 
 # Export compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -48,7 +48,7 @@ target_compile_options(${LIB_NAME} PRIVATE
 )
 
 # Add executable
-add_executable(test_${LIB_NAME} test/test_async_memcpy_benchmark.cu)
+add_executable(test_${LIB_NAME} test/test_concurrent_read_write_paradigm.cu)
 
 # Link library
 target_link_libraries(test_${LIB_NAME} ${LIB_NAME})
