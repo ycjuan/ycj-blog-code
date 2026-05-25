@@ -116,6 +116,9 @@ void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>&          
     const int numElements = (int)v_scalarElement.size();
 
     // --- H2D: scalar data, scatter to GPU immediately ---
+    // Hold m_readMutex around the scatter to exclude concurrent scorers from reading
+    // m_d_scalars while it is being written. No dirty-bit fencing needed — the row
+    // stays CLEAN and visible; scorers simply wait for the scatter to finish.
     {
         CudaDeviceArray<ScalarElement> d_scalarElement(numElements, "scalarElements");
         CHECK_CUDA(cudaMemcpyAsync(d_scalarElement.data(),
@@ -124,7 +127,8 @@ void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>&          
                                    cudaMemcpyHostToDevice,
                                    m_writeStream.get()));
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
-        int gridSize = (numElements + kBlockSize - 1) / kBlockSize;
+        int                         gridSize = (numElements + kBlockSize - 1) / kBlockSize;
+        std::lock_guard<std::mutex> readLock(m_readMutex);
         kn_scatter<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
                                                                      d_scalarElement.data(),
                                                                      m_numScalars,
