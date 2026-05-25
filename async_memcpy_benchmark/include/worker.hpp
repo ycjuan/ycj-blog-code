@@ -8,24 +8,30 @@
 #include <utility>
 #include <vector>
 
+// One embedding dimension value paired with its destination row. Used to
+// batch-scatter emb data to non-contiguous rows in a single kernel launch.
 struct EmbElement
 {
-    int rowIdx;
+    int   rowIdx;
     T_EMB val;
 };
 
+// One scalar value for a specific (row, scalar index) pair. Used to
+// scatter scalar updates without touching neighboring scalar columns.
 struct ScalarElement
 {
-    int rowIdx;
-    int scalarIdx;
+    int   rowIdx;
+    int   scalarIdx;
     float val;
 };
 
+// All data produced by the COW resolve phase, consumed by the scatter and
+// dirty-bit flip phases.
 struct CopyOnWriteUpsertData
 {
     std::vector<EmbElement> v_embElement;
-    std::vector<int> v_newRowIdx; // new rowIdx per doc
-    std::vector<int> v_oldDirtyRowIdx; // old rowIdxs to mark dirty (existing docs only)
+    std::vector<int>        v_newRowIdx;      // new rowIdx per doc (parallel to input v_docId)
+    std::vector<int>        v_oldDirtyRowIdx; // old rowIdxs to mark dirty (existing docs only)
 };
 
 class Worker
@@ -35,7 +41,7 @@ public:
     virtual ~Worker() = default;
 
     const T_EMB* data() const;
-    int getHeadRowIdx() const { return m_headRowIdx; }
+    int          getHeadRowIdx() const { return m_headRowIdx; }
 
     virtual void upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData) = 0;
     virtual void updateScalarData(const std::vector<long>& v_docId, const std::vector<std::vector<float>>& v2_scalar)
@@ -51,7 +57,7 @@ protected:
 
     // Resolves docIds to rowIdxs (inserting new docs into maps) and builds
     // a flat list of EmbElements. Must be called under the write mutex.
-    std::vector<EmbElement> resolveAndBuildEmbElements(const std::vector<long>& v_docId,
+    std::vector<EmbElement> resolveAndBuildEmbElements(const std::vector<long>&               v_docId,
                                                        const std::vector<std::vector<T_EMB>>& v2_embData);
 
     // Removes docIds from maps and returns the freed rowIdxs.
@@ -60,33 +66,36 @@ protected:
 
     // Resolves docIds to rowIdxs and builds a flat list of ScalarElements (one per doc per scalar).
     // Must be called under the write mutex.
-    std::vector<ScalarElement> resolveScalarElements(const std::vector<long>& v_docId,
+    std::vector<ScalarElement> resolveScalarElements(const std::vector<long>&               v_docId,
                                                      const std::vector<std::vector<float>>& v2_scalar);
 
     // Copy-on-write variant: always allocates a new rowIdx per doc (never reuses existing).
     // For existing docs, records old rowIdx in v_oldDirtyRowIdx for later dirtying.
     // Must be called under the write mutex.
-    CopyOnWriteUpsertData resolveAndBuildEmbElementsCopyOnWrite(const std::vector<long>& v_docId,
+    CopyOnWriteUpsertData resolveAndBuildEmbElementsCopyOnWrite(const std::vector<long>&               v_docId,
                                                                 const std::vector<std::vector<T_EMB>>& v2_embData);
 
-    // meta data
-    int m_maxNumDocs;
+    int m_maxNumDocs; // capacity: total rows allocated in device arrays
     int m_embDim;
     int m_numScalars;
-    int m_headRowIdx;
+    int m_headRowIdx; // next fresh row to allocate when m_emptyRowIdxSet is empty
 
-    // cuda arrays
+    // Flat device array of embeddings, row-major: m_data[rowIdx * m_embDim + dim]
     CudaDeviceArray<T_EMB> m_data;
-    CudaDeviceArray<float> m_d_scalars; // row-major: [rowIdx * m_numScalars + scalarIdx]
+    // Flat device array of scalars, row-major: m_d_scalars[rowIdx * m_numScalars + scalarIdx]
+    CudaDeviceArray<float> m_d_scalars;
+    // Per-target score output buffer, reused across scoreImpl calls.
     CudaDeviceArray<float> m_d_scores;
+    // Per-row dirty bit (char). 1 = row is being written or has been deleted; scorers skip it.
     CudaDeviceArray<char> m_d_dirty;
 
-    // docId <> rowIdx related
+    // CPU-side docId <-> rowIdx mapping. All access must be under the write mutex.
     std::unordered_map<long, int> m_docId2rowIdx;
-    std::vector<long> m_rowIdx2DocId;
+    std::vector<long>             m_rowIdx2DocId;
+    // Free list of rowIdxs released by deleteDocs. Drained before advancing m_headRowIdx.
     std::unordered_set<int> m_emptyRowIdxSet;
 
-    // cuda streams
+    // Separate streams so score H2D + kernel and write H2D + kernel can be issued independently.
     CudaStream m_readStream;
     CudaStream m_writeStream;
 };

@@ -3,6 +3,8 @@
 
 #include <vector>
 
+// Scatters scalar values to non-contiguous (row, scalarIdx) locations.
+// Each thread writes one float; independent of embedding scatter.
 static __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int numScalars, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
@@ -20,9 +22,14 @@ WorkerCopyOnWriteEager::WorkerCopyOnWriteEager(int maxNumDocs, int embDim, int n
 {
 }
 
+// Copies existing CPU scalars for each doc to its new rowIdx on the GPU.
+// Must be called after resolveAndScatterEmb (so v_newRowIdx is final) and
+// before commitDirtyBitFlip (so scalars are visible when the row is revealed).
 void WorkerCopyOnWriteEager::carryScalarsToNewRowIdx(const std::vector<long>& v_docId,
-                                                     const std::vector<int>& v_newRowIdx)
+                                                     const std::vector<int>&  v_newRowIdx)
 {
+    // Build ScalarElements targeting the new rowIdxs from the CPU scalar mirror.
+    // Docs with no scalar history are skipped — their GPU slot stays zero-initialized.
     std::vector<ScalarElement> v_scalarElement;
     for (int i = 0; i < (int)v_docId.size(); i++)
     {
@@ -42,7 +49,7 @@ void WorkerCopyOnWriteEager::carryScalarsToNewRowIdx(const std::vector<long>& v_
         return;
     }
 
-    const int kBlockSize = 256;
+    const int                      kBlockSize = 256;
     CudaDeviceArray<ScalarElement> d_scalarElement(v_scalarElement.size(), "scalarElements");
     CHECK_CUDA(cudaMemcpyAsync(d_scalarElement.data(),
                                v_scalarElement.data(),
@@ -58,24 +65,27 @@ void WorkerCopyOnWriteEager::carryScalarsToNewRowIdx(const std::vector<long>& v_
     CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
 }
 
-void WorkerCopyOnWriteEager::upsertDocs(const std::vector<long>& v_docId,
+void WorkerCopyOnWriteEager::upsertDocs(const std::vector<long>&               v_docId,
                                         const std::vector<std::vector<T_EMB>>& v2_embData)
 {
-    const int numDocs = (int)v_docId.size();
+    const int            numDocs = (int)v_docId.size();
     CudaDeviceArray<int> d_newRowIdx(numDocs, "newRowIdx");
 
+    // Phase 1: allocate new rowIdxs, write emb data to GPU.
     CopyOnWriteUpsertData upsertData = resolveAndScatterEmb(v_docId, v2_embData, d_newRowIdx);
     if (upsertData.v_embElement.empty())
     {
         return;
     }
 
+    // Phase 2: copy existing scalars to the new rowIdxs so they are current when revealed.
     carryScalarsToNewRowIdx(v_docId, upsertData.v_newRowIdx);
 
+    // Phase 3: atomically hide old rows and reveal new rows.
     commitDirtyBitFlip(upsertData, d_newRowIdx, numDocs);
 }
 
-void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>& v_docId,
+void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>&               v_docId,
                                               const std::vector<std::vector<float>>& v2_scalar)
 {
     // --- resolve docId -> rowIdx and build scalar elements ---
@@ -85,6 +95,7 @@ void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>& v_docId,
         std::lock_guard<std::mutex> lock(m_writeMutex);
         v_scalarElement = resolveScalarElements(v_docId, v2_scalar);
 
+        // Update CPU mirror so carryScalarsToNewRowIdx sees the latest values on the next upsert.
         for (int i = 0; i < (int)v_docId.size(); i++)
         {
             m_docId2scalar[v_docId[i]] = v2_scalar[i];
@@ -96,7 +107,7 @@ void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>& v_docId,
         return;
     }
 
-    const int kBlockSize = 256;
+    const int kBlockSize  = 256;
     const int numElements = (int)v_scalarElement.size();
 
     // --- H2D: scalar data, scatter to GPU immediately ---
@@ -118,8 +129,8 @@ void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>& v_docId,
 }
 
 void WorkerCopyOnWriteEager::score(const std::vector<T_EMB>& v_reqEmb,
-                                   const std::vector<int>& v_targetRowIdx,
-                                   int targetScalarIdx)
+                                   const std::vector<int>&   v_targetRowIdx,
+                                   int                       targetScalarIdx)
 {
     // --- lock: protect dirty bits from concurrent write ops ---
     std::lock_guard<std::mutex> lock(m_readMutex);

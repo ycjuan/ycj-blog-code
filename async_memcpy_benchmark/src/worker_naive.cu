@@ -4,6 +4,7 @@
 #include <tuple>
 #include <vector>
 
+// Scatters scalar values to non-contiguous (row, scalarIdx) locations.
 static __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int numScalars, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
@@ -14,6 +15,7 @@ static __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements,
     d_dst[d_elements[t].rowIdx * numScalars + d_elements[t].scalarIdx] = d_elements[t].val;
 }
 
+// Marks deleted rows as dirty so scorers skip them.
 static __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
@@ -24,6 +26,7 @@ static __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numEl
     d_dirty[d_rowIdx[t]] = 1;
 }
 
+// Scatters embedding values to non-contiguous rows. Each thread writes one T_EMB value.
 static __global__ void kn_scatter(T_EMB* d_dst, const EmbElement* d_elements, int embDim, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
@@ -61,7 +64,7 @@ void WorkerNaive::updateScalarData(const std::vector<long>& v_docId, const std::
                                    cudaMemcpyHostToDevice,
                                    m_writeStream.get()));
         const int kBlockSize = 256;
-        const int gridSize = (v_scalarElement.size() + kBlockSize - 1) / kBlockSize;
+        const int gridSize   = (v_scalarElement.size() + kBlockSize - 1) / kBlockSize;
         kn_scatter<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
                                                                      d_scalarElement.data(),
                                                                      m_numScalars,
@@ -92,7 +95,7 @@ void WorkerNaive::upsertDocs(const std::vector<long>& v_docId, const std::vector
                                    cudaMemcpyHostToDevice,
                                    m_writeStream.get()));
         const int kBlockSize = 256;
-        const int gridSize = (v_element.size() + kBlockSize - 1) / kBlockSize;
+        const int gridSize   = (v_element.size() + kBlockSize - 1) / kBlockSize;
         kn_scatter<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_data.data(),
                                                                      d_elements.data(),
                                                                      m_embDim,
@@ -123,7 +126,7 @@ void WorkerNaive::deleteDocs(const std::vector<long>& v_docId)
                                    cudaMemcpyHostToDevice,
                                    m_writeStream.get()));
         const int kBlockSize = 256;
-        const int gridSize = (v_deletedRowIdx.size() + kBlockSize - 1) / kBlockSize;
+        const int gridSize   = (v_deletedRowIdx.size() + kBlockSize - 1) / kBlockSize;
         kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                       d_deletedRowIdx.data(),
                                                                       v_deletedRowIdx.size());

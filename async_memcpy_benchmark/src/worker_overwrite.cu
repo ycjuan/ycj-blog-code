@@ -4,6 +4,7 @@
 #include <tuple>
 #include <vector>
 
+// Scatters embedding values to non-contiguous rows. Each thread writes one T_EMB value.
 static __global__ void kn_scatter(T_EMB* d_dst, const EmbElement* d_elements, int embDim, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
@@ -14,6 +15,7 @@ static __global__ void kn_scatter(T_EMB* d_dst, const EmbElement* d_elements, in
     d_dst[d_elements[t].rowIdx * embDim + t % embDim] = d_elements[t].val;
 }
 
+// Scatters scalar values to non-contiguous (row, scalarIdx) locations.
 static __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int numScalars, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
@@ -24,6 +26,7 @@ static __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements,
     d_dst[d_elements[t].rowIdx * numScalars + d_elements[t].scalarIdx] = d_elements[t].val;
 }
 
+// Sets d_dirty[d_rowIdx[t]] = val. Used for delete and scalar dirty-bit fencing.
 static __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements, char val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
@@ -34,6 +37,9 @@ static __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numEl
     d_dirty[d_rowIdx[t]] = val;
 }
 
+// Sets dirty bit for one row per doc using the EmbElement array. Each doc occupies
+// a contiguous block of embDim elements, so element[t * embDim] is the first element
+// of doc t and carries the correct rowIdx.
 static __global__ void kn_setDirty(char* d_dirty, const EmbElement* d_elements, int embDim, int numDocs, char val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
@@ -65,13 +71,13 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
     }
 
     const int kBlockSize = 256;
-    const int numDocs = v_docId.size();
+    const int numDocs    = v_docId.size();
 
-    // d_element at function scope — shared across sections, must
-    // outlive all kernel launches until the final sync in each section.
+    // d_element lives for the whole function: the dirty-bit kernels index into it
+    // by doc (stride embDim), so it must outlive both dirty-set and dirty-clear launches.
     CudaDeviceArray<EmbElement> d_element(v_element.size(), "EmbElements");
-    int dirtyGridSize = (numDocs + kBlockSize - 1) / kBlockSize;
-    int scatterGridSize = (v_element.size() + kBlockSize - 1) / kBlockSize;
+    int                         dirtyGridSize   = (numDocs + kBlockSize - 1) / kBlockSize;
+    int                         scatterGridSize = (v_element.size() + kBlockSize - 1) / kBlockSize;
 
     // --- H2D: emb data (can happen before dirty=1 is set) ---
     {
@@ -117,7 +123,7 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
     }
 }
 
-void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId,
+void WorkerOverwrite::updateScalarData(const std::vector<long>&               v_docId,
                                        const std::vector<std::vector<float>>& v2_scalar)
 {
     // --- resolve docId -> rowIdx and build scalar elements ---
@@ -133,7 +139,8 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId,
         return;
     }
 
-    // collect one rowIdx per doc (first ScalarElement of each contiguous group)
+    // resolveScalarElements emits numScalars elements per doc, all with the same rowIdx.
+    // Extract one rowIdx per doc by scanning for group boundaries.
     std::vector<int> v_dirtyRowIdx;
     for (int i = 0; i < (int)v_scalarElement.size();)
     {
@@ -143,15 +150,15 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>& v_docId,
             i++;
     }
 
-    const int kBlockSize = 256;
+    const int kBlockSize  = 256;
     const int numElements = v_scalarElement.size();
-    const int numDocs = v_dirtyRowIdx.size();
+    const int numDocs     = v_dirtyRowIdx.size();
 
     // d_scalarElement and d_dirtyRowIdx at function scope — shared across sections.
     CudaDeviceArray<ScalarElement> d_scalarElement(numElements, "scalarElements");
-    CudaDeviceArray<int> d_dirtyRowIdx(numDocs, "dirtyRowIdx");
-    int scatterGridSize = (numElements + kBlockSize - 1) / kBlockSize;
-    int dirtyGridSize = (numDocs + kBlockSize - 1) / kBlockSize;
+    CudaDeviceArray<int>           d_dirtyRowIdx(numDocs, "dirtyRowIdx");
+    int                            scatterGridSize = (numElements + kBlockSize - 1) / kBlockSize;
+    int                            dirtyGridSize   = (numDocs + kBlockSize - 1) / kBlockSize;
 
     // --- H2D: scalar data and dirty rowIdxs (can happen before dirty=1 is set) ---
     {
@@ -215,7 +222,7 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
     }
 
     const int kBlockSize = 256;
-    const int gridSize = (v_deletedRowIdx.size() + kBlockSize - 1) / kBlockSize;
+    const int gridSize   = (v_deletedRowIdx.size() + kBlockSize - 1) / kBlockSize;
 
     // --- H2D: deleted rowIdxs, set dirty=1 ---
     {
@@ -238,8 +245,8 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
 }
 
 void WorkerOverwrite::score(const std::vector<T_EMB>& v_reqEmb,
-                            const std::vector<int>& v_targetRowIdx,
-                            int targetScalarIdx)
+                            const std::vector<int>&   v_targetRowIdx,
+                            int                       targetScalarIdx)
 {
     // --- lock: protect dirty bits from concurrent write ops ---
     std::lock_guard<std::mutex> lock(m_readMutex);

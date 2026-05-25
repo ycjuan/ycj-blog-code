@@ -3,6 +3,8 @@
 
 #include <vector>
 
+// Scatters scalar values to non-contiguous (row, scalarIdx) locations.
+// Each thread writes one float; independent of embedding scatter.
 static __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements, int numScalars, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
@@ -20,12 +22,13 @@ WorkerCopyOnWriteLazy::WorkerCopyOnWriteLazy(int maxNumDocs, int embDim, int num
 {
 }
 
-void WorkerCopyOnWriteLazy::upsertDocs(const std::vector<long>& v_docId,
+void WorkerCopyOnWriteLazy::upsertDocs(const std::vector<long>&               v_docId,
                                        const std::vector<std::vector<T_EMB>>& v2_embData)
 {
-    const int numDocs = (int)v_docId.size();
+    const int            numDocs = (int)v_docId.size();
     CudaDeviceArray<int> d_newRowIdx(numDocs, "newRowIdx");
 
+    // No scalar handling here — scalars are synced to GPU lazily in score().
     CopyOnWriteUpsertData upsertData = resolveAndScatterEmb(v_docId, v2_embData, d_newRowIdx);
     if (upsertData.v_embElement.empty())
     {
@@ -35,7 +38,7 @@ void WorkerCopyOnWriteLazy::upsertDocs(const std::vector<long>& v_docId,
     commitDirtyBitFlip(upsertData, d_newRowIdx, numDocs);
 }
 
-void WorkerCopyOnWriteLazy::updateScalarData(const std::vector<long>& v_docId,
+void WorkerCopyOnWriteLazy::updateScalarData(const std::vector<long>&               v_docId,
                                              const std::vector<std::vector<float>>& v2_scalar)
 {
     // --- lock: protect scalar map ---
@@ -48,13 +51,16 @@ void WorkerCopyOnWriteLazy::updateScalarData(const std::vector<long>& v_docId,
 }
 
 void WorkerCopyOnWriteLazy::score(const std::vector<T_EMB>& v_reqEmb,
-                                  const std::vector<int>& v_targetRowIdx,
-                                  int targetScalarIdx)
+                                  const std::vector<int>&   v_targetRowIdx,
+                                  int                       targetScalarIdx)
 {
-    // --- lock: protect dirty bits from concurrent write ops ---
+    // Holds m_readMutex for the entire duration: the scalar scatter and score kernel
+    // must be atomic with respect to dirty-bit flips from concurrent upserts.
     std::lock_guard<std::mutex> lock(m_readMutex);
 
-    // --- sync CPU scalars to GPU for target rows (rowIdx -> docId -> scalars) ---
+    // Sync CPU scalars to GPU for the target rows immediately before scoring.
+    // Scalars are looked up via rowIdx -> docId -> m_docId2scalar (CPU map).
+    // Docs with no scalar history default to 0.
     {
         const int kBlockSize = 256;
 
@@ -63,7 +69,7 @@ void WorkerCopyOnWriteLazy::score(const std::vector<T_EMB>& v_reqEmb,
         for (int rowIdx : v_targetRowIdx)
         {
             long docId = m_rowIdx2DocId[rowIdx];
-            auto it = m_docId2scalar.find(docId);
+            auto it    = m_docId2scalar.find(docId);
             for (int j = 0; j < m_numScalars; j++)
             {
                 float val = (it != m_docId2scalar.end() && j < (int)it->second.size()) ? it->second[j] : 0.0f;

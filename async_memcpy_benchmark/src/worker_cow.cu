@@ -3,6 +3,8 @@
 
 #include <vector>
 
+// Sets d_dirty[d_rowIdx[t]] = val for each thread t. Used to atomically hide or
+// reveal a batch of rows during the dirty-bit flip.
 static __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements, char val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
@@ -13,6 +15,8 @@ static __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numEl
     d_dirty[d_rowIdx[t]] = val;
 }
 
+// Scatters embedding values to non-contiguous rows. Each thread writes one
+// T_EMB value; t % embDim gives the column within the row.
 static __global__ void kn_scatter(T_EMB* d_dst, const EmbElement* d_elements, int embDim, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
@@ -30,9 +34,9 @@ WorkerCopyOnWrite::WorkerCopyOnWrite(int maxNumDocs, int embDim, int numScalars)
 {
 }
 
-CopyOnWriteUpsertData WorkerCopyOnWrite::resolveAndScatterEmb(const std::vector<long>& v_docId,
+CopyOnWriteUpsertData WorkerCopyOnWrite::resolveAndScatterEmb(const std::vector<long>&               v_docId,
                                                               const std::vector<std::vector<T_EMB>>& v2_embData,
-                                                              CudaDeviceArray<int>& d_newRowIdx)
+                                                              CudaDeviceArray<int>&                  d_newRowIdx)
 {
     CopyOnWriteUpsertData upsertData;
     {
@@ -46,7 +50,7 @@ CopyOnWriteUpsertData WorkerCopyOnWrite::resolveAndScatterEmb(const std::vector<
         return upsertData;
     }
 
-    const int kBlockSize = 256;
+    const int                   kBlockSize = 256;
     CudaDeviceArray<EmbElement> d_element(upsertData.v_embElement.size(), "EmbElements");
 
     // --- H2D: emb data and new rowIdxs ---
@@ -78,15 +82,16 @@ CopyOnWriteUpsertData WorkerCopyOnWrite::resolveAndScatterEmb(const std::vector<
 }
 
 void WorkerCopyOnWrite::commitDirtyBitFlip(const CopyOnWriteUpsertData& upsertData,
-                                           const CudaDeviceArray<int>& d_newRowIdx,
-                                           int numDocs)
+                                           const CudaDeviceArray<int>&  d_newRowIdx,
+                                           int                          numDocs)
 {
     const int kBlockSize = 256;
 
     // --- lock: protect dirty bits from concurrent score reads ---
     std::lock_guard<std::mutex> lock(m_readMutex);
 
-    // set dirty=1 on old rowIdxs (hide stale data)
+    // Hide old rows first so scorers never see them after the new rows are revealed.
+    // Only present for re-upserted (existing) docs; new docs have no old row to hide.
     if (!upsertData.v_oldDirtyRowIdx.empty())
     {
         CudaDeviceArray<int> d_oldDirtyRowIdx(upsertData.v_oldDirtyRowIdx.size(), "oldDirtyRowIdx");
@@ -103,7 +108,7 @@ void WorkerCopyOnWrite::commitDirtyBitFlip(const CopyOnWriteUpsertData& upsertDa
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 
-    // set dirty=0 on new rowIdxs (make new data visible to scorers)
+    // Reveal new rows; emb (and scalars for Eager) are fully written before this point.
     {
         int gridSize = (numDocs + kBlockSize - 1) / kBlockSize;
         kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(), d_newRowIdx.data(), numDocs, 0);
@@ -132,7 +137,7 @@ void WorkerCopyOnWrite::deleteDocs(const std::vector<long>& v_docId)
     }
 
     const int kBlockSize = 256;
-    const int gridSize = (v_deletedRowIdx.size() + kBlockSize - 1) / kBlockSize;
+    const int gridSize   = (v_deletedRowIdx.size() + kBlockSize - 1) / kBlockSize;
 
     // --- H2D: deleted rowIdxs, set dirty=1 ---
     {
