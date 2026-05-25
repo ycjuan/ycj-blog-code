@@ -69,12 +69,12 @@ This eliminates the scalar-carry step from the hot upsert path at the cost of do
 
 ## Strategy Analysis
 
-| | Race condition | Concurrency | Doc visibility | Map mutation | Map lookup in score |
-|---|---|---|---|---|---|
-| Naive | ✅ (global mutex) | ❌ fully serialized | ✅ no (never dirty) | ✅ no | ✅ no |
-| Overwrite | ✅ (dirty-bit fence) | ✅ score overlaps write | ❌ dirty during emb+scalar scatter | ✅ no (in-place) | ✅ no |
-| COW Eager | ✅ (new rowIdx + readMutex for scalars) | ✅ score overlaps emb write | ✅ old row visible until flip | ❌ yes (new rowIdx per upsert) | ✅ no |
-| COW Lazy | ✅ (new rowIdx) | ⚠️ score serializes on scalar sync | ✅ old row visible until flip | ❌ yes (new rowIdx per upsert) | ❌ yes (rowIdx→docId→scalar per target row) |
+| | Race condition | Concurrency | Doc visibility | Map mutation | Carry secondary on upsert | Map lookup in score |
+|---|---|---|---|---|---|---|
+| Naive | ✅ (global mutex) | ❌ fully serialized | ✅ no (never dirty) | ✅ no | ✅ no | ✅ no |
+| Overwrite | ✅ (dirty-bit fence) | ✅ score overlaps write | ❌ dirty during emb+scalar scatter | ✅ no (in-place) | ✅ no | ✅ no |
+| COW Eager | ✅ (new rowIdx + readMutex for scalars) | ✅ score overlaps emb write | ✅ old row visible until flip | ❌ yes (new rowIdx per upsert) | ❌ yes (scalars copied to new rowIdx before flip) | ✅ no |
+| COW Lazy | ✅ (new rowIdx) | ⚠️ score serializes on scalar sync | ✅ old row visible until flip | ❌ yes (new rowIdx per upsert) | ✅ no (scalars always synced from CPU in score) | ❌ yes (rowIdx→docId→scalar per target row) |
 
 **WorkerOverwrite** handles races well and keeps the map stable, but the dirty-bit fence during both primary (emb) and secondary (scalar) updates makes documents transiently invisible to scorers.
 
