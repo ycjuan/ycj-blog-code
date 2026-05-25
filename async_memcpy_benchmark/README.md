@@ -92,6 +92,8 @@ This eliminates the scalar-carry step from the hot upsert path at the cost of do
 | COW Lazy | Overlapping (new rowIdx) | Serialized (m_writeMutex) | Score syncs CPU→GPU per call |
 
 > **Note on Upsert vs Upsert:** The benchmark uses a single upsert thread, so concurrent upserts never occur in practice. WorkerOverwrite would race if two upsert threads overlapped in the GPU scatter phase, since `m_writeMutex` is released before GPU work. COW workers serialize the entire write operation under `m_writeMutex` (including GPU work), so concurrent upserts are safe — but only because of the mutex, not because of rowIdx isolation.
+>
+> **Note on Upsert vs UpdateScalar in WorkerOverwrite:** Both operations release `m_writeMutex` before GPU work, so the upsert thread and the updateScalar thread (which ARE concurrent in the benchmark) can both issue to `m_writeStream` simultaneously. The dirty-bit kernels are serialized by `m_readMutex`, but the H2D and scatter phases between them are not. If the two operations happen to target the same doc, one thread's `kn_setDirty(CLEAN)` could overwrite the other's `kn_setDirty(DIRTY)` before the scatter completes, briefly exposing a partially-written row. Fixing this would require a dedicated stream mutex or extending `m_writeMutex` to cover all GPU work.
 
 ## Benchmark
 
