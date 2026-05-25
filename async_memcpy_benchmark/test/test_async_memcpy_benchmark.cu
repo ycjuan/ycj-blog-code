@@ -31,7 +31,7 @@ struct BenchConfig
     int upsertDocQps       = 70000; // doc-level QPS; call QPS = upsertDocQps / updateBatchSize
     int updateScalarDocQps = 30000; // doc-level QPS; call QPS = updateScalarDocQps / updateBatchSize
 
-    double durationSec = 3.0;
+    double durationSec = 15.0;
 };
 
 // ---- timing helpers ----
