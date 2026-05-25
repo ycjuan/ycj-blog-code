@@ -96,7 +96,7 @@ void WorkerCopyOnWriteLazy::score(const std::vector<T_EMB>& v_reqEmb,
                                                                     d_scalarElement.data(),
                                                                     m_numScalars,
                                                                     v_scalarElement.size());
-        // no sync here — scoreImpl launches on the same stream, ordering is guaranteed
+        CHECK_CUDA(cudaStreamSynchronize(m_readStream.get()));
         scoreImpl(v_reqEmb, v_targetRowIdx, targetScalarIdx);
     }
 }
