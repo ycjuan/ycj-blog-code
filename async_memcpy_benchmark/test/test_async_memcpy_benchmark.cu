@@ -169,14 +169,13 @@ struct BenchResult
     {
         std::cout << "\n=== " << workerName << " ===\n";
         std::cout << "  headRowIdx: " << headRowIdxBegin << " -> " << headRowIdxEnd << "\n";
-        scoreRec.report("score", numToScore);
+        scoreRec.report("score");
         upsertRec.report("upsert", updateBatchSize);
         deleteRec.report("delete", updateBatchSize / 2);
         updateScalarRec.report("updateScalar", updateBatchSize);
-        std::cout << "  observed doc QPS:"
-                  << "  score=" << std::fixed << std::setprecision(1)
-                  << (long long)scoreRec.count() * numToScore / durationSec
-                  << "  upsert=" << (long long)upsertRec.count() * updateBatchSize / durationSec
+        std::cout << "  observed QPS (calls):  score=" << std::fixed << std::setprecision(1)
+                  << scoreRec.count() / durationSec << "\n";
+        std::cout << "  observed doc QPS:  upsert=" << (long long)upsertRec.count() * updateBatchSize / durationSec
                   << "  delete=" << (long long)deleteRec.count() * (updateBatchSize / 2) / durationSec
                   << "  updateScalar=" << (long long)updateScalarRec.count() * updateBatchSize / durationSec << "\n";
     }
