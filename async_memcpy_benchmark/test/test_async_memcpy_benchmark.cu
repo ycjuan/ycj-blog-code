@@ -68,11 +68,16 @@ struct LatencyRecorder
         double    p50       = sorted[sorted.size() * 50 / 100];
         double    p99       = sorted[sorted.size() * 99 / 100];
         long long totalDocs = (long long)sorted.size() * docsPerCall;
+        auto      fmtMs     = [](double ms)
+        {
+            char buf[16];
+            std::snprintf(buf, sizeof(buf), "%.3fms", ms);
+            return std::string(buf);
+        };
         std::cout << "  " << std::left << std::setw(16) << name << "  calls=" << std::setw(6) << sorted.size()
-                  << "  docs=" << std::setw(10) << totalDocs << "  mean=" << std::setw(8) << std::fixed
-                  << std::setprecision(3) << mean << "ms"
-                  << "  p50=" << std::setw(8) << p50 << "ms"
-                  << "  p99=" << std::setw(8) << p99 << "ms\n";
+                  << "  docs=" << std::setw(10) << totalDocs << "  mean=" << std::setw(12) << std::left << fmtMs(mean)
+                  << "  p50=" << std::setw(12) << std::left << fmtMs(p50) << "  p99=" << std::setw(12) << std::left
+                  << fmtMs(p99) << "\n";
     }
 
     int count() const { return (int)v_latencyMs.size(); }
