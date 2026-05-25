@@ -8,6 +8,13 @@
 #include <utility>
 #include <vector>
 
+// Per-row visibility state. CLEAN = visible to scorers; DIRTY = being written or deleted.
+enum class DirtyBit : char
+{
+    CLEAN = 0,
+    DIRTY = 1,
+};
+
 // One embedding dimension value paired with its destination row. Used to
 // batch-scatter emb data to non-contiguous rows in a single kernel launch.
 struct EmbElement
@@ -71,8 +78,8 @@ protected:
     CudaDeviceArray<float> m_d_scalars;
     // Per-target score output buffer, reused across scoreImpl calls.
     CudaDeviceArray<float> m_d_scores;
-    // Per-row dirty bit (char). 1 = row is being written or has been deleted; scorers skip it.
-    CudaDeviceArray<char> m_d_dirty;
+    // Per-row dirty bit. DIRTY = row is being written or deleted; scorers skip it.
+    CudaDeviceArray<DirtyBit> m_d_dirty;
 
     // CPU-side docId <-> rowIdx mapping. All access must be under the write mutex.
     std::unordered_map<long, int> m_docId2rowIdx;

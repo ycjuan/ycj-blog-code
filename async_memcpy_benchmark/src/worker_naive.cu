@@ -16,14 +16,14 @@ static __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements,
 }
 
 // Marks deleted rows as dirty so scorers skip them.
-static __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements)
+static __global__ void kn_setDirty(DirtyBit* d_dirty, const int* d_rowIdx, int numElements)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
     {
         return;
     }
-    d_dirty[d_rowIdx[t]] = 1;
+    d_dirty[d_rowIdx[t]] = DirtyBit::DIRTY;
 }
 
 // Scatters embedding values to non-contiguous rows. Each thread writes one T_EMB value.

@@ -79,6 +79,7 @@ void WorkerCopyOnWriteEager::upsertDocs(const std::vector<long>&               v
     }
 
     // Phase 2: copy existing scalars to the new rowIdxs so they are current when revealed.
+    // New rows are still DIRTY at this point, so concurrent scorers skip them — no lock needed.
     carryScalarsToNewRowIdx(v_docId, upsertData.v_newRowIdx);
 
     // Phase 3: atomically hide old rows and reveal new rows.

@@ -5,7 +5,7 @@
 
 // Sets d_dirty[d_rowIdx[t]] = val for each thread t. Used to atomically hide or
 // reveal a batch of rows during the dirty-bit flip.
-static __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements, char val)
+static __global__ void kn_setDirty(DirtyBit* d_dirty, const int* d_rowIdx, int numElements, DirtyBit val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -143,14 +143,17 @@ void WorkerCopyOnWrite::commitDirtyBitFlip(const CopyOnWriteUpsertData& upsertDa
         kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                       d_oldDirtyRowIdx.data(),
                                                                       upsertData.v_oldDirtyRowIdx.size(),
-                                                                      1);
+                                                                      DirtyBit::DIRTY);
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 
     // Reveal new rows; emb (and scalars for Eager) are fully written before this point.
     {
         int gridSize = (numDocs + kBlockSize - 1) / kBlockSize;
-        kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(), d_newRowIdx.data(), numDocs, 0);
+        kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
+                                                                      d_newRowIdx.data(),
+                                                                      numDocs,
+                                                                      DirtyBit::CLEAN);
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 }
@@ -192,7 +195,7 @@ void WorkerCopyOnWrite::deleteDocs(const std::vector<long>& v_docId)
             kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                           d_deletedRowIdx.data(),
                                                                           v_deletedRowIdx.size(),
-                                                                          1);
+                                                                          DirtyBit::DIRTY);
         }
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }

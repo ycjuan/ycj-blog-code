@@ -27,7 +27,7 @@ static __global__ void kn_scatter(float* d_dst, const ScalarElement* d_elements,
 }
 
 // Sets d_dirty[d_rowIdx[t]] = val. Used for delete and scalar dirty-bit fencing.
-static __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numElements, char val)
+static __global__ void kn_setDirty(DirtyBit* d_dirty, const int* d_rowIdx, int numElements, DirtyBit val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numElements)
@@ -40,7 +40,11 @@ static __global__ void kn_setDirty(char* d_dirty, const int* d_rowIdx, int numEl
 // Sets dirty bit for one row per doc using the EmbElement array. Each doc occupies
 // a contiguous block of embDim elements, so element[t * embDim] is the first element
 // of doc t and carries the correct rowIdx.
-static __global__ void kn_setDirty(char* d_dirty, const EmbElement* d_elements, int embDim, int numDocs, char val)
+static __global__ void kn_setDirty(DirtyBit*         d_dirty,
+                                   const EmbElement* d_elements,
+                                   int               embDim,
+                                   int               numDocs,
+                                   DirtyBit          val)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numDocs)
@@ -97,7 +101,7 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
                                                                            d_element.data(),
                                                                            m_embDim,
                                                                            numDocs,
-                                                                           1);
+                                                                           DirtyBit::DIRTY);
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 
@@ -118,7 +122,7 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
                                                                            d_element.data(),
                                                                            m_embDim,
                                                                            numDocs,
-                                                                           0);
+                                                                           DirtyBit::CLEAN);
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 }
@@ -181,7 +185,7 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>&               v_
         kn_setDirty<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                            d_dirtyRowIdx.data(),
                                                                            numDocs,
-                                                                           1);
+                                                                           DirtyBit::DIRTY);
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 
@@ -201,7 +205,7 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>&               v_
         kn_setDirty<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                            d_dirtyRowIdx.data(),
                                                                            numDocs,
-                                                                           0);
+                                                                           DirtyBit::CLEAN);
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 }
@@ -238,7 +242,7 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
             kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                           d_deletedRowIdx.data(),
                                                                           v_deletedRowIdx.size(),
-                                                                          1);
+                                                                          DirtyBit::DIRTY);
         }
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }

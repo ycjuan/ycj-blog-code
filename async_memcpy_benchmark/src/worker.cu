@@ -17,7 +17,7 @@ Worker::Worker(int maxNumDocs, int embDim, int numScalars)
     // Zero-initialize so un-upserted rows score 0 rather than garbage.
     CHECK_CUDA(cudaMemset(m_d_scalars.data(), 0, maxNumDocs * numScalars * sizeof(float)));
     // All rows start clean; dirty bits are set when a row is being written or deleted.
-    CHECK_CUDA(cudaMemset(m_d_dirty.data(), 0, maxNumDocs * sizeof(char)));
+    CHECK_CUDA(cudaMemset(m_d_dirty.data(), 0, maxNumDocs * sizeof(DirtyBit)));
 }
 
 const T_EMB* Worker::data() const { return m_data.data(); }
@@ -105,16 +105,16 @@ std::vector<ScalarElement> Worker::resolveScalarElements(const std::vector<long>
     return v_scalarElement;
 }
 
-static __global__ void kn_score(float*       d_scores,
-                                const T_EMB* d_reqEmb,
-                                const T_EMB* d_docData,
-                                const float* d_scalars,
-                                const int*   d_rowIdx,
-                                const char*  d_dirty,
-                                int          embDim,
-                                int          numScalars,
-                                int          targetScalarIdx,
-                                int          numTargets)
+static __global__ void kn_score(float*          d_scores,
+                                const T_EMB*    d_reqEmb,
+                                const T_EMB*    d_docData,
+                                const float*    d_scalars,
+                                const int*      d_rowIdx,
+                                const DirtyBit* d_dirty,
+                                int             embDim,
+                                int             numScalars,
+                                int             targetScalarIdx,
+                                int             numTargets)
 {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t >= numTargets)
@@ -123,7 +123,7 @@ static __global__ void kn_score(float*       d_scores,
     }
     int r = d_rowIdx[t];
     // Skip rows that are being written or were deleted; score 0 so they rank last.
-    if (d_dirty[r])
+    if (d_dirty[r] == DirtyBit::DIRTY)
     {
         d_scores[t] = 0.0f;
         return;

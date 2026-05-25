@@ -8,10 +8,10 @@ A GPU vector index stores embedding vectors in device memory. Concurrent writes 
 
 ## The Data Model
 
-Each document has:
+All GPU arrays use **row-major** layout. Each document has:
 - An embedding vector (`bfloat16`, dimension 512) stored in a flat GPU array `m_data[rowIdx * embDim ... (rowIdx+1)*embDim]`
 - A list of scalar values (`float32`, 32 per doc) stored in `m_d_scalars[rowIdx * numScalars + scalarIdx]`
-- A dirty bit `m_d_dirty[rowIdx]` that marks a row as invisible to scorers
+- A dirty bit `m_d_dirty[rowIdx]` (`DirtyBit::CLEAN` or `DirtyBit::DIRTY`) that marks a row as invisible to scorers
 
 Documents are identified by a `long docId`. The index maps `docId -> rowIdx` (CPU-side hash map). Freed rowIdxs are recycled via a free-list.
 
