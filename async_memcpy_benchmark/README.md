@@ -69,16 +69,18 @@ This eliminates the scalar-carry step from the hot upsert path at the cost of do
 
 ## Strategy Analysis
 
-| | Race condition | Concurrency | Doc visibility | Map mutation |
-|---|---|---|---|---|
-| Naive | ✅ (global mutex) | ❌ fully serialized | ✅ no (never dirty) | ✅ no |
-| Overwrite | ✅ (dirty-bit fence) | ✅ score overlaps write | ❌ dirty during emb+scalar scatter | ✅ no (in-place) |
-| COW Eager | ✅ (new rowIdx + readMutex for scalars) | ✅ score overlaps emb write | ✅ old row visible until flip | ❌ yes (new rowIdx per upsert) |
-| COW Lazy | ✅ (new rowIdx) | ⚠️ score serializes on scalar sync | ✅ old row visible until flip | ❌ yes (new rowIdx per upsert) |
+| | Race condition | Concurrency | Doc visibility | Map mutation | Map lookup in score |
+|---|---|---|---|---|---|
+| Naive | ✅ (global mutex) | ❌ fully serialized | ✅ no (never dirty) | ✅ no | ✅ no |
+| Overwrite | ✅ (dirty-bit fence) | ✅ score overlaps write | ❌ dirty during emb+scalar scatter | ✅ no (in-place) | ✅ no |
+| COW Eager | ✅ (new rowIdx + readMutex for scalars) | ✅ score overlaps emb write | ✅ old row visible until flip | ❌ yes (new rowIdx per upsert) | ✅ no |
+| COW Lazy | ✅ (new rowIdx) | ⚠️ score serializes on scalar sync | ✅ old row visible until flip | ❌ yes (new rowIdx per upsert) | ❌ yes (rowIdx→docId→scalar per target row) |
 
 **WorkerOverwrite** handles races well and keeps the map stable, but the dirty-bit fence during both primary (emb) and secondary (scalar) updates makes documents transiently invisible to scorers.
 
 **WorkerCopyOnWriteEager** eliminates the visibility problem for primary updates by writing to a fresh rowIdx and flipping atomically. For secondary (scalar) updates, it avoids dirty-bit fencing entirely — the document stays visible — but must hold `m_readMutex` during the scatter to prevent scorers from reading mid-write. The tradeoff is constant map churn: every primary upsert allocates a new rowIdx and frees the old one.
+
+**WorkerCopyOnWriteLazy** avoids the scalar-carry step on the upsert path by keeping scalars on CPU only. But this pushes the cost into every score call: `score` must walk `rowIdx → docId → scalar` for each of the 10k target rows, build a scatter buffer, and H2D-sync it before the score kernel can run. This CPU map lookup on the hot scoring path is the dominant bottleneck — it drives score latency from ~0.3ms to ~8ms and limits throughput to ~126 calls/sec.
 
 ## Concurrency Summary
 
