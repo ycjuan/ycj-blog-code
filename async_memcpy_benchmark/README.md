@@ -1,4 +1,4 @@
-# async_memcpy_benchmark
+# Concurrent Read / Write Design Paradigm
 
 Benchmarks four concurrent read/write strategies for a GPU vector index under mixed workloads: simultaneous scoring (reads) and upsert/delete/scalar-update (writes).
 
