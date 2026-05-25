@@ -9,4 +9,4 @@ mkdir -p build
 cd build
 cmake ..
 make -j $(nproc)
-./test_async_memcpy_benchmark
+./test_concurrent_read_write_paradigm
