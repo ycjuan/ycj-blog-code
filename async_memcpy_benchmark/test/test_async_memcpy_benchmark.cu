@@ -101,8 +101,6 @@ static std::vector<float> randomScalars(int numScalars, std::mt19937& rng)
     std::uniform_real_distribution<float> dist(0.0f, 1.0f);
     std::vector<float> v(numScalars);
     for (auto& x : v)
-        dist(rng);
-    for (auto& x : v)
         x = dist(rng);
     return v;
 }
