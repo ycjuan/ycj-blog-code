@@ -17,6 +17,22 @@ Documents are identified by a `long docId`. The index maps `docId -> rowIdx` (CP
 
 Scoring takes a query embedding and a list of target `rowIdx` values, skips rows where `dirty==1`, and returns dot-product scores weighted by a selected scalar dimension (`targetScalarIdx`).
 
+There are two types of writes:
+- **Primary update (upsert):** replaces a document's embedding. This is the expensive operation — 512 bfloat16 values must be transferred to the GPU.
+- **Secondary update (scalar):** updates a document's scalar weights without touching the embedding. Much cheaper, but must still be coordinated with concurrent scorers reading the same scalar slots.
+
+## Design Challenges
+
+Getting concurrent reads and writes correct requires navigating four tensions:
+
+1. **Race condition** — A scorer and a writer touching the same GPU memory location from different CUDA streams have no ordering guarantee. Without explicit coordination, the scorer can read a partially-written value.
+
+2. **Concurrency** — If every operation must wait for every other, throughput suffers. The goal is to let scores and writes overlap as much as possible.
+
+3. **Doc visibility** — During an update, a document may need to be temporarily hidden from scorers (dirty=1) to prevent torn reads. Any score request that arrives during this window gets results as if the document does not exist.
+
+4. **docId↔rowIdx map mutation** — Some strategies (copy-on-write) allocate a new rowIdx on every upsert and free the old one. This keeps the embedding write invisible until committed, but it means the map is constantly changing, which adds overhead and complexity.
+
 ## The Four Strategies
 
 ### WorkerNaive
@@ -50,6 +66,19 @@ Same copy-on-write approach for embeddings. The difference is in how scalars are
 - `score` syncs the CPU scalars for the target rows to GPU (scatter kernel) immediately before calling the score kernel. Both launches go on the same CUDA stream so ordering is guaranteed without an explicit sync between them.
 
 This eliminates the scalar-carry step from the hot upsert path at the cost of doing a H2D scalar sync on every score call.
+
+## Strategy Analysis
+
+| | Race condition | Concurrency | Doc visibility | Map mutation |
+|---|---|---|---|---|
+| Naive | ✅ (global mutex) | ❌ fully serialized | ✅ no (never dirty) | ✅ no |
+| Overwrite | ✅ (dirty-bit fence) | ✅ score overlaps write | ❌ dirty during emb+scalar scatter | ✅ no (in-place) |
+| COW Eager | ✅ (new rowIdx + readMutex for scalars) | ✅ score overlaps emb write | ✅ old row visible until flip | ❌ yes (new rowIdx per upsert) |
+| COW Lazy | ✅ (new rowIdx) | ⚠️ score serializes on scalar sync | ✅ old row visible until flip | ❌ yes (new rowIdx per upsert) |
+
+**WorkerOverwrite** handles races well and keeps the map stable, but the dirty-bit fence during both primary (emb) and secondary (scalar) updates makes documents transiently invisible to scorers.
+
+**WorkerCopyOnWriteEager** eliminates the visibility problem for primary updates by writing to a fresh rowIdx and flipping atomically. For secondary (scalar) updates, it avoids dirty-bit fencing entirely — the document stays visible — but must hold `m_readMutex` during the scatter to prevent scorers from reading mid-write. The tradeoff is constant map churn: every primary upsert allocates a new rowIdx and frees the old one.
 
 ## Concurrency Summary
 
