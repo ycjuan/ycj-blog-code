@@ -28,11 +28,18 @@ void WorkerCopyOnWriteLazy::upsertDocs(const std::vector<long>&               v_
     const int            numDocs = (int)v_docId.size();
     CudaDeviceArray<int> d_newRowIdx(numDocs, "newRowIdx");
 
-    // No scalar handling here — scalars are synced to GPU lazily in score().
-    CopyOnWriteUpsertData upsertData = resolveAndScatterEmb(v_docId, v2_embData, d_newRowIdx);
-    if (upsertData.v_embElement.empty())
+    CopyOnWriteUpsertData upsertData;
     {
-        return;
+        // Hold m_writeMutex across resolveAndScatterEmb to serialize m_writeStream access
+        // with concurrent updateScalarData / deleteDocs.
+        std::lock_guard<std::mutex> writeLock(m_writeMutex);
+
+        // No scalar handling here — scalars are synced to GPU lazily in score().
+        upsertData = resolveAndScatterEmb(v_docId, v2_embData, d_newRowIdx);
+        if (upsertData.v_embElement.empty())
+        {
+            return;
+        }
     }
 
     commitDirtyBitFlip(upsertData, d_newRowIdx, numDocs);

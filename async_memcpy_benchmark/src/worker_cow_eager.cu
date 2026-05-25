@@ -71,16 +71,23 @@ void WorkerCopyOnWriteEager::upsertDocs(const std::vector<long>&               v
     const int            numDocs = (int)v_docId.size();
     CudaDeviceArray<int> d_newRowIdx(numDocs, "newRowIdx");
 
-    // Phase 1: allocate new rowIdxs, write emb data to GPU.
-    CopyOnWriteUpsertData upsertData = resolveAndScatterEmb(v_docId, v2_embData, d_newRowIdx);
-    if (upsertData.v_embElement.empty())
+    CopyOnWriteUpsertData upsertData;
     {
-        return;
-    }
+        // Hold m_writeMutex across Phase 1 and 2 to serialize m_writeStream and m_docId2scalar
+        // access with concurrent updateScalarData / deleteDocs.
+        std::lock_guard<std::mutex> writeLock(m_writeMutex);
 
-    // Phase 2: copy existing scalars to the new rowIdxs so they are current when revealed.
-    // New rows are still DIRTY at this point, so concurrent scorers skip them — no lock needed.
-    carryScalarsToNewRowIdx(v_docId, upsertData.v_newRowIdx);
+        // Phase 1: allocate new rowIdxs, write emb data to GPU.
+        upsertData = resolveAndScatterEmb(v_docId, v2_embData, d_newRowIdx);
+        if (upsertData.v_embElement.empty())
+        {
+            return;
+        }
+
+        // Phase 2: copy existing scalars to the new rowIdxs so they are current when revealed.
+        // New rows are still DIRTY, so concurrent scorers skip them.
+        carryScalarsToNewRowIdx(v_docId, upsertData.v_newRowIdx);
+    }
 
     // Phase 3: atomically hide old rows and reveal new rows.
     commitDirtyBitFlip(upsertData, d_newRowIdx, numDocs);
@@ -89,18 +96,16 @@ void WorkerCopyOnWriteEager::upsertDocs(const std::vector<long>&               v
 void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>&               v_docId,
                                               const std::vector<std::vector<float>>& v2_scalar)
 {
-    // --- resolve docId -> rowIdx and build scalar elements ---
-    std::vector<ScalarElement> v_scalarElement;
-    {
-        // --- lock: protect docId<>rowIdx map and scalar map ---
-        std::lock_guard<std::mutex> lock(m_writeMutex);
-        v_scalarElement = resolveScalarElements(v_docId, v2_scalar);
+    // Hold m_writeMutex for the entire operation to serialize m_writeStream access
+    // with concurrent upsertDocs / deleteDocs.
+    std::lock_guard<std::mutex> writeLock(m_writeMutex);
 
-        // Update CPU mirror so carryScalarsToNewRowIdx sees the latest values on the next upsert.
-        for (int i = 0; i < (int)v_docId.size(); i++)
-        {
-            m_docId2scalar[v_docId[i]] = v2_scalar[i];
-        }
+    std::vector<ScalarElement> v_scalarElement = resolveScalarElements(v_docId, v2_scalar);
+
+    // Update CPU mirror so carryScalarsToNewRowIdx sees the latest values on the next upsert.
+    for (int i = 0; i < (int)v_docId.size(); i++)
+    {
+        m_docId2scalar[v_docId[i]] = v2_scalar[i];
     }
 
     if (v_scalarElement.empty())

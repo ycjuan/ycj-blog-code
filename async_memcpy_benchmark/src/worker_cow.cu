@@ -38,11 +38,9 @@ CopyOnWriteUpsertData WorkerCopyOnWrite::resolveAndScatterEmb(const std::vector<
                                                               const std::vector<std::vector<T_EMB>>& v2_embData,
                                                               CudaDeviceArray<int>&                  d_newRowIdx)
 {
+    // Caller must hold m_writeMutex.
     CopyOnWriteUpsertData upsertData;
     {
-        // --- lock: protect docId<>rowIdx map ---
-        std::lock_guard<std::mutex> lock(m_writeMutex);
-
         upsertData.v_embElement.reserve(v_docId.size() * m_embDim);
         upsertData.v_newRowIdx.reserve(v_docId.size());
 
@@ -160,17 +158,15 @@ void WorkerCopyOnWrite::commitDirtyBitFlip(const CopyOnWriteUpsertData& upsertDa
 
 void WorkerCopyOnWrite::deleteDocs(const std::vector<long>& v_docId)
 {
-    // --- update maps, collect deleted rowIdxs ---
-    std::vector<int> v_deletedRowIdx;
-    {
-        // --- lock: protect docId<>rowIdx map and scalar map ---
-        std::lock_guard<std::mutex> lock(m_writeMutex);
-        v_deletedRowIdx = resolveDeletedRowIdxs(v_docId);
+    // Hold m_writeMutex for the entire operation to serialize m_writeStream access
+    // with concurrent upsertDocs / updateScalarData.
+    std::lock_guard<std::mutex> writeLock(m_writeMutex);
 
-        for (long docId : v_docId)
-        {
-            m_docId2scalar.erase(docId);
-        }
+    std::vector<int> v_deletedRowIdx = resolveDeletedRowIdxs(v_docId);
+
+    for (long docId : v_docId)
+    {
+        m_docId2scalar.erase(docId);
     }
 
     if (v_deletedRowIdx.empty())
@@ -191,7 +187,7 @@ void WorkerCopyOnWrite::deleteDocs(const std::vector<long>& v_docId)
                                    m_writeStream.get()));
         {
             // --- lock: protect dirty bits from concurrent score reads ---
-            std::lock_guard<std::mutex> lock(m_readMutex);
+            std::lock_guard<std::mutex> readLock(m_readMutex);
             kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                           d_deletedRowIdx.data(),
                                                                           v_deletedRowIdx.size(),
