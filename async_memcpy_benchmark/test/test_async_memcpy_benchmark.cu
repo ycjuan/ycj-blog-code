@@ -161,18 +161,23 @@ struct BenchResult
     std::string workerName;
     LatencyRecorder scoreRec;
     LatencyRecorder upsertRec;
+    LatencyRecorder deleteRec;
     LatencyRecorder updateScalarRec;
     double durationSec;
+    int headRowIdxBegin = 0;
+    int headRowIdxEnd = 0;
 
     void report() const
     {
         std::cout << "\n=== " << workerName << " ===\n";
+        std::cout << "  headRowIdx: " << headRowIdxBegin << " -> " << headRowIdxEnd << "\n";
         scoreRec.report("score");
         upsertRec.report("upsert");
+        deleteRec.report("delete");
         updateScalarRec.report("updateScalar");
         std::cout << "  observed QPS:"
                   << "  score=" << std::fixed << std::setprecision(1) << scoreRec.count() / durationSec
-                  << "  upsert=" << upsertRec.count() / durationSec
+                  << "  upsert=" << upsertRec.count() / durationSec << "  delete=" << deleteRec.count() / durationSec
                   << "  updateScalar=" << updateScalarRec.count() / durationSec << "\n";
     }
 };
@@ -189,6 +194,7 @@ static void runBench(const std::string& name,
 
     result.workerName = name;
     result.durationSec = cfg.durationSec;
+    result.headRowIdxBegin = worker.getHeadRowIdx();
 
     std::atomic<bool> stopFlag(false);
 
@@ -212,7 +218,7 @@ static void runBench(const std::string& name,
                 stopFlag);
         });
 
-    // upsert thread: half existing, half new docIds
+    // upsert+delete thread: half existing, half new docIds; new docIds are deleted after upsert
     std::thread upsertThread(
         [&]()
         {
@@ -224,21 +230,27 @@ static void runBench(const std::string& name,
                 {
                     int n = cfg.updateBatchSize;
                     std::vector<long> v_docId(n);
+                    std::vector<long> v_newDocId;
+                    v_newDocId.reserve(n / 2 + 1);
                     for (int i = 0; i < n; i++)
                     {
                         if (i % 2 == 0)
                         {
-                            // existing
                             v_docId[i] = v_bootstrapDocId[existingDocDist(threadRng)];
                         }
                         else
                         {
-                            // new
                             v_docId[i] = nextNewDocId++;
+                            v_newDocId.push_back(v_docId[i]);
                         }
                     }
                     std::vector<std::vector<T_EMB>> v2_emb = randomEmbBatch(n, cfg.embDim, threadRng);
                     worker.upsertDocs(v_docId, v2_emb);
+
+                    // delete the newly added docs to keep total doc count stable
+                    auto t0 = Clock::now();
+                    worker.deleteDocs(v_newDocId);
+                    result.deleteRec.record(toMs(Clock::now() - t0));
                 },
                 result.upsertRec,
                 stopFlag);
@@ -272,6 +284,8 @@ static void runBench(const std::string& name,
     scoreThread.join();
     upsertThread.join();
     updateScalarThread.join();
+
+    result.headRowIdxEnd = worker.getHeadRowIdx();
 }
 
 // ---- main ----

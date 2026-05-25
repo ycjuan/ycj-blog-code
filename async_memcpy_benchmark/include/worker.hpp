@@ -35,6 +35,7 @@ public:
     virtual ~Worker() = default;
 
     const T_EMB* data() const;
+    int getHeadRowIdx() const { return m_headRowIdx; }
 
     virtual void upsertDocs(const std::vector<long>& v_docId, const std::vector<std::vector<T_EMB>>& v2_embData) = 0;
     virtual void updateScalarData(const std::vector<long>& v_docId, const std::vector<std::vector<float>>& v2_scalar)
