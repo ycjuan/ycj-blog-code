@@ -25,15 +25,6 @@ struct ScalarElement
     float val;
 };
 
-// All data produced by the COW resolve phase, consumed by the scatter and
-// dirty-bit flip phases.
-struct CopyOnWriteUpsertData
-{
-    std::vector<EmbElement> v_embElement;
-    std::vector<int>        v_newRowIdx;      // new rowIdx per doc (parallel to input v_docId)
-    std::vector<int>        v_oldDirtyRowIdx; // old rowIdxs to mark dirty (existing docs only)
-};
-
 class Worker
 {
 public:
@@ -68,12 +59,6 @@ protected:
     // Must be called under the write mutex.
     std::vector<ScalarElement> resolveScalarElements(const std::vector<long>&               v_docId,
                                                      const std::vector<std::vector<float>>& v2_scalar);
-
-    // Copy-on-write variant: always allocates a new rowIdx per doc (never reuses existing).
-    // For existing docs, records old rowIdx in v_oldDirtyRowIdx for later dirtying.
-    // Must be called under the write mutex.
-    CopyOnWriteUpsertData resolveAndBuildEmbElementsCopyOnWrite(const std::vector<long>&               v_docId,
-                                                                const std::vector<std::vector<T_EMB>>& v2_embData);
 
     int m_maxNumDocs; // capacity: total rows allocated in device arrays
     int m_embDim;

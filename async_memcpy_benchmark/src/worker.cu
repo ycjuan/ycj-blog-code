@@ -105,53 +105,6 @@ std::vector<ScalarElement> Worker::resolveScalarElements(const std::vector<long>
     return v_scalarElement;
 }
 
-CopyOnWriteUpsertData Worker::resolveAndBuildEmbElementsCopyOnWrite(const std::vector<long>&               v_docId,
-                                                                    const std::vector<std::vector<T_EMB>>& v2_embData)
-{
-    CopyOnWriteUpsertData result;
-    result.v_embElement.reserve(v_docId.size() * m_embDim);
-    result.v_newRowIdx.reserve(v_docId.size());
-
-    for (int i = 0; i < (int)v_docId.size(); i++)
-    {
-        // Always allocate a fresh row — the new emb is written there while the old
-        // row stays visible to concurrent scorers until the dirty-bit flip commits.
-        int newRowIdx;
-        if (!m_emptyRowIdxSet.empty())
-        {
-            newRowIdx = *m_emptyRowIdxSet.begin();
-            m_emptyRowIdxSet.erase(m_emptyRowIdxSet.begin());
-        }
-        else
-        {
-            newRowIdx = m_headRowIdx++;
-        }
-
-        auto it = m_docId2rowIdx.find(v_docId[i]);
-        if (it != m_docId2rowIdx.end())
-        {
-            // Existing doc: remap to new row and return old row to free list.
-            // The old rowIdx is collected so commitDirtyBitFlip can mark it dirty.
-            result.v_oldDirtyRowIdx.push_back(it->second);
-            m_emptyRowIdxSet.insert(it->second);
-            it->second = newRowIdx;
-        }
-        else
-        {
-            m_docId2rowIdx[v_docId[i]] = newRowIdx;
-        }
-        m_rowIdx2DocId[newRowIdx] = v_docId[i];
-
-        result.v_newRowIdx.push_back(newRowIdx);
-        for (int j = 0; j < m_embDim; j++)
-        {
-            result.v_embElement.push_back({ newRowIdx, v2_embData[i][j] });
-        }
-    }
-
-    return result;
-}
-
 static __global__ void kn_score(float*       d_scores,
                                 const T_EMB* d_reqEmb,
                                 const T_EMB* d_docData,
