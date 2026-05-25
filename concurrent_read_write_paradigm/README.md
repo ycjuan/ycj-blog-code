@@ -32,6 +32,14 @@ There are two types of writes:
 - **Primary update (upsert):** replaces a document's embedding. This is the expensive operation — 512 bfloat16 values must be transferred to the GPU.
 - **Secondary update (scalar):** updates a document's scalar weights without touching the embedding. Much cheaper, but must still be coordinated with concurrent scorers reading the same scalar slots.
 
+## API Design
+
+Write operations (`upsertDocs`, `updateScalarData`, `deleteDocs`) take `docId` as input — the stable caller-facing identity. The index resolves `docId → rowIdx` internally before touching GPU memory.
+
+Score, however, takes `rowIdx` directly. The reason is performance: resolving `docId → rowIdx` requires a CPU hash map lookup per document, which is expensive at scale. A system that scores 10k documents per call and needs sub-millisecond latency cannot afford that overhead on the hot path.
+
+The assumption is that the surrounding system is designed to operate in terms of `rowIdx` when issuing score requests — for example, by maintaining its own `docId → rowIdx` mapping or by receiving `rowIdx` values from a prior retrieval stage. Exactly how to design such a system is out of scope for this post.
+
 ## Design Challenges
 
 Getting concurrent reads and writes correct requires navigating four tensions:
