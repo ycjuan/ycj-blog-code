@@ -238,13 +238,15 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
                                    m_writeStream.get()));
         {
             // --- lock: protect dirty bits from concurrent score reads ---
+            // Sync inside the lock so m_d_dirty is fully written before any
+            // scorer can acquire m_readMutex and launch kn_score.
             std::lock_guard<std::mutex> lock(m_readMutex);
             kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                           d_deletedRowIdx.data(),
                                                                           v_deletedRowIdx.size(),
                                                                           DirtyBit::DIRTY);
+            CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
         }
-        CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
     }
 }
 
