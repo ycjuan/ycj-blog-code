@@ -61,17 +61,12 @@ void WorkerCopyOnWriteLazy::score(const std::vector<T_EMB>& v_reqEmb,
                                   const std::vector<int>&   v_targetRowIdx,
                                   int                       targetScalarIdx)
 {
-    // Holds m_readMutex for the entire duration: the scalar scatter and score kernel
-    // must be atomic with respect to dirty-bit flips from concurrent upserts.
-    std::lock_guard<std::mutex> lock(m_readMutex);
-
-    // Sync CPU scalars to GPU for the target rows immediately before scoring.
-    // Scalars are looked up via rowIdx -> docId -> m_docId2scalar (CPU map).
-    // Docs with no scalar history default to 0.
+    // Snapshot scalars from the CPU maps under m_writeMutex before taking m_readMutex.
+    // Both m_rowIdx2DocId and m_docId2scalar are written under m_writeMutex; reading
+    // them without that lock would be a data race. Lock ordering: m_writeMutex first.
+    std::vector<ScalarElement> v_scalarElement;
     {
-        const int kBlockSize = 256;
-
-        std::vector<ScalarElement> v_scalarElement;
+        std::lock_guard<std::mutex> writeLock(m_writeMutex);
         v_scalarElement.reserve(v_targetRowIdx.size() * m_numScalars);
         for (int rowIdx : v_targetRowIdx)
         {
@@ -83,7 +78,13 @@ void WorkerCopyOnWriteLazy::score(const std::vector<T_EMB>& v_reqEmb,
                 v_scalarElement.push_back({ rowIdx, j, val });
             }
         }
+    }
 
+    // H2D scalar sync + score kernel must be atomic with respect to dirty-bit flips.
+    {
+        const int kBlockSize = 256;
+
+        std::lock_guard<std::mutex>    readLock(m_readMutex);
         CudaDeviceArray<ScalarElement> d_scalarElement(v_scalarElement.size(), "scalarElements");
         CHECK_CUDA(cudaMemcpyAsync(d_scalarElement.data(),
                                    v_scalarElement.data(),
@@ -96,7 +97,6 @@ void WorkerCopyOnWriteLazy::score(const std::vector<T_EMB>& v_reqEmb,
                                                                     m_numScalars,
                                                                     v_scalarElement.size());
         // no sync here — scoreImpl launches on the same stream, ordering is guaranteed
+        scoreImpl(v_reqEmb, v_targetRowIdx, targetScalarIdx);
     }
-
-    scoreImpl(v_reqEmb, v_targetRowIdx, targetScalarIdx);
 }
