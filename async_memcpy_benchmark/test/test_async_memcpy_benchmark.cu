@@ -51,7 +51,7 @@ struct LatencyRecorder
         v_latencyMs.push_back(ms);
     }
 
-    void report(const std::string& name) const
+    void report(const std::string& name, int docsPerCall = 1) const
     {
         if (v_latencyMs.empty())
         {
@@ -66,10 +66,10 @@ struct LatencyRecorder
         double mean = sum / sorted.size();
         double p50 = sorted[sorted.size() * 50 / 100];
         double p99 = sorted[sorted.size() * 99 / 100];
-        double realQps
-            = sorted.size() / (sum / 1000.0); // calls / total_wall would be wrong; report count/duration separately
-        std::cout << "  " << std::left << std::setw(16) << name << "  n=" << std::setw(6) << sorted.size()
-                  << "  mean=" << std::setw(8) << std::fixed << std::setprecision(3) << mean << "ms"
+        long long totalDocs = (long long)sorted.size() * docsPerCall;
+        std::cout << "  " << std::left << std::setw(16) << name << "  calls=" << std::setw(6) << sorted.size()
+                  << "  docs=" << std::setw(10) << totalDocs << "  mean=" << std::setw(8) << std::fixed
+                  << std::setprecision(3) << mean << "ms"
                   << "  p50=" << std::setw(8) << p50 << "ms"
                   << "  p99=" << std::setw(8) << p99 << "ms\n";
     }
@@ -167,18 +167,20 @@ struct BenchResult
     int headRowIdxBegin = 0;
     int headRowIdxEnd = 0;
 
-    void report() const
+    void report(int updateBatchSize, int numToScore) const
     {
         std::cout << "\n=== " << workerName << " ===\n";
         std::cout << "  headRowIdx: " << headRowIdxBegin << " -> " << headRowIdxEnd << "\n";
-        scoreRec.report("score");
-        upsertRec.report("upsert");
-        deleteRec.report("delete");
-        updateScalarRec.report("updateScalar");
-        std::cout << "  observed QPS:"
-                  << "  score=" << std::fixed << std::setprecision(1) << scoreRec.count() / durationSec
-                  << "  upsert=" << upsertRec.count() / durationSec << "  delete=" << deleteRec.count() / durationSec
-                  << "  updateScalar=" << updateScalarRec.count() / durationSec << "\n";
+        scoreRec.report("score", numToScore);
+        upsertRec.report("upsert", updateBatchSize);
+        deleteRec.report("delete", updateBatchSize / 2);
+        updateScalarRec.report("updateScalar", updateBatchSize);
+        std::cout << "  observed doc QPS:"
+                  << "  score=" << std::fixed << std::setprecision(1)
+                  << (long long)scoreRec.count() * numToScore / durationSec
+                  << "  upsert=" << (long long)upsertRec.count() * updateBatchSize / durationSec
+                  << "  delete=" << (long long)deleteRec.count() * (updateBatchSize / 2) / durationSec
+                  << "  updateScalar=" << (long long)updateScalarRec.count() * updateBatchSize / durationSec << "\n";
     }
 };
 
@@ -335,7 +337,7 @@ int main()
 
     std::cout << "\n\n========== RESULTS ==========\n";
     for (auto& r : v_result)
-        r.report();
+        r.report(cfg.updateBatchSize, cfg.numToScore);
 
     return 0;
 }
