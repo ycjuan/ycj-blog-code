@@ -56,9 +56,11 @@ This eliminates the scalar-carry step from the hot upsert path at the cost of do
 | Worker | Upsert vs Score | Upsert vs Upsert | Scalar update vs Score |
 |---|---|---|---|
 | Naive | Serialized | Serialized | Serialized |
-| Overwrite | Overlapping (dirty bit) | Safe (same rowIdx) | Overlapping (dirty bit) |
-| COW Eager | Overlapping (new rowIdx) | Safe (different rowIdxs) | Overlapping (GPU scalar always current) |
-| COW Lazy | Overlapping (new rowIdx) | Safe (different rowIdxs) | Score syncs CPU→GPU per call |
+| Overwrite | Overlapping (dirty bit) | **Races** on m_writeStream | Overlapping (dirty bit) |
+| COW Eager | Overlapping (new rowIdx) | Serialized (m_writeMutex) | Overlapping (GPU scalar always current) |
+| COW Lazy | Overlapping (new rowIdx) | Serialized (m_writeMutex) | Score syncs CPU→GPU per call |
+
+> **Note on Upsert vs Upsert:** The benchmark uses a single upsert thread, so concurrent upserts never occur in practice. WorkerOverwrite would race if two upsert threads overlapped in the GPU scatter phase, since `m_writeMutex` is released before GPU work. COW workers serialize the entire write operation under `m_writeMutex` (including GPU work), so concurrent upserts are safe — but only because of the mutex, not because of rowIdx isolation.
 
 ## Benchmark
 
