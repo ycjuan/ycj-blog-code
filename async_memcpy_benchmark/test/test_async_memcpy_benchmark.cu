@@ -30,7 +30,7 @@ struct BenchConfig
     int upsertQps = 10000; // each call = updateBatchSize docs
     int updateScalarQps = 30000;
 
-    double durationSec = 10.0;
+    double durationSec = 3.0;
 };
 
 // ---- timing helpers ----
