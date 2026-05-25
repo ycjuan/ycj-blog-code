@@ -26,9 +26,9 @@ struct BenchConfig
     int numToScore = 10000;
     int updateBatchSize = 1024;
 
-    double scoreQps = 2000.0;
-    double upsertQps = 10000.0; // each call = updateBatchSize docs
-    double updateScalarQps = 30000.0;
+    int scoreQps = 2000;
+    int upsertQps = 10000; // each call = updateBatchSize docs
+    int updateScalarQps = 30000;
 
     double durationSec = 10.0;
 };
