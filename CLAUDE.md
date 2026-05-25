@@ -16,4 +16,21 @@ Never use `git add -A` or `git add .`. Always add specific files by name.
 
 ## Shortcuts
 
-- **cmc** — "check my comments": fetch and display all unresolved PR review comments on the current branch, then ask the user which ones to act on.
+- **cmc** — "check my comments": fetch and display all unresolved PR review comments on the current branch, then ask the user which ones to act on. Use the GitHub GraphQL API (not REST) because only GraphQL exposes `isResolved` per thread:
+  ```bash
+  gh api graphql -f query='
+  {
+    repository(owner: "ycjuan", name: "ycj-blog-code") {
+      pullRequest(number: 37) {
+        reviewThreads(first: 50) {
+          nodes {
+            isResolved
+            comments(first: 1) {
+              nodes { body path originalLine createdAt url }
+            }
+          }
+        }
+      }
+    }
+  }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | .comments.nodes[0]'
+  ```
