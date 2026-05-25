@@ -26,12 +26,6 @@ public:
     void deleteDocs(const std::vector<long>& v_docId) override;
 
 protected:
-    // Copy-on-write variant: always allocates a new rowIdx per doc (never reuses existing).
-    // For existing docs, records old rowIdx in v_oldDirtyRowIdx for later dirtying.
-    // Must be called under the write mutex.
-    CopyOnWriteUpsertData resolveAndBuildEmbElementsCopyOnWrite(const std::vector<long>&               v_docId,
-                                                                const std::vector<std::vector<T_EMB>>& v2_embData);
-
     // Phase 1: resolve docId->rowIdx (COW), H2D emb data, scatter emb to m_data.
     // Fills d_newRowIdx (must be pre-allocated to v_docId.size()).
     // Returns empty upsertData if there is nothing to do.
