@@ -25,7 +25,7 @@ struct BenchConfig
     int embDim          = 512;
     int numScalars      = 32;
     int numToScore      = 10000;
-    int updateBatchSize = 1024;
+    int updateBatchSize = 1000;
 
     int scoreQps           = 2000;  // call-level QPS
     int upsertDocQps       = 10000; // doc-level QPS; call QPS = upsertDocQps / updateBatchSize
