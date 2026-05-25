@@ -10,6 +10,7 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <omp.h>
 #include <random>
 #include <string>
 #include <thread>
@@ -112,12 +113,25 @@ static std::vector<long> bootstrap(Worker& worker, int numRealDocs, int embDim, 
     std::vector<long> v_docId(numRealDocs);
     std::iota(v_docId.begin(), v_docId.end(), 1); // docIds 1..numRealDocs
 
-    std::vector<std::vector<T_EMB>> v2_emb = randomEmbBatch(numRealDocs, embDim, rng);
-    worker.upsertDocs(v_docId, v2_emb);
-
+    // generate emb and scalar data in parallel — each thread uses its own seeded RNG
+    std::vector<std::vector<T_EMB>> v2_emb(numRealDocs);
     std::vector<std::vector<float>> v2_scalar(numRealDocs);
-    for (auto& v : v2_scalar)
-        v = randomScalars(numScalars, rng);
+#pragma omp parallel for schedule(static)
+    for (int i = 0; i < numRealDocs; i++)
+    {
+        std::mt19937 threadRng(i);
+        std::uniform_real_distribution<float> embDist(-1.0f, 1.0f);
+        v2_emb[i].resize(embDim);
+        for (auto& x : v2_emb[i])
+            x = __float2bfloat16(embDist(threadRng));
+
+        std::uniform_real_distribution<float> scalarDist(0.0f, 1.0f);
+        v2_scalar[i].resize(numScalars);
+        for (auto& x : v2_scalar[i])
+            x = scalarDist(threadRng);
+    }
+
+    worker.upsertDocs(v_docId, v2_emb);
     worker.updateScalarData(v_docId, v2_scalar);
 
     return v_docId;
