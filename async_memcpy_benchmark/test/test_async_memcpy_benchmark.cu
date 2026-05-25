@@ -20,23 +20,23 @@
 
 struct BenchConfig
 {
-    int maxNumDocs = 2000000;
-    int numRealDocs = 1000000;
-    int embDim = 512;
-    int numScalars = 32;
-    int numToScore = 10000;
+    int maxNumDocs      = 2000000;
+    int numRealDocs     = 1000000;
+    int embDim          = 512;
+    int numScalars      = 32;
+    int numToScore      = 10000;
     int updateBatchSize = 1024;
 
-    int scoreQps = 2000;
-    int upsertQps = 10000; // each call = updateBatchSize docs
-    int updateScalarQps = 30000;
+    int scoreQps           = 2000;  // call-level QPS
+    int upsertDocQps       = 10000; // doc-level QPS; call QPS = upsertDocQps / updateBatchSize
+    int updateScalarDocQps = 30000; // doc-level QPS; call QPS = updateScalarDocQps / updateBatchSize
 
     double durationSec = 3.0;
 };
 
 // ---- timing helpers ----
 
-using Clock = std::chrono::steady_clock;
+using Clock     = std::chrono::steady_clock;
 using TimePoint = std::chrono::time_point<Clock>;
 
 static double toMs(std::chrono::nanoseconds ns) { return ns.count() / 1e6; }
@@ -44,7 +44,7 @@ static double toMs(std::chrono::nanoseconds ns) { return ns.count() / 1e6; }
 struct LatencyRecorder
 {
     std::unique_ptr<std::mutex> mu = std::make_unique<std::mutex>();
-    std::vector<double> v_latencyMs;
+    std::vector<double>         v_latencyMs;
 
     void record(double ms)
     {
@@ -64,9 +64,9 @@ struct LatencyRecorder
         double sum = 0;
         for (double v : sorted)
             sum += v;
-        double mean = sum / sorted.size();
-        double p50 = sorted[sorted.size() * 50 / 100];
-        double p99 = sorted[sorted.size() * 99 / 100];
+        double    mean      = sum / sorted.size();
+        double    p50       = sorted[sorted.size() * 50 / 100];
+        double    p99       = sorted[sorted.size() * 99 / 100];
         long long totalDocs = (long long)sorted.size() * docsPerCall;
         std::cout << "  " << std::left << std::setw(16) << name << "  calls=" << std::setw(6) << sorted.size()
                   << "  docs=" << std::setw(10) << totalDocs << "  mean=" << std::setw(8) << std::fixed
@@ -83,7 +83,7 @@ struct LatencyRecorder
 static std::vector<T_EMB> randomEmb(int embDim, std::mt19937& rng)
 {
     std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
-    std::vector<T_EMB> v(embDim);
+    std::vector<T_EMB>                    v(embDim);
     for (auto& x : v)
         x = __float2bfloat16(dist(rng));
     return v;
@@ -100,7 +100,7 @@ static std::vector<std::vector<T_EMB>> randomEmbBatch(int n, int embDim, std::mt
 static std::vector<float> randomScalars(int numScalars, std::mt19937& rng)
 {
     std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-    std::vector<float> v(numScalars);
+    std::vector<float>                    v(numScalars);
     for (auto& x : v)
         x = dist(rng);
     return v;
@@ -119,7 +119,7 @@ static std::vector<long> bootstrap(Worker& worker, int numRealDocs, int embDim, 
 #pragma omp parallel for schedule(static)
     for (int i = 0; i < numRealDocs; i++)
     {
-        std::mt19937 threadRng(i);
+        std::mt19937                          threadRng(i);
         std::uniform_real_distribution<float> embDist(-1.0f, 1.0f);
         v2_emb[i].resize(embDim);
         for (auto& x : v2_emb[i])
@@ -141,14 +141,14 @@ static std::vector<long> bootstrap(Worker& worker, int numRealDocs, int embDim, 
 
 // Calls fn() at the given QPS until stopFlag is set.
 // Records latency of each call into recorder.
-static void rateLimitedLoop(double qps,
-                            std::function<void()> fn,
-                            LatencyRecorder& recorder,
+static void rateLimitedLoop(double                   qps,
+                            std::function<void()>    fn,
+                            LatencyRecorder&         recorder,
                             const std::atomic<bool>& stopFlag)
 {
     using namespace std::chrono;
     auto intervalNs = nanoseconds((long long)(1e9 / qps));
-    auto next = Clock::now();
+    auto next       = Clock::now();
 
     while (!stopFlag.load(std::memory_order_relaxed))
     {
@@ -170,14 +170,14 @@ static void rateLimitedLoop(double qps,
 
 struct BenchResult
 {
-    std::string workerName;
+    std::string     workerName;
     LatencyRecorder scoreRec;
     LatencyRecorder upsertRec;
     LatencyRecorder deleteRec;
     LatencyRecorder updateScalarRec;
-    double durationSec;
-    int headRowIdxBegin = 0;
-    int headRowIdxEnd = 0;
+    double          durationSec;
+    int             headRowIdxBegin = 0;
+    int             headRowIdxEnd   = 0;
 
     void report(int updateBatchSize, int numToScore) const
     {
@@ -195,18 +195,18 @@ struct BenchResult
     }
 };
 
-static void runBench(const std::string& name,
-                     Worker& worker,
-                     const BenchConfig& cfg,
+static void runBench(const std::string&       name,
+                     Worker&                  worker,
+                     const BenchConfig&       cfg,
                      const std::vector<long>& v_bootstrapDocId,
-                     BenchResult& result)
+                     BenchResult&             result)
 {
-    std::mt19937 rng(42);
+    std::mt19937                        rng(42);
     std::uniform_int_distribution<long> newDocIdDist(cfg.numRealDocs + 1, cfg.numRealDocs * 2);
-    std::uniform_int_distribution<int> existingDocDist(0, (int)v_bootstrapDocId.size() - 1);
+    std::uniform_int_distribution<int>  existingDocDist(0, (int)v_bootstrapDocId.size() - 1);
 
-    result.workerName = name;
-    result.durationSec = cfg.durationSec;
+    result.workerName      = name;
+    result.durationSec     = cfg.durationSec;
     result.headRowIdxBegin = worker.getHeadRowIdx();
 
     std::atomic<bool> stopFlag(false);
@@ -215,7 +215,7 @@ static void runBench(const std::string& name,
     std::thread scoreThread(
         [&]()
         {
-            std::mt19937 threadRng(1);
+            std::mt19937                       threadRng(1);
             std::uniform_int_distribution<int> rowIdxDist(0, cfg.numRealDocs - 1);
             rateLimitedLoop(
                 cfg.scoreQps,
@@ -236,12 +236,12 @@ static void runBench(const std::string& name,
         [&]()
         {
             std::mt19937 threadRng(2);
-            long nextNewDocId = cfg.numRealDocs + 1;
+            long         nextNewDocId = cfg.numRealDocs + 1;
             rateLimitedLoop(
-                cfg.upsertQps,
+                cfg.upsertDocQps / cfg.updateBatchSize,
                 [&]()
                 {
-                    int n = cfg.updateBatchSize;
+                    int               n = cfg.updateBatchSize;
                     std::vector<long> v_docId(n);
                     std::vector<long> v_newDocId;
                     v_newDocId.reserve(n / 2 + 1);
@@ -275,10 +275,10 @@ static void runBench(const std::string& name,
         {
             std::mt19937 threadRng(3);
             rateLimitedLoop(
-                cfg.updateScalarQps,
+                cfg.updateScalarDocQps / cfg.updateBatchSize,
                 [&]()
                 {
-                    int n = cfg.updateBatchSize;
+                    int               n = cfg.updateBatchSize;
                     std::vector<long> v_docId(n);
                     for (int i = 0; i < n; i++)
                         v_docId[i] = v_bootstrapDocId[existingDocDist(threadRng)];
@@ -311,13 +311,13 @@ int main()
               << "  maxNumDocs=" << cfg.maxNumDocs << "  numRealDocs=" << cfg.numRealDocs << "  embDim=" << cfg.embDim
               << "  numScalars=" << cfg.numScalars << "\n"
               << "  numToScore=" << cfg.numToScore << "  updateBatchSize=" << cfg.updateBatchSize << "\n"
-              << "  scoreQps=" << cfg.scoreQps << "  upsertQps=" << cfg.upsertQps
-              << "  updateScalarQps=" << cfg.updateScalarQps << "\n"
+              << "  scoreQps=" << cfg.scoreQps << "  upsertDocQps=" << cfg.upsertDocQps
+              << "  updateScalarDocQps=" << cfg.updateScalarDocQps << "\n"
               << "  durationSec=" << cfg.durationSec << "\n";
 
     struct WorkerDef
     {
-        std::string name;
+        std::string                              name;
         std::function<std::unique_ptr<Worker>()> factory;
     };
 
@@ -337,8 +337,8 @@ int main()
     for (auto& def : v_workerDef)
     {
         std::cout << "\nBootstrapping " << def.name << "...\n";
-        auto worker = def.factory();
-        std::mt19937 rng(0);
+        auto              worker = def.factory();
+        std::mt19937      rng(0);
         std::vector<long> v_docId = bootstrap(*worker, cfg.numRealDocs, cfg.embDim, cfg.numScalars, rng);
 
         std::cout << "Running benchmark...\n";
