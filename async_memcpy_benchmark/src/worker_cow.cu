@@ -40,45 +40,43 @@ CopyOnWriteUpsertData WorkerCopyOnWrite::resolveAndScatterEmb(const std::vector<
 {
     // Caller must hold m_writeMutex.
     CopyOnWriteUpsertData upsertData;
+    upsertData.v_embElement.reserve(v_docId.size() * m_embDim);
+    upsertData.v_newRowIdx.reserve(v_docId.size());
+
+    for (int i = 0; i < (int)v_docId.size(); i++)
     {
-        upsertData.v_embElement.reserve(v_docId.size() * m_embDim);
-        upsertData.v_newRowIdx.reserve(v_docId.size());
-
-        for (int i = 0; i < (int)v_docId.size(); i++)
+        // Always allocate a fresh row — the new emb is written there while the old
+        // row stays visible to concurrent scorers until the dirty-bit flip commits.
+        int newRowIdx;
+        if (!m_emptyRowIdxSet.empty())
         {
-            // Always allocate a fresh row — the new emb is written there while the old
-            // row stays visible to concurrent scorers until the dirty-bit flip commits.
-            int newRowIdx;
-            if (!m_emptyRowIdxSet.empty())
-            {
-                newRowIdx = *m_emptyRowIdxSet.begin();
-                m_emptyRowIdxSet.erase(m_emptyRowIdxSet.begin());
-            }
-            else
-            {
-                newRowIdx = m_headRowIdx++;
-            }
+            newRowIdx = *m_emptyRowIdxSet.begin();
+            m_emptyRowIdxSet.erase(m_emptyRowIdxSet.begin());
+        }
+        else
+        {
+            newRowIdx = m_headRowIdx++;
+        }
 
-            auto it = m_docId2rowIdx.find(v_docId[i]);
-            if (it != m_docId2rowIdx.end())
-            {
-                // Existing doc: remap to new row and return old row to free list.
-                // The old rowIdx is collected so commitDirtyBitFlip can mark it dirty.
-                upsertData.v_oldDirtyRowIdx.push_back(it->second);
-                m_emptyRowIdxSet.insert(it->second);
-                it->second = newRowIdx;
-            }
-            else
-            {
-                m_docId2rowIdx[v_docId[i]] = newRowIdx;
-            }
-            m_rowIdx2DocId[newRowIdx] = v_docId[i];
+        auto it = m_docId2rowIdx.find(v_docId[i]);
+        if (it != m_docId2rowIdx.end())
+        {
+            // Existing doc: remap to new row and return old row to free list.
+            // The old rowIdx is collected so commitDirtyBitFlip can mark it dirty.
+            upsertData.v_oldDirtyRowIdx.push_back(it->second);
+            m_emptyRowIdxSet.insert(it->second);
+            it->second = newRowIdx;
+        }
+        else
+        {
+            m_docId2rowIdx[v_docId[i]] = newRowIdx;
+        }
+        m_rowIdx2DocId[newRowIdx] = v_docId[i];
 
-            upsertData.v_newRowIdx.push_back(newRowIdx);
-            for (int j = 0; j < m_embDim; j++)
-            {
-                upsertData.v_embElement.push_back({ newRowIdx, v2_embData[i][j] });
-            }
+        upsertData.v_newRowIdx.push_back(newRowIdx);
+        for (int j = 0; j < m_embDim; j++)
+        {
+            upsertData.v_embElement.push_back({ newRowIdx, v2_embData[i][j] });
         }
     }
 

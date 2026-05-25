@@ -64,8 +64,8 @@ This eliminates the scalar-carry step from the hot upsert path at the cost of do
 
 The benchmark (`test/test_async_memcpy_benchmark.cu`) runs each worker under a mixed workload for 3 seconds using three concurrent threads:
 
-- **Score thread**: issues scoring requests at 2500 calls/sec, each scoring 10k randomly selected rows
-- **Upsert+Delete thread**: upserts at 60k docs/sec in batches of 1000; half of each batch are existing docs (re-upserted) and half are new docs that are deleted immediately after to keep the index size stable
+- **Score thread**: issues scoring requests at 3000 calls/sec, each scoring 10k randomly selected rows
+- **Upsert+Delete thread**: upserts at 70k docs/sec in batches of 1000; half of each batch are existing docs (re-upserted) and half are new docs that are deleted immediately after to keep the index size stable
 - **UpdateScalar thread**: updates scalars at 30k docs/sec in batches of 1000
 
 The index is pre-loaded with 1M documents (out of a 2M capacity) before benchmarking begins.

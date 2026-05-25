@@ -21,7 +21,7 @@ public:
     CudaStream()
     {
         cudaStream_t s;
-        cudaError_t err = cudaStreamCreate(&s);
+        cudaError_t  err = cudaStreamCreate(&s);
         if (err != cudaSuccess)
         {
             std::ostringstream oss;
@@ -67,11 +67,11 @@ template <typename T>
 class CudaArray
 {
 public:
-    // See https://leimao.github.io/blog/CPP-Base-Class-Destructors/ for why we need to make this virtual
+    // Virtual so that deleting a CudaDeviceArray/CudaHostArray through a CudaArray* calls the right destructor.
     virtual ~CudaArray() = default;
 
     // Accessors
-    __device__ __host__ T* data() const { return m_p_dataRawPtr; }
+    __device__ __host__ T*       data() const { return m_p_dataRawPtr; }
     __device__ __host__ uint64_t getElementSize() const { return sizeof(T); }
     __device__ __host__ uint64_t getArraySize() const { return m_size; }
     __device__ __host__ uint64_t getArraySizeInBytes() const { return m_size * sizeof(T); }
@@ -84,9 +84,9 @@ protected: // Making the constructor protected will make this class non-instanti
     {
     }
 
-    uint64_t m_size;
+    uint64_t    m_size;
     std::string m_name;
-    T* m_p_dataRawPtr = nullptr;
+    T*          m_p_dataRawPtr = nullptr;
 
     // It is very important to note that we use shared_ptr here to release memory, instead of just call cudaFree /
     // cudaFreeHost in the destructor. This is because we want to make this class copyable, but when we copy, we only
