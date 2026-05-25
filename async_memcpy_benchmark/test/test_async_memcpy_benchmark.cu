@@ -52,7 +52,7 @@ struct LatencyRecorder
         v_latencyMs.push_back(ms);
     }
 
-    void report(const std::string& name, int docsPerCall = 1) const
+    void report(const std::string& name, int docsPerCall = 1, bool showDocs = true) const
     {
         if (v_latencyMs.empty())
         {
@@ -74,10 +74,13 @@ struct LatencyRecorder
             std::snprintf(buf, sizeof(buf), "%.3fms", ms);
             return std::string(buf);
         };
-        std::cout << "  " << std::left << std::setw(16) << name << "  calls=" << std::setw(6) << sorted.size()
-                  << "  docs=" << std::setw(10) << totalDocs << "  mean=" << std::setw(12) << std::left << fmtMs(mean)
-                  << "  p50=" << std::setw(12) << std::left << fmtMs(p50) << "  p99=" << std::setw(12) << std::left
-                  << fmtMs(p99) << "\n";
+        std::cout << "  " << std::left << std::setw(16) << name << "  calls=" << std::setw(6) << sorted.size();
+        if (showDocs)
+            std::cout << "  docs=" << std::setw(10) << totalDocs;
+        else
+            std::cout << std::string(18, ' '); // keep columns aligned
+        std::cout << "  mean=" << std::setw(12) << std::left << fmtMs(mean) << "  p50=" << std::setw(12) << std::left
+                  << fmtMs(p50) << "  p99=" << std::setw(12) << std::left << fmtMs(p99) << "\n";
     }
 
     int count() const { return (int)v_latencyMs.size(); }
@@ -188,7 +191,7 @@ struct BenchResult
     {
         std::cout << "\n=== " << workerName << " ===\n";
         std::cout << "  headRowIdx: " << headRowIdxBegin << " -> " << headRowIdxEnd << "\n";
-        scoreRec.report("score");
+        scoreRec.report("score", 1, false);
         upsertRec.report("upsert", updateBatchSize);
         deleteRec.report("delete", updateBatchSize / 2);
         updateScalarRec.report("updateScalar", updateBatchSize);
