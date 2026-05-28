@@ -286,6 +286,7 @@ upsert()
     }
     lock(dirtyBitMutex)
     {
+        H2D(oldDirtyRowIdx)
         setDirty(old=DIRTY)
         setDirty(new=CLEAN)
     }
@@ -347,6 +348,7 @@ upsert()
     }
     lock(dirtyBitMutex)
     {
+        H2D(oldDirtyRowIdx)
         setDirty(old=DIRTY)
         setDirty(new=CLEAN)
     }
