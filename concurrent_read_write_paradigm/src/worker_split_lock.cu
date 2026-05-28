@@ -58,7 +58,7 @@ void WorkerSplitLock::upsertDocs(const std::vector<long>& v_docId, const std::ve
     const int kBlockSize      = 256;
     const int scatterGridSize = (v_element.size() + kBlockSize - 1) / kBlockSize;
 
-    // --- H2D: can overlap with score (no GPU memory touched yet) ---
+    // --- H2D: can overlap with score and other writers ---
     CudaDeviceArray<EmbElement> d_element(v_element.size(), "EmbElements");
     CHECK_CUDA(cudaMemcpyAsync(d_element.data(),
                                v_element.data(),
@@ -67,9 +67,9 @@ void WorkerSplitLock::upsertDocs(const std::vector<long>& v_docId, const std::ve
                                m_writeStream.get()));
     CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
 
-    // --- scatter: exclusive with score kernel ---
+    // --- scatter: exclusive with score on m_data ---
     {
-        std::lock_guard<std::mutex> gpuLock(m_gpuMutex);
+        std::lock_guard<std::mutex> embDataLock(m_embDataMutex);
         kn_scatter<<<scatterGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_data.data(),
                                                                             d_element.data(),
                                                                             m_embDim,
@@ -96,7 +96,7 @@ void WorkerSplitLock::updateScalarData(const std::vector<long>&               v_
     const int kBlockSize      = 256;
     const int scatterGridSize = (v_scalarElement.size() + kBlockSize - 1) / kBlockSize;
 
-    // --- H2D: can overlap with score ---
+    // --- H2D: can overlap with score and other writers ---
     CudaDeviceArray<ScalarElement> d_scalarElement(v_scalarElement.size(), "scalarElements");
     CHECK_CUDA(cudaMemcpyAsync(d_scalarElement.data(),
                                v_scalarElement.data(),
@@ -105,9 +105,9 @@ void WorkerSplitLock::updateScalarData(const std::vector<long>&               v_
                                m_writeStream.get()));
     CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
 
-    // --- scatter: exclusive with score kernel ---
+    // --- scatter: exclusive with score on m_d_scalars ---
     {
-        std::lock_guard<std::mutex> gpuLock(m_gpuMutex);
+        std::lock_guard<std::mutex> scalarLock(m_scalarMutex);
         kn_scatter<<<scatterGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
                                                                             d_scalarElement.data(),
                                                                             m_numScalars,
@@ -133,7 +133,7 @@ void WorkerSplitLock::deleteDocs(const std::vector<long>& v_docId)
     const int kBlockSize = 256;
     const int gridSize   = (v_deletedRowIdx.size() + kBlockSize - 1) / kBlockSize;
 
-    // --- H2D: can overlap with score ---
+    // --- H2D: can overlap with score and other writers ---
     CudaDeviceArray<int> d_deletedRowIdx(v_deletedRowIdx.size(), "deletedRowIdx");
     CHECK_CUDA(cudaMemcpyAsync(d_deletedRowIdx.data(),
                                v_deletedRowIdx.data(),
@@ -142,11 +142,11 @@ void WorkerSplitLock::deleteDocs(const std::vector<long>& v_docId)
                                m_writeStream.get()));
     CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
 
-    // --- set dirty=1: exclusive with score kernel ---
+    // --- set dirty=1: exclusive with score on m_d_dirty ---
     // Sync inside the lock so m_d_dirty is fully written before any scorer
-    // can acquire m_gpuMutex and launch kn_score.
+    // can acquire m_dirtyBitMutex and launch kn_score.
     {
-        std::lock_guard<std::mutex> gpuLock(m_gpuMutex);
+        std::lock_guard<std::mutex> dirtyBitLock(m_dirtyBitMutex);
         kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                       d_deletedRowIdx.data(),
                                                                       v_deletedRowIdx.size());
@@ -158,6 +158,7 @@ void WorkerSplitLock::score(const std::vector<T_EMB>& v_reqEmb,
                             const std::vector<int>&   v_targetRowIdx,
                             int                       targetScalarIdx)
 {
-    std::lock_guard<std::mutex> gpuLock(m_gpuMutex);
+    // Acquire all three GPU mutexes atomically to avoid deadlock.
+    std::scoped_lock gpuLock(m_embDataMutex, m_scalarMutex, m_dirtyBitMutex);
     scoreImpl(v_reqEmb, v_targetRowIdx, targetScalarIdx);
 }
