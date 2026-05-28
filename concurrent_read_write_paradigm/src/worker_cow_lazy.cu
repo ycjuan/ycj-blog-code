@@ -30,9 +30,9 @@ void WorkerCopyOnWriteLazy::upsertDocs(const std::vector<long>&               v_
 
     CopyOnWriteUpsertData upsertData;
     {
-        // Hold m_writeMutex across resolveAndScatterEmb to serialize m_writeStream access
+        // Hold m_mapMutex across resolveAndScatterEmb to serialize m_writeStream access
         // with concurrent updateScalarData / deleteDocs.
-        std::lock_guard<std::mutex> writeLock(m_writeMutex);
+        std::lock_guard<std::mutex> mapLock(m_mapMutex);
 
         // No scalar handling here — scalars are synced to GPU lazily in score().
         upsertData = resolveAndScatterEmb(v_docId, v2_embData, d_newRowIdx);
@@ -49,7 +49,7 @@ void WorkerCopyOnWriteLazy::updateScalarData(const std::vector<long>&           
                                              const std::vector<std::vector<float>>& v2_scalar)
 {
     // --- lock: protect scalar map ---
-    std::lock_guard<std::mutex> lock(m_writeMutex);
+    std::lock_guard<std::mutex> mapLock(m_mapMutex);
 
     for (int i = 0; i < (int)v_docId.size(); i++)
     {
@@ -61,12 +61,12 @@ void WorkerCopyOnWriteLazy::score(const std::vector<T_EMB>& v_reqEmb,
                                   const std::vector<int>&   v_targetRowIdx,
                                   int                       targetScalarIdx)
 {
-    // Snapshot scalars from the CPU maps under m_writeMutex before taking m_readMutex.
-    // Both m_rowIdx2DocId and m_docId2scalar are written under m_writeMutex; reading
-    // them without that lock would be a data race. Lock ordering: m_writeMutex first.
+    // Snapshot scalars from the CPU maps under m_mapMutex before taking m_dirtyBitMutex.
+    // Both m_rowIdx2DocId and m_docId2scalar are written under m_mapMutex; reading
+    // them without that lock would be a data race. Lock ordering: m_mapMutex first.
     std::vector<ScalarElement> v_scalarElement;
     {
-        std::lock_guard<std::mutex> writeLock(m_writeMutex);
+        std::lock_guard<std::mutex> mapLock(m_mapMutex);
         v_scalarElement.reserve(v_targetRowIdx.size() * m_numScalars);
         for (int rowIdx : v_targetRowIdx)
         {
@@ -84,7 +84,7 @@ void WorkerCopyOnWriteLazy::score(const std::vector<T_EMB>& v_reqEmb,
     {
         const int kBlockSize = 256;
 
-        std::lock_guard<std::mutex>    readLock(m_readMutex);
+        std::lock_guard<std::mutex>    dirtyBitLock(m_dirtyBitMutex);
         CudaDeviceArray<ScalarElement> d_scalarElement(v_scalarElement.size(), "scalarElements");
         CHECK_CUDA(cudaMemcpyAsync(d_scalarElement.data(),
                                    v_scalarElement.data(),

@@ -65,7 +65,7 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
     std::vector<EmbElement> v_element;
     {
         // --- lock: protect docId<>rowIdx map ---
-        std::lock_guard<std::mutex> lock(m_writeMutex);
+        std::lock_guard<std::mutex> mapLock(m_mapMutex);
         v_element = resolveAndBuildEmbElements(v_docId, v2_embData);
     }
 
@@ -96,7 +96,7 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
     // --- set dirty=1 before scatter ---
     {
         // --- lock: protect dirty bits from concurrent score reads ---
-        std::lock_guard<std::mutex> lock(m_readMutex);
+        std::lock_guard<std::mutex> dirtyBitLock(m_dirtyBitMutex);
         kn_setDirty<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                            d_element.data(),
                                                                            m_embDim,
@@ -117,7 +117,7 @@ void WorkerOverwrite::upsertDocs(const std::vector<long>& v_docId, const std::ve
     // --- clear dirty=0 after scatter ---
     {
         // --- lock: protect dirty bits from concurrent score reads ---
-        std::lock_guard<std::mutex> lock(m_readMutex);
+        std::lock_guard<std::mutex> dirtyBitLock(m_dirtyBitMutex);
         kn_setDirty<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                            d_element.data(),
                                                                            m_embDim,
@@ -134,7 +134,7 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>&               v_
     std::vector<ScalarElement> v_scalarElement;
     {
         // --- lock: protect docId<>rowIdx map ---
-        std::lock_guard<std::mutex> lock(m_writeMutex);
+        std::lock_guard<std::mutex> mapLock(m_mapMutex);
         v_scalarElement = resolveScalarElements(v_docId, v2_scalar);
     }
 
@@ -181,7 +181,7 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>&               v_
     // --- set dirty=1 before scatter ---
     {
         // --- lock: protect dirty bits from concurrent score reads ---
-        std::lock_guard<std::mutex> lock(m_readMutex);
+        std::lock_guard<std::mutex> dirtyBitLock(m_dirtyBitMutex);
         kn_setDirty<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                            d_dirtyRowIdx.data(),
                                                                            numDocs,
@@ -201,7 +201,7 @@ void WorkerOverwrite::updateScalarData(const std::vector<long>&               v_
     // --- clear dirty=0 after scatter ---
     {
         // --- lock: protect dirty bits from concurrent score reads ---
-        std::lock_guard<std::mutex> lock(m_readMutex);
+        std::lock_guard<std::mutex> dirtyBitLock(m_dirtyBitMutex);
         kn_setDirty<<<dirtyGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                            d_dirtyRowIdx.data(),
                                                                            numDocs,
@@ -216,7 +216,7 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
     std::vector<int> v_deletedRowIdx;
     {
         // --- lock: protect docId<>rowIdx map ---
-        std::lock_guard<std::mutex> lock(m_writeMutex);
+        std::lock_guard<std::mutex> mapLock(m_mapMutex);
         v_deletedRowIdx = resolveDeletedRowIdxs(v_docId);
     }
 
@@ -239,8 +239,8 @@ void WorkerOverwrite::deleteDocs(const std::vector<long>& v_docId)
         {
             // --- lock: protect dirty bits from concurrent score reads ---
             // Sync inside the lock so m_d_dirty is fully written before any
-            // scorer can acquire m_readMutex and launch kn_score.
-            std::lock_guard<std::mutex> lock(m_readMutex);
+            // scorer can acquire m_dirtyBitMutex and launch kn_score.
+            std::lock_guard<std::mutex> dirtyBitLock(m_dirtyBitMutex);
             kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                           d_deletedRowIdx.data(),
                                                                           v_deletedRowIdx.size(),
@@ -255,6 +255,6 @@ void WorkerOverwrite::score(const std::vector<T_EMB>& v_reqEmb,
                             int                       targetScalarIdx)
 {
     // --- lock: protect dirty bits from concurrent write ops ---
-    std::lock_guard<std::mutex> lock(m_readMutex);
+    std::lock_guard<std::mutex> lock(m_dirtyBitMutex);
     scoreImpl(v_reqEmb, v_targetRowIdx, targetScalarIdx);
 }
