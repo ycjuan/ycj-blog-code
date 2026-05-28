@@ -1,6 +1,7 @@
 #include "worker_cow.hpp"
 #include "worker_naive.hpp"
 #include "worker_overwrite.hpp"
+#include "worker_split_lock.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -331,6 +332,8 @@ int main()
 
     std::vector<WorkerDef> v_workerDef = {
         { "WorkerNaive", [&]() { return std::make_unique<WorkerNaive>(cfg.maxNumDocs, cfg.embDim, cfg.numScalars); } },
+        { "WorkerSplitLock",
+          [&]() { return std::make_unique<WorkerSplitLock>(cfg.maxNumDocs, cfg.embDim, cfg.numScalars); } },
         { "WorkerOverwrite",
           [&]() { return std::make_unique<WorkerOverwrite>(cfg.maxNumDocs, cfg.embDim, cfg.numScalars); } },
         { "WorkerCopyOnWriteEager",
