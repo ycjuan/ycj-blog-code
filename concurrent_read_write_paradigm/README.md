@@ -112,92 +112,267 @@ The pseudo-code below shows the locking structure of each worker. Operations out
 ### WorkerNaive
 
 ```
-score()        { lock(globalMutex) { scoreKernel } }
+score()
+{
+    lock(globalMutex)
+    {
+        scoreKernel()
+    }
+}
 
-upsert()       { lock(globalMutex) { resolveMap; H2D; embScatterKernel } }
+upsert()
+{
+    lock(globalMutex)
+    {
+        resolveMap()
+        H2D()
+        embScatterKernel()
+    }
+}
 
-updateScalar() { lock(globalMutex) { resolveMap; H2D; scalarScatterKernel } }
+updateScalar()
+{
+    lock(globalMutex)
+    {
+        resolveMap()
+        H2D()
+        scalarScatterKernel()
+    }
+}
 
-delete()       { lock(globalMutex) { resolveMap; H2D; setDirtyKernel } }
+delete()
+{
+    lock(globalMutex)
+    {
+        resolveMap()
+        H2D()
+        setDirtyKernel()
+    }
+}
 ```
 
 ### WorkerSplitLock
 
 ```
-score()        { lock(embDataMutex, scalarMutex, dirtyBitMutex) { scoreKernel } }
+score()
+{
+    lock(embDataMutex, scalarMutex, dirtyBitMutex)
+    {
+        scoreKernel()
+    }
+}
 
-upsert()       { lock(mapMutex) { resolveMap }
-                 H2D
-                 lock(embDataMutex) { embScatterKernel } }
+upsert()
+{
+    lock(mapMutex)
+    {
+        resolveMap()
+    }
+    H2D()
+    lock(embDataMutex)
+    {
+        embScatterKernel()
+    }
+}
 
-updateScalar() { lock(mapMutex) { resolveMap }
-                 H2D
-                 lock(scalarMutex) { scalarScatterKernel } }
+updateScalar()
+{
+    lock(mapMutex)
+    {
+        resolveMap()
+    }
+    H2D()
+    lock(scalarMutex)
+    {
+        scalarScatterKernel()
+    }
+}
 
-delete()       { lock(mapMutex) { resolveMap }
-                 H2D
-                 lock(dirtyBitMutex) { setDirtyKernel } }
+delete()
+{
+    lock(mapMutex)
+    {
+        resolveMap()
+    }
+    H2D()
+    lock(dirtyBitMutex)
+    {
+        setDirtyKernel()
+    }
+}
 ```
 
 ### WorkerOverwrite
 
 ```
-score()        { lock(dirtyBitMutex) { scoreKernel } }
+score()
+{
+    lock(dirtyBitMutex)
+    {
+        scoreKernel()
+    }
+}
 
-upsert()       { lock(mapMutex) { resolveMap }
-                 H2D
-                 lock(dirtyBitMutex) { setDirty(DIRTY) }
-                 embScatterKernel
-                 lock(dirtyBitMutex) { setDirty(CLEAN) } }
+upsert()
+{
+    lock(mapMutex)
+    {
+        resolveMap()
+    }
+    H2D()
+    lock(dirtyBitMutex)
+    {
+        setDirty(DIRTY)
+    }
+    embScatterKernel()
+    lock(dirtyBitMutex)
+    {
+        setDirty(CLEAN)
+    }
+}
 
-updateScalar() { lock(mapMutex) { resolveMap }
-                 H2D
-                 lock(dirtyBitMutex) { setDirty(DIRTY) }
-                 scalarScatterKernel
-                 lock(dirtyBitMutex) { setDirty(CLEAN) } }
+updateScalar()
+{
+    lock(mapMutex)
+    {
+        resolveMap()
+    }
+    H2D()
+    lock(dirtyBitMutex)
+    {
+        setDirty(DIRTY)
+    }
+    scalarScatterKernel()
+    lock(dirtyBitMutex)
+    {
+        setDirty(CLEAN)
+    }
+}
 
-delete()       { lock(mapMutex) { resolveMap }
-                 H2D
-                 lock(dirtyBitMutex) { setDirtyKernel(DIRTY) } }
+delete()
+{
+    lock(mapMutex)
+    {
+        resolveMap()
+    }
+    H2D()
+    lock(dirtyBitMutex)
+    {
+        setDirtyKernel(DIRTY)
+    }
+}
 ```
 
 ### WorkerCopyOnWriteEager
 
 ```
-score()        { lock(dirtyBitMutex, scalarMutex) { scoreKernel } }
+score()
+{
+    lock(dirtyBitMutex, scalarMutex)
+    {
+        scoreKernel()
+    }
+}
 
-upsert()       { lock(mapMutex) { resolveMap
-                                  H2D
-                                  embScatterKernel
-                                  carryScalarsH2D
-                                  scalarScatterKernel }
-                 lock(dirtyBitMutex) { setDirty(old=DIRTY)
-                                       setDirty(new=CLEAN) } }
+upsert()
+{
+    lock(mapMutex)
+    {
+        resolveMap()
+        H2D()
+        embScatterKernel()
+        carryScalarsH2D()
+        scalarScatterKernel()
+    }
+    lock(dirtyBitMutex)
+    {
+        setDirty(old=DIRTY)
+        setDirty(new=CLEAN)
+    }
+}
 
-updateScalar() { lock(mapMutex) { resolveMap; updateCPUScalars }
-                 H2D
-                 lock(scalarMutex) { scalarScatterKernel } }
+updateScalar()
+{
+    lock(mapMutex)
+    {
+        resolveMap()
+        updateCPUScalars()
+    }
+    H2D()
+    lock(scalarMutex)
+    {
+        scalarScatterKernel()
+    }
+}
 
-delete()       { lock(mapMutex) { resolveMap; eraseCPUScalars }
-                 H2D
-                 lock(dirtyBitMutex) { setDirtyKernel(DIRTY) } }
+delete()
+{
+    lock(mapMutex)
+    {
+        resolveMap()
+        eraseCPUScalars()
+    }
+    H2D()
+    lock(dirtyBitMutex)
+    {
+        setDirtyKernel(DIRTY)
+    }
+}
 ```
 
 ### WorkerCopyOnWriteLazy
 
 ```
-score()        { lock(mapMutex) { snapshotScalarsFromCPU }
-                 lock(dirtyBitMutex) { H2D; scalarScatterKernel; scoreKernel } }
+score()
+{
+    lock(mapMutex)
+    {
+        snapshotScalarsFromCPU()
+    }
+    lock(dirtyBitMutex)
+    {
+        H2D()
+        scalarScatterKernel()
+        scoreKernel()
+    }
+}
 
-upsert()       { lock(mapMutex) { resolveMap; H2D; embScatterKernel }
-                 lock(dirtyBitMutex) { setDirty(old=DIRTY)
-                                       setDirty(new=CLEAN) } }
+upsert()
+{
+    lock(mapMutex)
+    {
+        resolveMap()
+        H2D()
+        embScatterKernel()
+    }
+    lock(dirtyBitMutex)
+    {
+        setDirty(old=DIRTY)
+        setDirty(new=CLEAN)
+    }
+}
 
-updateScalar() { lock(mapMutex) { updateCPUScalarsOnly } }
+updateScalar()
+{
+    lock(mapMutex)
+    {
+        updateCPUScalarsOnly()
+    }
+}
 
-delete()       { lock(mapMutex) { resolveMap; eraseCPUScalars }
-                 H2D
-                 lock(dirtyBitMutex) { setDirtyKernel(DIRTY) } }
+delete()
+{
+    lock(mapMutex)
+    {
+        resolveMap()
+        eraseCPUScalars()
+    }
+    H2D()
+    lock(dirtyBitMutex)
+    {
+        setDirtyKernel(DIRTY)
+    }
+}
 ```
 
 ## Strategy Analysis
