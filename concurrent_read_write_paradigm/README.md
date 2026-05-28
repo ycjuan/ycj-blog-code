@@ -114,16 +114,14 @@ The pseudo-code below shows the locking structure of each worker. Operations out
 ```
 score()
 {
-    lock(globalMutex)
-    {
+    { lock(globalMutex)
         scoreKernel()
     }
 }
 
 upsert()
 {
-    lock(globalMutex)
-    {
+    { lock(globalMutex)
         resolveMap()
         H2D()
         embScatterKernel()
@@ -132,8 +130,7 @@ upsert()
 
 updateScalar()
 {
-    lock(globalMutex)
-    {
+    { lock(globalMutex)
         resolveMap()
         H2D()
         scalarScatterKernel()
@@ -142,8 +139,7 @@ updateScalar()
 
 delete()
 {
-    lock(globalMutex)
-    {
+    { lock(globalMutex)
         resolveMap()
         H2D()
         setDirtyKernel()
@@ -156,47 +152,40 @@ delete()
 ```
 score()
 {
-    lock(embDataMutex, scalarMutex, dirtyBitMutex)
-    {
+    { lock(embDataMutex, scalarMutex, dirtyBitMutex)
         scoreKernel()
     }
 }
 
 upsert()
 {
-    lock(mapMutex)
-    {
+    { lock(mapMutex)
         resolveMap()
     }
     H2D()
-    lock(embDataMutex)
-    {
+    { lock(embDataMutex)
         embScatterKernel()
     }
 }
 
 updateScalar()
 {
-    lock(mapMutex)
-    {
+    { lock(mapMutex)
         resolveMap()
     }
     H2D()
-    lock(scalarMutex)
-    {
+    { lock(scalarMutex)
         scalarScatterKernel()
     }
 }
 
 delete()
 {
-    lock(mapMutex)
-    {
+    { lock(mapMutex)
         resolveMap()
     }
     H2D()
-    lock(dirtyBitMutex)
-    {
+    { lock(dirtyBitMutex)
         setDirtyKernel()
     }
 }
@@ -207,57 +196,48 @@ delete()
 ```
 score()
 {
-    lock(dirtyBitMutex)
-    {
+    { lock(dirtyBitMutex)
         scoreKernel()
     }
 }
 
 upsert()
 {
-    lock(mapMutex)
-    {
+    { lock(mapMutex)
         resolveMap()
     }
     H2D()
-    lock(dirtyBitMutex)
-    {
+    { lock(dirtyBitMutex)
         setDirty(DIRTY)
     }
     embScatterKernel()
-    lock(dirtyBitMutex)
-    {
+    { lock(dirtyBitMutex)
         setDirty(CLEAN)
     }
 }
 
 updateScalar()
 {
-    lock(mapMutex)
-    {
+    { lock(mapMutex)
         resolveMap()
     }
     H2D()
-    lock(dirtyBitMutex)
-    {
+    { lock(dirtyBitMutex)
         setDirty(DIRTY)
     }
     scalarScatterKernel()
-    lock(dirtyBitMutex)
-    {
+    { lock(dirtyBitMutex)
         setDirty(CLEAN)
     }
 }
 
 delete()
 {
-    lock(mapMutex)
-    {
+    { lock(mapMutex)
         resolveMap()
     }
     H2D()
-    lock(dirtyBitMutex)
-    {
+    { lock(dirtyBitMutex)
         setDirtyKernel(DIRTY)
     }
 }
@@ -268,24 +248,21 @@ delete()
 ```
 score()
 {
-    lock(dirtyBitMutex, scalarMutex)
-    {
+    { lock(dirtyBitMutex, scalarMutex)
         scoreKernel()
     }
 }
 
 upsert()
 {
-    lock(mapMutex)
-    {
+    { lock(mapMutex)
         resolveMap()
         H2D()
         embScatterKernel()
         carryScalarsH2D()
         scalarScatterKernel()
     }
-    lock(dirtyBitMutex)
-    {
+    { lock(dirtyBitMutex)
         H2D(oldDirtyRowIdx)
         setDirty(old=DIRTY)
         setDirty(new=CLEAN)
@@ -294,13 +271,11 @@ upsert()
 
 updateScalar()
 {
-    lock(mapMutex)
-    {
+    { lock(mapMutex)
         resolveMap()
         updateCPUScalars()
         H2D()
-        lock(scalarMutex)
-        {
+        { lock(scalarMutex)
             scalarScatterKernel()
         }
     }
@@ -308,13 +283,11 @@ updateScalar()
 
 delete()
 {
-    lock(mapMutex)
-    {
+    { lock(mapMutex)
         resolveMap()
         eraseCPUScalars()
         H2D()
-        lock(dirtyBitMutex)
-        {
+        { lock(dirtyBitMutex)
             setDirtyKernel(DIRTY)
         }
     }
@@ -326,12 +299,10 @@ delete()
 ```
 score()
 {
-    lock(mapMutex)
-    {
+    { lock(mapMutex)
         snapshotScalarsFromCPU()
     }
-    lock(dirtyBitMutex)
-    {
+    { lock(dirtyBitMutex)
         H2D()
         scalarScatterKernel()
         scoreKernel()
@@ -340,14 +311,12 @@ score()
 
 upsert()
 {
-    lock(mapMutex)
-    {
+    { lock(mapMutex)
         resolveMap()
         H2D()
         embScatterKernel()
     }
-    lock(dirtyBitMutex)
-    {
+    { lock(dirtyBitMutex)
         H2D(oldDirtyRowIdx)
         setDirty(old=DIRTY)
         setDirty(new=CLEAN)
@@ -356,21 +325,18 @@ upsert()
 
 updateScalar()
 {
-    lock(mapMutex)
-    {
+    { lock(mapMutex)
         updateCPUScalarsOnly()
     }
 }
 
 delete()
 {
-    lock(mapMutex)
-    {
+    { lock(mapMutex)
         resolveMap()
         eraseCPUScalars()
         H2D()
-        lock(dirtyBitMutex)
-        {
+        { lock(dirtyBitMutex)
             setDirtyKernel(DIRTY)
         }
     }
