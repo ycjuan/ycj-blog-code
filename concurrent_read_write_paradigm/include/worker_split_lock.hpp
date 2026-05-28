@@ -23,6 +23,6 @@ public:
                int                       targetScalarIdx) override;
 
 private:
-    std::mutex m_writeMutex; // protects CPU docId<>rowIdx maps
-    std::mutex m_readMutex;  // serializes GPU scatter kernels vs score kernel
+    std::mutex m_mapMutex; // protects CPU docId<>rowIdx maps
+    std::mutex m_gpuMutex; // serializes GPU scatter kernels vs score kernel
 };
