@@ -46,7 +46,7 @@ void WorkerSplitLock::upsertDocs(const std::vector<long>& v_docId, const std::ve
     // --- resolve docId -> rowIdx and build emb elements ---
     std::vector<EmbElement> v_element;
     {
-        std::lock_guard<std::mutex> writeLock(m_mapMutex);
+        std::lock_guard<std::mutex> mapLock(m_mapMutex);
         v_element = resolveAndBuildEmbElements(v_docId, v2_embData);
     }
 
@@ -69,7 +69,7 @@ void WorkerSplitLock::upsertDocs(const std::vector<long>& v_docId, const std::ve
 
     // --- scatter: exclusive with score kernel ---
     {
-        std::lock_guard<std::mutex> readLock(m_gpuMutex);
+        std::lock_guard<std::mutex> gpuLock(m_gpuMutex);
         kn_scatter<<<scatterGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_data.data(),
                                                                             d_element.data(),
                                                                             m_embDim,
@@ -84,7 +84,7 @@ void WorkerSplitLock::updateScalarData(const std::vector<long>&               v_
     // --- resolve docId -> rowIdx and build scalar elements ---
     std::vector<ScalarElement> v_scalarElement;
     {
-        std::lock_guard<std::mutex> writeLock(m_mapMutex);
+        std::lock_guard<std::mutex> mapLock(m_mapMutex);
         v_scalarElement = resolveScalarElements(v_docId, v2_scalar);
     }
 
@@ -107,7 +107,7 @@ void WorkerSplitLock::updateScalarData(const std::vector<long>&               v_
 
     // --- scatter: exclusive with score kernel ---
     {
-        std::lock_guard<std::mutex> readLock(m_gpuMutex);
+        std::lock_guard<std::mutex> gpuLock(m_gpuMutex);
         kn_scatter<<<scatterGridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
                                                                             d_scalarElement.data(),
                                                                             m_numScalars,
@@ -121,7 +121,7 @@ void WorkerSplitLock::deleteDocs(const std::vector<long>& v_docId)
     // --- update maps, collect deleted rowIdxs ---
     std::vector<int> v_deletedRowIdx;
     {
-        std::lock_guard<std::mutex> writeLock(m_mapMutex);
+        std::lock_guard<std::mutex> mapLock(m_mapMutex);
         v_deletedRowIdx = resolveDeletedRowIdxs(v_docId);
     }
 
@@ -146,7 +146,7 @@ void WorkerSplitLock::deleteDocs(const std::vector<long>& v_docId)
     // Sync inside the lock so m_d_dirty is fully written before any scorer
     // can acquire m_gpuMutex and launch kn_score.
     {
-        std::lock_guard<std::mutex> readLock(m_gpuMutex);
+        std::lock_guard<std::mutex> gpuLock(m_gpuMutex);
         kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                       d_deletedRowIdx.data(),
                                                                       v_deletedRowIdx.size());
@@ -158,6 +158,6 @@ void WorkerSplitLock::score(const std::vector<T_EMB>& v_reqEmb,
                             const std::vector<int>&   v_targetRowIdx,
                             int                       targetScalarIdx)
 {
-    std::lock_guard<std::mutex> readLock(m_gpuMutex);
+    std::lock_guard<std::mutex> gpuLock(m_gpuMutex);
     scoreImpl(v_reqEmb, v_targetRowIdx, targetScalarIdx);
 }
