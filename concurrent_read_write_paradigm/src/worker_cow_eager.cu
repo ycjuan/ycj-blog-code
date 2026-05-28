@@ -73,9 +73,9 @@ void WorkerCopyOnWriteEager::upsertDocs(const std::vector<long>&               v
 
     CopyOnWriteUpsertData upsertData;
     {
-        // Hold m_writeMutex across Phase 1 and 2 to serialize m_writeStream and m_docId2scalar
+        // Hold m_mapMutex across Phase 1 and 2 to serialize m_writeStream and m_docId2scalar
         // access with concurrent updateScalarData / deleteDocs.
-        std::lock_guard<std::mutex> writeLock(m_writeMutex);
+        std::lock_guard<std::mutex> mapLock(m_mapMutex);
 
         // Phase 1: allocate new rowIdxs, write emb data to GPU.
         upsertData = resolveAndScatterEmb(v_docId, v2_embData, d_newRowIdx);
@@ -95,9 +95,9 @@ void WorkerCopyOnWriteEager::upsertDocs(const std::vector<long>&               v
 void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>&               v_docId,
                                               const std::vector<std::vector<float>>& v2_scalar)
 {
-    // Hold m_writeMutex for the entire operation to serialize m_writeStream access
+    // Hold m_mapMutex for the entire operation to serialize m_writeStream access
     // with concurrent upsertDocs / deleteDocs.
-    std::lock_guard<std::mutex> writeLock(m_writeMutex);
+    std::lock_guard<std::mutex> mapLock(m_mapMutex);
 
     std::vector<ScalarElement> v_scalarElement = resolveScalarElements(v_docId, v2_scalar);
 
@@ -128,7 +128,7 @@ void WorkerCopyOnWriteEager::updateScalarData(const std::vector<long>&          
                                    m_writeStream.get()));
         CHECK_CUDA(cudaStreamSynchronize(m_writeStream.get()));
         int                         gridSize = (numElements + kBlockSize - 1) / kBlockSize;
-        std::lock_guard<std::mutex> readLock(m_readMutex);
+        std::lock_guard<std::mutex> scalarLock(m_scalarMutex);
         kn_scatter<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_scalars.data(),
                                                                      d_scalarElement.data(),
                                                                      m_numScalars,
@@ -142,6 +142,6 @@ void WorkerCopyOnWriteEager::score(const std::vector<T_EMB>& v_reqEmb,
                                    int                       targetScalarIdx)
 {
     // --- lock: protect dirty bits from concurrent write ops ---
-    std::lock_guard<std::mutex> lock(m_readMutex);
+    std::scoped_lock scoreLock(m_dirtyBitMutex, m_scalarMutex);
     scoreImpl(v_reqEmb, v_targetRowIdx, targetScalarIdx);
 }

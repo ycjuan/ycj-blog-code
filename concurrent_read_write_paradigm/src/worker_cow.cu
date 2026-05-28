@@ -38,7 +38,7 @@ CopyOnWriteUpsertData WorkerCopyOnWrite::resolveAndScatterEmb(const std::vector<
                                                               const std::vector<std::vector<T_EMB>>& v2_embData,
                                                               CudaDeviceArray<int>&                  d_newRowIdx)
 {
-    // Caller must hold m_writeMutex.
+    // Caller must hold m_mapMutex.
     CopyOnWriteUpsertData upsertData;
     upsertData.v_embElement.reserve(v_docId.size() * m_embDim);
     upsertData.v_newRowIdx.reserve(v_docId.size());
@@ -123,7 +123,7 @@ void WorkerCopyOnWrite::commitDirtyBitFlip(const CopyOnWriteUpsertData& upsertDa
     const int kBlockSize = 256;
 
     // --- lock: protect dirty bits from concurrent score reads ---
-    std::lock_guard<std::mutex> lock(m_readMutex);
+    std::lock_guard<std::mutex> dirtyBitLock(m_dirtyBitMutex);
 
     // Hide old rows first so scorers never see them after the new rows are revealed.
     // Only present for re-upserted (existing) docs; new docs have no old row to hide.
@@ -156,9 +156,9 @@ void WorkerCopyOnWrite::commitDirtyBitFlip(const CopyOnWriteUpsertData& upsertDa
 
 void WorkerCopyOnWrite::deleteDocs(const std::vector<long>& v_docId)
 {
-    // Hold m_writeMutex for the entire operation to serialize m_writeStream access
+    // Hold m_mapMutex for the entire operation to serialize m_writeStream access
     // with concurrent upsertDocs / updateScalarData.
-    std::lock_guard<std::mutex> writeLock(m_writeMutex);
+    std::lock_guard<std::mutex> mapLock(m_mapMutex);
 
     std::vector<int> v_deletedRowIdx = resolveDeletedRowIdxs(v_docId);
 
@@ -186,8 +186,8 @@ void WorkerCopyOnWrite::deleteDocs(const std::vector<long>& v_docId)
         {
             // --- lock: protect dirty bits from concurrent score reads ---
             // Sync inside the lock so m_d_dirty is fully written before any
-            // scorer can acquire m_readMutex and launch kn_score.
-            std::lock_guard<std::mutex> readLock(m_readMutex);
+            // scorer can acquire m_dirtyBitMutex and launch kn_score.
+            std::lock_guard<std::mutex> dirtyBitLock(m_dirtyBitMutex);
             kn_setDirty<<<gridSize, kBlockSize, 0, m_writeStream.get()>>>(m_d_dirty.data(),
                                                                           d_deletedRowIdx.data(),
                                                                           v_deletedRowIdx.size(),

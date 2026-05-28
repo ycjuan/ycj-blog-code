@@ -13,10 +13,10 @@ public:
     void updateScalarData(const std::vector<long>& v_docId, const std::vector<std::vector<float>>& v2_scalar) override;
     void deleteDocs(const std::vector<long>& v_docId) override;
     void score(const std::vector<T_EMB>& v_reqEmb,
-               const std::vector<int>& v_targetRowIdx,
-               int targetScalarIdx) override;
+               const std::vector<int>&   v_targetRowIdx,
+               int                       targetScalarIdx) override;
 
 private:
-    std::mutex m_readMutex; // locked only when dirty bits are modified
-    std::mutex m_writeMutex; // locked when rowIdx<>docId map is modified
+    std::mutex m_mapMutex;      // protects CPU docId<>rowIdx map
+    std::mutex m_dirtyBitMutex; // protects GPU dirty-bit array (m_d_dirty)
 };

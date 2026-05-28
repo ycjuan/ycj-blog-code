@@ -38,8 +38,8 @@ protected:
                             const CudaDeviceArray<int>&  d_newRowIdx,
                             int                          numDocs);
 
-    std::mutex m_readMutex;  // locked only when dirty bits are modified or read
-    std::mutex m_writeMutex; // locked when rowIdx<>docId map or scalar map is modified
+    std::mutex m_mapMutex;      // protects CPU docId<>rowIdx map and scalar map
+    std::mutex m_dirtyBitMutex; // protects GPU dirty-bit array (m_d_dirty)
 
     std::unordered_map<long, std::vector<float>> m_docId2scalar; // CPU-side scalar store
 };
@@ -62,7 +62,8 @@ public:
                int                       targetScalarIdx) override;
 
 private:
-    void carryScalarsToNewRowIdx(const std::vector<long>& v_docId, const std::vector<int>& v_newRowIdx);
+    void       carryScalarsToNewRowIdx(const std::vector<long>& v_docId, const std::vector<int>& v_newRowIdx);
+    std::mutex m_scalarMutex; // protects GPU scalar array (m_d_scalars)
 };
 
 // Lazy variant: updateScalarData stores scalars on CPU only. upsertDocs does not
