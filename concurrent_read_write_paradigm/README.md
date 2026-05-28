@@ -297,11 +297,11 @@ updateScalar()
     {
         resolveMap()
         updateCPUScalars()
-    }
-    H2D()
-    lock(scalarMutex)
-    {
-        scalarScatterKernel()
+        H2D()
+        lock(scalarMutex)
+        {
+            scalarScatterKernel()
+        }
     }
 }
 
@@ -311,11 +311,11 @@ delete()
     {
         resolveMap()
         eraseCPUScalars()
-    }
-    H2D()
-    lock(dirtyBitMutex)
-    {
-        setDirtyKernel(DIRTY)
+        H2D()
+        lock(dirtyBitMutex)
+        {
+            setDirtyKernel(DIRTY)
+        }
     }
 }
 ```
@@ -366,11 +366,11 @@ delete()
     {
         resolveMap()
         eraseCPUScalars()
-    }
-    H2D()
-    lock(dirtyBitMutex)
-    {
-        setDirtyKernel(DIRTY)
+        H2D()
+        lock(dirtyBitMutex)
+        {
+            setDirtyKernel(DIRTY)
+        }
     }
 }
 ```
