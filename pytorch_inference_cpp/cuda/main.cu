@@ -226,16 +226,9 @@ int main()
     GpuBuf d_query(query_dim);
     d_query.upload(h_query);
 
-    // docs stored col-major [doc_dim x num_docs] for cuBLAS
-    // Row-major [num_docs x doc_dim] == col-major [doc_dim x num_docs] after transpose.
-    // For simplicity: upload row-major and use CUBLAS_OP_T on it later.
-    // Instead, store docs as col-major from the start:
-    std::vector<float> h_docs_col(doc_dim * num_docs);
-    for (int d = 0; d < num_docs; ++d)
-        for (int j = 0; j < doc_dim; ++j)
-            h_docs_col[j * num_docs + d] = h_docs[d * doc_dim + j];
-    GpuBuf d_docs(doc_dim * num_docs);
-    d_docs.upload(h_docs_col);
+    // docs row-major [num_docs x doc_dim] == col-major [doc_dim x num_docs]: same memory layout
+    GpuBuf d_docs(num_docs * doc_dim);
+    d_docs.upload(h_docs);
 
     // --- Activation buffers (col-major: [dim x num_docs]) ---
     const int H1   = hidden_sizes[0];
@@ -289,7 +282,7 @@ int main()
     for (int d = 0; d < num_docs; ++d)
     {
         for (int h = 0; h < num_heads; ++h)
-            std::cout << h_scores[d * num_heads + h] << " ";
+            std::cout << h_scores[h + d * num_heads] << " ";
         std::cout << "\n";
     }
 
