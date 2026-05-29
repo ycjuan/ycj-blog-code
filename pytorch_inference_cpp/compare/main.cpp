@@ -67,11 +67,14 @@ int main()
     assertEqual(ref, got_trt, "TensorRT     vs TorchScript");
     assertEqual(ref, got_cu, "Pure CUDA    vs TorchScript");
 
-    std::cout << "\nBenchmarking (num_docs=10000, 3 warmup + 10 iters)...\n";
-    printf("  TorchScript  : %7.2f ms\n", benchMs(*ts, in, 3, 10));
-    printf("  ONNX Runtime : %7.2f ms\n", benchMs(*ort, in, 3, 10));
-    printf("  TensorRT     : %7.2f ms\n", benchMs(*trt, in, 3, 10));
-    printf("  Pure CUDA    : %7.2f ms\n", benchMs(*cu, in, 3, 10));
+    const int numTrials       = 10;
+    const int numWarmupTrials = 3;
+
+    std::cout << "\nBenchmarking (num_docs=10000, " << numWarmupTrials << " warmup + " << numTrials << " trials)...\n";
+    printf("  TorchScript  : %7.2f ms\n", benchMs(*ts, in, numWarmupTrials, numTrials));
+    printf("  ONNX Runtime : %7.2f ms\n", benchMs(*ort, in, numWarmupTrials, numTrials));
+    printf("  TensorRT     : %7.2f ms\n", benchMs(*trt, in, numWarmupTrials, numTrials));
+    printf("  Pure CUDA    : %7.2f ms\n", benchMs(*cu, in, numWarmupTrials, numTrials));
 
     return 0;
 }
