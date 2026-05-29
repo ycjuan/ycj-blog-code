@@ -19,7 +19,7 @@ python3 export.py
 ### LibTorch (for TorchScript approach)
 
 ```bash
-cd ~/external && wget https://download.pytorch.org/libtorch/cu128/libtorch-cxx11-abi-shared-with-deps-2.8.0%2Bcu128.zip && unzip libtorch-*.zip
+cd ~/external && wget https://download.pytorch.org/libtorch/cu128/libtorch-shared-with-deps-2.8.0%2Bcu128.zip && unzip libtorch-*.zip
 # Produces: ~/external/libtorch/
 ```
 
