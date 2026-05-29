@@ -30,6 +30,13 @@ int main()
     TrtUniquePtr<nvinfer1::IBuilderConfig> config(builder->createBuilderConfig());
     config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, 1 << 20);
 
+    // Optimization profile required because the ONNX model has a dynamic batch dimension
+    nvinfer1::IOptimizationProfile* profile = builder->createOptimizationProfile();
+    profile->setDimensions("input", nvinfer1::OptProfileSelector::kMIN, nvinfer1::Dims2(1, 4));
+    profile->setDimensions("input", nvinfer1::OptProfileSelector::kOPT, nvinfer1::Dims2(1, 4));
+    profile->setDimensions("input", nvinfer1::OptProfileSelector::kMAX, nvinfer1::Dims2(1, 4));
+    config->addOptimizationProfile(profile);
+
     TrtUniquePtr<nvinfer1::ICudaEngine> engine(builder->buildEngineWithConfig(*network, *config));
 
     // --- Run inference ---
