@@ -1,8 +1,8 @@
 #pragma once
+#include <memory>
 #include <string>
 #include <vector>
 
-// Inputs and model locations shared by all backends
 struct Input
 {
     std::vector<float> query; // [query_dim]
@@ -20,8 +20,15 @@ struct Paths
     std::string weights_dir;       // weights/
 };
 
-// Each backend returns scores [num_docs x num_heads], row-major
-std::vector<float> run_torchscript(const Paths& paths, const Input& in);
-std::vector<float> run_onnxruntime(const Paths& paths, const Input& in);
-std::vector<float> run_tensorrt(const Paths& paths, const Input& in);
-std::vector<float> run_cuda(const Paths& paths, const Input& in);
+// Abstract backend: construct once (loads/compiles the model), call infer() many times.
+// Separating init from infer lets benchmarks measure pure forward-pass latency.
+struct InferBackend
+{
+    virtual ~InferBackend()                           = default;
+    virtual std::vector<float> infer(const Input& in) = 0;
+};
+
+std::unique_ptr<InferBackend> make_torchscript(const Paths& paths);
+std::unique_ptr<InferBackend> make_onnxruntime(const Paths& paths);
+std::unique_ptr<InferBackend> make_tensorrt(const Paths& paths, const Input& profile_input);
+std::unique_ptr<InferBackend> make_cuda(const Paths& paths, const Input& shape_hint);
