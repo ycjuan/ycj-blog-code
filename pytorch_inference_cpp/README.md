@@ -65,6 +65,6 @@ cd onnxruntime
 
 ```bash
 cd tensorrt
-./compile.sh /path/to/tensorrt   # update once installed via dnf
+./compile.sh
 ./build/inference
 ```
