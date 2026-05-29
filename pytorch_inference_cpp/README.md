@@ -26,8 +26,8 @@ cd ~/external && wget https://download.pytorch.org/libtorch/cu128/libtorch-share
 ### ONNX Runtime (for ONNX Runtime approach)
 
 ```bash
-cd ~/external && wget https://github.com/microsoft/onnxruntime/releases/download/v1.22.0/onnxruntime-linux-x64-gpu-cuda12-1.22.0.tgz && tar -xzf onnxruntime-*.tgz
-# Produces: ~/external/onnxruntime-linux-x64-gpu-cuda12-1.22.0/
+cd ~/external && wget https://github.com/microsoft/onnxruntime/releases/download/v1.26.0/onnxruntime-linux-x64-gpu-1.26.0.tgz && tar -xzf onnxruntime-linux-x64-gpu-1.26.0.tgz
+# Produces: ~/external/onnxruntime-linux-x64-gpu-1.26.0/
 ```
 
 ### TensorRT (for TensorRT approach)
@@ -53,7 +53,7 @@ cd torchscript
 
 ```bash
 cd onnxruntime
-./compile.sh ~/external/onnxruntime-linux-x64-gpu-cuda12-1.22.0
+./compile.sh ~/external/onnxruntime-linux-x64-gpu-1.26.0
 ./build/inference
 ```
 
