@@ -18,20 +18,16 @@ python3 export.py
 
 ### LibTorch (for TorchScript approach)
 
-Download from https://pytorch.org/get-started/locally/ — select Stable, Linux, LibTorch, C++/Java, CUDA 12.8.
-
 ```bash
-cd ~ && unzip libtorch-*.zip
-# Produces: ~/libtorch/
+cd ~/external && wget https://download.pytorch.org/libtorch/cu128/libtorch-cxx11-abi-shared-with-deps-2.8.0%2Bcu128.zip && unzip libtorch-*.zip
+# Produces: ~/external/libtorch/
 ```
 
 ### ONNX Runtime (for ONNX Runtime approach)
 
-Download the CUDA 12 variant from https://github.com/microsoft/onnxruntime/releases — pick `onnxruntime-linux-x64-gpu-cuda12-*.tgz`.
-
 ```bash
-cd ~ && tar -xzf onnxruntime-linux-x64-gpu-cuda12-*.tgz
-# Produces: ~/onnxruntime-linux-x64-gpu-cuda12-<version>/
+cd ~/external && wget https://github.com/microsoft/onnxruntime/releases/download/v1.22.0/onnxruntime-linux-x64-gpu-cuda12-1.22.0.tgz && tar -xzf onnxruntime-*.tgz
+# Produces: ~/external/onnxruntime-linux-x64-gpu-cuda12-1.22.0/
 ```
 
 ### TensorRT (for TensorRT approach)
@@ -49,7 +45,7 @@ sudo dnf install tensorrt
 
 ```bash
 cd torchscript
-./compile.sh ~/libtorch
+./compile.sh ~/external/libtorch
 ./build/inference
 ```
 
@@ -57,11 +53,11 @@ cd torchscript
 
 ```bash
 cd onnxruntime
-./compile.sh ~/onnxruntime-linux-x64-gpu-cuda12-<version>
+./compile.sh ~/external/onnxruntime-linux-x64-gpu-cuda12-1.22.0
 ./build/inference
 ```
 
-### Approach 3: TensorRT
+### Approach 3: TensorRT (requires GPU)
 
 ```bash
 cd tensorrt
