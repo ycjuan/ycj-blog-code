@@ -1,6 +1,5 @@
 #include <iostream>
 #include <torch/script.h>
-#include <vector>
 
 int main()
 {
@@ -16,12 +15,14 @@ int main()
     }
     model.eval();
 
-    torch::Tensor input = torch::randn({ 1, 4 });
-    std::cout << "Input:  " << input << "\n";
+    torch::Tensor query = torch::randn({ 64 });
+    torch::Tensor docs  = torch::randn({ 5, 128 });
 
-    std::vector<torch::jit::IValue> inputs = { input };
-    torch::Tensor                   output = model.forward(inputs).toTensor();
-    std::cout << "Output: " << output << "\n";
+    std::vector<torch::jit::IValue> inputs = { query, docs };
+    torch::Tensor                   scores = model.forward(inputs).toTensor();
+
+    std::cout << "Scores shape: [" << scores.size(0) << ", " << scores.size(1) << "]\n";
+    std::cout << "Scores:\n" << scores << "\n";
 
     return 0;
 }

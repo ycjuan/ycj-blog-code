@@ -9,32 +9,49 @@ int main()
 
     Ort::Session session(env, "../model.onnx", session_options);
 
-    Ort::AllocatorWithDefaultOptions allocator;
+    // query: [64], docs: [5, 128]
+    std::vector<float>   query_data(64);
+    std::vector<float>   docs_data(5 * 128);
+    std::vector<int64_t> query_shape = { 64 };
+    std::vector<int64_t> docs_shape  = { 5, 128 };
 
-    const char* input_name  = "input";
-    const char* output_name = "output";
+    // Fill with dummy data
+    for (auto& v : query_data)
+        v = 0.5f;
+    for (auto& v : docs_data)
+        v = 0.5f;
 
-    std::vector<float>   input_data  = { 1.0f, 2.0f, 3.0f, 4.0f };
-    std::vector<int64_t> input_shape = { 1, 4 };
+    Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 
-    Ort::MemoryInfo memory_info  = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-    Ort::Value      input_tensor = Ort::Value::CreateTensor<float>(memory_info,
-                                                              input_data.data(),
-                                                              input_data.size(),
-                                                              input_shape.data(),
-                                                              input_shape.size());
+    Ort::Value input_tensors[2] = {
+        Ort::Value::CreateTensor<float>(memory_info,
+                                        query_data.data(),
+                                        query_data.size(),
+                                        query_shape.data(),
+                                        query_shape.size()),
+        Ort::Value::CreateTensor<float>(memory_info,
+                                        docs_data.data(),
+                                        docs_data.size(),
+                                        docs_shape.data(),
+                                        docs_shape.size()),
+    };
 
-    std::vector<const char*> input_names  = { input_name };
-    std::vector<const char*> output_names = { output_name };
+    const char* input_names[]  = { "query", "docs" };
+    const char* output_names[] = { "scores" };
 
-    auto output_tensors
-        = session.Run(Ort::RunOptions { nullptr }, input_names.data(), &input_tensor, 1, output_names.data(), 1);
+    auto output_tensors = session.Run(Ort::RunOptions { nullptr }, input_names, input_tensors, 2, output_names, 1);
 
-    float* output_data  = output_tensors[0].GetTensorMutableData<float>();
-    auto   output_shape = output_tensors[0].GetTensorTypeAndShapeInfo().GetShape();
+    float* scores    = output_tensors[0].GetTensorMutableData<float>();
+    auto   out_shape = output_tensors[0].GetTensorTypeAndShapeInfo().GetShape();
 
-    std::cout << "Output shape: [" << output_shape[0] << ", " << output_shape[1] << "]\n";
-    std::cout << "Output: [" << output_data[0] << ", " << output_data[1] << "]\n";
+    std::cout << "Scores shape: [" << out_shape[0] << ", " << out_shape[1] << "]\n";
+    std::cout << "Scores:\n";
+    for (int d = 0; d < out_shape[0]; ++d)
+    {
+        for (int h = 0; h < out_shape[1]; ++h)
+            std::cout << scores[d * out_shape[1] + h] << " ";
+        std::cout << "\n";
+    }
 
     return 0;
 }
