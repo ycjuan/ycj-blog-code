@@ -89,3 +89,39 @@ torch.onnx.export(
     opset_version=17,
 )
 print("Saved model.onnx (ONNX Runtime + TensorRT)")
+
+# --- Approach 4: Pure CUDA — dump weights as raw float32 binary files ---
+# Each Linear weight is [out_dim, in_dim] row-major (PyTorch default).
+# Biases are [out_dim].
+import os
+weights_dir = "weights"
+os.makedirs(weights_dir, exist_ok=True)
+
+def save_tensor(tensor: torch.Tensor, name: str):
+    path = os.path.join(weights_dir, name)
+    tensor.detach().cpu().float().numpy().tofile(path)
+    print(f"  Saved {path}  shape={list(tensor.shape)}")
+
+print("Saving weights for pure CUDA inference:")
+save_tensor(model.w1_query.weight, "w1_query.bin")  # [H1, Dq]
+save_tensor(model.w1_query.bias,   "b1.bin")         # [H1]
+save_tensor(model.w1_doc.weight,   "w1_doc.bin")     # [H1, Dd]
+for i, layer in enumerate(model.hidden):
+    if isinstance(layer, torch.nn.Linear):
+        idx = i // 2  # each hidden block is Linear + ReLU
+        save_tensor(layer.weight, f"w_hidden_{idx}.bin")
+        save_tensor(layer.bias,   f"b_hidden_{idx}.bin")
+save_tensor(model.output.weight, "w_out.bin")        # [num_heads, H_last]
+save_tensor(model.output.bias,   "b_out.bin")        # [num_heads]
+
+# Also save config so the C++ side knows the dims
+import json
+config = {
+    "query_dim":    QUERY_DIM,
+    "doc_dim":      DOC_DIM,
+    "hidden_sizes": HIDDEN_SIZES,
+    "num_heads":    NUM_HEADS,
+}
+with open(os.path.join(weights_dir, "config.json"), "w") as f:
+    json.dump(config, f, indent=2)
+print(f"  Saved {weights_dir}/config.json")
