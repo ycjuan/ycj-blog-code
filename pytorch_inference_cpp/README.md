@@ -85,5 +85,16 @@ Expected output:
 [PASS] TensorRT     vs TorchScript
 [PASS] Pure CUDA    vs TorchScript
 
+Benchmarking (num_docs=10000, 3 warmup + 10 iters)...
+  TorchScript  :   13.92 ms
+  ONNX Runtime :   12.64 ms
+  TensorRT     :    2.01 ms
+  Pure CUDA    :    3.21 ms
+
 All backends agree.
 ```
+
+Benchmark config: Amazon Linux 2023, CUDA 12.9, TensorRT 11, T4 GPU.
+Model: query\_dim=64, doc\_dim=128, hidden=[256, 128], num\_heads=2.
+
+TensorRT is ~7x faster than TorchScript/ONNX Runtime because its engine compilation step tunes kernel tiling for the exact shape. Pure CUDA sits in between, using generic cuBLAS without TRT's auto-tuning.
