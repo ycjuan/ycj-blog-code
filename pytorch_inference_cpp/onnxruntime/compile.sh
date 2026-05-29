@@ -1,12 +1,7 @@
 #!/bin/bash
 set -e
 
-ONNXRUNTIME_ROOT=$1
-
-if [ -z "$ONNXRUNTIME_ROOT" ]; then
-    echo "Usage: ./compile.sh /path/to/onnxruntime"
-    exit 1
-fi
+ONNXRUNTIME_ROOT=~/external/onnxruntime-linux-x64-gpu-1.26.0
 
 mkdir -p build && cd build
 cmake .. -DONNXRUNTIME_ROOT=$ONNXRUNTIME_ROOT

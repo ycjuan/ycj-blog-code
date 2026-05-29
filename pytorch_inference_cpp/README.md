@@ -45,7 +45,7 @@ sudo dnf install tensorrt
 
 ```bash
 cd torchscript
-./compile.sh ~/external/libtorch
+./compile.sh
 ./build/inference
 ```
 
@@ -53,7 +53,7 @@ cd torchscript
 
 ```bash
 cd onnxruntime
-./compile.sh ~/external/onnxruntime-linux-x64-gpu-1.26.0
+./compile.sh
 ./build/inference
 ```
 
