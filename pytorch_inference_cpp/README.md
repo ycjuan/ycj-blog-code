@@ -120,10 +120,20 @@ Benchmarking (num_docs=10000, 3 warmup + 10 trials)...
   AOTInductor  :    2.24 ms
 ```
 
-Benchmark config: Amazon Linux 2023, CUDA 12.9, TensorRT 11, T4 GPU.
-Model: query\_dim=64, doc\_dim=128, hidden=[256, 128], num\_heads=2.
+## Benchmark
 
-TensorRT and AOTInductor are both ~5x faster than TorchScript/ONNX Runtime because they compile GPU kernels ahead of time and auto-tune tiling for the exact input shape. Pure CUDA uses generic cuBLAS GEMMs without that auto-tuning. The key difference between TensorRT and AOTInductor: TensorRT requires a separate install, while AOTInductor ships as part of LibTorch.
+Config: Amazon Linux 2023, CUDA 12.9, TensorRT 11, T4 GPU.
+Model: query\_dim=64, doc\_dim=128, hidden=[256, 128], num\_heads=2, num\_docs=10000.
+
+| Backend | Latency |
+|---|---|
+| TorchScript | 10.71 ms |
+| ONNX Runtime | 12.27 ms |
+| Pure CUDA | 3.24 ms |
+| **AOTInductor** | **2.24 ms** |
+| **TensorRT** | **2.01 ms** |
+
+TensorRT and AOTInductor are both ~5x faster than TorchScript/ONNX Runtime because they compile GPU kernels ahead of time and auto-tune tiling for the exact input shape. Pure CUDA uses generic cuBLAS GEMMs without that auto-tuning.
 
 ## TensorRT vs AOTInductor
 
