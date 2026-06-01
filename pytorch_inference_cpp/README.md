@@ -1,6 +1,6 @@
 # PyTorch Inference in C++
 
-Demonstrates four approaches to serve a PyTorch model in pure C++ with no Python runtime.
+Demonstrates five approaches to serve a PyTorch model in pure C++ with no Python runtime.
 
 ## Model
 
@@ -11,26 +11,26 @@ A 2-tower MLP scorer (query + doc):
 
 ## Dependency comparison
 
-| | TorchScript | ONNX Runtime | TensorRT | Pure CUDA |
-|---|---|---|---|---|
-| Convert via | `torch.jit.trace` | `torch.onnx.export` | `torch.onnx.export` | weight dump |
-| Convert deps | PyTorch | PyTorch + `onnx` | PyTorch + `onnx` | PyTorch |
-| Model file | `model.pt` | `model.onnx` | `model.onnx` | `weights/*.bin` |
-| C++ library | LibTorch | ONNX Runtime | TensorRT + CUDA | cuBLAS only |
-| NVIDIA GPU required | No | No | Yes | Yes |
-| PyTorch at serve time | No | No | No | No |
+| | TorchScript | ONNX Runtime | TensorRT | Pure CUDA | AOTInductor |
+|---|---|---|---|---|---|
+| Convert via | `torch.jit.trace` | `torch.onnx.export` | `torch.onnx.export` | weight dump | `torch.export` |
+| Convert deps | PyTorch | PyTorch + `onnx` | PyTorch + `onnx` | PyTorch | PyTorch |
+| Model file | `model.pt` | `model.onnx` | `model.onnx` | `weights/*.bin` | `model.pt2` |
+| C++ library | LibTorch | ONNX Runtime | TensorRT + CUDA | cuBLAS only | LibTorch |
+| NVIDIA GPU required | No | No | Yes | Yes | Yes |
+| PyTorch at serve time | No | No | No | No | No |
 
 ## Step 1: Export the model
 
 ```bash
 pip install torch onnx
 python3 export.py
-# Produces: model.pt, model.onnx, weights/
+# Produces: model.pt, model.onnx, model.pt2, weights/
 ```
 
 ## Step 2: Install dependencies
 
-### LibTorch (TorchScript and compare)
+### LibTorch (TorchScript, AOTInductor, and compare)
 
 ```bash
 cd ~/external && wget https://download.pytorch.org/libtorch/cu128/libtorch-shared-with-deps-2.8.0%2Bcu128.zip && unzip libtorch-*.zip
@@ -90,7 +90,15 @@ cd tensorrt && ./compile.sh && ./run.sh
 cd cuda && ./compile.sh && ./run.sh
 ```
 
-## Step 4: Run all four and assert they agree
+### Approach 5: AOTInductor (requires GPU)
+
+Uses `torch.export` + `torch._inductor.aoti_compile_and_package` to compile the model into a `.pt2` package with Inductor's kernel auto-tuning. Loaded in C++ via `AOTIModelPackageLoader`, which is part of LibTorch — no extra dependency beyond LibTorch.
+
+```bash
+cd aotinductor && ./compile.sh && ./run.sh
+```
+
+## Step 4: Run all five and assert they agree
 
 ```bash
 cd compare && ./compile.sh && ./run.sh
@@ -99,25 +107,27 @@ cd compare && ./compile.sh && ./run.sh
 Expected output:
 
 ```
-[PASS] ONNX Runtime vs TorchScript
-[PASS] TensorRT     vs TorchScript
-[PASS] Pure CUDA    vs TorchScript
+[PASS] ONNX Runtime  vs TorchScript
+[PASS] TensorRT      vs TorchScript
+[PASS] Pure CUDA     vs TorchScript
+[PASS] AOTInductor   vs TorchScript
 
 Benchmarking (num_docs=10000, 3 warmup + 10 trials)...
-  TorchScript  :    9.12 ms
-  ONNX Runtime :   11.78 ms
-  TensorRT     :    1.96 ms
-  Pure CUDA    :    3.13 ms
+  TorchScript  :   10.71 ms
+  ONNX Runtime :   12.27 ms
+  TensorRT     :    2.01 ms
+  Pure CUDA    :    3.24 ms
+  AOTInductor  :    2.24 ms
 ```
 
 Benchmark config: Amazon Linux 2023, CUDA 12.9, TensorRT 11, T4 GPU.
 Model: query\_dim=64, doc\_dim=128, hidden=[256, 128], num\_heads=2.
 
-TensorRT is ~7x faster than TorchScript/ONNX Runtime because its engine compilation step tunes kernel tiling for the exact shape. Pure CUDA sits in between, using generic cuBLAS without TRT's auto-tuning.
+TensorRT and AOTInductor are both ~5x faster than TorchScript/ONNX Runtime because they compile GPU kernels ahead of time and auto-tune tiling for the exact input shape. Pure CUDA uses generic cuBLAS GEMMs without that auto-tuning. The key difference between TensorRT and AOTInductor: TensorRT requires a separate install, while AOTInductor ships as part of LibTorch.
 
 ## Run everything end-to-end
 
-To export, compile, and run all four approaches in one shot:
+To export, compile, and run all five approaches in one shot:
 
 ```bash
 ./run.sh
