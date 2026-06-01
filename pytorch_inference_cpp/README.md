@@ -98,3 +98,7 @@ Benchmark config: Amazon Linux 2023, CUDA 12.9, TensorRT 11, T4 GPU.
 Model: query\_dim=64, doc\_dim=128, hidden=[256, 128], num\_heads=2.
 
 TensorRT is ~7x faster than TorchScript/ONNX Runtime because its engine compilation step tunes kernel tiling for the exact shape. Pure CUDA sits in between, using generic cuBLAS without TRT's auto-tuning.
+
+## Acknowledgements
+
+The multi-layer MLP model in `export.py` is taken from a certain work done by my colleague [Benjamin Le](https://www.linkedin.com/in/benjaminhoanle/) with some simplifications.
