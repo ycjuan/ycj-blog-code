@@ -25,8 +25,31 @@ struct Paths
 // Separating init from infer lets benchmarks measure pure forward-pass latency.
 struct InferBackend
 {
-    virtual ~InferBackend()                           = default;
+    virtual ~InferBackend() = default;
+
+    // End-to-end inference (H2D + kernel + D2H). Used for correctness checks.
     virtual std::vector<float> infer(const Input& in) = 0;
+
+    // GPU backends implement this: kernel-only, inputs/outputs already on device.
+    // d_query: [query_dim], d_docs: [num_docs x doc_dim] (row-major),
+    // d_scores: [num_docs x num_heads] output (row-major).
+    virtual bool supports_device_infer() const { return false; }
+    virtual void infer_device(const float* d_query,
+                              const float* d_docs,
+                              float*       d_scores,
+                              int          query_dim,
+                              int          doc_dim,
+                              int          num_docs,
+                              int          num_heads)
+    {
+        (void)d_query;
+        (void)d_docs;
+        (void)d_scores;
+        (void)query_dim;
+        (void)doc_dim;
+        (void)num_docs;
+        (void)num_heads;
+    }
 };
 
 std::unique_ptr<InferBackend> make_torchscript(const Paths& paths);

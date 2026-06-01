@@ -153,8 +153,7 @@ struct CudaBackend : InferBackend
         d_b1       = upload("b1.bin");
         d_w1_doc   = upload("w1_doc.bin");
 
-        // Infer hidden_sizes from weight files
-        hidden_sizes.push_back(static_cast<int>(d_b1.n)); // H1 = size of b1
+        hidden_sizes.push_back(static_cast<int>(d_b1.n));
         for (int i = 0;; ++i)
         {
             std::ifstream f(wdir + "w_hidden_" + std::to_string(i) + ".bin", std::ios::binary);
@@ -163,7 +162,6 @@ struct CudaBackend : InferBackend
             f.seekg(0, std::ios::end);
             int prev = hidden_sizes.back();
             hidden_sizes.push_back(static_cast<int>(f.tellg() / sizeof(float)) / prev);
-
             d_w_hidden.push_back(upload("w_hidden_" + std::to_string(i) + ".bin"));
             d_b_hidden.push_back(upload("b_hidden_" + std::to_string(i) + ".bin"));
         }
@@ -174,33 +172,31 @@ struct CudaBackend : InferBackend
 
     ~CudaBackend() { cublasDestroy(handle); }
 
-    std::vector<float> infer(const Input& in) override
+    bool supports_device_infer() const override { return true; }
+
+    // d_scores output is col-major [num_heads x num_docs] (native cuBLAS layout).
+    void infer_device(const float* d_query,
+                      const float* d_docs,
+                      float*       d_scores,
+                      int          query_dim_,
+                      int          doc_dim_,
+                      int          num_docs,
+                      int          num_heads_) override
     {
-        const int num_docs = in.num_docs;
-        const int H1       = hidden_sizes[0];
-        const int maxH     = *std::max_element(hidden_sizes.begin(), hidden_sizes.end());
-
-        GpuBuf d_query(in.query_dim);
-        d_query.upload(in.query);
-
-        // docs row-major [num_docs x doc_dim] == col-major [doc_dim x num_docs]: same memory layout
-        GpuBuf d_docs(in.docs.size());
-        d_docs.upload(in.docs);
+        const int H1   = hidden_sizes[0];
+        const int maxH = *std::max_element(hidden_sizes.begin(), hidden_sizes.end());
 
         GpuBuf d_query_proj(H1);
         GpuBuf d_act_a(maxH * num_docs);
         GpuBuf d_act_b(maxH * num_docs);
-        GpuBuf d_scores(num_heads * num_docs);
 
-        // Layer 1: query_proj = W1_query @ query + b1
-        gemv(handle, d_w1_query.ptr, H1, in.query_dim, d_query.ptr, d_query_proj.ptr);
+        gemv(handle, d_w1_query.ptr, H1, query_dim_, d_query, d_query_proj.ptr);
         {
             const float alpha = 1.0f;
             CHECK_CUBLAS(cublasSaxpy(handle, H1, &alpha, d_b1.ptr, 1, d_query_proj.ptr, 1));
         }
 
-        // Layer 1: act = ReLU(W1_doc @ docs + query_proj)
-        gemm(handle, d_w1_doc.ptr, H1, in.doc_dim, d_docs.ptr, num_docs, d_act_a.ptr);
+        gemm(handle, d_w1_doc.ptr, H1, doc_dim_, d_docs, num_docs, d_act_a.ptr);
         {
             dim3 block(16, 16);
             dim3 grid((H1 + 15) / 16, (num_docs + 15) / 16);
@@ -208,7 +204,6 @@ struct CudaBackend : InferBackend
             reluInPlace<<<(H1 * num_docs + 255) / 256, 256>>>(d_act_a.ptr, H1 * num_docs);
         }
 
-        // Hidden layers
         GpuBuf* src = &d_act_a;
         GpuBuf* dst = &d_act_b;
         for (size_t i = 0; i + 1 < hidden_sizes.size(); ++i)
@@ -225,23 +220,33 @@ struct CudaBackend : InferBackend
             std::swap(src, dst);
         }
 
-        // Output layer + sigmoid
         const int H_last = hidden_sizes.back();
-        gemm(handle, d_w_out.ptr, num_heads, H_last, src->ptr, num_docs, d_scores.ptr);
+        gemm(handle, d_w_out.ptr, num_heads_, H_last, src->ptr, num_docs, d_scores);
         {
             dim3 block(16, 16);
-            dim3 grid((num_heads + 15) / 16, (num_docs + 15) / 16);
-            addBiasColMajor<<<grid, block>>>(d_scores.ptr, d_b_out.ptr, num_heads, num_docs);
-            sigmoidInPlace<<<(num_heads * num_docs + 255) / 256, 256>>>(d_scores.ptr, num_heads * num_docs);
+            dim3 grid((num_heads_ + 15) / 16, (num_docs + 15) / 16);
+            addBiasColMajor<<<grid, block>>>(d_scores, d_b_out.ptr, num_heads_, num_docs);
+            sigmoidInPlace<<<(num_heads_ * num_docs + 255) / 256, 256>>>(d_scores, num_heads_ * num_docs);
         }
         CHECK_CUDA(cudaDeviceSynchronize());
+    }
 
-        // d_scores is [num_heads x num_docs] col-major → convert to [num_docs x num_heads] row-major
+    std::vector<float> infer(const Input& in) override
+    {
+        GpuBuf d_query(in.query_dim);
+        d_query.upload(in.query);
+        GpuBuf d_docs(in.docs.size());
+        d_docs.upload(in.docs);
+        GpuBuf d_scores(in.num_heads * in.num_docs);
+
+        infer_device(d_query.ptr, d_docs.ptr, d_scores.ptr, in.query_dim, in.doc_dim, in.num_docs, in.num_heads);
+
+        // d_scores is col-major [num_heads x num_docs] → reorder to row-major [num_docs x num_heads]
         auto               raw = d_scores.download();
-        std::vector<float> scores(num_heads * num_docs);
-        for (int d = 0; d < num_docs; ++d)
-            for (int h = 0; h < num_heads; ++h)
-                scores[d * num_heads + h] = raw[h + d * num_heads];
+        std::vector<float> scores(in.num_heads * in.num_docs);
+        for (int d = 0; d < in.num_docs; ++d)
+            for (int h = 0; h < in.num_heads; ++h)
+                scores[d * in.num_heads + h] = raw[h + d * in.num_heads];
         return scores;
     }
 };
