@@ -1,6 +1,7 @@
 #include "backends.hpp"
 #include <chrono>
 #include <cmath>
+#include <cuda_runtime.h>
 #include <iostream>
 #include <stdexcept>
 
@@ -15,6 +16,44 @@ static double benchMs(InferBackend& backend, const Input& in, int warmup, int it
     for (int i = 0; i < iters; ++i)
         backend.infer(in);
     auto t1 = Clock::now();
+
+    return std::chrono::duration<double, std::milli>(t1 - t0).count() / iters;
+}
+
+// Measures the cost of copying query+docs H2D and scores D2H, with no compute.
+// This overhead is shared by all GPU backends and is subtracted to get kernel-only time.
+static double benchTransferMs(const Input& in, int warmup, int iters)
+{
+    const size_t query_bytes  = in.query.size() * sizeof(float);
+    const size_t docs_bytes   = in.docs.size() * sizeof(float);
+    const size_t scores_bytes = in.num_docs * in.num_heads * sizeof(float);
+
+    void* d_query;
+    void* d_docs;
+    void* d_scores;
+    cudaMalloc(&d_query, query_bytes);
+    cudaMalloc(&d_docs, docs_bytes);
+    cudaMalloc(&d_scores, scores_bytes);
+
+    std::vector<float> h_scores(in.num_docs * in.num_heads);
+    auto               doTransfer = [&]()
+    {
+        cudaMemcpy(d_query, in.query.data(), query_bytes, cudaMemcpyHostToDevice);
+        cudaMemcpy(d_docs, in.docs.data(), docs_bytes, cudaMemcpyHostToDevice);
+        cudaMemcpy(h_scores.data(), d_scores, scores_bytes, cudaMemcpyDeviceToHost);
+    };
+
+    for (int i = 0; i < warmup; ++i)
+        doTransfer();
+
+    auto t0 = Clock::now();
+    for (int i = 0; i < iters; ++i)
+        doTransfer();
+    auto t1 = Clock::now();
+
+    cudaFree(d_query);
+    cudaFree(d_docs);
+    cudaFree(d_scores);
 
     return std::chrono::duration<double, std::milli>(t1 - t0).count() / iters;
 }
@@ -73,12 +112,22 @@ int main()
     const int numTrials       = 10;
     const int numWarmupTrials = 3;
 
+    const double transferMs = benchTransferMs(in, numWarmupTrials, numTrials);
+
     std::cout << "\nBenchmarking (num_docs=10000, " << numWarmupTrials << " warmup + " << numTrials << " trials)...\n";
-    printf("  TorchScript  : %7.2f ms\n", benchMs(*ts, in, numWarmupTrials, numTrials));
-    printf("  ONNX Runtime : %7.2f ms\n", benchMs(*ort, in, numWarmupTrials, numTrials));
-    printf("  TensorRT     : %7.2f ms\n", benchMs(*trt, in, numWarmupTrials, numTrials));
-    printf("  Pure CUDA    : %7.2f ms\n", benchMs(*cu, in, numWarmupTrials, numTrials));
-    printf("  AOTInductor  : %7.2f ms\n", benchMs(*aoti, in, numWarmupTrials, numTrials));
+    std::cout << "  H2D + D2H transfer : " << transferMs << " ms (subtracted from GPU backends below)\n\n";
+
+    const double tsMs   = benchMs(*ts, in, numWarmupTrials, numTrials);
+    const double ortMs  = benchMs(*ort, in, numWarmupTrials, numTrials);
+    const double trtMs  = benchMs(*trt, in, numWarmupTrials, numTrials);
+    const double cuMs   = benchMs(*cu, in, numWarmupTrials, numTrials);
+    const double aotiMs = benchMs(*aoti, in, numWarmupTrials, numTrials);
+
+    printf("  %-14s  total: %6.2f ms\n", "TorchScript", tsMs);
+    printf("  %-14s  total: %6.2f ms\n", "ONNX Runtime", ortMs);
+    printf("  %-14s  total: %6.2f ms  kernel: %6.2f ms\n", "TensorRT", trtMs, trtMs - transferMs);
+    printf("  %-14s  total: %6.2f ms  kernel: %6.2f ms\n", "Pure CUDA", cuMs, cuMs - transferMs);
+    printf("  %-14s  total: %6.2f ms  kernel: %6.2f ms\n", "AOTInductor", aotiMs, aotiMs - transferMs);
 
     return 0;
 }
