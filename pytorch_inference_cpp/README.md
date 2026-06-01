@@ -44,6 +44,15 @@ sudo dnf install tensorrt
 
 No extra install needed — uses cuBLAS from the CUDA Toolkit.
 
+## Dependency comparison
+
+| | TorchScript | ONNX Runtime | TensorRT | Pure CUDA |
+|---|---|---|---|---|
+| Model file | `model.pt` | `model.onnx` | `model.onnx` | `weights/*.bin` |
+| C++ library | LibTorch | ONNX Runtime | TensorRT + CUDA | cuBLAS only |
+| NVIDIA GPU required | No | No | Yes | Yes |
+| PyTorch at serve time | No | No | No | No |
+
 ## Step 3: Individual approaches
 
 Each folder is a self-contained standalone example.
