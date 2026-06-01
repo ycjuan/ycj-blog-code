@@ -4,7 +4,7 @@ Demonstrates four approaches to serve a PyTorch model in pure C++ with no Python
 
 ## Model
 
-A 2-tower MLP scorer (query + doc), matching the MlpScorerGPU architecture:
+A 2-tower MLP scorer (query + doc):
 - Layer 1: separate projections for query and doc, additively fused with ReLU
 - Hidden layers: linear + ReLU stack
 - Output: linear → sigmoid, with `num_heads` scores per doc

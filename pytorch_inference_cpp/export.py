@@ -4,13 +4,12 @@ import torch.nn as nn
 
 class MlpScorer(nn.Module):
     """
-    2-tower MLP scorer (query + doc), matching the MlpScorerGPU architecture.
+    2-tower MLP scorer (query + doc).
 
     Layer 1 uses separate weight matrices for query and doc. The query
     projection (W1_query * query + b1) is computed once and broadcast as a
     bias across all docs: h1 = ReLU(W1_doc * docs + query_proj).
-    This avoids concatenating query into every doc row, matching the C++
-    chained-BIAS-epilogue pipeline.
+    This avoids concatenating query into every doc row.
 
     Config:
         query_dim    (Dq): embedding dim of the query tower
