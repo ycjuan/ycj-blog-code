@@ -48,6 +48,8 @@ No extra install needed — uses cuBLAS from the CUDA Toolkit.
 
 | | TorchScript | ONNX Runtime | TensorRT | Pure CUDA |
 |---|---|---|---|---|
+| Convert via | `torch.jit.trace` | `torch.onnx.export` | `torch.onnx.export` | weight dump |
+| Convert deps | PyTorch | PyTorch + `onnx` | PyTorch + `onnx` | PyTorch |
 | Model file | `model.pt` | `model.onnx` | `model.onnx` | `weights/*.bin` |
 | C++ library | LibTorch | ONNX Runtime | TensorRT + CUDA | cuBLAS only |
 | NVIDIA GPU required | No | No | Yes | Yes |
