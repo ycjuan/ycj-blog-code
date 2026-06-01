@@ -127,21 +127,8 @@ TensorRT and AOTInductor are both ~5x faster than TorchScript/ONNX Runtime becau
 
 ## TensorRT vs AOTInductor
 
-Both compile GPU kernels ahead of time and auto-tune tiling for the exact input shape, giving similar latency (~2 ms on a T4). The choice comes down to ecosystem fit:
-
-**TensorRT advantages:**
-- Slightly faster in practice — more aggressive kernel fusion and selection
-- More mature for production serving; widely used in industry
-- Better quantization support (INT8, FP16) out of the box
-- Not tied to PyTorch — works with any ONNX-compatible framework
-
-**AOTInductor advantages:**
-- **No extra install** — ships as part of LibTorch; TensorRT is a separate heavy dependency
-- **Simpler workflow** — `torch.export` → `.pt2` → C++, all within the PyTorch ecosystem; TensorRT adds an ONNX intermediate step
-- **Actively developed** — TorchScript (the old PyTorch C++ serving path) is deprecated; AOTInductor is its official replacement
-- **Dynamic shapes are first-class** — TensorRT requires manually configuring optimization profiles (min/opt/max); AOTInductor handles dynamic dims more naturally via `torch.export.Dim`
-
-**Bottom line:** TensorRT is the better choice if you need maximum GPU performance and are already in the NVIDIA ecosystem. AOTInductor is the better choice if you want a simpler, PyTorch-native path with nearly the same speed — and it is where PyTorch is actively investing.
+- **TensorRT**: slightly faster; supports all ONNX-compatible models, not just PyTorch
+- **AOTInductor**: PyTorch-native, no dependency beyond LibTorch
 
 ## Run everything end-to-end
 
