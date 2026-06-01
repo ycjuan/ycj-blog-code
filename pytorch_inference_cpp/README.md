@@ -62,6 +62,9 @@ cd onnxruntime && ./compile.sh && ./run.sh
 
 ### Approach 3: TensorRT (requires GPU)
 
+TensorRT does not use the ONNX Runtime library, but it does read `model.onnx`
+directly — `nvonnxparser` parses it at startup to compile a GPU-optimized engine.
+
 ```bash
 cd tensorrt && ./compile.sh && ./run.sh
 ```
