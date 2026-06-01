@@ -14,6 +14,8 @@ When creating a new file, immediately `git add` it.
 
 Never use `git add -A` or `git add .`. Always add specific files by name.
 
+When checking out a new branch, always prefix the branch name with `YYMMDD-` (e.g., `260601-my-feature`).
+
 ## Repos
 
 - `~/ycjuan.github.io` — my blog repo
