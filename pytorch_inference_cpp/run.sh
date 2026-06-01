@@ -39,6 +39,13 @@ cd "$SCRIPT_DIR"
 
 echo ""
 echo "============================================================"
+echo "Step 5b: AOTInductor"
+echo "============================================================"
+cd aotinductor && ./compile.sh && ./run.sh
+cd "$SCRIPT_DIR"
+
+echo ""
+echo "============================================================"
 echo "Step 6: Compare all backends + benchmark"
 echo "============================================================"
 cd compare && ./compile.sh && ./run.sh
