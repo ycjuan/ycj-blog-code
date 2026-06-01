@@ -18,6 +18,7 @@ struct Paths
     std::string torchscript_model; // model.pt
     std::string onnx_model;        // model.onnx
     std::string weights_dir;       // weights/
+    std::string aoti_model;        // model.pt2
 };
 
 // Abstract backend: construct once (loads/compiles the model), call infer() many times.
@@ -32,3 +33,4 @@ std::unique_ptr<InferBackend> make_torchscript(const Paths& paths);
 std::unique_ptr<InferBackend> make_onnxruntime(const Paths& paths);
 std::unique_ptr<InferBackend> make_tensorrt(const Paths& paths, const Input& profile_input);
 std::unique_ptr<InferBackend> make_cuda(const Paths& paths, const Input& shape_hint);
+std::unique_ptr<InferBackend> make_aotinductor(const Paths& paths);

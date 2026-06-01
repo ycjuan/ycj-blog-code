@@ -49,23 +49,26 @@ int main()
 
     Input in { query, docs, num_docs, query_dim, doc_dim, num_heads };
 
-    Paths paths { "../model.pt", "../model.onnx", "../weights/" };
+    Paths paths { "../model.pt", "../model.onnx", "../weights/", "../model.pt2" };
 
     std::cout << "Initializing backends...\n";
-    auto ts  = make_torchscript(paths);
-    auto ort = make_onnxruntime(paths);
-    auto trt = make_tensorrt(paths, in);
-    auto cu  = make_cuda(paths, in);
+    auto ts   = make_torchscript(paths);
+    auto ort  = make_onnxruntime(paths);
+    auto trt  = make_tensorrt(paths, in);
+    auto cu   = make_cuda(paths, in);
+    auto aoti = make_aotinductor(paths);
 
     std::cout << "Checking correctness (num_docs=10000)...\n";
-    auto ref     = ts->infer(in);
-    auto got_ort = ort->infer(in);
-    auto got_trt = trt->infer(in);
-    auto got_cu  = cu->infer(in);
+    auto ref      = ts->infer(in);
+    auto got_ort  = ort->infer(in);
+    auto got_trt  = trt->infer(in);
+    auto got_cu   = cu->infer(in);
+    auto got_aoti = aoti->infer(in);
 
-    assertEqual(ref, got_ort, "ONNX Runtime vs TorchScript");
-    assertEqual(ref, got_trt, "TensorRT     vs TorchScript");
-    assertEqual(ref, got_cu, "Pure CUDA    vs TorchScript");
+    assertEqual(ref, got_ort, "ONNX Runtime  vs TorchScript");
+    assertEqual(ref, got_trt, "TensorRT      vs TorchScript");
+    assertEqual(ref, got_cu, "Pure CUDA     vs TorchScript");
+    assertEqual(ref, got_aoti, "AOTInductor   vs TorchScript");
 
     const int numTrials       = 10;
     const int numWarmupTrials = 3;
@@ -75,6 +78,7 @@ int main()
     printf("  ONNX Runtime : %7.2f ms\n", benchMs(*ort, in, numWarmupTrials, numTrials));
     printf("  TensorRT     : %7.2f ms\n", benchMs(*trt, in, numWarmupTrials, numTrials));
     printf("  Pure CUDA    : %7.2f ms\n", benchMs(*cu, in, numWarmupTrials, numTrials));
+    printf("  AOTInductor  : %7.2f ms\n", benchMs(*aoti, in, numWarmupTrials, numTrials));
 
     return 0;
 }

@@ -22,6 +22,7 @@ add_executable(compare
     backend_onnxruntime.cu
     backend_tensorrt.cu
     backend_cuda.cu
+    backend_aotinductor.cu
 )
 
 target_include_directories(compare PRIVATE

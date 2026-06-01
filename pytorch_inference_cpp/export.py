@@ -113,6 +113,19 @@ for i, layer in enumerate(model.hidden):
 save_tensor(model.output.weight, "w_out.bin")        # [num_heads, H_last]
 save_tensor(model.output.bias,   "b_out.bin")        # [num_heads]
 
+# --- Approach 5: AOTInductor ---
+# Weights are baked into the compiled .pt2 package.
+# The model is moved to CUDA for GPU-optimized kernel generation.
+model_cuda = model.cuda()
+num_docs_dim = torch.export.Dim("num_docs", min=1, max=100000)
+ep = torch.export.export(
+    model_cuda,
+    (dummy_query.cuda(), dummy_docs.cuda()),
+    dynamic_shapes=(None, {0: num_docs_dim}),
+)
+torch._inductor.aoti_compile_and_package(ep, package_path="model.pt2")
+print("Saved model.pt2 (AOTInductor)")
+
 # Also save config so the C++ side knows the dims
 import json
 config = {
