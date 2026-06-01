@@ -46,6 +46,8 @@ cd ~/external && wget https://github.com/microsoft/onnxruntime/releases/download
 
 ### TensorRT (TensorRT and compare — requires GPU)
 
+The command below works on Amazon Linux 2023. For other distributions, refer to the [NVIDIA TensorRT installation guide](https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html).
+
 ```bash
 sudo dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo
 sudo dnf install tensorrt
