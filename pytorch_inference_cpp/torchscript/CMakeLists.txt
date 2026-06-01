@@ -7,5 +7,5 @@ set(CMAKE_CXX_STANDARD 17)
 # and set: cmake -DCMAKE_PREFIX_PATH=/path/to/libtorch ..
 find_package(Torch REQUIRED)
 
-add_executable(inference main.cpp)
+add_executable(inference main.cu)
 target_link_libraries(inference ${TORCH_LIBRARIES})

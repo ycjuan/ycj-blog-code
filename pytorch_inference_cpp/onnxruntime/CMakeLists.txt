@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 17)
 # and set: cmake -DONNXRUNTIME_ROOT=/path/to/onnxruntime ..
 set(ONNXRUNTIME_ROOT "" CACHE PATH "Path to ONNX Runtime root directory")
 
-add_executable(inference main.cpp)
+add_executable(inference main.cu)
 target_include_directories(inference PRIVATE ${ONNXRUNTIME_ROOT}/include)
 target_link_directories(inference PRIVATE ${ONNXRUNTIME_ROOT}/lib)
 target_link_libraries(inference onnxruntime)

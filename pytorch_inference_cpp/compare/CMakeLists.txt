@@ -17,10 +17,10 @@ endif()
 find_package(CUDAToolkit REQUIRED)
 
 add_executable(compare
-    main.cpp
-    backend_torchscript.cpp
-    backend_onnxruntime.cpp
-    backend_tensorrt.cpp
+    main.cu
+    backend_torchscript.cu
+    backend_onnxruntime.cu
+    backend_tensorrt.cu
     backend_cuda.cu
 )
 
