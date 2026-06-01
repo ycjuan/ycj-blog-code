@@ -14,6 +14,10 @@ When creating a new file, immediately `git add` it.
 
 Never use `git add -A` or `git add .`. Always add specific files by name.
 
+## Repos
+
+- `~/ycjuan.github.io` — my blog repo
+
 ## Shortcuts
 
 - **cmc** — "check my comments": fetch and display all unresolved PR review comments on the current branch, then ask the user which ones to act on. Use the GitHub GraphQL API (not REST) because only GraphQL exposes `isResolved` per thread:
