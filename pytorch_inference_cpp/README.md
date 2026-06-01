@@ -63,6 +63,8 @@ Each folder is a self-contained standalone example. `compile.sh` runs CMake and 
 
 ### Approach 1: TorchScript + LibTorch
 
+> **Note:** TorchScript is largely deprecated. PyTorch 2.x introduced `torch.export` as the modern replacement, and the TorchScript-based ONNX exporter is being superseded by a `torch.export`-based one starting in PyTorch 2.9. TorchScript still works but is in maintenance mode. See [PyTorch docs](https://docs.pytorch.org/docs/2.12/notes/cpu_threading_torchscript_inference.html) for more details.
+
 ```bash
 cd torchscript && ./compile.sh && ./run.sh
 ```
