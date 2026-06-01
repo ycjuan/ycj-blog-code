@@ -12,7 +12,7 @@ A 2-tower MLP scorer (query + doc):
 ## Step 1: Export the model
 
 ```bash
-pip install onnx
+pip install torch onnx
 python3 export.py
 # Produces: model.pt, model.onnx, weights/
 ```
