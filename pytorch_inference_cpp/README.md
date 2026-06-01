@@ -85,11 +85,11 @@ Expected output:
 [PASS] TensorRT     vs TorchScript
 [PASS] Pure CUDA    vs TorchScript
 
-Benchmarking (num_docs=10000, 3 warmup + 10 iters)...
-  TorchScript  :   13.92 ms
-  ONNX Runtime :   12.64 ms
-  TensorRT     :    2.01 ms
-  Pure CUDA    :    3.21 ms
+Benchmarking (num_docs=10000, 3 warmup + 10 trials)...
+  TorchScript  :    9.17 ms
+  ONNX Runtime :    6.05 ms
+  TensorRT     :    1.94 ms
+  Pure CUDA    :    3.12 ms
 
 All backends agree.
 ```
