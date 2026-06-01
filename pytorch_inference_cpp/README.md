@@ -9,6 +9,17 @@ A 2-tower MLP scorer (query + doc):
 - Hidden layers: linear + ReLU stack
 - Output: linear → sigmoid, with `num_heads` scores per doc
 
+## Dependency comparison
+
+| | TorchScript | ONNX Runtime | TensorRT | Pure CUDA |
+|---|---|---|---|---|
+| Convert via | `torch.jit.trace` | `torch.onnx.export` | `torch.onnx.export` | weight dump |
+| Convert deps | PyTorch | PyTorch + `onnx` | PyTorch + `onnx` | PyTorch |
+| Model file | `model.pt` | `model.onnx` | `model.onnx` | `weights/*.bin` |
+| C++ library | LibTorch | ONNX Runtime | TensorRT + CUDA | cuBLAS only |
+| NVIDIA GPU required | No | No | Yes | Yes |
+| PyTorch at serve time | No | No | No | No |
+
 ## Step 1: Export the model
 
 ```bash
@@ -44,20 +55,9 @@ sudo dnf install tensorrt
 
 No extra install needed — uses cuBLAS from the CUDA Toolkit.
 
-## Dependency comparison
-
-| | TorchScript | ONNX Runtime | TensorRT | Pure CUDA |
-|---|---|---|---|---|
-| Convert via | `torch.jit.trace` | `torch.onnx.export` | `torch.onnx.export` | weight dump |
-| Convert deps | PyTorch | PyTorch + `onnx` | PyTorch + `onnx` | PyTorch |
-| Model file | `model.pt` | `model.onnx` | `model.onnx` | `weights/*.bin` |
-| C++ library | LibTorch | ONNX Runtime | TensorRT + CUDA | cuBLAS only |
-| NVIDIA GPU required | No | No | Yes | Yes |
-| PyTorch at serve time | No | No | No | No |
-
 ## Step 3: Individual approaches
 
-Each folder is a self-contained standalone example.
+Each folder is a self-contained standalone example. `compile.sh` runs CMake and builds the binary; `run.sh` executes it.
 
 ### Approach 1: TorchScript + LibTorch
 
@@ -104,14 +104,20 @@ Benchmarking (num_docs=10000, 3 warmup + 10 trials)...
   ONNX Runtime :   11.78 ms
   TensorRT     :    1.96 ms
   Pure CUDA    :    3.13 ms
-
-All backends agree.
 ```
 
 Benchmark config: Amazon Linux 2023, CUDA 12.9, TensorRT 11, T4 GPU.
 Model: query\_dim=64, doc\_dim=128, hidden=[256, 128], num\_heads=2.
 
 TensorRT is ~7x faster than TorchScript/ONNX Runtime because its engine compilation step tunes kernel tiling for the exact shape. Pure CUDA sits in between, using generic cuBLAS without TRT's auto-tuning.
+
+## Run everything end-to-end
+
+To export, compile, and run all four approaches in one shot:
+
+```bash
+./run.sh
+```
 
 ## Acknowledgements
 
