@@ -82,7 +82,7 @@ int main()
     std::vector<float> h_scores(num_docs * num_heads);
 
     // [A] H2D transfer
-    double msA = benchMs(
+    double msH2D = benchMs(
         [&]()
         {
             cudaMemcpy(d_query, in.query.data(), query_dim * sizeof(float), cudaMemcpyHostToDevice);
@@ -92,7 +92,7 @@ int main()
         numTrials);
 
     // [C] D2H transfer
-    double msC = benchMs(
+    double msD2H = benchMs(
         [&]() { cudaMemcpy(h_scores.data(), d_scores, num_docs * num_heads * sizeof(float), cudaMemcpyDeviceToHost); },
         numWarmupTrials,
         numTrials);
@@ -126,15 +126,15 @@ int main()
     std::cout << "\nBenchmarking (num_docs=" << num_docs << ", " << numWarmupTrials << " warmup + " << numTrials
               << " trials)...\n\n";
 
-    printf("  [A] H2D transfer              : %6.2f ms\n", msA);
-    printf("  [C] D2H transfer              : %6.2f ms\n", msC);
-    printf("  [A+C] total transfer          : %6.2f ms\n\n", msA + msC);
+    printf("  [A] H2D transfer              : %6.2f ms\n", msH2D);
+    printf("  [C] D2H transfer              : %6.2f ms\n", msD2H);
+    printf("  [A+C] total transfer          : %6.2f ms\n\n", msH2D + msD2H);
 
     printf("  %-14s  e2e: %6.2f ms\n", "TorchScript", msTs);
     printf("  %-14s  e2e: %6.2f ms\n", "ONNX Runtime", msOrt);
-    printf("  %-14s  e2e: %6.2f ms  kernel: %6.2f ms\n", "TensorRT", msTrt + msA + msC, msTrt);
-    printf("  %-14s  e2e: %6.2f ms  kernel: %6.2f ms\n", "Pure CUDA", msCu + msA + msC, msCu);
-    printf("  %-14s  e2e: %6.2f ms  kernel: %6.2f ms\n", "AOTInductor", msAoti + msA + msC, msAoti);
+    printf("  %-14s  e2e: %6.2f ms  kernel: %6.2f ms\n", "TensorRT", msTrt + msH2D + msD2H, msTrt);
+    printf("  %-14s  e2e: %6.2f ms  kernel: %6.2f ms\n", "Pure CUDA", msCu + msH2D + msD2H, msCu);
+    printf("  %-14s  e2e: %6.2f ms  kernel: %6.2f ms\n", "AOTInductor", msAoti + msH2D + msD2H, msAoti);
 
     return 0;
 }
