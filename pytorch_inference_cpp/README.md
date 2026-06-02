@@ -11,12 +11,12 @@ A 2-tower MLP scorer (query + doc):
 
 ## Dependency comparison
 
-| | TorchScript | ONNX Runtime | TensorRT | Pure CUDA | AOTInductor |
+| | TorchScript | ONNX Runtime | TensorRT | AOTInductor | Pure CUDA |
 |---|---|---|---|---|---|
-| Convert via | `torch.jit.trace` | `torch.onnx.export` | `torch.onnx.export` | weight dump | `torch.export` |
+| Convert via | `torch.jit.trace` | `torch.onnx.export` | `torch.onnx.export` | `torch.export` | weight dump |
 | Convert deps | PyTorch | PyTorch + `onnx` | PyTorch + `onnx` | PyTorch | PyTorch |
-| Model file | `model.pt` | `model.onnx` | `model.onnx` | `weights/*.bin` | `model.pt2` |
-| C++ library | LibTorch | ONNX Runtime | TensorRT + CUDA | cuBLAS only | LibTorch |
+| Model file | `model.pt` | `model.onnx` | `model.onnx` | `model.pt2` | `weights/*.bin` |
+| C++ library | LibTorch | ONNX Runtime | TensorRT + CUDA | LibTorch | cuBLAS only |
 | NVIDIA GPU required | No | No | Yes | Yes | Yes |
 | PyTorch at serve time | No | No | No | No | No |
 
