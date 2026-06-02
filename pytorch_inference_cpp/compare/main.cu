@@ -1,8 +1,10 @@
 #include "backends.hpp"
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cuda_runtime.h>
 #include <iostream>
+#include <random>
 #include <stdexcept>
 
 using Clock = std::chrono::high_resolution_clock;
@@ -41,10 +43,13 @@ int main()
     const int num_docs  = 10000;
     const int num_heads = 2;
 
-    std::vector<float> query(query_dim, 0.5f);
+    std::mt19937                          rng(42);
+    std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+
+    std::vector<float> query(query_dim);
+    std::generate(query.begin(), query.end(), [&] { return dist(rng); });
     std::vector<float> docs(num_docs * doc_dim);
-    for (int i = 0; i < num_docs * doc_dim; ++i)
-        docs[i] = static_cast<float>(i % 7) / 7.0f;
+    std::generate(docs.begin(), docs.end(), [&] { return dist(rng); });
 
     Input in { query, docs, num_docs, query_dim, doc_dim, num_heads };
 
