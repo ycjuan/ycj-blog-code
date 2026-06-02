@@ -138,8 +138,8 @@ int main()
     printf("  %-14s  e2e: %6.2f ms\n", "TorchScript", msTs);
     printf("  %-14s  e2e: %6.2f ms\n", "ONNX Runtime", msOrt);
     printf("  %-14s  e2e: %6.2f ms  kernel: %6.2f ms\n", "TensorRT", msTrt + msH2D + msD2H, msTrt);
-    printf("  %-14s  e2e: %6.2f ms  kernel: %6.2f ms\n", "Pure CUDA", msCu + msH2D + msD2H, msCu);
     printf("  %-14s  e2e: %6.2f ms  kernel: %6.2f ms\n", "AOTInductor", msAoti + msH2D + msD2H, msAoti);
+    printf("  %-14s  e2e: %6.2f ms  kernel: %6.2f ms\n", "Pure CUDA", msCu + msH2D + msD2H, msCu);
 
     return 0;
 }

@@ -84,18 +84,18 @@ directly — `nvonnxparser` parses it at startup to compile a GPU-optimized engi
 cd tensorrt && ./compile.sh && ./run.sh
 ```
 
-### Approach 4: Pure CUDA + cuBLAS
-
-```bash
-cd cuda && ./compile.sh && ./run.sh
-```
-
-### Approach 5: AOTInductor (requires GPU)
+### Approach 4: AOTInductor (requires GPU)
 
 Uses `torch.export` + `torch._inductor.aoti_compile_and_package` to compile the model into a `.pt2` package with Inductor's kernel auto-tuning. Loaded in C++ via `AOTIModelPackageLoader`, which is part of LibTorch — no extra dependency beyond LibTorch.
 
 ```bash
 cd aotinductor && ./compile.sh && ./run.sh
+```
+
+### Approach 5: Pure CUDA + cuBLAS
+
+```bash
+cd cuda && ./compile.sh && ./run.sh
 ```
 
 ## Step 4: Run all five and assert they agree
@@ -121,8 +121,8 @@ Benchmarking (num_docs=10000, 3 warmup + 10 trials)...
   TorchScript     e2e:  10.75 ms
   ONNX Runtime    e2e:  12.63 ms
   TensorRT        e2e:   1.77 ms  kernel:   0.59 ms
-  Pure CUDA       e2e:   2.62 ms  kernel:   1.44 ms
   AOTInductor     e2e:   1.80 ms  kernel:   0.62 ms
+  Pure CUDA       e2e:   2.62 ms  kernel:   1.44 ms
 ```
 
 ## Benchmark
@@ -136,8 +136,8 @@ The benchmark separately times three segments: **[A]** copying query and doc emb
 |---|---|---|
 | TorchScript | 10.75 ms | — |
 | ONNX Runtime | 12.63 ms | — |
-| Pure CUDA | 2.62 ms | 1.44 ms |
 | AOTInductor | 1.80 ms | 0.62 ms |
+| Pure CUDA | 2.62 ms | 1.44 ms |
 | **TensorRT** | **1.77 ms** | **0.59 ms** |
 
 H2D transfer (1.14 ms) and D2H transfer (0.04 ms) are shared across all GPU backends. The e2e column is kernel + transfer.
