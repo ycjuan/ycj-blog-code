@@ -113,11 +113,16 @@ Expected output:
 [PASS] AOTInductor   vs TorchScript
 
 Benchmarking (num_docs=10000, 3 warmup + 10 trials)...
-  TorchScript  :   10.71 ms
-  ONNX Runtime :   12.27 ms
-  TensorRT     :    2.01 ms
-  Pure CUDA    :    3.24 ms
-  AOTInductor  :    2.24 ms
+
+  [A] H2D transfer              :   1.14 ms
+  [C] D2H transfer              :   0.04 ms
+  [A+C] total transfer          :   1.18 ms
+
+  TorchScript     e2e:  10.75 ms
+  ONNX Runtime    e2e:  12.63 ms
+  TensorRT        e2e:   1.77 ms  kernel:   0.59 ms
+  Pure CUDA       e2e:   2.62 ms  kernel:   1.44 ms
+  AOTInductor     e2e:   1.80 ms  kernel:   0.62 ms
 ```
 
 ## Benchmark
@@ -125,13 +130,19 @@ Benchmarking (num_docs=10000, 3 warmup + 10 trials)...
 Config: Amazon Linux 2023, CUDA 12.9, TensorRT 11, T4 GPU.
 Model: query\_dim=64, doc\_dim=128, hidden=[256, 128], num\_heads=2, num\_docs=10000.
 
-| Backend | Latency |
-|---|---|
-| TorchScript | 10.71 ms |
-| ONNX Runtime | 12.27 ms |
-| Pure CUDA | 3.24 ms |
-| **AOTInductor** | **2.24 ms** |
-| **TensorRT** | **2.01 ms** |
+The benchmark separately times three segments: **[A]** copying query and doc embeddings from CPU to GPU (H2D), **[B]** the inference kernel itself, and **[C]** copying scores back from GPU to CPU (D2H). This makes the comparison fair — H2D/D2H costs are the same across all GPU backends, so kernel time isolates each approach's actual compute efficiency.
+
+| Backend | e2e | kernel only |
+|---|---|---|
+| TorchScript | 10.75 ms | — |
+| ONNX Runtime | 12.63 ms | — |
+| Pure CUDA | 2.62 ms | 1.44 ms |
+| AOTInductor | 1.80 ms | 0.62 ms |
+| **TensorRT** | **1.77 ms** | **0.59 ms** |
+
+H2D transfer (1.14 ms) and D2H transfer (0.04 ms) are shared across all GPU backends. The e2e column is kernel + transfer.
+
+**TorchScript and ONNX Runtime cannot report kernel-only time.** They are CPU-side runtimes that manage their own internal GPU memory, so there is no API to inject pre-allocated device pointers and skip the H2D step — inference is always an end-to-end black box.
 
 TensorRT and AOTInductor are both ~5x faster than TorchScript/ONNX Runtime because they compile GPU kernels ahead of time and auto-tune tiling for the exact input shape. Pure CUDA uses generic cuBLAS GEMMs without that auto-tuning.
 
