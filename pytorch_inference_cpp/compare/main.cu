@@ -71,8 +71,8 @@ int main()
 
     assertEqual(ref, got_ort, "ONNX Runtime  vs TorchScript");
     assertEqual(ref, got_trt, "TensorRT      vs TorchScript");
-    assertEqual(ref, got_cu, "Pure CUDA     vs TorchScript");
     assertEqual(ref, got_aoti, "AOTInductor   vs TorchScript");
+    assertEqual(ref, got_cu, "Pure CUDA     vs TorchScript");
 
     const int numTrials       = 10;
     const int numWarmupTrials = 3;

@@ -109,8 +109,8 @@ Expected output:
 ```
 [PASS] ONNX Runtime  vs TorchScript
 [PASS] TensorRT      vs TorchScript
-[PASS] Pure CUDA     vs TorchScript
 [PASS] AOTInductor   vs TorchScript
+[PASS] Pure CUDA     vs TorchScript
 
 Benchmarking (num_docs=10000, 3 warmup + 10 trials)...
 
@@ -136,9 +136,9 @@ The benchmark separately times three segments: **[A]** copying query and doc emb
 |---|---|---|
 | TorchScript | 10.75 ms | — |
 | ONNX Runtime | 12.63 ms | — |
+| **TensorRT** | **1.77 ms** | **0.59 ms** |
 | AOTInductor | 1.80 ms | 0.62 ms |
 | Pure CUDA | 2.62 ms | 1.44 ms |
-| **TensorRT** | **1.77 ms** | **0.59 ms** |
 
 H2D transfer (1.14 ms) and D2H transfer (0.04 ms) are shared across all GPU backends. The e2e column is kernel + transfer.
 
