@@ -42,4 +42,7 @@ struct OnnxRuntimeBackend : InferBackend
     }
 };
 
-std::unique_ptr<InferBackend> make_onnxruntime(const Paths& paths) { return std::make_unique<OnnxRuntimeBackend>(paths); }
+std::unique_ptr<InferBackend> make_onnxruntime(const Paths& paths)
+{
+    return std::make_unique<OnnxRuntimeBackend>(paths);
+}

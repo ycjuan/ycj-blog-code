@@ -1,22 +1,23 @@
 #include "backends.hpp"
+#include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cuda_runtime.h>
 #include <iostream>
+#include <random>
 #include <stdexcept>
 
 using Clock = std::chrono::high_resolution_clock;
 
-static double benchMs(InferBackend& backend, const Input& in, int warmup, int iters)
+template <typename Fn>
+static double benchMs(Fn fn, int warmup, int iters)
 {
     for (int i = 0; i < warmup; ++i)
-        backend.infer(in);
-
+        fn();
     auto t0 = Clock::now();
     for (int i = 0; i < iters; ++i)
-        backend.infer(in);
-    auto t1 = Clock::now();
-
-    return std::chrono::duration<double, std::milli>(t1 - t0).count() / iters;
+        fn();
+    return std::chrono::duration<double, std::milli>(Clock::now() - t0).count() / iters;
 }
 
 static void assertEqual(const std::vector<float>& ref,
@@ -42,10 +43,13 @@ int main()
     const int num_docs  = 10000;
     const int num_heads = 2;
 
-    std::vector<float> query(query_dim, 0.5f);
+    std::mt19937                          rng(42);
+    std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+
+    std::vector<float> query(query_dim);
+    std::generate(query.begin(), query.end(), [&] { return dist(rng); });
     std::vector<float> docs(num_docs * doc_dim);
-    for (int i = 0; i < num_docs * doc_dim; ++i)
-        docs[i] = static_cast<float>(i % 7) / 7.0f;
+    std::generate(docs.begin(), docs.end(), [&] { return dist(rng); });
 
     Input in { query, docs, num_docs, query_dim, doc_dim, num_heads };
 
@@ -58,7 +62,7 @@ int main()
     auto cu   = make_cuda(paths, in);
     auto aoti = make_aotinductor(paths);
 
-    std::cout << "Checking correctness (num_docs=10000)...\n";
+    std::cout << "Checking correctness (num_docs=" << num_docs << ")...\n";
     auto ref      = ts->infer(in);
     auto got_ort  = ort->infer(in);
     auto got_trt  = trt->infer(in);
@@ -67,18 +71,75 @@ int main()
 
     assertEqual(ref, got_ort, "ONNX Runtime  vs TorchScript");
     assertEqual(ref, got_trt, "TensorRT      vs TorchScript");
-    assertEqual(ref, got_cu, "Pure CUDA     vs TorchScript");
     assertEqual(ref, got_aoti, "AOTInductor   vs TorchScript");
+    assertEqual(ref, got_cu, "Pure CUDA     vs TorchScript");
 
     const int numTrials       = 10;
     const int numWarmupTrials = 3;
 
-    std::cout << "\nBenchmarking (num_docs=10000, " << numWarmupTrials << " warmup + " << numTrials << " trials)...\n";
-    printf("  TorchScript  : %7.2f ms\n", benchMs(*ts, in, numWarmupTrials, numTrials));
-    printf("  ONNX Runtime : %7.2f ms\n", benchMs(*ort, in, numWarmupTrials, numTrials));
-    printf("  TensorRT     : %7.2f ms\n", benchMs(*trt, in, numWarmupTrials, numTrials));
-    printf("  Pure CUDA    : %7.2f ms\n", benchMs(*cu, in, numWarmupTrials, numTrials));
-    printf("  AOTInductor  : %7.2f ms\n", benchMs(*aoti, in, numWarmupTrials, numTrials));
+    // Pre-allocate shared GPU buffers for A/B/C benchmarks
+    float* d_query  = nullptr;
+    float* d_docs   = nullptr;
+    float* d_scores = nullptr;
+    cudaMalloc(&d_query, query_dim * sizeof(float));
+    cudaMalloc(&d_docs, num_docs * doc_dim * sizeof(float));
+    cudaMalloc(&d_scores, num_docs * num_heads * sizeof(float));
+    std::vector<float> h_scores(num_docs * num_heads);
+
+    // [A] H2D transfer
+    double msH2D = benchMs(
+        [&]()
+        {
+            cudaMemcpy(d_query, in.query.data(), query_dim * sizeof(float), cudaMemcpyHostToDevice);
+            cudaMemcpy(d_docs, in.docs.data(), num_docs * doc_dim * sizeof(float), cudaMemcpyHostToDevice);
+        },
+        numWarmupTrials,
+        numTrials);
+
+    // [C] D2H transfer
+    double msD2H = benchMs(
+        [&]() { cudaMemcpy(h_scores.data(), d_scores, num_docs * num_heads * sizeof(float), cudaMemcpyDeviceToHost); },
+        numWarmupTrials,
+        numTrials);
+
+    // Pre-fill d_query / d_docs once for kernel benchmarks
+    cudaMemcpy(d_query, in.query.data(), query_dim * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_docs, in.docs.data(), num_docs * doc_dim * sizeof(float), cudaMemcpyHostToDevice);
+
+    // [B] Kernel-only benchmarks for GPU backends
+    double msTrt
+        = benchMs([&]() { trt->infer_device(d_query, d_docs, d_scores, query_dim, doc_dim, num_docs, num_heads); },
+                  numWarmupTrials,
+                  numTrials);
+    double msCu
+        = benchMs([&]() { cu->infer_device(d_query, d_docs, d_scores, query_dim, doc_dim, num_docs, num_heads); },
+                  numWarmupTrials,
+                  numTrials);
+    double msAoti
+        = benchMs([&]() { aoti->infer_device(d_query, d_docs, d_scores, query_dim, doc_dim, num_docs, num_heads); },
+                  numWarmupTrials,
+                  numTrials);
+
+    // E2E benchmarks for CPU backends (no H2D/D2H separation possible)
+    double msTs  = benchMs([&]() { ts->infer(in); }, numWarmupTrials, numTrials);
+    double msOrt = benchMs([&]() { ort->infer(in); }, numWarmupTrials, numTrials);
+
+    cudaFree(d_query);
+    cudaFree(d_docs);
+    cudaFree(d_scores);
+
+    std::cout << "\nBenchmarking (num_docs=" << num_docs << ", " << numWarmupTrials << " warmup + " << numTrials
+              << " trials)...\n\n";
+
+    printf("  [A] H2D transfer              : %6.2f ms\n", msH2D);
+    printf("  [C] D2H transfer              : %6.2f ms\n", msD2H);
+    printf("  [A+C] total transfer          : %6.2f ms\n\n", msH2D + msD2H);
+
+    printf("  %-14s  e2e: %6.2f ms\n", "TorchScript", msTs);
+    printf("  %-14s  e2e: %6.2f ms\n", "ONNX Runtime", msOrt);
+    printf("  %-14s  e2e: %6.2f ms  kernel: %6.2f ms\n", "TensorRT", msTrt + msH2D + msD2H, msTrt);
+    printf("  %-14s  e2e: %6.2f ms  kernel: %6.2f ms\n", "AOTInductor", msAoti + msH2D + msD2H, msAoti);
+    printf("  %-14s  e2e: %6.2f ms  kernel: %6.2f ms\n", "Pure CUDA", msCu + msH2D + msD2H, msCu);
 
     return 0;
 }

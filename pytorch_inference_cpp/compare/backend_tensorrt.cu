@@ -37,7 +37,7 @@ struct TensorRTBackend : InferBackend
         parser->parseFromFile(paths.onnx_model.c_str(), static_cast<int>(nvinfer1::ILogger::Severity::kWARNING));
 
         std::unique_ptr<nvinfer1::IBuilderConfig> config(builder->createBuilderConfig());
-        config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, 256 << 20); // 256 MB
+        config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, 256 << 20);
 
         const int                       max_docs = profile_input.num_docs;
         nvinfer1::IOptimizationProfile* profile  = builder->createOptimizationProfile();
@@ -53,11 +53,27 @@ struct TensorRTBackend : InferBackend
         context.reset(engine->createExecutionContext());
     }
 
+    bool supports_device_infer() const override { return true; }
+
+    void infer_device(const float* d_query,
+                      const float* d_docs,
+                      float*       d_scores,
+                      int          query_dim_,
+                      int          doc_dim_,
+                      int          num_docs,
+                      int          num_heads_) override
+    {
+        context->setInputShape("query", nvinfer1::Dims { 1, { query_dim_ } });
+        context->setInputShape("docs", nvinfer1::Dims2(num_docs, doc_dim_));
+        context->setTensorAddress("query", const_cast<float*>(d_query));
+        context->setTensorAddress("docs", const_cast<float*>(d_docs));
+        context->setTensorAddress("scores", d_scores);
+        context->enqueueV3(0);
+        cudaDeviceSynchronize();
+    }
+
     std::vector<float> infer(const Input& in) override
     {
-        context->setInputShape("query", nvinfer1::Dims { 1, { in.query_dim } });
-        context->setInputShape("docs", nvinfer1::Dims2(in.num_docs, in.doc_dim));
-
         void* d_query  = nullptr;
         void* d_docs   = nullptr;
         void* d_scores = nullptr;
@@ -68,11 +84,13 @@ struct TensorRTBackend : InferBackend
         cudaMemcpy(d_query, in.query.data(), in.query.size() * sizeof(float), cudaMemcpyHostToDevice);
         cudaMemcpy(d_docs, in.docs.data(), in.docs.size() * sizeof(float), cudaMemcpyHostToDevice);
 
-        context->setTensorAddress("query", d_query);
-        context->setTensorAddress("docs", d_docs);
-        context->setTensorAddress("scores", d_scores);
-        context->enqueueV3(0);
-        cudaDeviceSynchronize();
+        infer_device(static_cast<float*>(d_query),
+                     static_cast<float*>(d_docs),
+                     static_cast<float*>(d_scores),
+                     in.query_dim,
+                     in.doc_dim,
+                     in.num_docs,
+                     in.num_heads);
 
         std::vector<float> scores(in.num_docs * in.num_heads);
         cudaMemcpy(scores.data(), d_scores, scores.size() * sizeof(float), cudaMemcpyDeviceToHost);
