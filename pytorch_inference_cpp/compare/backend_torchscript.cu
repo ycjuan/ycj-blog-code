@@ -23,4 +23,7 @@ struct TorchScriptBackend : InferBackend
     }
 };
 
-std::unique_ptr<InferBackend> make_torchscript(const Paths& paths) { return std::make_unique<TorchScriptBackend>(paths); }
+std::unique_ptr<InferBackend> make_torchscript(const Paths& paths)
+{
+    return std::make_unique<TorchScriptBackend>(paths);
+}
