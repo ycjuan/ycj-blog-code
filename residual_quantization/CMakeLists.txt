@@ -21,17 +21,8 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 find_package(CUDA REQUIRED)
 
 # Add library
-set(LIB_HEADER_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/util.cuh
-    ${CMAKE_CURRENT_SOURCE_DIR}/data.cuh
-    ${CMAKE_CURRENT_SOURCE_DIR}/methods.cuh
-)
-
-
-set(LIB_SOURCE_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/data.cu
-    ${CMAKE_CURRENT_SOURCE_DIR}/methods.cu
-)
+file(GLOB_RECURSE LIB_HEADER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/*.cuh)
+file(GLOB_RECURSE LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cu)
 
 add_library(${LIB_NAME} SHARED
     ${LIB_HEADER_FILES}
@@ -42,10 +33,10 @@ add_library(${LIB_NAME} SHARED
 set_property(TARGET ${LIB_NAME} PROPERTY CUDA_ARCHITECTURES 89)
 
 # Include directories
-target_include_directories(${LIB_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(${LIB_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Link CUDA libraries
-target_link_libraries(${LIB_NAME} 
+target_link_libraries(${LIB_NAME}
     ${CUDA_LIBRARIES}
     cublas
     gomp
@@ -59,12 +50,17 @@ target_compile_options(${LIB_NAME} PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler -fopenmp>
 )
 
-# Add executable
-add_executable(test_${LIB_NAME} main.cu)
-add_executable(test_${LIB_NAME}_unit_tests unit_tests.cu)
+# Add executables
+add_executable(test_${LIB_NAME} test/main.cu)
+add_executable(test_${LIB_NAME}_unit_tests test/unit_tests.cu)
 
 # Link library
 target_link_libraries(test_${LIB_NAME} ${LIB_NAME})
+target_link_libraries(test_${LIB_NAME}_unit_tests ${LIB_NAME})
+
+target_compile_options(test_${LIB_NAME} PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:-Wno-deprecated-gpu-targets -Xcompiler -fopenmp>
+)
 
 # Set linker language to CUDA
 set_target_properties(${LIB_NAME} PROPERTIES LINKER_LANGUAGE CUDA)
