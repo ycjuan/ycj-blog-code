@@ -3,65 +3,104 @@
 #include "util.cuh"
 
 // One block per scored document, 1024 threads per block.
-// Each thread handles (embDim / 1024) elements cooperatively.
-// Shared memory layout: two ping-pong buffers of embDim floats for the WHT butterfly.
+// Each thread handles kElemsPerThread=4 elements (assumes embDim=4096).
+//
+// WHT butterfly is split into three tiers to minimize shared memory pressure:
+//   - Strides 1, 2        (< kElemsPerThread):     intra-thread, pure register ops
+//   - Strides 4 .. 64     (intra-warp):             __shfl_xor_sync, no shared memory
+//   - Strides 128 .. 2048 (inter-warp):             single shared memory buffer (16 KB)
+//
+// Using a single buffer (vs ping-pong) halves shared memory from 32 KB to 16 KB,
+// doubling occupancy from 4 to 8 blocks per SM.
 __global__ void turboQuantKernel(Data data, RQ_T* p_turboRes)
 {
+    constexpr int kElemsPerThread = 4;
+
     int toScoreIdx = blockIdx.x;
     if (toScoreIdx >= data.config.numToScore)
         return;
 
-    int docIdx         = data.d_docIdxToScore[toScoreIdx];
-    int embDim         = data.config.embDim;
-    int elemsPerThread = embDim / blockDim.x;
+    int docIdx = data.d_docIdxToScore[toScoreIdx];
+    int embDim = data.config.embDim;
 
-    // Two ping-pong buffers for the in-place WHT butterfly
-    extern __shared__ float shm[]; // 2 * embDim floats
-    float*                  cur = shm;
-    float*                  nxt = shm + embDim;
-
-    // Step 1: Lloyd-Max dequantize into the rotated space
-    for (int k = 0; k < elemsPerThread; k++)
+    // Step 1: Lloyd-Max dequantize into registers (rotated space)
+    float vals[kElemsPerThread];
+    for (int k = 0; k < kElemsPerThread; k++)
     {
-        int    embIdx    = threadIdx.x * elemsPerThread + k;
+        int    embIdx    = threadIdx.x * kElemsPerThread + k;
         int    rqIdx     = getRqIdx(embIdx, data.config.numBitsPerDim, kBitsPerInt);
         size_t rqMemAddr = getMemAddr(docIdx, rqIdx, data.config.numDocs, data.config.getRqDim());
-        cur[embIdx]      = lloydMaxDequantize(data.config.numBitsPerDim,
-                                         kBitsPerInt,
-                                         data.config.stdDev,
-                                         p_turboRes[rqMemAddr],
-                                         embIdx);
+        vals[k]          = lloydMaxDequantize(data.config.numBitsPerDim,
+                                     kBitsPerInt,
+                                     data.config.stdDev,
+                                     p_turboRes[rqMemAddr],
+                                     embIdx);
     }
+
+    // Step 2: WHT butterfly — inverse RHT = (1/sqrt(d)) * D * WHT(x_rot)
+
+    // Tier 1: strides 1, 2 — pairs lie within the same thread's 4 elements, no sync needed
+    {
+        float a;
+        a       = vals[0];
+        vals[0] = a + vals[1];
+        vals[1] = a - vals[1];
+        a       = vals[2];
+        vals[2] = a + vals[3];
+        vals[3] = a - vals[3];
+        a       = vals[0];
+        vals[0] = a + vals[2];
+        vals[2] = a - vals[2];
+        a       = vals[1];
+        vals[1] = a + vals[3];
+        vals[3] = a - vals[3];
+    }
+
+    // Tier 2: strides 4..64 — pairs within the same warp, use warp shuffles
+    for (int stride = kElemsPerThread; stride < kElemsPerThread * 32; stride <<= 1)
+    {
+        int laneMask = stride / kElemsPerThread;
+        for (int k = 0; k < kElemsPerThread; k++)
+        {
+            int   globalIdx = threadIdx.x * kElemsPerThread + k;
+            float partner   = __shfl_xor_sync(0xffffffff, vals[k], laneMask);
+            vals[k]         = (globalIdx & stride) ? (partner - vals[k]) : (vals[k] + partner);
+        }
+    }
+
+    // Tier 3: strides 128..2048 — inter-warp, single shared memory buffer (16 KB)
+    extern __shared__ float shm[]; // embDim floats
+
+    for (int k = 0; k < kElemsPerThread; k++)
+        shm[threadIdx.x * kElemsPerThread + k] = vals[k];
     __syncthreads();
 
-    // Step 2: Inverse RHT = (1/sqrt(d)) * D * WHT
-    // The forward RHT was: x_rot = (1/sqrt(d)) * WHT(D * x)
-    // The inverse is:      x     = (1/sqrt(d)) * D * WHT(x_rot)
-    // where D = diag(h_rhtSigns). Both forward and inverse have identical cost.
-
-    // WHT butterfly (ping-pong to avoid read-write conflicts)
-    for (int stride = 1; stride < embDim; stride <<= 1)
+    for (int stride = kElemsPerThread * 32; stride < embDim; stride <<= 1)
     {
-        for (int k = 0; k < elemsPerThread; k++)
+        for (int k = 0; k < kElemsPerThread; k++)
         {
-            int   embIdx = threadIdx.x * elemsPerThread + k;
-            float a      = cur[embIdx];
-            float b      = cur[embIdx ^ stride];
-            nxt[embIdx]  = (embIdx & stride) ? (b - a) : (a + b);
+            int   globalIdx  = threadIdx.x * kElemsPerThread + k;
+            float localVal   = shm[globalIdx];
+            float partnerVal = shm[globalIdx ^ stride];
+            vals[k]          = (globalIdx & stride) ? (partnerVal - localVal) : (localVal + partnerVal);
         }
         __syncthreads();
-        float* tmp = cur;
-        cur        = nxt;
-        nxt        = tmp;
+        // Skip the write-back on the last stride — vals[] already holds the final result
+        if (stride < embDim / 2)
+        {
+            for (int k = 0; k < kElemsPerThread; k++)
+                shm[threadIdx.x * kElemsPerThread + k] = vals[k];
+            __syncthreads();
+        }
     }
 
-    // Apply sign flip and normalize, then add centroid to recover the embedding
+    // Step 3: sign flip, normalize, add centroid, store
     int   centroidIdx = data.d_centroidIdx[docIdx];
     float scale       = 1.0f / sqrtf((float)embDim);
-    for (int k = 0; k < elemsPerThread; k++)
+    for (int k = 0; k < kElemsPerThread; k++)
     {
-        int    embIdx          = threadIdx.x * elemsPerThread + k;
-        float  residual        = cur[embIdx] * scale * data.d_rhtSigns[embIdx];
+        int    embIdx          = threadIdx.x * kElemsPerThread + k;
+        float  residual        = vals[k] * scale * data.d_rhtSigns[embIdx];
         size_t centroidAddr    = getMemAddr(centroidIdx, embIdx * 2, data.config.numCentroids, data.config.embDim * 2);
         float  centroid        = static_cast<float>(data.d_centroidEmb[centroidAddr]);
         size_t dstMemAddr      = getMemAddr(toScoreIdx, embIdx, data.config.numToScore, data.config.embDim);
@@ -72,7 +111,7 @@ __global__ void turboQuantKernel(Data data, RQ_T* p_turboRes)
 void methodTurboQuant(Data data, bool copyTurboResFromHost)
 {
     RQ_T*  p_turboRes = copyTurboResFromHost ? data.h_turboRes : data.d_turboRes;
-    size_t shmBytes   = 2 * data.config.embDim * sizeof(float);
+    size_t shmBytes   = data.config.embDim * sizeof(float); // single buffer, 16 KB for embDim=4096
     turboQuantKernel<<<data.config.numToScore, 1024, shmBytes>>>(data, p_turboRes);
     CHECK_CUDA(cudaGetLastError());
     CHECK_CUDA(cudaDeviceSynchronize());
