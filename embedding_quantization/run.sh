@@ -7,5 +7,5 @@ mkdir -p build
 cd build
 cmake ..
 make -j 4
-./test_residual_quantization_unit_tests
-./test_residual_quantization
+./test_embedding_quantization_unit_tests
+./test_embedding_quantization
