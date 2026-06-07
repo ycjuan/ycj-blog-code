@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 # Library name
-set(LIB_NAME residual_quantization)
+set(LIB_NAME embedding_quantization)
 
 # Export compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
