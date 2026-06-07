@@ -9,7 +9,9 @@
 std::vector<EMB_T> copyResults(Data data)
 {
     std::vector<EMB_T> rst(data.config.numToScore * data.config.embDim);
-    CHECK_CUDA(cudaMemcpy(rst.data(), data.d_rst, data.config.numToScore * data.config.embDim * sizeof(EMB_T),
+    CHECK_CUDA(cudaMemcpy(rst.data(),
+                          data.d_rst,
+                          data.config.numToScore * data.config.embDim * sizeof(EMB_T),
                           cudaMemcpyDeviceToHost));
     return rst;
 }
@@ -22,22 +24,22 @@ float computeRMSE(const std::vector<EMB_T>& rstA, const std::vector<EMB_T>& rstB
     }
 
     double sum = 0;
-    #pragma omp parallel for reduction(+:sum)
+#pragma omp parallel for reduction(+ : sum)
     for (int i = 0; i < numToScore; i++)
     {
-        double diffSum = 0;
+        double diffSum    = 0;
         double twoNormSum = 0;
         for (int j = 0; j < embDim; j++)
         {
             size_t memAddr = getMemAddr(i, j, numToScore, embDim);
-            float valA = static_cast<float>(rstA[memAddr]);
-            float valB = static_cast<float>(rstB[memAddr]);
-            float diff = (valA - valB);
+            float  valA    = static_cast<float>(rstA[memAddr]);
+            float  valB    = static_cast<float>(rstB[memAddr]);
+            float  diff    = (valA - valB);
             diffSum += diff * diff;
             twoNormSum += valA * valA;
         }
-        float twoNorm = sqrt(twoNormSum / embDim);
-        float rmse = sqrt(diffSum / embDim);
+        float twoNorm        = sqrt(twoNormSum / embDim);
+        float rmse           = sqrt(diffSum / embDim);
         float normalizedRMSE = rmse / twoNorm;
         sum += normalizedRMSE;
     }
@@ -65,8 +67,8 @@ void runExp(Data data, Method method, const std::string& methodName, std::vector
 
     // -------------
     // Copy the result back to Host and compute the RMSE
-    std::vector<EMB_T> rst = copyResults(data);
-    float rmse = computeRMSE(rstRef, rst, data.config.numToScore, data.config.embDim);
+    std::vector<EMB_T> rst  = copyResults(data);
+    float              rmse = computeRMSE(rstRef, rst, data.config.numToScore, data.config.embDim);
     std::cout << methodName << " RMSE: " << rmse << ", time: " << timeMs << " ms" << std::endl;
 }
 
@@ -79,13 +81,13 @@ int main()
     // -------------
     // Residual Quantization config
     Config config;
-    config.numDocs = 1000000;
-    config.numToScore = 100000;
-    config.embDim = 4096;
+    config.numDocs       = 1000000;
+    config.numToScore    = 100000;
+    config.embDim        = 4096;
     config.numBitsPerDim = 2;
-    config.numCentroids = 1024;
-    config.stdDev = 0.1f;
-    config.debugMode = false;
+    config.numCentroids  = 1024;
+    config.stdDev        = 0.1f;
+    config.debugMode     = false;
     config.validate();
 
     // -------------

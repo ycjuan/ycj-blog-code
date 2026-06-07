@@ -10,7 +10,7 @@
         if (status != cudaSuccess)                                                                                     \
         {                                                                                                              \
             std::string error = "[topk_baseline.cu] CUDA API failed at line " + std::to_string(__LINE__)               \
-                + " with error: " + cudaGetErrorString(status) + "\n";                                                 \
+                                + " with error: " + cudaGetErrorString(status) + "\n";                                 \
             throw std::runtime_error(error);                                                                           \
         }                                                                                                              \
     }
@@ -22,9 +22,9 @@ public:
 
     float tocMs()
     {
-        auto stop = std::chrono::high_resolution_clock::now();
+        auto                      stop     = std::chrono::high_resolution_clock::now();
         std::chrono::microseconds duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start_);
-        float timeMs = duration.count() / 1000.0;
+        float                     timeMs   = duration.count() / 1000.0;
         return timeMs;
     }
 
@@ -36,7 +36,7 @@ inline void printDeviceInfo()
 {
     using namespace std;
 
-    int deviceCount;
+    int         deviceCount;
     cudaError_t cudaError = cudaGetDeviceCount(&deviceCount);
     if (cudaError != cudaSuccess)
     {
