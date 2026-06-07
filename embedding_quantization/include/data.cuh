@@ -41,8 +41,12 @@ struct Data
     EMB_T* d_centroidEmb;
     int*   h_centroidIdx; // numDocs x 1
     int*   d_centroidIdx;
-    RQ_T*  h_residual; // numDocs x embDim x numBitsPerDim / sizeof(RQ_T)
+    RQ_T*  h_residual; // numDocs x getRqDim(), packed quantized residuals for res_quant
     RQ_T*  d_residual;
+    int*   h_rhtSigns; // embDim x 1, random ±1 signs for RHT used by turbo_quant
+    int*   d_rhtSigns;
+    RQ_T*  h_turboRes; // numDocs x getRqDim(), Lloyd-Max quantized rotated residuals for turbo_quant
+    RQ_T*  d_turboRes;
     int*   h_docIdxToScore; // numToScore x 1
     int*   d_docIdxToScore;
     EMB_T* d_rst; // numToScore x embDim
@@ -164,6 +168,61 @@ inline void quantize(int   numBitsPerDim,
     // !!!!!VERY IMPORTANT!!!!! rq is NOT OVERWRITTEN-ABLE. Let's say you first encode 0b01, and then encode 0b10, the
     // result will be 0b11, NOT 0b10
     globalQuantRes |= mask;
+}
+
+// Lloyd-Max scalar quantizer for Gaussian N(0, stdDev²) at numBitsPerDim=2.
+// Boundaries at 0 and ±0.9816*stdDev; centroids at ±0.4528*stdDev and ±1.5104*stdDev.
+// Uses the same bit-packing layout as quantize/dequantize.
+inline void lloydMaxQuantize(int   numBitsPerDim,
+                             int   numBitsPerInt,
+                             float stdDev,
+                             float val,
+                             RQ_T& globalQuantRes,
+                             int   embIdx)
+{
+    int bin;
+    if (val < -0.9816f * stdDev)
+        bin = 0;
+    else if (val < 0.0f)
+        bin = 1;
+    else if (val < 0.9816f * stdDev)
+        bin = 2;
+    else
+        bin = 3;
+
+    const int embsPerInt = numBitsPerInt / numBitsPerDim;
+    const int shifts     = (embIdx % embsPerInt) * numBitsPerDim;
+    globalQuantRes |= static_cast<RQ_T>(bin) << shifts;
+}
+
+inline __device__ __host__ float lloydMaxDequantize(int   numBitsPerDim,
+                                                    int   numBitsPerInt,
+                                                    float stdDev,
+                                                    RQ_T  rq,
+                                                    int   embIdx)
+{
+    const int embsPerInt = numBitsPerInt / numBitsPerDim;
+    const int shifts     = (embIdx % embsPerInt) * numBitsPerDim;
+    const int fullRange  = (1 << numBitsPerDim);
+    int       bin        = static_cast<int>(((static_cast<RQ_T>(fullRange) - 1) << shifts & rq) >> shifts);
+
+    float centroid;
+    switch (bin)
+    {
+    case 0:
+        centroid = -1.5104f;
+        break;
+    case 1:
+        centroid = -0.4528f;
+        break;
+    case 2:
+        centroid = 0.4528f;
+        break;
+    default:
+        centroid = 1.5104f;
+        break;
+    }
+    return centroid * stdDev;
 }
 
 inline __device__ __host__ float dequantize(int numBitsPerDim, int numBitsPerInt, float stdDev, RQ_T rq, int embIdx)

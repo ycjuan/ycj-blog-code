@@ -22,9 +22,14 @@ Data genData(Config config)
         CHECK_CUDA(cudaMalloc(&data.d_centroidIdx, config.numDocs * sizeof(int)));
         CHECK_CUDA(cudaMallocHost(&data.h_residual, config.numDocs * config.getRqDim() * sizeof(RQ_T)));
         memset(data.h_residual, 0, config.numDocs * config.getRqDim() * sizeof(RQ_T));
+        CHECK_CUDA(cudaMalloc(&data.d_residual, config.numDocs * config.getRqDim() * sizeof(RQ_T)));
+        CHECK_CUDA(cudaMallocHost(&data.h_rhtSigns, config.embDim * sizeof(int)));
+        CHECK_CUDA(cudaMalloc(&data.d_rhtSigns, config.embDim * sizeof(int)));
+        CHECK_CUDA(cudaMallocHost(&data.h_turboRes, config.numDocs * config.getRqDim() * sizeof(RQ_T)));
+        memset(data.h_turboRes, 0, config.numDocs * config.getRqDim() * sizeof(RQ_T));
+        CHECK_CUDA(cudaMalloc(&data.d_turboRes, config.numDocs * config.getRqDim() * sizeof(RQ_T)));
         CHECK_CUDA(cudaMallocHost(&data.h_docIdxToScore, config.numToScore * sizeof(int)));
         CHECK_CUDA(cudaMalloc(&data.d_docIdxToScore, config.numToScore * sizeof(int)));
-        CHECK_CUDA(cudaMalloc(&data.d_residual, config.numDocs * config.getRqDim() * sizeof(RQ_T)));
         CHECK_CUDA(cudaMalloc(&data.d_rst, config.numToScore * config.embDim * sizeof(EMB_T)));
     }
 
@@ -47,6 +52,16 @@ Data genData(Config config)
 }
 
 // ------------
+// Generate RHT signs for turbo_quant
+{
+    std::cout << "Generating RHT signs" << std::endl;
+    std::default_random_engine         rhtRng(42);
+    std::uniform_int_distribution<int> signDist(0, 1);
+    for (int i = 0; i < config.embDim; i++)
+        data.h_rhtSigns[i] = (signDist(rhtRng) == 0) ? -1 : 1;
+}
+
+// ------------
 // Generate document embeddings
 {
     std::cout << "Generating document embeddings" << std::endl;
@@ -64,18 +79,50 @@ Data genData(Config config)
     {
         int centroidIdx            = docIdx % config.numCentroids;
         data.h_centroidIdx[docIdx] = centroidIdx;
+
+        // Collect all residuals for this document so we can apply RHT afterward
+        std::vector<float> residuals(config.embDim);
+
         for (int embIdx = 0; embIdx < config.embDim; embIdx++)
         {
             auto centroid
                 = data.h_centroidEmb[getMemAddr(centroidIdx, embIdx * 2, config.numCentroids, config.embDim * 2)];
-            auto  residual = norm_distributions[omp_get_thread_num()](generators[omp_get_thread_num()]);
-            float emb
-                = static_cast<float>(centroid)
-                  + residual; // We use float here because some compilers can't perform the addition of BF16 in CPU
+            float residual = norm_distributions[omp_get_thread_num()](generators[omp_get_thread_num()]);
+            float emb      = static_cast<float>(centroid) + residual;
             data.h_emb[getMemAddr(docIdx, embIdx, config.numDocs, config.embDim)] = static_cast<EMB_T>(emb);
             auto rqIdx     = getRqIdx(embIdx, config.numBitsPerDim, kBitsPerInt);
             auto rqMemAddr = getMemAddr(docIdx, rqIdx, config.numDocs, config.getRqDim());
             quantize(config.numBitsPerDim, kBitsPerInt, config.stdDev, residual, data.h_residual[rqMemAddr], embIdx);
+            residuals[embIdx] = residual;
+        }
+
+        // Apply RHT to residuals: x_rot = (1/sqrt(d)) * WHT(signs * x)
+        // Step 1: sign flip
+        for (int i = 0; i < config.embDim; i++)
+            residuals[i] *= data.h_rhtSigns[i];
+        // Step 2: Walsh-Hadamard Transform (in-place)
+        for (int stride = 1; stride < config.embDim; stride <<= 1)
+            for (int i = 0; i < config.embDim; i += 2 * stride)
+                for (int j = 0; j < stride; j++)
+                {
+                    float a                   = residuals[i + j];
+                    float b                   = residuals[i + j + stride];
+                    residuals[i + j]          = a + b;
+                    residuals[i + j + stride] = a - b;
+                }
+        // Step 3: normalize and Lloyd-Max quantize
+        float scale = 1.0f / sqrtf((float)config.embDim);
+        for (int embIdx = 0; embIdx < config.embDim; embIdx++)
+        {
+            float rotated   = residuals[embIdx] * scale;
+            auto  rqIdx     = getRqIdx(embIdx, config.numBitsPerDim, kBitsPerInt);
+            auto  rqMemAddr = getMemAddr(docIdx, rqIdx, config.numDocs, config.getRqDim());
+            lloydMaxQuantize(config.numBitsPerDim,
+                             kBitsPerInt,
+                             config.stdDev,
+                             rotated,
+                             data.h_turboRes[rqMemAddr],
+                             embIdx);
         }
     }
 }
@@ -114,6 +161,11 @@ Data genData(Config config)
         cudaMemcpy(data.d_centroidIdx, data.h_centroidIdx, config.numDocs * sizeof(int), cudaMemcpyHostToDevice));
     CHECK_CUDA(cudaMemcpy(data.d_residual,
                           data.h_residual,
+                          config.numDocs * config.getRqDim() * sizeof(RQ_T),
+                          cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMemcpy(data.d_rhtSigns, data.h_rhtSigns, config.embDim * sizeof(int), cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMemcpy(data.d_turboRes,
+                          data.h_turboRes,
                           config.numDocs * config.getRqDim() * sizeof(RQ_T),
                           cudaMemcpyHostToDevice));
     CHECK_CUDA(cudaMemcpy(data.d_docIdxToScore,
