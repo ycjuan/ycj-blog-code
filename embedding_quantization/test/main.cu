@@ -81,8 +81,8 @@ int main()
     // -------------
     // Residual Quantization config
     Config config;
-    config.numDocs       = 1000000;
-    config.numToScore    = 100000;
+    config.numDocs       = 200000;
+    config.numToScore    = 20000;
     config.embDim        = 4096;
     config.numBitsPerDim = 2;
     config.numCentroids  = 1024;
@@ -105,6 +105,8 @@ int main()
     runExp(data, Method::BASELINE_D2D, "Baseline D2D", rstRef, kNumTrials);
     runExp(data, Method::RES_QUANT_H2D, "Residual Quant H2D", rstRef, kNumTrials);
     runExp(data, Method::RES_QUANT_D2D, "Residual Quant D2D", rstRef, kNumTrials);
+    runExp(data, Method::TURBO_QUANT_H2D, "Turbo Quant H2D", rstRef, kNumTrials);
+    runExp(data, Method::TURBO_QUANT_D2D, "Turbo Quant D2D", rstRef, kNumTrials);
 
     return 0;
 }

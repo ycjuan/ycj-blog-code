@@ -20,12 +20,12 @@ __global__ void resQuantKernel(Data data, RQ_T* p_quantRes)
         int centroidIdx = data.d_centroidIdx[docIdx];
 
         // get the memory address of the centroid and quantized residual
-        size_t centroidMemAddr = getMemAddr(centroidIdx, embIdx * 2, data.config.numCentroids, data.config.embDim * 2);
+        size_t centroidMemAddr = getMemAddr(centroidIdx, embIdx, data.config.numCentroids, data.config.embDim);
         size_t quantResMemAddr = getMemAddr(docIdx, quantResIdx, data.config.numDocs, data.config.getRqDim());
 
-        // get the centroid, stdDev, and quantized residual
-        EMB_T centroid = data.d_centroidEmb[centroidMemAddr];
-        EMB_T stdDev   = data.d_centroidEmb[centroidMemAddr + 1];
+        // get the centroid, per-dim stdDev, and quantized residual
+        EMB_T centroid = data.d_centroidVal[centroidMemAddr];
+        float stdDev   = data.d_centroidStd[centroidMemAddr];
         RQ_T  quantRes = p_quantRes[quantResMemAddr];
 
         // perform the dequantization
