@@ -101,8 +101,8 @@ __global__ void turboQuantKernel(Data data, RQ_T* p_turboRes)
     {
         int    embIdx          = threadIdx.x * kElemsPerThread + k;
         float  residual        = vals[k] * scale * data.d_rhtSigns[embIdx];
-        size_t centroidAddr    = getMemAddr(centroidIdx, embIdx * 2, data.config.numCentroids, data.config.embDim * 2);
-        float  centroid        = static_cast<float>(data.d_centroidEmb[centroidAddr]);
+        size_t centroidAddr    = getMemAddr(centroidIdx, embIdx, data.config.numCentroids, data.config.embDim);
+        float  centroid        = static_cast<float>(data.d_centroidVal[centroidAddr]);
         size_t dstMemAddr      = getMemAddr(toScoreIdx, embIdx, data.config.numToScore, data.config.embDim);
         data.d_rst[dstMemAddr] = static_cast<EMB_T>(centroid + residual);
     }

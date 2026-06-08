@@ -16,8 +16,8 @@ Data genData(Config config)
         std::cout << "Allocating memory for data" << std::endl;
         CHECK_CUDA(cudaMallocHost(&data.h_emb, config.numDocs * config.embDim * sizeof(EMB_T)));
         CHECK_CUDA(cudaMalloc(&data.d_emb, config.numDocs * config.embDim * sizeof(EMB_T)));
-        CHECK_CUDA(cudaMallocHost(&data.h_centroidEmb, config.numCentroids * config.embDim * 2 * sizeof(EMB_T)));
-        CHECK_CUDA(cudaMalloc(&data.d_centroidEmb, config.numCentroids * config.embDim * 2 * sizeof(EMB_T)));
+        CHECK_CUDA(cudaMallocHost(&data.h_centroidVal, config.numCentroids * config.embDim * sizeof(EMB_T)));
+        CHECK_CUDA(cudaMalloc(&data.d_centroidVal, config.numCentroids * config.embDim * sizeof(EMB_T)));
         CHECK_CUDA(cudaMallocHost(&data.h_centroidIdx, config.numDocs * sizeof(int)));
         CHECK_CUDA(cudaMalloc(&data.d_centroidIdx, config.numDocs * sizeof(int)));
         CHECK_CUDA(cudaMallocHost(&data.h_residual, config.numDocs * config.getRqDim() * sizeof(RQ_T)));
@@ -44,9 +44,8 @@ Data genData(Config config)
     {
         for (int embIdx = 0; embIdx < config.embDim; embIdx++)
         {
-            const auto addr              = getMemAddr(centroidIdx, embIdx * 2, config.numCentroids, config.embDim * 2);
-            data.h_centroidEmb[addr]     = (EMB_T)distribution(generator);
-            data.h_centroidEmb[addr + 1] = (EMB_T)config.stdDev;
+            const auto addr          = getMemAddr(centroidIdx, embIdx, config.numCentroids, config.embDim);
+            data.h_centroidVal[addr] = (EMB_T)distribution(generator);
         }
     }
 }
@@ -85,8 +84,7 @@ Data genData(Config config)
 
         for (int embIdx = 0; embIdx < config.embDim; embIdx++)
         {
-            auto centroid
-                = data.h_centroidEmb[getMemAddr(centroidIdx, embIdx * 2, config.numCentroids, config.embDim * 2)];
+            auto  centroid = data.h_centroidVal[getMemAddr(centroidIdx, embIdx, config.numCentroids, config.embDim)];
             float residual = norm_distributions[omp_get_thread_num()](generators[omp_get_thread_num()]);
             float emb      = static_cast<float>(centroid) + residual;
             data.h_emb[getMemAddr(docIdx, embIdx, config.numDocs, config.embDim)] = static_cast<EMB_T>(emb);
@@ -133,17 +131,13 @@ Data genData(Config config)
     std::cout << "Generating document indices to score" << std::endl;
     std::vector<int> docIdxToScore(config.numDocs);
     for (int i = 0; i < config.numDocs; i++)
-    {
         docIdxToScore[i] = i;
-    }
     std::default_random_engine generator;
     std::shuffle(docIdxToScore.begin(), docIdxToScore.end(), generator);
     docIdxToScore.resize(config.numToScore);
     std::sort(docIdxToScore.begin(), docIdxToScore.end());
     for (int i = 0; i < config.numToScore; i++)
-    {
         data.h_docIdxToScore[i] = docIdxToScore[i];
-    }
 }
 }
 
@@ -153,9 +147,9 @@ Data genData(Config config)
     std::cout << "Copying data to device" << std::endl;
     CHECK_CUDA(
         cudaMemcpy(data.d_emb, data.h_emb, config.numDocs * config.embDim * sizeof(EMB_T), cudaMemcpyHostToDevice));
-    CHECK_CUDA(cudaMemcpy(data.d_centroidEmb,
-                          data.h_centroidEmb,
-                          config.numCentroids * config.embDim * 2 * sizeof(EMB_T),
+    CHECK_CUDA(cudaMemcpy(data.d_centroidVal,
+                          data.h_centroidVal,
+                          config.numCentroids * config.embDim * sizeof(EMB_T),
                           cudaMemcpyHostToDevice));
     CHECK_CUDA(
         cudaMemcpy(data.d_centroidIdx, data.h_centroidIdx, config.numDocs * sizeof(int), cudaMemcpyHostToDevice));

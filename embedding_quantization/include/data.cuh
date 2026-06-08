@@ -36,9 +36,8 @@ struct Data
 
     EMB_T* h_emb; // numDocs x embDim
     EMB_T* d_emb;
-    EMB_T*
-        h_centroidEmb; // numCentroids x embDim x 2 (the first half is the embedding, and the second half is the stdDev)
-    EMB_T* d_centroidEmb;
+    EMB_T* h_centroidVal; // numCentroids x embDim
+    EMB_T* d_centroidVal;
     int*   h_centroidIdx; // numDocs x 1
     int*   d_centroidIdx;
     RQ_T*  h_residual; // numDocs x getRqDim(), packed quantized residuals for res_quant
