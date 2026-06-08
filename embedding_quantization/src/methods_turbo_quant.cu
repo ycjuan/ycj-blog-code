@@ -2,15 +2,20 @@
 #include "methods_turbo_quant.cuh"
 #include "util.cuh"
 
+// TurboQuant: https://arxiv.org/abs/2504.19874
+// Quantizes the raw embedding (no centroid subtraction) via RHT + Lloyd-Max.
+// RHT spreads energy uniformly across dims, making the distribution approximately
+// Gaussian and amenable to Lloyd-Max quantization.
+//
 // One block per scored document, 1024 threads per block.
 // elemsPerThread = embDim / 1024 (e.g. 1 for embDim=1024, 4 for embDim=4096).
 //
 // WHT butterfly is split into three tiers to minimize shared memory pressure:
-//   - Strides < elemsPerThread:                intra-thread, pure register ops
-//   - Strides elemsPerThread .. 16*elemsPerThread (intra-warp): __shfl_xor_sync
-//   - Strides 32*elemsPerThread .. embDim/2    (inter-warp):   single shared memory buffer
+//   - Strides < elemsPerThread:                   intra-thread, pure register ops
+//   - Strides elemsPerThread .. 31*elemsPerThread: __shfl_xor_sync (intra-warp)
+//   - Strides 32*elemsPerThread .. embDim/2:       single shared memory buffer
 //
-// Using a single buffer (vs ping-pong) halves shared memory, doubling occupancy.
+// Single buffer (vs ping-pong) halves shared memory, doubling occupancy.
 
 constexpr int kMaxElemsPerThread = 4; // upper bound; actual value is embDim / 1024
 
@@ -21,10 +26,9 @@ __global__ void turboQuantKernel(Data data, RQ_T* p_turboRes)
         return;
 
     int   docIdx         = data.d_docIdxToScore[toScoreIdx];
-    int   centroidIdx    = data.d_centroidIdx[docIdx];
     int   embDim         = data.config.embDim;
     int   elemsPerThread = embDim / blockDim.x;
-    float effStd         = data.d_centroidEffStd[centroidIdx];
+    float stdDev         = data.turboQuantStdDev;
 
     // Step 1: Lloyd-Max dequantize into registers (rotated space)
     float vals[kMaxElemsPerThread];
@@ -33,10 +37,10 @@ __global__ void turboQuantKernel(Data data, RQ_T* p_turboRes)
         int    embIdx    = threadIdx.x * elemsPerThread + k;
         int    rqIdx     = getRqIdx(embIdx, data.config.numBitsPerDim, kBitsPerInt);
         size_t rqMemAddr = getMemAddr(docIdx, rqIdx, data.config.numDocs, data.config.getRqDim());
-        vals[k] = lloydMaxDequantize(data.config.numBitsPerDim, kBitsPerInt, effStd, p_turboRes[rqMemAddr], embIdx);
+        vals[k] = lloydMaxDequantize(data.config.numBitsPerDim, kBitsPerInt, stdDev, p_turboRes[rqMemAddr], embIdx);
     }
 
-    // Step 2: WHT butterfly — inverse RHT = (1/sqrt(d)) * D * WHT(x_rot)
+    // Step 2: inverse RHT = (1/sqrt(d)) * D * WHT(x_rot)
 
     // Tier 1: strides 1..(elemsPerThread-1) — pairs within this thread's elements
     for (int stride = 1; stride < elemsPerThread; stride <<= 1)
@@ -48,7 +52,7 @@ __global__ void turboQuantKernel(Data data, RQ_T* p_turboRes)
             vals[k] = (k & stride) ? (tmp[k ^ stride] - tmp[k]) : (tmp[k] + tmp[k ^ stride]);
     }
 
-    // Tier 2: strides elemsPerThread..16*elemsPerThread — intra-warp, use warp shuffles
+    // Tier 2: strides elemsPerThread..31*elemsPerThread — intra-warp, warp shuffles
     for (int stride = elemsPerThread; stride < elemsPerThread * 32; stride <<= 1)
     {
         int laneMask = stride / elemsPerThread;
@@ -85,16 +89,13 @@ __global__ void turboQuantKernel(Data data, RQ_T* p_turboRes)
         }
     }
 
-    // Step 3: sign flip, normalize, add centroid, store
+    // Step 3: sign flip + normalize → reconstructed embedding, store directly
     float scale = 1.0f / sqrtf((float)embDim);
     for (int k = 0; k < elemsPerThread; k++)
     {
         int    embIdx          = threadIdx.x * elemsPerThread + k;
-        float  residual        = vals[k] * scale * data.d_rhtSigns[embIdx];
-        size_t centroidAddr    = getMemAddr(centroidIdx, embIdx, data.config.numCentroids, data.config.embDim);
-        float  centroid        = static_cast<float>(data.d_centroidVal[centroidAddr]);
         size_t dstMemAddr      = getMemAddr(toScoreIdx, embIdx, data.config.numToScore, data.config.embDim);
-        data.d_rst[dstMemAddr] = static_cast<EMB_T>(centroid + residual);
+        data.d_rst[dstMemAddr] = static_cast<EMB_T>(vals[k] * scale * data.d_rhtSigns[embIdx]);
     }
 }
 

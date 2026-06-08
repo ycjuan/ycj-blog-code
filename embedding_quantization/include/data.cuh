@@ -44,9 +44,8 @@ struct Data
     RQ_T*  d_residual;
     float* h_centroidStd; // numCentroids x embDim, per-dim per-centroid stdDev for res_quant
     float* d_centroidStd;
-    float* h_centroidEffStd; // numCentroids x 1, RMS effective stdDev per centroid for turbo_quant
-    float* d_centroidEffStd;
-    int*   h_rhtSigns; // embDim x 1, random ±1 signs for RHT used by turbo_quant
+    float  turboQuantStdDev; // global RMS stdDev of raw embeddings, for turbo_quant Lloyd-Max boundaries
+    int*   h_rhtSigns;       // embDim x 1, random ±1 signs for RHT used by turbo_quant
     int*   d_rhtSigns;
     RQ_T*  h_turboRes; // numDocs x getRqDim(), Lloyd-Max quantized rotated residuals for turbo_quant
     RQ_T*  d_turboRes;
