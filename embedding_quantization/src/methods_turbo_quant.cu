@@ -20,9 +20,11 @@ __global__ void turboQuantKernel(Data data, RQ_T* p_turboRes)
     if (toScoreIdx >= data.config.numToScore)
         return;
 
-    int docIdx         = data.d_docIdxToScore[toScoreIdx];
-    int embDim         = data.config.embDim;
-    int elemsPerThread = embDim / blockDim.x;
+    int   docIdx         = data.d_docIdxToScore[toScoreIdx];
+    int   centroidIdx    = data.d_centroidIdx[docIdx];
+    int   embDim         = data.config.embDim;
+    int   elemsPerThread = embDim / blockDim.x;
+    float effStd         = data.d_centroidEffStd[centroidIdx];
 
     // Step 1: Lloyd-Max dequantize into registers (rotated space)
     float vals[kMaxElemsPerThread];
@@ -31,11 +33,7 @@ __global__ void turboQuantKernel(Data data, RQ_T* p_turboRes)
         int    embIdx    = threadIdx.x * elemsPerThread + k;
         int    rqIdx     = getRqIdx(embIdx, data.config.numBitsPerDim, kBitsPerInt);
         size_t rqMemAddr = getMemAddr(docIdx, rqIdx, data.config.numDocs, data.config.getRqDim());
-        vals[k]          = lloydMaxDequantize(data.config.numBitsPerDim,
-                                     kBitsPerInt,
-                                     data.config.stdDev,
-                                     p_turboRes[rqMemAddr],
-                                     embIdx);
+        vals[k] = lloydMaxDequantize(data.config.numBitsPerDim, kBitsPerInt, effStd, p_turboRes[rqMemAddr], embIdx);
     }
 
     // Step 2: WHT butterfly — inverse RHT = (1/sqrt(d)) * D * WHT(x_rot)
@@ -88,8 +86,7 @@ __global__ void turboQuantKernel(Data data, RQ_T* p_turboRes)
     }
 
     // Step 3: sign flip, normalize, add centroid, store
-    int   centroidIdx = data.d_centroidIdx[docIdx];
-    float scale       = 1.0f / sqrtf((float)embDim);
+    float scale = 1.0f / sqrtf((float)embDim);
     for (int k = 0; k < elemsPerThread; k++)
     {
         int    embIdx          = threadIdx.x * elemsPerThread + k;

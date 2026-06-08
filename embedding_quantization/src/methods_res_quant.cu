@@ -23,12 +23,13 @@ __global__ void resQuantKernel(Data data, RQ_T* p_quantRes)
         size_t centroidMemAddr = getMemAddr(centroidIdx, embIdx, data.config.numCentroids, data.config.embDim);
         size_t quantResMemAddr = getMemAddr(docIdx, quantResIdx, data.config.numDocs, data.config.getRqDim());
 
-        // get the centroid and quantized residual
+        // get the centroid, per-dim stdDev, and quantized residual
         EMB_T centroid = data.d_centroidVal[centroidMemAddr];
+        float stdDev   = data.d_centroidStd[centroidMemAddr];
         RQ_T  quantRes = p_quantRes[quantResMemAddr];
 
         // perform the dequantization
-        EMB_T residual = dequantize(data.config.numBitsPerDim, kBitsPerInt, data.config.stdDev, quantRes, embIdx);
+        EMB_T residual = dequantize(data.config.numBitsPerDim, kBitsPerInt, stdDev, quantRes, embIdx);
 
         // recover the embedding value by adding the centroid and the residual
         EMB_T rst = centroid + residual;
