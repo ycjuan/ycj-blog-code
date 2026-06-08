@@ -81,9 +81,9 @@ int main()
     // -------------
     // Residual Quantization config
     Config config;
-    config.numDocs       = 1000000;
-    config.numToScore    = 100000;
-    config.embDim        = 4096;
+    config.numDocs       = 100000;
+    config.numToScore    = 10000;
+    config.embDim        = 1024;
     config.numBitsPerDim = 2;
     config.numCentroids  = 1024;
     config.stdDev        = 0.1f;
