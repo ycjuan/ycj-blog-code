@@ -24,16 +24,16 @@ All arrays use row-major layout. Quantized residuals are bit-packed: with `numBi
 
 ## Results
 
-On an NVIDIA T4 (SM75), with `numDocs=100K`, `numToScore=10K`, `embDim=1024`, `numBitsPerDim=2`, `numCentroids=1024`:
+On an NVIDIA T4 (SM75), with `numDocs=200K`, `numToScore=10K`, `embDim=4096`, `numBitsPerDim=2`, `numCentroids=1024`:
 
 | Method             | RMSE     | Latency  |
 |--------------------|----------|----------|
-| Baseline H2D       | 0.000    | 3.28 ms  |
-| Baseline D2D       | 0.000    | 0.64 ms  |
-| ResQuant H2D       | 0.107    | 1.14 ms  |
-| ResQuant D2D       | 0.107    | 1.00 ms  |
-| TurboQuant H2D     | 0.059    | 3.36 ms  |
-| TurboQuant D2D     | 0.059    | 2.52 ms  |
+| Baseline H2D       | 0.000    | 13.08 ms |
+| Baseline D2D       | 0.000    | 1.21 ms  |
+| ResQuant H2D       | 0.107    | 2.44 ms  |
+| ResQuant D2D       | 0.107    | 3.98 ms  |
+| TurboQuant H2D     | 0.059    | 12.73 ms |
+| TurboQuant D2D     | 0.059    | 9.99 ms  |
 
 RMSE is normalized per-document: `mean over docs of (‖reconstructed − original‖₂ / ‖original‖₂)`.
 
