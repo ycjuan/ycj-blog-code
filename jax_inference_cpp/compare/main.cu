@@ -1,0 +1,140 @@
+#include "backends.hpp"
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <cuda_runtime.h>
+#include <iostream>
+#include <random>
+#include <stdexcept>
+
+using Clock = std::chrono::high_resolution_clock;
+
+template <typename Fn>
+static double benchMs(Fn fn, int warmup, int iters)
+{
+    for (int i = 0; i < warmup; ++i)
+        fn();
+    auto t0 = Clock::now();
+    for (int i = 0; i < iters; ++i)
+        fn();
+    return std::chrono::duration<double, std::milli>(Clock::now() - t0).count() / iters;
+}
+
+static void assertEqual(const std::vector<float>& ref,
+                        const std::vector<float>& got,
+                        const std::string&        name,
+                        float                     tol = 1e-3f)
+{
+    if (ref.size() != got.size())
+        throw std::runtime_error(name + ": size mismatch");
+    for (size_t i = 0; i < ref.size(); ++i)
+    {
+        if (std::fabs(ref[i] - got[i]) > tol)
+            throw std::runtime_error(name + ": mismatch at index " + std::to_string(i)
+                                     + " (ref=" + std::to_string(ref[i]) + " got=" + std::to_string(got[i]) + ")");
+    }
+    std::cout << "[PASS] " << name << "\n";
+}
+
+static bool hasCuda()
+{
+    int count = 0;
+    return cudaGetDeviceCount(&count) == cudaSuccess && count > 0;
+}
+
+int main()
+{
+    const int query_dim = 64;
+    const int doc_dim   = 128;
+    const int num_docs  = 10000;
+    const int num_heads = 2;
+
+    std::mt19937                          rng(42);
+    std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+
+    std::vector<float> query(query_dim);
+    std::generate(query.begin(), query.end(), [&] { return dist(rng); });
+    std::vector<float> docs(num_docs * doc_dim);
+    std::generate(docs.begin(), docs.end(), [&] { return dist(rng); });
+
+    Input in { query, docs, num_docs, query_dim, doc_dim, num_heads };
+    Paths paths { "../model.onnx", "../model.vmfb", "../weights/" };
+
+    const bool gpu_available = hasCuda();
+    if (!gpu_available)
+        std::cout << "[INFO] No CUDA GPU detected; skipping Pure CUDA backend.\n";
+
+    std::cout << "Initializing backends...\n";
+    auto                          ort  = make_onnxruntime(paths);
+    auto                          iree = make_iree(paths, in);
+    std::unique_ptr<InferBackend> cu;
+    if (gpu_available)
+        cu = make_cuda(paths, in);
+
+    std::cout << "Checking correctness (num_docs=" << num_docs << ")...\n";
+    auto ref      = ort->infer(in);
+    auto got_iree = iree->infer(in);
+    assertEqual(ref, got_iree, "IREE       vs ONNX Runtime");
+    if (cu)
+    {
+        auto got_cu = cu->infer(in);
+        assertEqual(ref, got_cu, "Pure CUDA  vs ONNX Runtime");
+    }
+
+    const int numTrials       = 10;
+    const int numWarmupTrials = 3;
+
+    double msOrt  = benchMs([&]() { ort->infer(in); }, numWarmupTrials, numTrials);
+    double msIree = benchMs([&]() { iree->infer(in); }, numWarmupTrials, numTrials);
+
+    std::cout << "\nBenchmarking (num_docs=" << num_docs << ", " << numWarmupTrials << " warmup + " << numTrials
+              << " trials)...\n\n";
+
+    printf("  %-14s  e2e: %6.2f ms\n", "ONNX Runtime", msOrt);
+    printf("  %-14s  e2e: %6.2f ms\n", "IREE (CPU)", msIree);
+
+    if (gpu_available)
+    {
+        float* d_query  = nullptr;
+        float* d_docs   = nullptr;
+        float* d_scores = nullptr;
+        cudaMalloc(&d_query, query_dim * sizeof(float));
+        cudaMalloc(&d_docs, num_docs * doc_dim * sizeof(float));
+        cudaMalloc(&d_scores, num_docs * num_heads * sizeof(float));
+        std::vector<float> h_scores(num_docs * num_heads);
+
+        double msH2D = benchMs(
+            [&]()
+            {
+                cudaMemcpy(d_query, in.query.data(), query_dim * sizeof(float), cudaMemcpyHostToDevice);
+                cudaMemcpy(d_docs, in.docs.data(), num_docs * doc_dim * sizeof(float), cudaMemcpyHostToDevice);
+            },
+            numWarmupTrials,
+            numTrials);
+
+        double msD2H = benchMs(
+            [&]()
+            { cudaMemcpy(h_scores.data(), d_scores, num_docs * num_heads * sizeof(float), cudaMemcpyDeviceToHost); },
+            numWarmupTrials,
+            numTrials);
+
+        cudaMemcpy(d_query, in.query.data(), query_dim * sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_docs, in.docs.data(), num_docs * doc_dim * sizeof(float), cudaMemcpyHostToDevice);
+
+        double msCu
+            = benchMs([&]() { cu->infer_device(d_query, d_docs, d_scores, query_dim, doc_dim, num_docs, num_heads); },
+                      numWarmupTrials,
+                      numTrials);
+
+        printf("  [A] H2D transfer              : %6.2f ms\n", msH2D);
+        printf("  [C] D2H transfer              : %6.2f ms\n", msD2H);
+        printf("  [A+C] total transfer          : %6.2f ms\n\n", msH2D + msD2H);
+        printf("  %-14s  e2e: %6.2f ms  kernel: %6.2f ms\n", "Pure CUDA", msCu + msH2D + msD2H, msCu);
+
+        cudaFree(d_query);
+        cudaFree(d_docs);
+        cudaFree(d_scores);
+    }
+
+    return 0;
+}
