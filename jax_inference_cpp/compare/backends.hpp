@@ -15,9 +15,10 @@ struct Input
 
 struct Paths
 {
-    std::string onnx_model;  // model.onnx
-    std::string iree_model;  // model.vmfb
-    std::string weights_dir; // weights/
+    std::string onnx_model;      // model.onnx
+    std::string iree_model;      // model.vmfb        (llvm-cpu)
+    std::string iree_cuda_model; // model_cuda.vmfb   (cuda)
+    std::string weights_dir;     // weights/
 };
 
 // Abstract backend: construct once (loads/compiles the model), call infer() many times.
@@ -53,4 +54,5 @@ struct InferBackend
 std::unique_ptr<InferBackend> make_onnxruntime(const Paths& paths);
 std::unique_ptr<InferBackend> make_onnxruntime_gpu(const Paths& paths);
 std::unique_ptr<InferBackend> make_iree(const Paths& paths, const Input& shape_hint);
+std::unique_ptr<InferBackend> make_iree_cuda(const Paths& paths, const Input& shape_hint);
 std::unique_ptr<InferBackend> make_cuda(const Paths& paths, const Input& shape_hint);

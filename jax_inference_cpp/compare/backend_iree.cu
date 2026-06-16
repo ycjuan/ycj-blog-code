@@ -101,7 +101,7 @@ struct IreeBackend : InferBackend
     iree_hal_device_t*       device   = nullptr;
     iree_runtime_session_t*  session  = nullptr;
 
-    explicit IreeBackend(const Paths& paths)
+    explicit IreeBackend(const std::string& vmfb_path, const char* driver)
     {
         iree_runtime_instance_options_t inst_opts;
         iree_runtime_instance_options_initialize(&inst_opts);
@@ -109,14 +109,14 @@ struct IreeBackend : InferBackend
         IREE_CHECK_OK(iree_runtime_instance_create(&inst_opts, iree_allocator_system(), &instance));
 
         IREE_CHECK_OK(
-            iree_runtime_instance_try_create_default_device(instance, iree_make_cstring_view("local-sync"), &device));
+            iree_runtime_instance_try_create_default_device(instance, iree_make_cstring_view(driver), &device));
 
         iree_runtime_session_options_t sess_opts;
         iree_runtime_session_options_initialize(&sess_opts);
         IREE_CHECK_OK(
             iree_runtime_session_create_with_device(instance, &sess_opts, device, iree_allocator_system(), &session));
 
-        IREE_CHECK_OK(iree_runtime_session_append_bytecode_module_from_file(session, paths.iree_model.c_str()));
+        IREE_CHECK_OK(iree_runtime_session_append_bytecode_module_from_file(session, vmfb_path.c_str()));
     }
 
     ~IreeBackend()
@@ -167,5 +167,10 @@ struct IreeBackend : InferBackend
 
 std::unique_ptr<InferBackend> make_iree(const Paths& paths, const Input& /*shape_hint*/)
 {
-    return std::make_unique<IreeBackend>(paths);
+    return std::make_unique<IreeBackend>(paths.iree_model, "local-sync");
+}
+
+std::unique_ptr<InferBackend> make_iree_cuda(const Paths& paths, const Input& /*shape_hint*/)
+{
+    return std::make_unique<IreeBackend>(paths.iree_cuda_model, "cuda");
 }

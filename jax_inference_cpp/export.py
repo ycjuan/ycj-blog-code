@@ -165,31 +165,40 @@ stablehlo_text = exported.mlir_module()
 
 import subprocess, tempfile, shutil
 
-# IREE compiles to CPU-optimized native code via llvm-cpu backend.
-# GPU (CUDA) requires JAX 3.10+ on Python 3.10+; see README for details.
-iree_compile = os.path.expanduser("~/external/bin/iree-compile")
+def iree_compile_mlir(mlir_text, output_path, extra_flags):
+    """Compile StableHLO text to a vmfb via iree-compile."""
+    iree_compile = shutil.which("iree-compile") or os.path.expanduser("~/external/bin/iree-compile")
+    with tempfile.NamedTemporaryFile(suffix=".mlir", mode="w", delete=False) as tmp:
+        tmp.write(mlir_text)
+        tmp_path = tmp.name
+    result = subprocess.run(
+        [iree_compile, tmp_path, "--iree-input-type=stablehlo",
+         "--iree-opt-const-eval=false", "-o", output_path] + extra_flags,
+        capture_output=True, text=True,
+    )
+    os.unlink(tmp_path)
+    if result.returncode != 0:
+        raise RuntimeError(f"iree-compile failed:\n{result.stderr}")
 
-with tempfile.NamedTemporaryFile(suffix=".mlir", mode="w", delete=False) as tmp:
-    tmp.write(stablehlo_text)
-    tmp_path = tmp.name
-
-result = subprocess.run(
-    [
-        iree_compile, tmp_path,
-        "--iree-input-type=stablehlo",
-        "--iree-hal-target-backends=llvm-cpu",
-        "--iree-llvmcpu-target-cpu=host",
-        "--iree-opt-const-eval=false",
-        "-o", "model.vmfb",
-    ],
-    capture_output=True,
-    text=True,
-)
-if result.returncode != 0:
-    raise RuntimeError(f"iree-compile failed:\n{result.stderr}")
+# CPU vmfb via llvm-cpu backend (works with any Python version)
+iree_compile_mlir(stablehlo_text, "model.vmfb", [
+    "--iree-hal-target-backends=llvm-cpu",
+    "--iree-llvmcpu-target-cpu=host",
+])
 with open("model.vmfb", "rb") as f:
-    vmfb = f.read()
-print(f"Saved model.vmfb ({len(vmfb)} bytes)")
+    print(f"Saved model.vmfb ({len(f.read())} bytes)")
+
+# CUDA vmfb via cuda backend (requires iree-compile with CUDA support, e.g. from venv311)
+try:
+    iree_compile_mlir(stablehlo_text, "model_cuda.vmfb", [
+        "--iree-hal-target-backends=cuda",
+        "--iree-hal-target-device=cuda",
+        "--iree-cuda-target=sm_75",
+    ])
+    with open("model_cuda.vmfb", "rb") as f:
+        print(f"Saved model_cuda.vmfb ({len(f.read())} bytes)")
+except RuntimeError as e:
+    print(f"[SKIP] model_cuda.vmfb: {str(e)[:120]}")
 
 # ---------------------------------------------------------------------------
 # Export C: raw weights (same binary format as pytorch_inference_cpp)

@@ -10,7 +10,7 @@ if(ONNXRUNTIME_ROOT STREQUAL "")
     message(FATAL_ERROR "Set -DONNXRUNTIME_ROOT=/path/to/onnxruntime")
 endif()
 
-# --- IREE runtime (from iree-dist) ---
+# --- IREE runtime: use iree-311-cuda which has both CPU and CUDA HAL drivers ---
 set(IREE_ROOT "" CACHE PATH "Path to IREE dist root (contains include/ and lib/)")
 if(IREE_ROOT STREQUAL "")
     message(FATAL_ERROR "Set -DIREE_ROOT=/path/to/iree-dist")
@@ -42,7 +42,7 @@ target_link_libraries(compare
     onnxruntime
     iree_runtime_unified
     flatcc_parsing
-    flatcc_runtime
+    printf_printf
     CUDA::cublas
     CUDA::cudart
     pthread

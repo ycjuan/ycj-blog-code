@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cmath>
 #include <cuda_runtime.h>
+#include <fstream>
 #include <iostream>
 #include <random>
 #include <stdexcept>
@@ -42,6 +43,8 @@ static bool hasCuda()
     return cudaGetDeviceCount(&count) == cudaSuccess && count > 0;
 }
 
+static bool fileExists(const std::string& path) { return std::ifstream(path).good(); }
+
 int main()
 {
     const int query_dim = 64;
@@ -58,29 +61,36 @@ int main()
     std::generate(docs.begin(), docs.end(), [&] { return dist(rng); });
 
     Input in { query, docs, num_docs, query_dim, doc_dim, num_heads };
-    Paths paths { "../model.onnx", "../model.vmfb", "../weights/" };
+    Paths paths { "../model.onnx", "../model.vmfb", "../model_cuda.vmfb", "../weights/" };
 
-    const bool gpu_available = hasCuda();
+    const bool gpu_available       = hasCuda();
+    const bool iree_cuda_available = gpu_available && fileExists(paths.iree_cuda_model);
     if (!gpu_available)
         std::cout << "[INFO] No CUDA GPU detected; skipping GPU backends.\n";
+    else if (!iree_cuda_available)
+        std::cout << "[INFO] model_cuda.vmfb not found; skipping IREE CUDA backend.\n";
 
     std::cout << "Initializing backends...\n";
     auto                          ort  = make_onnxruntime(paths);
     auto                          iree = make_iree(paths, in);
     std::unique_ptr<InferBackend> ort_gpu;
+    std::unique_ptr<InferBackend> iree_cuda;
     std::unique_ptr<InferBackend> cu;
     if (gpu_available)
     {
         ort_gpu = make_onnxruntime_gpu(paths);
         cu      = make_cuda(paths, in);
+        if (iree_cuda_available)
+            iree_cuda = make_iree_cuda(paths, in);
     }
 
     std::cout << "Checking correctness (num_docs=" << num_docs << ")...\n";
-    auto ref      = ort->infer(in);
-    auto got_iree = iree->infer(in);
-    assertEqual(ref, got_iree, "IREE (CPU)      vs ORT (CPU)");
+    auto ref = ort->infer(in);
+    assertEqual(ref, iree->infer(in), "IREE (CPU)      vs ORT (CPU)");
     if (ort_gpu)
         assertEqual(ref, ort_gpu->infer(in), "ORT (GPU)       vs ORT (CPU)");
+    if (iree_cuda)
+        assertEqual(ref, iree_cuda->infer(in), "IREE (CUDA)     vs ORT (CPU)");
     if (cu)
         assertEqual(ref, cu->infer(in), "Pure CUDA       vs ORT (CPU)");
 
@@ -136,6 +146,11 @@ int main()
         printf("  [A+C] total transfer          :   %5.2f ms\n\n", msH2D + msD2H);
 
         printf("  %-25s  e2e: %6.2f ms\n", "ONNX Runtime (GPU)", msOrtGpu);
+        if (iree_cuda)
+        {
+            double msIreeCuda = benchMs([&]() { iree_cuda->infer(in); }, numWarmupTrials, numTrials);
+            printf("  %-25s  e2e: %6.2f ms\n", "IREE (CUDA)", msIreeCuda);
+        }
         printf("  %-25s  e2e: %6.2f ms  kernel: %6.2f ms\n", "Pure CUDA", msCu + msH2D + msD2H, msCu);
 
         cudaFree(d_query);
