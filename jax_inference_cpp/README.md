@@ -83,18 +83,23 @@ cd cuda && ./compile.sh && ./run.sh
 cd compare && ./compile.sh && ./run.sh
 ```
 
-Expected output (CPU-only machine):
+Expected output:
 
 ```
-[INFO] No CUDA GPU detected; skipping Pure CUDA backend.
 Initializing backends...
 Checking correctness (num_docs=10000)...
 [PASS] IREE       vs ONNX Runtime
+[PASS] Pure CUDA  vs ONNX Runtime
 
 Benchmarking (num_docs=10000, 3 warmup + 10 trials)...
 
-  ONNX Runtime    e2e:  49.22 ms
-  IREE (CPU)      e2e: 931.38 ms
+  ONNX Runtime    e2e:  12.03 ms
+  IREE (CPU)      e2e: 837.64 ms
+  [A] H2D transfer              :   1.12 ms
+  [C] D2H transfer              :   0.04 ms
+  [A+C] total transfer          :   1.16 ms
+
+  Pure CUDA       e2e:   2.83 ms  kernel:   1.68 ms
 ```
 
 ## Benchmark
@@ -106,9 +111,9 @@ The benchmark separately times three segments: **[A]** copying query and doc emb
 
 | Backend | e2e | kernel only |
 |---|---|---|
-| ONNX Runtime (CPU) | 49.22 ms | — |
-| IREE (CPU, local-sync) | 931.38 ms | — |
-| Pure CUDA | — | — |
+| ONNX Runtime (CPU) | 12.03 ms | — |
+| IREE (CPU, local-sync) | 837.64 ms | — |
+| Pure CUDA | 2.83 ms | 1.68 ms |
 
 > **Note:** IREE here uses the `local-sync` driver (single-threaded) due to a threading incompatibility on this machine. The `local-task` driver (multi-threaded) would be significantly faster. ONNX Runtime uses its default thread pool.
 
