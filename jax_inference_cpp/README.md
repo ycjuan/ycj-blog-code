@@ -20,36 +20,69 @@ A 2-tower MLP scorer (query + doc), defined in Flax:
 | GPU required | No (CPU EP) / Yes (CUDA EP) | No (llvm-cpu) / Yes (cuda) | Yes |
 | Python at serve time | No | No | No |
 
-## Step 1: Export the model
+## Step 1: Install Python 3.11
 
-Requires Python 3.11+ for IREE CUDA support. Python 3.9 can export CPU-only artifacts.
+IREE's CUDA compiler backend requires Python 3.11+. Install it via the system package manager (Python 3.9 can still export CPU-only artifacts):
 
 ```bash
-# Python 3.11+ venv (for IREE CUDA vmfb + ONNX + CPU vmfb)
-python3.11 -m venv venv && source venv/bin/activate
+# Amazon Linux 2023 / RHEL
+sudo dnf install python3.11
+
+# Ubuntu / Debian
+# sudo apt install python3.11
+```
+
+## Step 2: Create a Python venv and export the model
+
+```bash
+python3.11 -m venv ~/venv311
+source ~/venv311/bin/activate
 pip install "jax[cuda12]" flax onnx iree-base-compiler
-python3 export.py
+
+cd jax_inference_cpp
+JAX_PLATFORMS=cpu python3 export.py
 # Produces: model.onnx, model.vmfb (llvm-cpu), model_cuda.vmfb (cuda), weights/
 ```
 
-## Step 2: Install dependencies
+## Step 3: Install C++ dependencies
 
 ### ONNX Runtime
 
+Download the pre-built GPU package from the [ONNX Runtime releases page](https://github.com/microsoft/onnxruntime/releases):
+
 ```bash
-cd ~/external && wget https://github.com/microsoft/onnxruntime/releases/download/v1.26.0/onnxruntime-linux-x64-gpu-1.26.0.tgz && tar -xzf onnxruntime-linux-x64-gpu-1.26.0.tgz
+mkdir -p ~/external && cd ~/external
+wget https://github.com/microsoft/onnxruntime/releases/download/v1.26.0/onnxruntime-linux-x64-gpu-1.26.0.tgz
+tar -xzf onnxruntime-linux-x64-gpu-1.26.0.tgz
+# Produces: ~/external/onnxruntime-linux-x64-gpu-1.26.0/{include,lib}/
 ```
 
 ### IREE runtime with CUDA (build from source)
 
-The pip `iree-base-compiler` ships no C static library, so the runtime must be built from source.
-Build only the runtime (no compiler = no LLVM = ~10 min):
+The pip `iree-base-compiler` package ships the compiler but no C static library for embedding. The runtime must be built from source. Building with `-DIREE_BUILD_COMPILER=OFF` skips LLVM compilation and finishes in ~10 minutes.
+
+CMake 3.26+ is required (the system cmake may be older; install a newer one via pip):
+
+```bash
+pip install cmake   # installs cmake 4.x to ~/.local/bin/cmake
+```
+
+Clone IREE 3.11.0 and initialize the required submodules:
 
 ```bash
 git clone --depth 1 --branch v3.11.0 https://github.com/iree-org/iree.git /tmp/iree-src
-git -C /tmp/iree-src submodule update --init --depth 1 --recursive
+git -C /tmp/iree-src submodule update --init --depth 1 \
+    third_party/flatcc \
+    third_party/vulkan_headers \
+    third_party/webgpu-headers \
+    third_party/printf
+```
+
+Configure and build (runtime only, no compiler):
+
+```bash
 mkdir /tmp/iree-build && cd /tmp/iree-build
-cmake /tmp/iree-src \
+~/.local/bin/cmake /tmp/iree-src \
     -DCMAKE_BUILD_TYPE=Release \
     -DIREE_BUILD_COMPILER=OFF \
     -DIREE_BUILD_TESTS=OFF \
@@ -59,16 +92,31 @@ cmake /tmp/iree-src \
     -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \
     -DIREE_HAL_DRIVER_LOCAL_TASK=ON
 make -j$(nproc) iree_runtime_unified
-# Copy artifacts to ~/external/iree-311-cuda/{lib,include}/
+```
+
+Install into `~/external/iree-311-cuda/`:
+
+```bash
+IREE_DIST=~/external/iree-311-cuda
+mkdir -p $IREE_DIST/{lib,include}
+
+cp /tmp/iree-build/runtime/src/iree/runtime/libiree_runtime_unified.a $IREE_DIST/lib/
+cp /tmp/iree-build/build_tools/third_party/printf/libprintf_printf.a    $IREE_DIST/lib/
+find /tmp/iree-build -name "libflatcc*.a" -exec cp {} $IREE_DIST/lib/ \;
+
+cp -r /tmp/iree-src/runtime/src/iree $IREE_DIST/include/iree
+
+# Optional: clean up build directories (~2 GB)
+rm -rf /tmp/iree-build /tmp/iree-src
 ```
 
 ### Pure CUDA
 
 No extra install — uses cuBLAS from the CUDA Toolkit.
 
-## Step 3: Individual approaches
+## Step 4: Individual approaches
 
-Each folder is a self-contained standalone example.
+Each folder is a self-contained standalone example. `compile.sh` runs CMake and builds the binary; `run.sh` executes it.
 
 ### Approach 1: ONNX Runtime
 
@@ -93,10 +141,18 @@ cd iree && ./compile.sh && ./run.sh
 cd cuda && ./compile.sh && ./run.sh
 ```
 
-## Step 4: Compare all backends
+## Step 5: Compare all backends
 
 ```bash
-cd compare && ./compile.sh && ./run.sh
+cd compare && ./compile.sh
+```
+
+The ONNX Runtime CUDA Execution Provider requires cuDNN. When JAX is installed via `pip install "jax[cuda12]"`, cuDNN is bundled under the venv's `nvidia/cudnn/lib/` directory. Add it to `LD_LIBRARY_PATH` before running:
+
+```bash
+CUDNN_LIB=~/venv311/lib/python3.11/site-packages/nvidia/cudnn/lib
+LD_LIBRARY_PATH=~/external/onnxruntime-linux-x64-gpu-1.26.0/lib:${CUDNN_LIB}:$LD_LIBRARY_PATH \
+    ./build/compare
 ```
 
 Expected output:
