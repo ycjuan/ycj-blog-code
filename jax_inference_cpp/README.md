@@ -88,18 +88,20 @@ Expected output:
 ```
 Initializing backends...
 Checking correctness (num_docs=10000)...
-[PASS] IREE       vs ONNX Runtime
-[PASS] Pure CUDA  vs ONNX Runtime
+[PASS] IREE (CPU)      vs ORT (CPU)
+[PASS] ORT (GPU)       vs ORT (CPU)
+[PASS] Pure CUDA       vs ORT (CPU)
 
 Benchmarking (num_docs=10000, 3 warmup + 10 trials)...
 
-  ONNX Runtime    e2e:  12.03 ms
-  IREE (CPU)      e2e: 837.64 ms
-  [A] H2D transfer              :   1.12 ms
-  [C] D2H transfer              :   0.04 ms
-  [A+C] total transfer          :   1.16 ms
+  ONNX Runtime (CPU)         e2e:   6.67 ms
+  IREE (CPU, local-sync)     e2e: 838.92 ms
+  [A] H2D transfer              :    1.14 ms
+  [C] D2H transfer              :    0.04 ms
+  [A+C] total transfer          :    1.18 ms
 
-  Pure CUDA       e2e:   2.83 ms  kernel:   1.68 ms
+  ONNX Runtime (GPU)         e2e:   2.12 ms
+  Pure CUDA                  e2e:   2.81 ms  kernel:   1.63 ms
 ```
 
 ## Benchmark
@@ -111,9 +113,12 @@ The benchmark separately times three segments: **[A]** copying query and doc emb
 
 | Backend | e2e | kernel only |
 |---|---|---|
-| ONNX Runtime (CPU) | 12.03 ms | — |
-| IREE (CPU, local-sync) | 837.64 ms | — |
-| Pure CUDA | 2.83 ms | 1.68 ms |
+| ONNX Runtime (CPU) | 6.67 ms | — |
+| IREE (CPU, local-sync) | 838.92 ms | — |
+| **ONNX Runtime (GPU)** | **2.12 ms** | — |
+| Pure CUDA | 2.81 ms | 1.63 ms |
+
+ONNX Runtime GPU (CUDA EP) is slightly faster than Pure CUDA end-to-end because ORT manages its own GPU memory pool and avoids the separate H2D step visible in our Pure CUDA benchmark. Pure CUDA's kernel-only time (1.63 ms) is the actual compute cost; the difference vs ORT GPU (2.12 ms) is ORT's internal H2D + D2H overhead.
 
 > **Note:** IREE here uses the `local-sync` driver (single-threaded) due to a threading incompatibility on this machine. The `local-task` driver (multi-threaded) would be significantly faster. ONNX Runtime uses its default thread pool.
 

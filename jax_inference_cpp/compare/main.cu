@@ -62,24 +62,27 @@ int main()
 
     const bool gpu_available = hasCuda();
     if (!gpu_available)
-        std::cout << "[INFO] No CUDA GPU detected; skipping Pure CUDA backend.\n";
+        std::cout << "[INFO] No CUDA GPU detected; skipping GPU backends.\n";
 
     std::cout << "Initializing backends...\n";
     auto                          ort  = make_onnxruntime(paths);
     auto                          iree = make_iree(paths, in);
+    std::unique_ptr<InferBackend> ort_gpu;
     std::unique_ptr<InferBackend> cu;
     if (gpu_available)
-        cu = make_cuda(paths, in);
+    {
+        ort_gpu = make_onnxruntime_gpu(paths);
+        cu      = make_cuda(paths, in);
+    }
 
     std::cout << "Checking correctness (num_docs=" << num_docs << ")...\n";
     auto ref      = ort->infer(in);
     auto got_iree = iree->infer(in);
-    assertEqual(ref, got_iree, "IREE       vs ONNX Runtime");
+    assertEqual(ref, got_iree, "IREE (CPU)      vs ORT (CPU)");
+    if (ort_gpu)
+        assertEqual(ref, ort_gpu->infer(in), "ORT (GPU)       vs ORT (CPU)");
     if (cu)
-    {
-        auto got_cu = cu->infer(in);
-        assertEqual(ref, got_cu, "Pure CUDA  vs ONNX Runtime");
-    }
+        assertEqual(ref, cu->infer(in), "Pure CUDA       vs ORT (CPU)");
 
     const int numTrials       = 10;
     const int numWarmupTrials = 3;
@@ -90,11 +93,13 @@ int main()
     std::cout << "\nBenchmarking (num_docs=" << num_docs << ", " << numWarmupTrials << " warmup + " << numTrials
               << " trials)...\n\n";
 
-    printf("  %-14s  e2e: %6.2f ms\n", "ONNX Runtime", msOrt);
-    printf("  %-14s  e2e: %6.2f ms\n", "IREE (CPU)", msIree);
+    printf("  %-25s  e2e: %6.2f ms\n", "ONNX Runtime (CPU)", msOrt);
+    printf("  %-25s  e2e: %6.2f ms\n", "IREE (CPU, local-sync)", msIree);
 
     if (gpu_available)
     {
+        double msOrtGpu = benchMs([&]() { ort_gpu->infer(in); }, numWarmupTrials, numTrials);
+
         float* d_query  = nullptr;
         float* d_docs   = nullptr;
         float* d_scores = nullptr;
@@ -126,10 +131,12 @@ int main()
                       numWarmupTrials,
                       numTrials);
 
-        printf("  [A] H2D transfer              : %6.2f ms\n", msH2D);
-        printf("  [C] D2H transfer              : %6.2f ms\n", msD2H);
-        printf("  [A+C] total transfer          : %6.2f ms\n\n", msH2D + msD2H);
-        printf("  %-14s  e2e: %6.2f ms  kernel: %6.2f ms\n", "Pure CUDA", msCu + msH2D + msD2H, msCu);
+        printf("  [A] H2D transfer              :   %5.2f ms\n", msH2D);
+        printf("  [C] D2H transfer              :   %5.2f ms\n", msD2H);
+        printf("  [A+C] total transfer          :   %5.2f ms\n\n", msH2D + msD2H);
+
+        printf("  %-25s  e2e: %6.2f ms\n", "ONNX Runtime (GPU)", msOrtGpu);
+        printf("  %-25s  e2e: %6.2f ms  kernel: %6.2f ms\n", "Pure CUDA", msCu + msH2D + msD2H, msCu);
 
         cudaFree(d_query);
         cudaFree(d_docs);

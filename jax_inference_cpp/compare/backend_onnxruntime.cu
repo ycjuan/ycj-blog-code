@@ -7,9 +7,16 @@ struct OnnxRuntimeBackend : InferBackend
     Ort::SessionOptions opts;
     Ort::Session        session;
 
-    explicit OnnxRuntimeBackend(const Paths& paths)
-        : session(env, paths.onnx_model.c_str(), opts)
+    explicit OnnxRuntimeBackend(const Paths& paths, bool use_gpu)
+        : session(nullptr)
     {
+        if (use_gpu)
+        {
+            OrtCUDAProviderOptions cuda_opts {};
+            cuda_opts.device_id = 0;
+            opts.AppendExecutionProvider_CUDA(cuda_opts);
+        }
+        session = Ort::Session(env, paths.onnx_model.c_str(), opts);
     }
 
     std::vector<float> infer(const Input& in) override
@@ -44,5 +51,10 @@ struct OnnxRuntimeBackend : InferBackend
 
 std::unique_ptr<InferBackend> make_onnxruntime(const Paths& paths)
 {
-    return std::make_unique<OnnxRuntimeBackend>(paths);
+    return std::make_unique<OnnxRuntimeBackend>(paths, /*use_gpu=*/false);
+}
+
+std::unique_ptr<InferBackend> make_onnxruntime_gpu(const Paths& paths)
+{
+    return std::make_unique<OnnxRuntimeBackend>(paths, /*use_gpu=*/true);
 }

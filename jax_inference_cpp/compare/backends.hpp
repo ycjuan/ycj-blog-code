@@ -51,5 +51,6 @@ struct InferBackend
 };
 
 std::unique_ptr<InferBackend> make_onnxruntime(const Paths& paths);
+std::unique_ptr<InferBackend> make_onnxruntime_gpu(const Paths& paths);
 std::unique_ptr<InferBackend> make_iree(const Paths& paths, const Input& shape_hint);
 std::unique_ptr<InferBackend> make_cuda(const Paths& paths, const Input& shape_hint);
