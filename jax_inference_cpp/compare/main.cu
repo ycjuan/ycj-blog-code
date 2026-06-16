@@ -108,8 +108,6 @@ int main()
 
     if (gpu_available)
     {
-        double msOrtGpu = benchMs([&]() { ort_gpu->infer(in); }, numWarmupTrials, numTrials);
-
         float* d_query  = nullptr;
         float* d_docs   = nullptr;
         float* d_scores = nullptr;
@@ -133,8 +131,21 @@ int main()
             numWarmupTrials,
             numTrials);
 
+        // Pre-copy inputs so kernel benchmarks start with data already on device.
         cudaMemcpy(d_query, in.query.data(), query_dim * sizeof(float), cudaMemcpyHostToDevice);
         cudaMemcpy(d_docs, in.docs.data(), num_docs * doc_dim * sizeof(float), cudaMemcpyHostToDevice);
+
+        double msOrtGpu = benchMs(
+            [&]() { ort_gpu->infer_device(d_query, d_docs, d_scores, query_dim, doc_dim, num_docs, num_heads); },
+            numWarmupTrials,
+            numTrials);
+
+        double msIreeCuda = 0;
+        if (iree_cuda)
+            msIreeCuda = benchMs(
+                [&]() { iree_cuda->infer_device(d_query, d_docs, d_scores, query_dim, doc_dim, num_docs, num_heads); },
+                numWarmupTrials,
+                numTrials);
 
         double msCu
             = benchMs([&]() { cu->infer_device(d_query, d_docs, d_scores, query_dim, doc_dim, num_docs, num_heads); },
@@ -145,12 +156,9 @@ int main()
         printf("  [C] D2H transfer              :   %5.2f ms\n", msD2H);
         printf("  [A+C] total transfer          :   %5.2f ms\n\n", msH2D + msD2H);
 
-        printf("  %-25s  e2e: %6.2f ms\n", "ONNX Runtime (GPU)", msOrtGpu);
+        printf("  %-25s  e2e: %6.2f ms  kernel: %6.2f ms\n", "ONNX Runtime (GPU)", msOrtGpu + msH2D + msD2H, msOrtGpu);
         if (iree_cuda)
-        {
-            double msIreeCuda = benchMs([&]() { iree_cuda->infer(in); }, numWarmupTrials, numTrials);
-            printf("  %-25s  e2e: %6.2f ms\n", "IREE (CUDA)", msIreeCuda);
-        }
+            printf("  %-25s  e2e: %6.2f ms  kernel: %6.2f ms\n", "IREE (CUDA)", msIreeCuda + msH2D + msD2H, msIreeCuda);
         printf("  %-25s  e2e: %6.2f ms  kernel: %6.2f ms\n", "Pure CUDA", msCu + msH2D + msD2H, msCu);
 
         cudaFree(d_query);
