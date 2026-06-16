@@ -193,9 +193,11 @@ The benchmark separately times three segments: **[A]** H2D transfer, **[B]** ker
 | IREE (CUDA) | 34.38 ms | — |
 | Pure CUDA | 2.91 ms | 1.69 ms |
 
-ONNX Runtime GPU and Pure CUDA are ~16x faster than IREE CUDA. IREE's CUDA codegen for this model produces unvectorized kernels — it launches one thread per output element rather than using cuBLAS-style tiling. ORT GPU uses cuDNN/cuBLAS internally and benefits from highly optimized GEMM implementations.
+ONNX Runtime GPU and Pure CUDA are ~16x faster than IREE CUDA. IREE's CUDA codegen for this model produces unvectorized kernels — it launches one thread per output element rather than using cuBLAS-style tiling. ORT GPU routes through cuDNN/cuBLAS, which uses highly tuned GEMM implementations with tensor cores.
 
 IREE CPU (`local-sync`, single-threaded) is 4x slower than ORT CPU because ORT uses its default multi-threaded execution pool.
+
+IREE's strength is portability across exotic targets (TPUs, mobile NPUs, custom accelerators) where cuBLAS doesn't exist. For standard GPU GEMM workloads on NVIDIA hardware, it is not competitive with ORT.
 
 ## JAX → ONNX
 
