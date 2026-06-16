@@ -20,7 +20,7 @@ target_link_directories(inference PRIVATE ${IREE_ROOT}/lib)
 target_link_libraries(inference
     iree_runtime_unified
     flatcc_parsing
-    flatcc_runtime
+    printf_printf
     pthread
     dl
     m
