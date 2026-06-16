@@ -167,15 +167,15 @@ Checking correctness (num_docs=10000)...
 
 Benchmarking (num_docs=10000, 3 warmup + 10 trials)...
 
-  ONNX Runtime (CPU)         e2e:  12.16 ms
-  IREE (CPU, local-sync)     e2e:  47.31 ms
-  [A] H2D transfer              :    1.18 ms
+  ONNX Runtime (CPU)         e2e:  12.48 ms
+  IREE (CPU, local-sync)     e2e:  45.74 ms
+  [A] H2D transfer              :    1.13 ms
   [C] D2H transfer              :    0.04 ms
-  [A+C] total transfer          :    1.22 ms
+  [A+C] total transfer          :    1.16 ms
 
-  ONNX Runtime (GPU)         e2e:   2.13 ms
-  IREE (CUDA)                e2e:  34.38 ms
-  Pure CUDA                  e2e:   2.91 ms  kernel:   1.69 ms
+  ONNX Runtime (GPU)         e2e:   2.11 ms
+  IREE (CUDA)                e2e:  34.97 ms
+  Pure CUDA                  e2e:   2.84 ms  kernel:   1.67 ms
 ```
 
 ## Benchmark
@@ -187,11 +187,11 @@ The benchmark separately times three segments: **[A]** H2D transfer, **[B]** ker
 
 | Backend | e2e | kernel only |
 |---|---|---|
-| ONNX Runtime (CPU) | 12.16 ms | — |
-| IREE (CPU, local-sync) | 47.31 ms | — |
-| **ONNX Runtime (GPU)** | **2.13 ms** | — |
-| IREE (CUDA) | 34.38 ms | — |
-| Pure CUDA | 2.91 ms | 1.69 ms |
+| ONNX Runtime (CPU) | 12.48 ms | — |
+| IREE (CPU, local-sync) | 45.74 ms | — |
+| **ONNX Runtime (GPU)** | **2.11 ms** | — |
+| IREE (CUDA) | 34.97 ms | — |
+| Pure CUDA | 2.84 ms | 1.67 ms |
 
 ONNX Runtime GPU and Pure CUDA are ~16x faster than IREE CUDA. IREE's CUDA codegen for this model produces unvectorized kernels — it launches one thread per output element rather than using cuBLAS-style tiling. ORT GPU routes through cuDNN/cuBLAS, which uses highly tuned GEMM implementations with tensor cores.
 
