@@ -1,3 +1,4 @@
 model.onnx
 model.vmfb
+model_cuda.vmfb
 weights/

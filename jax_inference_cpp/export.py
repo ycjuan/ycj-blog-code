@@ -1,5 +1,4 @@
 import os
-os.environ["JAX_PLATFORMS"] = os.environ.get("JAX_PLATFORMS", "")  # auto-detect; override with JAX_PLATFORMS=cpu
 
 import jax
 import jax.numpy as jnp
@@ -8,7 +7,6 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-import struct
 
 # ---------------------------------------------------------------------------
 # Model definition (same architecture as pytorch_inference_cpp/export.py)
@@ -149,7 +147,6 @@ print("Saved model.onnx")
 # ---------------------------------------------------------------------------
 # Export B: IREE vmfb (JAX → StableHLO → iree-compile)
 # ---------------------------------------------------------------------------
-from iree.compiler import compile_str
 import jax.export as jax_export
 
 @jax.jit
@@ -175,17 +172,23 @@ def iree_compile_mlir(mlir_text, output_path, extra_flags):
         else shutil.which("iree-compile")
         or os.path.expanduser("~/external/bin/iree-compile")
     )
-    with tempfile.NamedTemporaryFile(suffix=".mlir", mode="w", delete=False) as tmp:
-        tmp.write(mlir_text)
-        tmp_path = tmp.name
-    result = subprocess.run(
-        [iree_compile, tmp_path, "--iree-input-type=stablehlo",
-         "--iree-opt-const-eval=false", "-o", output_path] + extra_flags,
-        capture_output=True, text=True,
-    )
-    os.unlink(tmp_path)
-    if result.returncode != 0:
-        raise RuntimeError(f"iree-compile failed:\n{result.stderr}")
+    if not iree_compile or not os.path.exists(iree_compile):
+        raise FileNotFoundError(f"iree-compile not found; looked for: {iree_compile}")
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".mlir", mode="w", delete=False) as tmp:
+            tmp.write(mlir_text)
+            tmp_path = tmp.name
+        result = subprocess.run(
+            [iree_compile, tmp_path, "--iree-input-type=stablehlo",
+             "--iree-opt-const-eval=false", "-o", output_path] + extra_flags,
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"iree-compile failed:\n{result.stderr}")
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 # CPU vmfb via llvm-cpu backend (works with any Python version)
 iree_compile_mlir(stablehlo_text, "model.vmfb", [

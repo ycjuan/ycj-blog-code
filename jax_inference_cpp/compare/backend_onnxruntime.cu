@@ -1,5 +1,6 @@
 #include "backends.hpp"
 #include <onnxruntime_cxx_api.h>
+#include <cuda_runtime.h>
 
 struct OnnxRuntimeBackend : InferBackend
 {
