@@ -40,7 +40,7 @@ source ~/external/venv311/bin/activate
 pip install "jax[cuda12]" flax onnx iree-base-compiler
 
 cd jax_inference_cpp
-JAX_PLATFORMS=cpu python3 export.py
+JAX_PLATFORMS=cpu python3 export.py  # or ./run.sh [cpu|gpu] to run the whole pipeline
 # Produces: model.onnx, model.vmfb (llvm-cpu), model_cuda.vmfb (cuda), weights/
 ```
 

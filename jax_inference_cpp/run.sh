@@ -4,10 +4,16 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+DEVICE="${1:-cpu}"
+case "$DEVICE" in
+    cpu|gpu) ;;
+    *) echo "Usage: $0 [cpu|gpu]" >&2; exit 1 ;;
+esac
+
 echo "============================================================"
-echo "Step 1: Export model"
+echo "Step 1: Export model (JAX_PLATFORMS=$DEVICE)"
 echo "============================================================"
-JAX_PLATFORMS=cpu python3 export.py
+JAX_PLATFORMS=$DEVICE python3 export.py
 
 echo ""
 echo "============================================================"
