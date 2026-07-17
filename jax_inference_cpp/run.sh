@@ -10,10 +10,19 @@ case "$DEVICE" in
     *) echo "Usage: $0 [cpu|gpu]" >&2; exit 1 ;;
 esac
 
+# GPU export needs jax[cuda12], which lives in the venv311 virtualenv (see README);
+# CPU export works with the system python3.
+PYTHON=python3
+JAX_PLATFORM=cpu
+if [ "$DEVICE" = "gpu" ]; then
+    PYTHON=~/external/venv311/bin/python3
+    JAX_PLATFORM=cuda
+fi
+
 echo "============================================================"
-echo "Step 1: Export model (JAX_PLATFORMS=$DEVICE)"
+echo "Step 1: Export model (JAX_PLATFORMS=$JAX_PLATFORM)"
 echo "============================================================"
-JAX_PLATFORMS=$DEVICE python3 export.py
+JAX_PLATFORMS=$JAX_PLATFORM $PYTHON export.py
 
 echo ""
 echo "============================================================"
