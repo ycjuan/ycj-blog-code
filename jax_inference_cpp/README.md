@@ -35,8 +35,8 @@ sudo dnf install python3.11
 ## Step 2: Create a Python venv and export the model
 
 ```bash
-python3.11 -m venv ~/venv311
-source ~/venv311/bin/activate
+python3.11 -m venv ~/external/venv311
+source ~/external/venv311/bin/activate
 pip install "jax[cuda12]" flax onnx iree-base-compiler
 
 cd jax_inference_cpp
@@ -150,7 +150,7 @@ cd compare && ./compile.sh
 The ONNX Runtime CUDA Execution Provider requires cuDNN. When JAX is installed via `pip install "jax[cuda12]"`, cuDNN is bundled under the venv's `nvidia/cudnn/lib/` directory. Add it to `LD_LIBRARY_PATH` before running:
 
 ```bash
-CUDNN_LIB=~/venv311/lib/python3.11/site-packages/nvidia/cudnn/lib
+CUDNN_LIB=~/external/venv311/lib/python3.11/site-packages/nvidia/cudnn/lib
 LD_LIBRARY_PATH=~/external/onnxruntime-linux-x64-gpu-1.26.0/lib:${CUDNN_LIB}:$LD_LIBRARY_PATH \
     ./build/compare
 ```

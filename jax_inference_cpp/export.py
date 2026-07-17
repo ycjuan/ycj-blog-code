@@ -166,7 +166,7 @@ def iree_compile_mlir(mlir_text, output_path, extra_flags):
     """Compile StableHLO text to a vmfb via iree-compile."""
     # Prefer venv311's iree-compile (3.11.0, bytecode v17) even when not activated,
     # because the bundled IREE runtime only accepts v17.
-    venv311_compiler = os.path.expanduser("~/venv311/bin/iree-compile")
+    venv311_compiler = os.path.expanduser("~/external/venv311/bin/iree-compile")
     iree_compile = (
         venv311_compiler if os.path.exists(venv311_compiler)
         else shutil.which("iree-compile")
