@@ -4,20 +4,23 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-DEVICE="${1:-cpu}"
-case "$DEVICE" in
-    cpu|gpu) ;;
-    *) echo "Usage: $0 [cpu|gpu]" >&2; exit 1 ;;
-esac
-
-# GPU export needs jax[cuda12], which lives in the venv311 virtualenv (see README);
-# CPU export works with the system python3.
-PYTHON=python3
+# JAX_PLATFORMS only controls which device JAX itself uses while tracing/exporting
+# the model in Step 1 (export.py) — it has no effect on which backends run in
+# Steps 2-5, since those C++ binaries always build and run their own CPU/GPU
+# code paths against the exported model files (model.onnx, .vmfb, weights/*.bin).
+#
+# Hardcoded to "cpu" because:
+#   - the system python3 (no venv needed) is sufficient — JAX's PRNG is
+#     device-independent, so exported weights/artifacts are bit-identical
+#     whether traced on CPU or GPU
+#   - this model is tiny, so CPU tracing is effectively free
+#
+# Switch to "cuda" (and use venv311's python, which has jax[cuda12] — see
+# README) only if:
+#   - you're validating that the venv311 CUDA-enabled jax install itself works
+#   - the model becomes large enough that CPU tracing/compilation is slow
 JAX_PLATFORM=cpu
-if [ "$DEVICE" = "gpu" ]; then
-    PYTHON=~/external/venv311/bin/python3
-    JAX_PLATFORM=cuda
-fi
+PYTHON=python3
 
 echo "============================================================"
 echo "Step 1: Export model (JAX_PLATFORMS=$JAX_PLATFORM)"

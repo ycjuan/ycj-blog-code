@@ -40,9 +40,19 @@ source ~/external/venv311/bin/activate
 pip install "jax[cuda12]" flax onnx iree-base-compiler
 
 cd jax_inference_cpp
-JAX_PLATFORMS=cpu python3 export.py  # or ./run.sh [cpu|gpu] to run the whole pipeline
+JAX_PLATFORMS=cpu python3 export.py
 # Produces: model.onnx, model.vmfb (llvm-cpu), model_cuda.vmfb (cuda), weights/
 ```
+
+`JAX_PLATFORMS` only controls which device JAX uses while *tracing/exporting* the
+model — it has no effect on which backends run at inference time (Steps 4-5
+below always build and run both CPU and GPU code paths). `cpu` is the default
+and sufficient for this small model, since JAX's PRNG is device-independent and
+export artifacts are bit-identical either way, plus it avoids needing the venv
+at all (the system `python3` already has `jax`, `flax`, `onnx`, `iree-compile`).
+Switch to `JAX_PLATFORMS=cuda` (with `~/external/venv311/bin/python3`, which has
+`jax[cuda12]`) only to sanity-check that the venv's CUDA-enabled jax install
+works, or if the model grows large enough that CPU tracing becomes slow.
 
 ## Step 3: Install C++ dependencies
 
