@@ -11,7 +11,7 @@
 namespace // anonymous namespace
 {
 
-    constexpr bool g_kDebug = false;
+constexpr bool g_kDebug = false;
 
 }
 
@@ -20,7 +20,7 @@ namespace // anonymous namespace
 std::vector<CabmOp> infix2postfix(std::vector<CabmOp> infix)
 {
     std::vector<CabmOp> postfix;
-    std::stack<CabmOp> s;
+    std::stack<CabmOp>  s;
 
     for (auto op : infix)
     {

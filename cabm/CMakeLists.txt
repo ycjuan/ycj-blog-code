@@ -21,19 +21,8 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 find_package(CUDA REQUIRED)
 
 # Add library
-set(LIB_HEADER_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/cabm.cuh
-    ${CMAKE_CURRENT_SOURCE_DIR}/data_struct.cuh
-    ${CMAKE_CURRENT_SOURCE_DIR}/macro.cuh
-    ${CMAKE_CURRENT_SOURCE_DIR}/util.cuh
-)
-
-set(LIB_SOURCE_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/cabm_common.cu
-    ${CMAKE_CURRENT_SOURCE_DIR}/cabm_cpu.cu
-    ${CMAKE_CURRENT_SOURCE_DIR}/cabm_gpu.cu
-    ${CMAKE_CURRENT_SOURCE_DIR}/data_struct.cu
-)
+file(GLOB_RECURSE LIB_HEADER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/*.cuh)
+file(GLOB_RECURSE LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cu)
 
 add_library(${LIB_NAME} SHARED
     ${LIB_HEADER_FILES}
@@ -44,7 +33,7 @@ add_library(${LIB_NAME} SHARED
 set_property(TARGET ${LIB_NAME} PROPERTY CUDA_ARCHITECTURES 89)
 
 # Include directories
-target_include_directories(${LIB_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(${LIB_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Link CUDA libraries
 target_link_libraries(${LIB_NAME} 
@@ -59,9 +48,9 @@ target_compile_options(${LIB_NAME} PRIVATE
 )
 
 # Add executable
-add_executable(test1 test1.cu)
-add_executable(test2 test2.cu)
-add_executable(test3 test3.cu)
+add_executable(test1 test/test1.cu)
+add_executable(test2 test/test2.cu)
+add_executable(test3 test/test3.cu)
 
 # Link library
 target_link_libraries(test1 ${LIB_NAME})

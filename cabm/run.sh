@@ -2,11 +2,13 @@
 
 set -e
 
-rm -rf build
+if [[ "$1" == "-a" ]]; then
+    rm -rf build
+fi
 mkdir -p build
 cd build
 cmake ..
-make -j 4
+make -j $(nproc)
 ./test1
 ./test2
 ./test3

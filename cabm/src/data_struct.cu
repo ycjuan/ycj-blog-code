@@ -1,12 +1,12 @@
-#include <stdexcept>
-#include <random>
 #include <algorithm>
+#include <random>
+#include <stdexcept>
 
 #include "data_struct.cuh"
 
 void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>& data3D,
-                              int targetField,
-                              bool useManagedMemory)
+                      int                                                         targetField,
+                      bool                                                        useManagedMemory)
 {
     // -----------------
     // Check empty and infer num rows
@@ -26,7 +26,7 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
         for (const auto& inputData2D : data3D)
         {
             const auto& inputData1D = inputData2D.at(targetField);
-            m_maxNumValsPerRow = std::max(m_maxNumValsPerRow, (uint32_t)inputData1D.size());
+            m_maxNumValsPerRow      = std::max(m_maxNumValsPerRow, (uint32_t)inputData1D.size());
             data2D.push_back(inputData1D);
         }
         m_maxNumValsPerRow++; // The first element is reserved for storing num vals per row
@@ -35,10 +35,10 @@ void AbmDataGpu::init(const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>
 
     // -----------------
     // Malloc data
-    {   
+    {
         // -----------
         // Calculate the size of the data
-        m_d_data_size = m_numRows * m_maxNumValsPerRow;
+        m_d_data_size          = m_numRows * m_maxNumValsPerRow;
         m_d_data_size_in_bytes = m_d_data_size * sizeof(ABM_DATA_TYPE);
 
         // -----------
@@ -94,14 +94,14 @@ void AbmDataGpu::free()
         cudaFree(m_d_data);
         m_d_data = nullptr;
     }
-    m_d_data_size = 0;
+    m_d_data_size          = 0;
     m_d_data_size_in_bytes = 0;
-    m_numRows = 0;
-    m_maxNumValsPerRow = 0;
+    m_numRows              = 0;
+    m_maxNumValsPerRow     = 0;
 }
 
-std::vector<std::vector<std::vector<ABM_DATA_TYPE>>> genRandData3D(int numRows,
-                                                                   int numFields,
+std::vector<std::vector<std::vector<ABM_DATA_TYPE>>> genRandData3D(int              numRows,
+                                                                   int              numFields,
                                                                    std::vector<int> numValsPerFieldMin,
                                                                    std::vector<int> numValsPerFieldMax,
                                                                    std::vector<int> cardinalities)
@@ -119,7 +119,7 @@ std::vector<std::vector<std::vector<ABM_DATA_TYPE>>> genRandData3D(int numRows,
 
     // -----------------
     // Prepare random number generator
-    std::default_random_engine generator(std::random_device{}());
+    std::default_random_engine                   generator(std::random_device {}());
     std::uniform_int_distribution<ABM_DATA_TYPE> valDist;
 
     // -----------------
@@ -130,9 +130,9 @@ std::vector<std::vector<std::vector<ABM_DATA_TYPE>>> genRandData3D(int numRows,
         std::vector<std::vector<ABM_DATA_TYPE>> data2D;
         for (int field = 0; field < numFields; field++)
         {
-            std::vector<ABM_DATA_TYPE> data1D;
+            std::vector<ABM_DATA_TYPE>         data1D;
             std::uniform_int_distribution<int> numValsDist(numValsPerFieldMin.at(field), numValsPerFieldMax.at(field));
-            int numVals = numValsDist(generator);
+            int                                numVals = numValsDist(generator);
             for (int val = 0; val < numVals; val++)
             {
                 data1D.push_back(valDist(generator) % cardinalities.at(field));

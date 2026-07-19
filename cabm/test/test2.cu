@@ -6,11 +6,11 @@
 
 void test2a()
 {
-    int numRows = 10;
-    int numFields = 3;
+    int              numRows            = 10;
+    int              numFields          = 3;
     std::vector<int> numValsPerFieldMin = { 1, 2, 3 };
     std::vector<int> numValsPerFieldMax = { 10, 20, 30 };
-    std::vector<int> cardinalities = { 100, 100, 100 };
+    std::vector<int> cardinalities      = { 100, 100, 100 };
 
     const auto data3D = genRandData3D(numRows, numFields, numValsPerFieldMin, numValsPerFieldMax, cardinalities);
 
@@ -30,7 +30,9 @@ void test2a()
         {
             if (reqAbmDataGpuList.at(field).getNumVals(row) != data3D.at(row).at(field).size())
             {
-                std::cout << "Error at (" << row << ", " << field << "): " << reqAbmDataGpuList.at(field).getNumVals(row) << " != " << data3D.at(row).at(field).size() << std::endl;
+                std::cout << "Error at (" << row << ", " << field
+                          << "): " << reqAbmDataGpuList.at(field).getNumVals(row)
+                          << " != " << data3D.at(row).at(field).size() << std::endl;
                 assert(false);
             }
             for (uint32_t valOffset = 0; valOffset < data3D.at(row).at(field).size(); valOffset++)
@@ -38,7 +40,8 @@ void test2a()
                 ABM_DATA_TYPE val = reqAbmDataGpuList.at(field).getVal(row, valOffset);
                 if (val != data3D.at(row).at(field).at(valOffset))
                 {
-                    std::cout << "Error at (" << row << ", " << field << ", " << valOffset << "): " << val << " != " << data3D.at(row).at(field).at(valOffset) << std::endl;
+                    std::cout << "Error at (" << row << ", " << field << ", " << valOffset << "): " << val
+                              << " != " << data3D.at(row).at(field).at(valOffset) << std::endl;
                     assert(false);
                 }
             }
