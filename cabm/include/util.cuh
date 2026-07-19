@@ -1,23 +1,19 @@
 #pragma once
 
 #include <chrono>
-#include <stdexcept>
 #include <iostream>
+#include <stdexcept>
 
 class Timer
 {
 public:
-
-    void tic()
-    {
-        start_ = std::chrono::high_resolution_clock::now();
-    }
+    void tic() { start_ = std::chrono::high_resolution_clock::now(); }
 
     float tocMs()
     {
-        auto stop = std::chrono::high_resolution_clock::now();
+        auto                      stop     = std::chrono::high_resolution_clock::now();
         std::chrono::microseconds duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start_);
-        float timeMs = duration.count() / 1000.0;
+        float                     timeMs   = duration.count() / 1000.0;
         return timeMs;
     }
 
@@ -25,12 +21,11 @@ private:
     std::chrono::high_resolution_clock::time_point start_;
 };
 
-
 inline void printDeviceInfo()
 {
     using namespace std;
 
-    int deviceCount;
+    int         deviceCount;
     cudaError_t cudaError = cudaGetDeviceCount(&deviceCount);
     if (cudaError != cudaSuccess)
     {
@@ -48,8 +43,10 @@ inline void printDeviceInfo()
         cout << "  Total global memory: " << prop.totalGlobalMem / (1024 * 1024) << " MB" << endl;
         cout << "  Multiprocessor count: " << prop.multiProcessorCount << endl;
         cout << "  Max threads per block: " << prop.maxThreadsPerBlock << endl;
-        cout << "  Max threads dim: (" << prop.maxThreadsDim[0] << ", " << prop.maxThreadsDim[1] << ", " << prop.maxThreadsDim[2] << ")" << endl;
-        cout << "  Max grid size: (" << prop.maxGridSize[0] << ", " << prop.maxGridSize[1] << ", " << prop.maxGridSize[2] << ")" << endl;
+        cout << "  Max threads dim: (" << prop.maxThreadsDim[0] << ", " << prop.maxThreadsDim[1] << ", "
+             << prop.maxThreadsDim[2] << ")" << endl;
+        cout << "  Max grid size: (" << prop.maxGridSize[0] << ", " << prop.maxGridSize[1] << ", "
+             << prop.maxGridSize[2] << ")" << endl;
         cout << "  Clock rate: " << prop.clockRate / 1000 << " MHz" << endl;
         cout << "  Compute capability: " << prop.major << "." << prop.minor << endl;
         cout << "  Memory clock rate: " << prop.memoryClockRate / 1000 << " MHz" << endl;
@@ -63,6 +60,5 @@ inline void printDeviceInfo()
         cout << "  canMapHostMemory: " << (prop.canMapHostMemory ? "Yes" : "No") << endl;
         cout << "  sharedMemPerBlock: " << prop.sharedMemPerBlock / 1024 << " KB" << endl;
         cout << "  sharedMemPerMultiprocessor: " << prop.sharedMemPerMultiprocessor / 1024 << " KB" << endl;
-
     }
 }

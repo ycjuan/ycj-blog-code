@@ -24,8 +24,8 @@ constexpr uint32_t g_kMaxBitStackSize = 64;
 */
 __device__ void stackPush(uint64_t& bitStack, const uint8_t bitStackIdx, bool value)
 {
-    uint64_t mask = value? 1L << bitStackIdx : ~(1L << bitStackIdx);
-    bitStack = value? bitStack | mask : bitStack & mask;
+    uint64_t mask = value ? 1L << bitStackIdx : ~(1L << bitStackIdx);
+    bitStack      = value ? bitStack | mask : bitStack & mask;
 }
 
 /*
@@ -37,15 +37,15 @@ __device__ void stackPush(uint64_t& bitStack, const uint8_t bitStackIdx, bool va
 __device__ bool stackTop(const uint64_t bitStack, const uint8_t bitStackIdx)
 {
     uint64_t mask = 1L << bitStackIdx;
-    uint64_t tmp = bitStack & mask;
+    uint64_t tmp  = bitStack & mask;
     return tmp > 0L;
 }
 
 __device__ bool matchOp(const AbmDataGpu& reqAbmDataGpu,
                         const AbmDataGpu& docAbmDataGpu,
-                        const int reqIdx,
-                        const int docIdx,
-                        const CabmOp& op)
+                        const int         reqIdx,
+                        const int         docIdx,
+                        const CabmOp&     op)
 {
     // Init the value index
     int reqValIdx = 0;
@@ -91,11 +91,11 @@ struct OperandKernelParam
 {
     AbmDataGpu reqAbmDataGpu;
     AbmDataGpu docAbmDataGpu;
-    CabmOp op;
-    uint64_t reqIdx;
-    uint64_t numDocs;
-    uint64_t* d_bitStacks;
-    uint8_t bitStackIdx;
+    CabmOp     op;
+    uint64_t   reqIdx;
+    uint64_t   numDocs;
+    uint64_t*  d_bitStacks;
+    uint8_t    bitStackIdx;
 };
 
 __global__ void matchOpKernel(OperandKernelParam param)
@@ -110,11 +110,11 @@ __global__ void matchOpKernel(OperandKernelParam param)
 
 struct OperatorKernelParam
 {
-    CabmOp op;
-    uint64_t numPostfixOps;
+    CabmOp    op;
+    uint64_t  numPostfixOps;
     uint64_t* d_bitStacks;
-    uint64_t numDocs;
-    uint8_t bitStackIdx;
+    uint64_t  numDocs;
+    uint8_t   bitStackIdx;
 };
 
 __global__ void operatorKernel(OperatorKernelParam param)
@@ -123,9 +123,10 @@ __global__ void operatorKernel(OperatorKernelParam param)
     if (docIdx < param.numDocs)
     {
         uint64_t& bitStack = param.d_bitStacks[docIdx];
-        bool rst1 = stackTop(bitStack, param.bitStackIdx - 1); // Get the first of first operand
-        bool rst2 = stackTop(bitStack, param.bitStackIdx - 2); // Get the second of second operand
-        bool rst = (param.op.getOpType() == CabmOpType::OPERATOR_AND) ? (rst1 & rst2) : (rst1 | rst2); // Apply the operator
+        bool      rst1     = stackTop(bitStack, param.bitStackIdx - 1); // Get the first of first operand
+        bool      rst2     = stackTop(bitStack, param.bitStackIdx - 2); // Get the second of second operand
+        bool      rst
+            = (param.op.getOpType() == CabmOpType::OPERATOR_AND) ? (rst1 & rst2) : (rst1 | rst2); // Apply the operator
         stackPush(bitStack, param.bitStackIdx - 2, rst); // Push the result to the bit stack
     }
 }
@@ -143,10 +144,10 @@ void cabmGpu(CabmGpuParam& param)
 {
     // -----------------
     // Reset time
-    param.timeMsOperandKernel = 0;
+    param.timeMsOperandKernel  = 0;
     param.timeMsOperatorKernel = 0;
-    param.timeMsCopyRstKernel = 0;
-    param.timeMsTotal = 0;
+    param.timeMsCopyRstKernel  = 0;
+    param.timeMsTotal          = 0;
 
     // -----------------
     // Start timer
@@ -156,7 +157,7 @@ void cabmGpu(CabmGpuParam& param)
     // -----------------
     // Set the block and grid size
     const int kBlockSize = 1024;
-    const int kGridSize = (param.numDocs + kBlockSize - 1) / kBlockSize;
+    const int kGridSize  = (param.numDocs + kBlockSize - 1) / kBlockSize;
 
     for (uint32_t reqIdx = 0; reqIdx < param.numReqs; reqIdx++)
     {
@@ -164,7 +165,7 @@ void cabmGpu(CabmGpuParam& param)
         // Initialize the bit stack index and set the bit stack to 0
         uint8_t currBitStackIdx = 0;
         CHECK_CUDA(cudaMemset(param.d_bitStacks, 0, param.numDocs * sizeof(uint64_t)));
-        
+
         for (const auto& op : param.postfixOps)
         {
             if (op.isOperand())
@@ -184,11 +185,11 @@ void cabmGpu(CabmGpuParam& param)
                 OperandKernelParam operandKernelParam;
                 operandKernelParam.reqAbmDataGpu = param.reqAbmDataGpuList.at(op.getReqFieldIdx());
                 operandKernelParam.docAbmDataGpu = param.docAbmDataGpuList.at(op.getDocFieldIdx());
-                operandKernelParam.op = op;
-                operandKernelParam.reqIdx = reqIdx;
-                operandKernelParam.numDocs = param.numDocs;
-                operandKernelParam.d_bitStacks = param.d_bitStacks;
-                operandKernelParam.bitStackIdx = currBitStackIdx;
+                operandKernelParam.op            = op;
+                operandKernelParam.reqIdx        = reqIdx;
+                operandKernelParam.numDocs       = param.numDocs;
+                operandKernelParam.d_bitStacks   = param.d_bitStacks;
+                operandKernelParam.bitStackIdx   = currBitStackIdx;
 
                 // -----------------
                 // Launch the operand kernel
@@ -218,10 +219,10 @@ void cabmGpu(CabmGpuParam& param)
                 // -----------------
                 // Create the operator kernel parameter
                 OperatorKernelParam operatorKernelParam;
-                operatorKernelParam.op = op;
+                operatorKernelParam.op          = op;
                 operatorKernelParam.d_bitStacks = param.d_bitStacks;
                 operatorKernelParam.bitStackIdx = currBitStackIdx;
-                operatorKernelParam.numDocs = param.numDocs;
+                operatorKernelParam.numDocs     = param.numDocs;
 
                 // -----------------
                 // Launch the operator kernel
@@ -263,7 +264,7 @@ void cabmGpu(CabmGpuParam& param)
     param.timeMsTotal = timerTotal.tocMs();
 }
 
-bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
+bool evaluatePostfixGpuWrapped(std::vector<CabmOp>                            postfix1D,
                                const std::vector<std::vector<ABM_DATA_TYPE>>& reqData2D,
                                const std::vector<std::vector<ABM_DATA_TYPE>>& docData2D)
 {
@@ -273,8 +274,8 @@ bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
     {
         reqAbmDataGpuList.push_back(AbmDataGpu());
         docAbmDataGpuList.push_back(AbmDataGpu());
-        reqAbmDataGpuList.at(field).init({reqData2D}, field, true);
-        docAbmDataGpuList.at(field).init({docData2D}, field, true);
+        reqAbmDataGpuList.at(field).init({ reqData2D }, field, true);
+        docAbmDataGpuList.at(field).init({ docData2D }, field, true);
     }
 
     uint8_t* d_rst;
@@ -283,11 +284,11 @@ bool evaluatePostfixGpuWrapped(std::vector<CabmOp> postfix1D,
     CHECK_CUDA(cudaMallocManaged(&d_bitStacks, 1 * sizeof(uint64_t)));
 
     CabmGpuParam param;
-    param.d_rst = d_rst;
-    param.d_bitStacks = d_bitStacks;
-    param.numDocs = 1;
-    param.numReqs = 1;
-    param.postfixOps = postfix1D;
+    param.d_rst             = d_rst;
+    param.d_bitStacks       = d_bitStacks;
+    param.numDocs           = 1;
+    param.numReqs           = 1;
+    param.postfixOps        = postfix1D;
     param.reqAbmDataGpuList = reqAbmDataGpuList;
     param.docAbmDataGpuList = docAbmDataGpuList;
 

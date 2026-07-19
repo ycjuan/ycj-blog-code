@@ -7,7 +7,7 @@
 #include "cabm.cuh"
 #include "data_struct.cuh"
 
-int evaluateOp(CabmOp& op,
+int evaluateOp(CabmOp&                                        op,
                const std::vector<std::vector<ABM_DATA_TYPE>>& reqData2D,
                const std::vector<std::vector<ABM_DATA_TYPE>>& docData2D)
 {
@@ -45,7 +45,7 @@ int evaluateOp(CabmOp& op,
 }
 
 // the code is modified from https://www.geeksforgeeks.org/evaluation-of-postfix-expression/
-bool evaluatePostfix(std::vector<CabmOp> postfix1D,
+bool evaluatePostfix(std::vector<CabmOp>                            postfix1D,
                      const std::vector<std::vector<ABM_DATA_TYPE>>& reqData2D,
                      const std::vector<std::vector<ABM_DATA_TYPE>>& docData2D)
 {
@@ -87,7 +87,7 @@ bool evaluatePostfix(std::vector<CabmOp> postfix1D,
     return (bool)st.top();
 }
 
-std::vector<std::vector<uint8_t>> cabmCpu(const std::vector<CabmOp>& infixExpr,
+std::vector<std::vector<uint8_t>> cabmCpu(const std::vector<CabmOp>&                                  infixExpr,
                                           const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>& reqData3D,
                                           const std::vector<std::vector<std::vector<ABM_DATA_TYPE>>>& docData3D)
 {

@@ -3,20 +3,20 @@
 #include <iostream>
 #include <vector>
 
-#include "data_struct.cuh"
 #include "cabm.cuh"
+#include "data_struct.cuh"
 #include "macro.cuh"
 #include "util.cuh"
 
 void test3a()
 {
-    const int kNumReqs = 1;
-    const uint64_t kNumDocs = 1000000;
-    const int kNumFields = 6;
-    const int kNumTrials = 100;
+    const int              kNumReqs            = 1;
+    const uint64_t         kNumDocs            = 1000000;
+    const int              kNumFields          = 6;
+    const int              kNumTrials          = 100;
     const std::vector<int> kNumValsPerFieldMin = { 2, 2, 2, 2, 2, 2 };
     const std::vector<int> kNumValsPerFieldMax = { 10, 10, 10, 10, 10, 10 };
-    const std::vector<int> kCardinalities = { 100, 100, 100, 100, 100, 100 };
+    const std::vector<int> kCardinalities      = { 100, 100, 100, 100, 100, 100 };
 
     const auto reqData3D
         = genRandData3D(kNumReqs, kNumFields, kNumValsPerFieldMin, kNumValsPerFieldMax, kCardinalities);
@@ -53,8 +53,8 @@ void test3a()
         {
             reqAbmDataGpuList.push_back(AbmDataGpu());
             docAbmDataGpuList.push_back(AbmDataGpu());
-            reqAbmDataGpuList.at(fieldIdx).init({reqData3D}, fieldIdx, true);
-            docAbmDataGpuList.at(fieldIdx).init({docData3D}, fieldIdx, true);
+            reqAbmDataGpuList.at(fieldIdx).init({ reqData3D }, fieldIdx, true);
+            docAbmDataGpuList.at(fieldIdx).init({ docData3D }, fieldIdx, true);
         }
 
         uint8_t* d_rst;
@@ -63,20 +63,20 @@ void test3a()
         CHECK_CUDA(cudaMalloc(&d_bitStacks, kNumDocs * sizeof(uint64_t)));
 
         CabmGpuParam param;
-        param.d_rst = d_rst;
-        param.d_bitStacks = d_bitStacks;
-        param.numDocs = kNumDocs;
-        param.numReqs = kNumReqs;
-        param.postfixOps = postfix;
+        param.d_rst             = d_rst;
+        param.d_bitStacks       = d_bitStacks;
+        param.numDocs           = kNumDocs;
+        param.numReqs           = kNumReqs;
+        param.postfixOps        = postfix;
         param.reqAbmDataGpuList = reqAbmDataGpuList;
         param.docAbmDataGpuList = docAbmDataGpuList;
 
         Timer timer;
-        float timeMsOperandKernel = 0;
+        float timeMsOperandKernel  = 0;
         float timeMsOperatorKernel = 0;
-        float timeMsCopyRstKernel = 0;
-        float timeMsTotal = 0;
-        float timeMsTotalOuter = 0;
+        float timeMsCopyRstKernel  = 0;
+        float timeMsTotal          = 0;
+        float timeMsTotalOuter     = 0;
         for (int trial = -3; trial < kNumTrials; trial++)
         {
             if (trial == 0)
@@ -139,8 +139,8 @@ void test3a()
                     {
                         numCFGT++;
                     }
-                    //std::cout << "Error at (" << reqIdx << ", " << docIdx << "): " << rstCpu << " != " << rstGpu << std::endl;
-                    //assert(false);
+                    // std::cout << "Error at (" << reqIdx << ", " << docIdx << "): " << rstCpu << " != " << rstGpu <<
+                    // std::endl; assert(false);
                 }
             }
         }
