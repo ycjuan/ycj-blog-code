@@ -2,6 +2,7 @@
 #include "methods.cuh"
 #include "methods_baseline.cuh"
 #include "methods_res_quant.cuh"
+#include "methods_turbo_quant.cuh"
 #include "util.cuh"
 #include <vector>
 
@@ -43,6 +44,12 @@ void runMethod(Data data, Method method)
         break;
     case Method::RES_QUANT_D2D:
         methodResQuant(data, false);
+        break;
+    case Method::TURBO_QUANT_H2D:
+        methodTurboQuant(data, true);
+        break;
+    case Method::TURBO_QUANT_D2D:
+        methodTurboQuant(data, false);
         break;
     default:
         throw std::runtime_error("Invalid method");
