@@ -12,4 +12,4 @@ CUDA `__global__` kernel functions use a `kn_` prefix and no `Kernel` suffix.
 Prefix vector variables by dimensionality. Use the singular form of the element name (no plural).
 
 - `v_` — 1D vector: `v_docId`, `v_rowIdx`, `v_scalar`
-- `v2_` — 2D vector (vector of vectors): `v2_embData`
+- `vv_` — 2D vector (vector of vectors): `vv_embData`
