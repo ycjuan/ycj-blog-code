@@ -22,8 +22,18 @@ find_package(CUDA REQUIRED)
 find_package(Threads REQUIRED)
 
 # Add library
-file(GLOB_RECURSE LIB_HEADER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/*.cuh)
-file(GLOB_RECURSE LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cu)
+file(GLOB_RECURSE LIB_HEADER_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/include/*.cuh
+    ${CMAKE_CURRENT_SOURCE_DIR}/method_a_macro_partition/include/*.cuh
+    ${CMAKE_CURRENT_SOURCE_DIR}/method_b_shared_dispatcher/include/*.cuh
+    ${CMAKE_CURRENT_SOURCE_DIR}/method_c_unified/include/*.cuh
+)
+file(GLOB_RECURSE LIB_SOURCE_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/src/*.cu
+    ${CMAKE_CURRENT_SOURCE_DIR}/method_a_macro_partition/src/*.cu
+    ${CMAKE_CURRENT_SOURCE_DIR}/method_b_shared_dispatcher/src/*.cu
+    ${CMAKE_CURRENT_SOURCE_DIR}/method_c_unified/src/*.cu
+)
 
 add_library(${LIB_NAME} SHARED
     ${LIB_HEADER_FILES}
@@ -33,8 +43,14 @@ add_library(${LIB_NAME} SHARED
 # Set CUDA architecture
 set_property(TARGET ${LIB_NAME} PROPERTY CUDA_ARCHITECTURES 75 80 86 89 90)
 
-# Include directories
-target_include_directories(${LIB_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+# Include directories - one per method folder, so each method's headers can be included by name
+# (e.g. #include "block_manager.cuh") without needing to know the folder layout.
+target_include_directories(${LIB_NAME} PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/method_a_macro_partition/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/method_b_shared_dispatcher/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/method_c_unified/include
+)
 
 # Link CUDA libraries
 target_link_libraries(${LIB_NAME}

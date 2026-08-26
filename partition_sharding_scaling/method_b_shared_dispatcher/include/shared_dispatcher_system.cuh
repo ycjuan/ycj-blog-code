@@ -7,7 +7,7 @@
 #include <thread>
 #include <vector>
 
-#include "block_manager.cuh" // reuses SystemConfig
+#include "retrieval_system.cuh"
 #include "retriever.cuh"
 #include "thread_pool.cuh"
 #include "types.cuh"
@@ -19,13 +19,13 @@
 // small, fixed-size ThreadPool. The number of OS threads used is therefore independent of
 // numPartitions x numShards - only the number of Retrievers (GPU-side state) still scales with
 // it.
-class SharedDispatcherSystem
+class SharedDispatcherSystem : public RetrievalSystem
 {
 public:
-    void init(SystemConfig cfg, int poolSize);
-    void destroy();
+    void init(SystemConfig cfg) override;
+    void destroy() override;
 
-    std::future<RequestResult> submit(Query query);
+    std::future<RequestResult> submit(Query query) override;
 
 private:
     struct PendingItem

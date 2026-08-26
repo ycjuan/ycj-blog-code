@@ -1,6 +1,6 @@
 #include "shared_dispatcher_system.cuh"
 
-void SharedDispatcherSystem::init(SystemConfig cfg, int poolSize)
+void SharedDispatcherSystem::init(SystemConfig cfg)
 {
     cfg_ = cfg;
     v2_retriever_.resize(cfg_.numPartitions);
@@ -15,7 +15,7 @@ void SharedDispatcherSystem::init(SystemConfig cfg, int poolSize)
         }
     }
 
-    pool_.init(poolSize);
+    pool_.init(cfg_.threadPoolSize);
     stopFlag_ = false;
     thread_   = std::thread(&SharedDispatcherSystem::run, this);
 }

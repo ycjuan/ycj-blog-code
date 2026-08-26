@@ -1,6 +1,6 @@
 #include "unified_system.cuh"
 
-void UnifiedSystem::init(SystemConfig cfg, int poolSize)
+void UnifiedSystem::init(SystemConfig cfg)
 {
     cfg_ = cfg;
     UnifiedConfig unifiedCfg;
@@ -8,7 +8,7 @@ void UnifiedSystem::init(SystemConfig cfg, int poolSize)
     unifiedCfg.numShards       = cfg_.numShards;
     unifiedCfg.numDocsPerShard = cfg_.numDocsPerShard;
     unifiedCfg.embDim          = cfg_.embDim;
-    embData_.init(unifiedCfg, poolSize);
+    embData_.init(unifiedCfg, cfg_.threadPoolSize);
 
     int numToReturn = cfg_.numToReturn;
     dispatcher_.start(cfg_.batchSize,

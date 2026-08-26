@@ -1,18 +1,18 @@
 #pragma once
 
-#include "block_manager.cuh" // reuses SystemConfig
 #include "dispatcher.cuh"
+#include "retrieval_system.cuh"
 #include "unified_emb_data_gpu.cuh"
 
 // Variant C system: exactly one Dispatcher and one (logical) Retriever/EmbDataGpu from the
 // caller's perspective. Partition/shard fan-out is fully hidden inside UnifiedEmbDataGpu.
-class UnifiedSystem
+class UnifiedSystem : public RetrievalSystem
 {
 public:
-    void init(SystemConfig cfg, int poolSize);
-    void destroy();
+    void init(SystemConfig cfg) override;
+    void destroy() override;
 
-    std::future<RequestResult> submit(Query query);
+    std::future<RequestResult> submit(Query query) override;
 
 private:
     SystemConfig      cfg_;

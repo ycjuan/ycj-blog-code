@@ -13,14 +13,17 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <functional>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <numeric>
 #include <random>
 #include <thread>
 #include <vector>
 
 #include "block_manager.cuh"
+#include "retrieval_system.cuh"
 #include "shared_dispatcher_system.cuh"
 #include "unified_system.cuh"
 
@@ -149,6 +152,19 @@ int main(int argc, char** argv)
 
     printHeader();
 
+    // Factories for the three variants under comparison. Each is wrapped behind the common
+    // RetrievalSystem interface so the benchmark loop below only needs to be written once.
+    struct SystemFactory
+    {
+        std::string                                       name;
+        std::function<std::unique_ptr<RetrievalSystem>()> create;
+    };
+    std::vector<SystemFactory> v_factory = {
+        { "A_macro", [] { return std::make_unique<BlockManager>(); } },
+        { "B_shared", [] { return std::make_unique<SharedDispatcherSystem>(); } },
+        { "C_unified", [] { return std::make_unique<UnifiedSystem>(); } },
+    };
+
     for (int numPartitions : v_numPartitions)
     {
         SystemConfig cfg;
@@ -159,41 +175,18 @@ int main(int argc, char** argv)
         cfg.numToReturn     = kNumToReturn;
         cfg.batchSize       = kBatchSize;
         cfg.maxWait         = kMaxWait;
+        cfg.threadPoolSize  = kThreadPoolSize; // unused by variant A, bounds fan-out threads for B/C
 
-        // -------- Variant A: macro partition (Dispatcher inside each Block) --------
+        for (auto& factory : v_factory)
         {
-            BlockManager system;
-            system.init(cfg);
-            auto result = runLoadTest([&](Query q) { return system.submit(std::move(q)); },
+            std::unique_ptr<RetrievalSystem> system = factory.create();
+            system->init(cfg);
+            auto result = runLoadTest([&](Query q) { return system->submit(std::move(q)); },
                                       numPartitions,
                                       kNumClientThreads,
                                       kDurationSec);
-            printRow("A_macro", numPartitions, result);
-            system.destroy();
-        }
-
-        // -------- Variant B: single shared Dispatcher, still per-shard Retrievers --------
-        {
-            SharedDispatcherSystem system;
-            system.init(cfg, kThreadPoolSize);
-            auto result = runLoadTest([&](Query q) { return system.submit(std::move(q)); },
-                                      numPartitions,
-                                      kNumClientThreads,
-                                      kDurationSec);
-            printRow("B_shared", numPartitions, result);
-            system.destroy();
-        }
-
-        // -------- Variant C: partition/sharding hidden inside EmbDataGpu --------
-        {
-            UnifiedSystem system;
-            system.init(cfg, kThreadPoolSize);
-            auto result = runLoadTest([&](Query q) { return system.submit(std::move(q)); },
-                                      numPartitions,
-                                      kNumClientThreads,
-                                      kDurationSec);
-            printRow("C_unified", numPartitions, result);
-            system.destroy();
+            printRow(factory.name, numPartitions, result);
+            system->destroy();
         }
     }
 
