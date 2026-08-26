@@ -139,8 +139,8 @@ int main(int argc, char** argv)
     const int    kEmbDim           = 32;
     const int    kNumToReturn      = 50;
     const int    kBatchSize        = 16;
-    const auto   kMaxWait          = std::chrono::microseconds(2000);
-    const int    kNumClientThreads = 8;
+    const auto   kMaxWait          = std::chrono::microseconds(200000);
+    const int    kNumClientThreads = 100;
     const double kDurationSec      = 2.0;
     const int    kThreadPoolSize   = 8; // fixed, independent of numPartitions (variants B & C)
 
@@ -153,6 +153,23 @@ int main(int argc, char** argv)
             v_numPartitions.push_back(std::atoi(argv[i]));
         }
     }
+
+    std::cout << "=== Benchmark config ===\n"
+              << "kTotalDocs        = " << kTotalDocs << "\n"
+              << "kNumShards        = " << kNumShards << "\n"
+              << "kEmbDim           = " << kEmbDim << "\n"
+              << "kNumToReturn      = " << kNumToReturn << "\n"
+              << "kBatchSize        = " << kBatchSize << "\n"
+              << "kMaxWait          = " << kMaxWait.count() << " us\n"
+              << "kNumClientThreads = " << kNumClientThreads << "\n"
+              << "kDurationSec      = " << kDurationSec << "\n"
+              << "kThreadPoolSize   = " << kThreadPoolSize << "\n"
+              << "v_numPartitions   = [";
+    for (size_t i = 0; i < v_numPartitions.size(); i++)
+    {
+        std::cout << v_numPartitions[i] << (i + 1 < v_numPartitions.size() ? ", " : "");
+    }
+    std::cout << "]\n========================\n" << std::endl;
 
     printHeader();
 
