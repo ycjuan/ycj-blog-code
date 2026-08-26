@@ -125,6 +125,11 @@ void printRow(const std::string& variant, int numPartitions, int numDocsPerShard
               << r.p99LatencyMs << std::endl;
 }
 
+void printSeparator()
+{
+    std::cout << std::string(86, '-') << std::endl;
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -215,6 +220,7 @@ int main(int argc, char** argv)
             printRow(factory.name, numPartitions, cfg.numDocsPerShard, result);
             system->destroy();
         }
+        printSeparator();
     }
 
     return 0;
