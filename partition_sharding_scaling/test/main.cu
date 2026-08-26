@@ -112,26 +112,30 @@ LoadTestResult runLoadTest(SubmitFn submitFn, int numPartitions, int numClientTh
 
 void printHeader()
 {
-    std::cout << std::left << std::setw(14) << "variant" << std::setw(14) << "numPartitions" << std::setw(14)
-              << "throughputQps" << std::setw(14) << "avgLatMs" << std::setw(14) << "p50LatMs" << std::setw(14)
-              << "p99LatMs" << std::endl;
+    std::cout << std::left << std::setw(14) << "variant" << std::setw(14) << "numPartitions" << std::setw(16)
+              << "docsPerShard" << std::setw(14) << "throughputQps" << std::setw(14) << "avgLatMs" << std::setw(14)
+              << "p50LatMs" << std::setw(14) << "p99LatMs" << std::endl;
 }
 
-void printRow(const std::string& variant, int numPartitions, const LoadTestResult& r)
+void printRow(const std::string& variant, int numPartitions, int numDocsPerShard, const LoadTestResult& r)
 {
-    std::cout << std::left << std::setw(14) << variant << std::setw(14) << numPartitions << std::setw(14) << std::fixed
-              << std::setprecision(1) << r.throughputQps << std::setw(14) << r.avgLatencyMs << std::setw(14)
-              << r.p50LatencyMs << std::setw(14) << r.p99LatencyMs << std::endl;
+    std::cout << std::left << std::setw(14) << variant << std::setw(14) << numPartitions << std::setw(16)
+              << numDocsPerShard << std::setw(14) << std::fixed << std::setprecision(1) << r.throughputQps
+              << std::setw(14) << r.avgLatencyMs << std::setw(14) << r.p50LatencyMs << std::setw(14)
+              << r.p99LatencyMs << std::endl;
 }
 
 } // namespace
 
 int main(int argc, char** argv)
 {
-    // Kept small by default so the demo runs quickly; bump these up on a real GPU box to see
-    // the scaling behavior more clearly.
+    // Kept small by default so the demo runs quickly; bump kTotalDocs up on a real GPU box to see
+    // the scaling behavior more clearly. Total corpus size is held constant across the sweep, and
+    // split evenly across numPartitions x numShards Retrievers -- e.g. 12M docs / (4 partitions x
+    // 3 shards) = 1M docs per (partition, shard). This isolates the effect of partition count on
+    // dispatch/scheduling overhead from the effect of per-shard corpus size.
+    const long   kTotalDocs        = 12000000;
     const int    kNumShards        = 4;
-    const int    kNumDocsPerShard  = 20000;
     const int    kEmbDim           = 32;
     const int    kNumToReturn      = 50;
     const int    kBatchSize        = 16;
@@ -167,10 +171,16 @@ int main(int argc, char** argv)
 
     for (int numPartitions : v_numPartitions)
     {
+        long numDocsPerShard = kTotalDocs / (static_cast<long>(numPartitions) * kNumShards);
+        if (numDocsPerShard < 1)
+        {
+            numDocsPerShard = 1;
+        }
+
         SystemConfig cfg;
         cfg.numPartitions   = numPartitions;
         cfg.numShards       = kNumShards;
-        cfg.numDocsPerShard = kNumDocsPerShard;
+        cfg.numDocsPerShard = static_cast<int>(numDocsPerShard);
         cfg.embDim          = kEmbDim;
         cfg.numToReturn     = kNumToReturn;
         cfg.batchSize       = kBatchSize;
@@ -185,7 +195,7 @@ int main(int argc, char** argv)
                                       numPartitions,
                                       kNumClientThreads,
                                       kDurationSec);
-            printRow(factory.name, numPartitions, result);
+            printRow(factory.name, numPartitions, cfg.numDocsPerShard, result);
             system->destroy();
         }
     }
