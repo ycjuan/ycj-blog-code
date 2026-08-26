@@ -26,8 +26,8 @@ public:
 
 private:
     SystemConfig                                          cfg_;
-    std::vector<std::vector<Retriever>>                   v2_retriever_;  // [partition][shard]
-    std::vector<std::vector<std::unique_ptr<Dispatcher>>> v2_dispatcher_; // [partition][shard],
+    std::vector<std::vector<Retriever>>                   vv_retriever_;  // [partition][shard]
+    std::vector<std::vector<std::unique_ptr<Dispatcher>>> vv_dispatcher_; // [partition][shard],
                                                                           // unique_ptr because
                                                                           // Dispatcher's
                                                                           // mutex/condition_variable

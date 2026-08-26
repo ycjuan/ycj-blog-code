@@ -38,7 +38,7 @@ private:
     void processBatch(int partitionId, std::vector<PendingItem> batch);
 
     SystemConfig                        cfg_;
-    std::vector<std::vector<Retriever>> v2_retriever_; // [partition][shard]
+    std::vector<std::vector<Retriever>> vv_retriever_; // [partition][shard]
     ThreadPool                          pool_;
 
     std::thread                          thread_;

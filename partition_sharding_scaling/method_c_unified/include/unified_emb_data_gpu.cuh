@@ -31,6 +31,6 @@ public:
 
 private:
     UnifiedConfig                       cfg_;
-    std::vector<std::vector<Retriever>> v2_retriever_; // [partition][shard], internal only
+    std::vector<std::vector<Retriever>> vv_retriever_; // [partition][shard], internal only
     ThreadPool                          pool_;
 };

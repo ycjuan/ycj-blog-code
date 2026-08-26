@@ -38,7 +38,7 @@ results when run — "running the test binary" is the test suite for that projec
   (`d_rowIdx`, `d_dirty`, `d_elements`).
 - Vector variables, prefixed by dimensionality, using the singular element name:
   - `v_` for a 1D vector (`v_docId`, `v_rowIdx`, `v_scalar`)
-  - `v2_` for a vector of vectors (`v2_embData`)
+  - `vv_` for a vector of vectors (`vv_embData`)
 
 ## Git workflow
 

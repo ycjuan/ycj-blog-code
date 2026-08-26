@@ -5,14 +5,14 @@
 void UnifiedEmbDataGpu::init(UnifiedConfig cfg, int poolSize)
 {
     cfg_ = cfg;
-    v2_retriever_.resize(cfg_.numPartitions);
+    vv_retriever_.resize(cfg_.numPartitions);
     for (int p = 0; p < cfg_.numPartitions; p++)
     {
-        v2_retriever_[p].resize(cfg_.numShards);
+        vv_retriever_[p].resize(cfg_.numShards);
         for (int s = 0; s < cfg_.numShards; s++)
         {
             unsigned seed = (unsigned)(p * cfg_.numShards + s);
-            v2_retriever_[p][s].init(cfg_.numDocsPerShard, cfg_.embDim, seed);
+            vv_retriever_[p][s].init(cfg_.numDocsPerShard, cfg_.embDim, seed);
         }
     }
     pool_.init(poolSize);
@@ -21,7 +21,7 @@ void UnifiedEmbDataGpu::init(UnifiedConfig cfg, int poolSize)
 void UnifiedEmbDataGpu::destroy()
 {
     pool_.destroy();
-    for (auto& v_retriever : v2_retriever_)
+    for (auto& v_retriever : vv_retriever_)
     {
         for (auto& retriever : v_retriever)
         {
@@ -63,7 +63,7 @@ std::vector<RequestResult> UnifiedEmbDataGpu::score(const std::vector<Query>& v_
                 std::vector<std::vector<RequestResult>> v_shardResult(cfg_.numShards);
                 for (int s = 0; s < cfg_.numShards; s++)
                 {
-                    v_shardResult[s] = v2_retriever_[partitionId][s].score(v_subQuery, numToReturn);
+                    v_shardResult[s] = vv_retriever_[partitionId][s].score(v_subQuery, numToReturn);
                 }
 
                 for (size_t i = 0; i < v_idx.size(); i++)
