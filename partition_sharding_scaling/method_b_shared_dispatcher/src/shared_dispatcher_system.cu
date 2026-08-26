@@ -5,6 +5,7 @@ void SharedDispatcherSystem::init(SystemConfig cfg)
     cfg_ = cfg;
     vv_retriever_.resize(cfg_.numPartitions);
     v_queue_.resize(cfg_.numPartitions);
+    v_partitionBusy_.assign(cfg_.numPartitions, false);
     for (int p = 0; p < cfg_.numPartitions; p++)
     {
         vv_retriever_[p].resize(cfg_.numShards);
@@ -83,6 +84,13 @@ void SharedDispatcherSystem::run()
 
             for (int p = 0; p < cfg_.numPartitions; p++)
             {
+                if (v_partitionBusy_[p])
+                {
+                    // A pooled task is still scoring a previous batch for this partition;
+                    // leave its queued items for the next wakeup rather than racing a second
+                    // task against the same Retrievers.
+                    continue;
+                }
                 auto& queue = v_queue_[p];
                 if (queue.empty())
                 {
@@ -96,12 +104,34 @@ void SharedDispatcherSystem::run()
                     batch.push_back(std::move(queue.front()));
                     queue.pop_front();
                 }
+                v_partitionBusy_[p] = true;
                 v_readyBatch.emplace_back(p, std::move(batch));
             }
 
             if (v_readyBatch.empty() && stopFlag_)
             {
-                return;
+                // Only fully shut down once there is truly nothing left to do: no queued items,
+                // and no pooled task still running (which could otherwise still be holding back
+                // queued items for a busy partition).
+                bool anyPending = false;
+                for (int p = 0; p < cfg_.numPartitions; p++)
+                {
+                    if (v_partitionBusy_[p] || !v_queue_[p].empty())
+                    {
+                        anyPending = true;
+                        break;
+                    }
+                }
+                if (!anyPending)
+                {
+                    return;
+                }
+                // Otherwise, a pooled task is still finishing up (or its results are still
+                // queued for a busy partition); briefly yield instead of busy-spinning the
+                // predicate (which is already true, so wait_for won't actually block).
+                lock.unlock();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
             }
         }
 
@@ -109,7 +139,16 @@ void SharedDispatcherSystem::run()
         {
             pool_.enqueueMoveOnly(
                 [this, partitionId = partitionBatch.first, batch = std::move(partitionBatch.second)]() mutable
-                { processBatch(partitionId, std::move(batch)); });
+                {
+                    processBatch(partitionId, std::move(batch));
+                    {
+                        std::lock_guard<std::mutex> lock(mutex_);
+                        v_partitionBusy_[partitionId] = false;
+                    }
+                    // Wake run() in case items queued for this partition while it was busy
+                    // (or in case we're shutting down and this was the last pending task).
+                    cv_.notify_all();
+                });
         }
     }
 }

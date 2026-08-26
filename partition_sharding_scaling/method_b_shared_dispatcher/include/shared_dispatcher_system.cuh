@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <future>
@@ -45,5 +46,10 @@ private:
     std::mutex                           mutex_;
     std::condition_variable              cv_;
     std::vector<std::deque<PendingItem>> v_queue_; // one queue per partition
-    bool                                 stopFlag_ = false;
+    // A given partition's Retrievers (and their scratch GPU buffers / cuBLAS handles) are not
+    // safe to call concurrently from two threads. v_partitionBusy_[p] is true while a pooled
+    // task is actively scoring a batch for partition p; run() must not schedule a second
+    // concurrent batch for the same partition until the first one finishes.
+    std::vector<bool>                    v_partitionBusy_;
+    bool                                  stopFlag_ = false;
 };
