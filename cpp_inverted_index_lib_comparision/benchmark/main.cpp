@@ -62,7 +62,8 @@ static Args parseArgs(int argc, char** argv)
 {
     Args args;
     // Maps a flag (long or short form) to the Args field it sets.
-    auto apply = [&](const string& key, int value) {
+    auto apply = [&](const string& key, int value)
+    {
         if (key == "num_docs" || key == "d")
             args.corpus.numDocs = value;
         else if (key == "num_vocab_per_doc" || key == "v")
@@ -160,10 +161,11 @@ int main(int argc, char** argv)
 
     vector<string> queries = buildQueries(corpus.vocab);
 
-    cout << left << setw(60) << "Query" << right << setw(12) << "PISA(us)" << setw(12) << "Xapian(us)" << setw(14)
-         << "PISA count" << setw(14) << "Xapian count" << setw(10) << "Match"
+    cout << left << setw(45) << "Query" << right << setw(12) << "PISA(ms)" << setw(12) << "PISA QPS" << setw(12)
+         << "Xapian(ms)" << setw(12) << "Xapian QPS" << setw(12) << "PISA cnt" << setw(12) << "Xapian cnt" << setw(8)
+         << "Match"
          << "\n";
-    cout << string(122, '-') << "\n";
+    cout << string(125, '-') << "\n";
 
     for (const string& query : queries)
     {
@@ -172,12 +174,21 @@ int main(int argc, char** argv)
         auto [pisaResult, pisaLatencyUs]     = timedEvaluate(pisaEngine, *ast, args.reps);
         auto [xapianResult, xapianLatencyUs] = timedEvaluate(xapianEngine, *ast, args.reps);
 
+        // QPS here means single-threaded queries/sec implied by one query's
+        // median latency (1e6 / latency_us), not a multi-threaded throughput
+        // measurement.
+        double pisaQps         = 1e6 / pisaLatencyUs;
+        double xapianQps       = 1e6 / xapianLatencyUs;
+        double pisaLatencyMs   = pisaLatencyUs / 1000.0;
+        double xapianLatencyMs = xapianLatencyUs / 1000.0;
+
         bool match = (pisaResult == xapianResult);
 
-        string displayQuery = query.size() > 58 ? query.substr(0, 55) + "..." : query;
-        cout << left << setw(60) << displayQuery << right << setw(12) << fixed << setprecision(1) << pisaLatencyUs
-             << setw(12) << xapianLatencyUs << setw(14) << pisaResult.size() << setw(14) << xapianResult.size()
-             << setw(10) << (match ? "yes" : "NO") << "\n";
+        string displayQuery = query.size() > 43 ? query.substr(0, 40) + "..." : query;
+        cout << left << setw(45) << displayQuery << right << setw(12) << fixed << setprecision(4) << pisaLatencyMs
+             << setw(12) << setprecision(0) << pisaQps << setw(12) << setprecision(4) << xapianLatencyMs << setw(12)
+             << setprecision(0) << xapianQps << setw(12) << pisaResult.size() << setw(12) << xapianResult.size()
+             << setw(8) << (match ? "yes" : "NO") << "\n";
 
         if (!match)
         {

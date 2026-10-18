@@ -61,42 +61,47 @@ exist in the corpus, so results are non-trivial).
 
 ```bash
 PATH=/usr/local/bin:$PATH ./run.sh
-# or with custom corpus parameters:
+# or with custom corpus parameters (long or short flags):
 PATH=/usr/local/bin:$PATH ./run.sh --num_docs=200000 --num_vocab_per_doc=30 --vocab_card=5000 --num_char_per_vocab=8 --reps=7
+PATH=/usr/local/bin:$PATH ./run.sh -d 200000 -v 30 -k 5000 -l 8 -r 7
 ```
+
+Each row reports median latency in milliseconds and the implied QPS
+(`1e6 / median_latency_us`) -- i.e. single-threaded queries/sec implied by one
+query's latency, not a multi-threaded throughput measurement.
 
 ## Example results
 
 20,000 docs, 20 terms/doc, 2,000-term vocabulary:
 
 ```
-Index build time: pisa=44.48 ms, xapian=489.38 ms
+Index build time: pisa=44.72 ms, xapian=491.42 ms
 
-Query                                                           PISA(us)  Xapian(us)    PISA count  Xapian count     Match
---------------------------------------------------------------------------------------------------------------------------
-juyetu                                                               0.1        18.3           191           191       yes
-juyetu AND ppelec                                                    1.4         6.4             4             4       yes
-(juyetu AND ppelec) OR blwipd                                        1.6        26.0           198           198       yes
-(juyetu AND ppelec) OR (blwipd AND sqabzs)                           2.3        13.4             6             6       yes
-juyetu AND (ppelec OR blwipd) AND NOT sqabzs                        85.1        12.6             5             5       yes
-juyetu OR ppelec OR blwipd OR sqabzs OR vyfaez                      11.3       127.3           944           944       yes
-(juyetu OR ppelec) AND NOT (blwipd AND sqabzs)                      80.2        57.4           359           359       yes
+Query                                            PISA(ms)    PISA QPS  Xapian(ms)  Xapian QPS    PISA cnt  Xapian cnt   Match
+-----------------------------------------------------------------------------------------------------------------------------
+juyetu                                             0.0001     7142857      0.0316       31635         191         191     yes
+juyetu AND ppelec                                  0.0011      880282      0.0062      160875           4           4     yes
+(juyetu AND ppelec) OR blwipd                      0.0019      537346      0.0263       38003         198         198     yes
+(juyetu AND ppelec) OR (blwipd AND sqabzs)         0.0019      538503      0.0133       75165           6           6     yes
+juyetu AND (ppelec OR blwipd) AND NOT sq...        0.0728       13742      0.0126       79327           5           5     yes
+juyetu OR ppelec OR blwipd OR sqabzs OR ...        0.0137       72918      0.1318        7587         944         944     yes
+(juyetu OR ppelec) AND NOT (blwipd AND s...        0.0754       13269      0.0572       17494         359         359     yes
 ```
 
 200,000 docs, 30 terms/doc, 5,000-term vocabulary:
 
 ```
-Index build time: pisa=661.68 ms, xapian=8201.16 ms
+Index build time: pisa=682.51 ms, xapian=8329.71 ms
 
-Query                                                           PISA(us)  Xapian(us)    PISA count  Xapian count     Match
---------------------------------------------------------------------------------------------------------------------------
-juyetupp                                                             0.2       117.6          1194          1194       yes
-juyetupp AND elecblwi                                                9.8        32.6             4             4       yes
-(juyetupp AND elecblwi) OR pdsqabzs                                 12.7       170.7          1226          1226       yes
-(juyetupp AND elecblwi) OR (pdsqabzs AND vyfaezeq)                  23.6        68.8             9             9       yes
-juyetupp AND (elecblwi OR pdsqabzs) AND NOT vyfaezeq               931.4        69.9            12            12       yes
-juyetupp OR elecblwi OR pdsqabzs OR vyfaezeq OR hpnalahn            85.9       868.9          6004          6004       yes
-(juyetupp OR elecblwi) AND NOT (pdsqabzs AND vyfaezeq)             940.1       413.1          2447          2447       yes
+Query                                            PISA(ms)    PISA QPS  Xapian(ms)  Xapian QPS    PISA cnt  Xapian cnt   Match
+-----------------------------------------------------------------------------------------------------------------------------
+juyetupp                                           0.0002     4132231      0.1174        8516        1194        1194     yes
+juyetupp AND elecblwi                              0.0067      149880      0.0335       29895           4           4     yes
+(juyetupp AND elecblwi) OR pdsqabzs                0.0127       78530      0.1733        5771        1226        1226     yes
+(juyetupp AND elecblwi) OR (pdsqabzs AND...        0.0229       43592      0.0711       14065           9           9     yes
+juyetupp AND (elecblwi OR pdsqabzs) AND ...        0.8172        1224      0.0722       13851          12          12     yes
+juyetupp OR elecblwi OR pdsqabzs OR vyfa...        0.0964       10370      0.8735        1145        6004        6004     yes
+(juyetupp OR elecblwi) AND NOT (pdsqabzs...        0.8193        1221      0.4138        2417        2447        2447     yes
 ```
 
 ## Takeaways (from the runs above, not a general claim)
