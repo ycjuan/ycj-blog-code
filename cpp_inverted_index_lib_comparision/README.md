@@ -72,7 +72,7 @@ evaluated by each engine) plus a separate phrase-as-key benchmark, reporting
 result counts and p50/p95 latency side by side.
 
 ```bash
-PATH=/usr/local/bin:$PATH ./run.sh --num_docs=200000 --num_vocab_per_doc=30 --vocab_card=5000
+PATH=/usr/local/bin:$PATH ./run.sh --num_docs=200000 --phrase_card=5000
 ```
 
 ### Corpus parameters
@@ -80,23 +80,31 @@ PATH=/usr/local/bin:$PATH ./run.sh --num_docs=200000 --num_vocab_per_doc=30 --vo
 | Flag | Short | Meaning | Default |
 |---|---|---|---|
 | `--num_docs` | `-d` | number of documents | 20000 |
-| `--num_vocab_per_doc` | `-v` | terms sampled (with replacement) into each doc | 20 |
 | `--num_char_per_vocab` | `-l` | character length of each distinct vocabulary term | 6 |
-| `--vocab_card` | `-k` | vocabulary cardinality (# of distinct terms overall) | 2000 |
+| `--phrase_card` | `-k` | phrase cardinality (# of distinct seed phrases) | 2000 |
 | `--reps` | `-r` | repetitions per query; reports p50/p95 latency across them | 20 |
-| `--num_vocab_per_key` | `-p` | terms per key, for the phrase-as-key benchmark | 3 |
-| `--num_keys_per_doc` | `-n` | keys per doc, for the phrase-as-key benchmark | 5 |
+| `--num_vocab_per_phrase` | `-p` | terms per seed phrase | 3 |
+| `--num_phrases_per_doc` | `-n` | seed phrases sampled into each doc | 5 |
 | `--gpu_copy` | `-g` | also measure a real `cudaMalloc`+`cudaMemcpy` D2H copy per query | off |
 
 Long form takes `--flag=value`; short form takes `-f value` (e.g.
-`-d 200000 -v 30`). Run `./benchmark --help` for the full usage message.
+`-d 200000 -k 5000`). Run `./benchmark --help` for the full usage message.
 
-Generation is seeded (`seed=42`) for reproducibility. Each doc is a
-space-joined string of `num_vocab_per_doc` terms drawn uniformly from a fixed
-vocabulary of `vocab_card` distinct, `num_char_per_vocab`-character terms.
-The phrase-as-key benchmark uses a separate corpus (seeded independently,
-`seed=43`) that reuses `num_docs`/`num_char_per_vocab`/`vocab_card` but
-generates docs as `num_keys_per_doc` multi-term keys instead (see below).
+Generation is seeded (`seed=42`) for reproducibility. A fixed pool of
+`phrase_card` distinct *seed phrases* is generated up front (each a
+`num_vocab_per_phrase`-term tuple, each term `num_char_per_vocab`
+characters). Every doc is then built by sampling `num_phrases_per_doc` of
+those *same* seed phrases (with replacement) -- so a given phrase recurs
+across many docs whenever `num_docs` is large relative to `phrase_card`.
+This single corpus backs both halves of the benchmark: PISA/Xapian see each
+doc as the flat bag of all terms across its sampled phrases, while
+`KeyEngine` sees each doc as its list of sampled phrase strings (see
+below). Reusing the same seed-phrase pool across docs is what makes the
+phrase-as-key benchmark meaningful -- a phrase has to actually recur to have
+anything interesting to look up (an earlier version of this benchmark
+sampled each phrase's terms independently per doc, so phrases almost never
+repeated and `Key#` was ~1 for nearly every query).
+
 
 ### Design: one query AST, two evaluators
 
@@ -136,8 +144,8 @@ exist in the corpus, so results are non-trivial).
 ```bash
 PATH=/usr/local/bin:$PATH ./run.sh
 # or with custom corpus parameters (long or short flags):
-PATH=/usr/local/bin:$PATH ./run.sh --num_docs=200000 --num_vocab_per_doc=30 --vocab_card=5000 --num_char_per_vocab=8 --reps=20
-PATH=/usr/local/bin:$PATH ./run.sh -d 200000 -v 30 -k 5000 -l 8 -r 20
+PATH=/usr/local/bin:$PATH ./run.sh --num_docs=200000 --phrase_card=5000 --num_char_per_vocab=8 --reps=20
+PATH=/usr/local/bin:$PATH ./run.sh -d 200000 -k 5000 -l 8 -r 20
 ```
 
 Each row reports p50 and p95 latency (milliseconds, across `--reps`
@@ -171,42 +179,46 @@ to track transfer size once results reach the hundreds-of-thousands range.
 
 ### Example results
 
-20,000 docs, 20 terms/doc, 2,000-term vocabulary:
+20,000 docs, phrase_card=2000, 3 terms/phrase, 5 phrases/doc:
 
 ```
-Index build time: pisa=46.45 ms, xapian=485.22 ms
+Index build time: pisa=59.16 ms, xapian=412.38 ms, key_engine=8.21 ms
 
 Query                                   PISA p50  PISA p95   PISA QPS  PISA Copy  Xapian p50  Xapian p95 Xapian QPS  Xapian Copy    PISA#  Xapian#  Match
                                             (ms)      (ms)               p50(ms)        (ms)        (ms)                 p50(ms)
--------------------------------------------------------------------------------------------------------------------------------------------------------------------
-juyetu                                    0.0001    0.0005   11111111     0.0000      0.0175      0.0318      57241       0.0000      191      191    yes
-juyetu AND ppelec                         0.0007    0.0020    1451379     0.0000      0.0053      0.0085     187758       0.0000        4        4    yes
-(juyetu AND ppelec) OR blwipd             0.0016    0.0024     629723     0.0000      0.0254      0.0282      39358       0.0000      198      198    yes
-(juyetu AND ppelec) OR (blwipd AN...      0.0015    0.0027     671592     0.0000      0.0120      0.0142      83654       0.0000        6        6    yes
-juyetu AND (ppelec OR blwipd) AND...      0.0714    0.0803      14004     0.0000      0.0108      0.0151      92885       0.0000        5        5    yes
-juyetu OR ppelec OR blwipd OR sqa...      0.0094    0.0154     106078     0.0001      0.1243      0.1401       8045       0.0001      944      944    yes
-(juyetu OR ppelec) AND NOT (blwip...      0.0720    0.0816      13886     0.0001      0.0555      0.0607      18010       0.0001      359      359    yes
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+juyetu                                    0.0001    0.0002   12987013     0.0000      0.0052      0.0162     193461       0.0000       52       52    yes
+juyetu AND ppelec                         0.0004    0.0007    2347418     0.0000      0.0086      0.0094     115701       0.0000       52       52    yes
+(juyetu AND ppelec) OR blwipd             0.0008    0.0009    1303781     0.0000      0.0103      0.0111      96665       0.0000       52       52    yes
+(juyetu AND ppelec) OR (blwipd AN...      0.0010    0.0013    1034126     0.0000      0.0109      0.0117      91971       0.0000       52       52    yes
+juyetu AND (ppelec OR blwipd) AND...      0.0875    0.0966      11434     0.0000      0.0133      0.0143      75171       0.0000       52       52    yes
+juyetu OR ppelec OR blwipd OR sqa...      0.0018    0.0028     559284     0.0000      0.0171      0.0208      58353       0.0000       96       96    yes
+(juyetu OR ppelec) AND NOT (blwip...      0.0647    0.0691      15450     0.0000      0.0117      0.0126      85463       0.0000       52       52    yes
 ```
 
-200,000 docs, 30 terms/doc, 5,000-term vocabulary:
+200,000 docs, phrase_card=5000, 8-char terms:
+
+```bash
+PATH=/usr/local/bin:$PATH ./run.sh -d 200000 -k 5000 -l 8
+```
 
 ```
-Index build time: pisa=695.33 ms, xapian=8415.11 ms
+Index build time: pisa=451.77 ms, xapian=4611.00 ms, key_engine=113.29 ms
 
 Query                                   PISA p50  PISA p95   PISA QPS  PISA Copy  Xapian p50  Xapian p95 Xapian QPS  Xapian Copy    PISA#  Xapian#  Match
                                             (ms)      (ms)               p50(ms)        (ms)        (ms)                 p50(ms)
--------------------------------------------------------------------------------------------------------------------------------------------------------------------
-juyetupp                                  0.0002    0.0008    6250000     0.0001      0.1175      0.1608       8510       0.0001     1194     1194    yes
-juyetupp AND elecblwi                     0.0044    0.0120     226501     0.0000      0.0311      0.0370      32119       0.0000        4        4    yes
-(juyetupp AND elecblwi) OR pdsqabzs       0.0105    0.0176      95411     0.0001      0.1700      0.1782       5882       0.0001     1226     1226    yes
-(juyetupp AND elecblwi) OR (pdsqa...      0.0189    0.0253      53042     0.0000      0.0675      0.0720      14821       0.0000        9        9    yes
-juyetupp AND (elecblwi OR pdsqabz...      0.8192    1.3967       1221     0.0000      0.0688      0.0757      14532       0.0000       12       12    yes
-juyetupp OR elecblwi OR pdsqabzs ...      0.0937    0.1026      10674     0.0025      0.8666      0.8927       1154       0.0025     6004     6004    yes
-(juyetupp OR elecblwi) AND NOT (p...      0.8151    0.8445       1227     0.0008      0.4119      0.4317       2428       0.0006     2447     2447    yes
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+juyetupp                                  0.0001    0.0002   13157895     0.0000      0.0170      0.0302      58696       0.0000      186      186    yes
+juyetupp AND elecblwi                     0.0008    0.0012    1210654     0.0000      0.0244      0.0260      40984       0.0000      186      186    yes
+(juyetupp AND elecblwi) OR pdsqabzs       0.0015    0.0023     661813     0.0000      0.0288      0.0386      34685       0.0000      186      186    yes
+(juyetupp AND elecblwi) OR (pdsqa...      0.0020    0.0035     497265     0.0000      0.0288      0.0310      34771       0.0000      186      186    yes
+juyetupp AND (elecblwi OR pdsqabz...      0.9018    0.9321       1109     0.0000      0.0380      0.0413      26327       0.0000      186      186    yes
+juyetupp OR elecblwi OR pdsqabzs ...      0.0038    0.0071     263783     0.0001      0.0587      0.0635      17042       0.0001      379      379    yes
+(juyetupp OR elecblwi) AND NOT (p...      0.6762    0.6977       1479     0.0000      0.0320      0.0360      31297       0.0000      186      186    yes
 ```
 
 With `--gpu_copy` on a Tesla T4 (real `cudaMemcpy` D2H instead of a
-same-host copy; same corpus as above) -- note the GPU copy's higher, more
+same-host copy; 20,000-doc corpus) -- note the GPU copy's higher, more
 uniform floor (fixed launch/sync overhead) compared to the same-host
 `*Copy` column:
 
@@ -215,64 +227,45 @@ PATH=/usr/local/bin:$PATH ./run.sh --gpu_copy
 ```
 
 ```
-Index build time: pisa=46.89 ms, xapian=514.05 ms
+Index build time: pisa=58.0 ms, xapian=410.3 ms, key_engine=8.1 ms
 
 Query                                   PISA p50  PISA p95   PISA QPS  PISA Copy PISA GPUCopy  Xapian p50  Xapian p95 Xapian QPS  Xapian Copy Xapian GPUCopy    PISA#  Xapian#  Match
                                             (ms)      (ms)               p50(ms)      p50(ms)        (ms)        (ms)                 p50(ms)        p50(ms)
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-juyetu                                    0.0001    0.0004   11363636     0.0000       0.0064      0.0174      0.0308      57386       0.0000         0.0063      191      191    yes
-juyetu AND ppelec                         0.0009    0.0020    1169591     0.0000       0.0062      0.0053      0.0099     190078       0.0000         0.0063        4        4    yes
-(juyetu AND ppelec) OR blwipd             0.0014    0.0028     698812     0.0000       0.0065      0.0260      0.0297      38442       0.0000         0.0065      198      198    yes
-(juyetu AND ppelec) OR (blwipd AN...      0.0016    0.0038     633714     0.0000       0.0064      0.0131      0.0301      76208       0.0000         0.0063        6        6    yes
-juyetu AND (ppelec OR blwipd) AND...      0.0841    0.0882      11889     0.0000       0.0064      0.0109      0.0171      91684       0.0000         0.0063        5        5    yes
-juyetu OR ppelec OR blwipd OR sqa...      0.0078    0.0140     128634     0.0001       0.0073      0.1237      0.1317       8085       0.0001         0.0072      944      944    yes
-(juyetu OR ppelec) AND NOT (blwip...      0.0772    0.0862      12960     0.0001       0.0065      0.0574      0.0630      17412       0.0001         0.0067      359      359    yes
+juyetu                                    0.0001    0.0002   13157895     0.0000       0.0068      0.0022      0.0091     456621       0.0000         0.0067       14       14    yes
+juyetu AND ppelec                         0.0003    0.0007    3584229     0.0000       0.0067      0.0047      0.0274     211595       0.0000         0.0067       14       14    yes
+(juyetu AND ppelec) OR blwipd             0.0005    0.0008    2053388     0.0000       0.0067      0.0057      0.0075     175346       0.0000         0.0064       14       14    yes
+(juyetu AND ppelec) OR (blwipd AN...      0.0006    0.0010    1779359     0.0000       0.0067      0.0066      0.0080     151837       0.0000         0.0064       14       14    yes
 ```
 
-
-(default settings -- `vocab_card` large relative to key size, so `Key#`
-almost always equals `PISA#`/`Xapian#`):
+Phrase-as-key, 20,000 docs, 5 phrases/doc, 3 terms/phrase, phrase_card=2000
+(default settings). Because each seed phrase's terms are generated fresh
+and never shared with any other phrase, a phrase lookup and the equivalent
+AND query always match the same doc set here (`Key#` == `PISA#` ==
+`Xapian#`) -- see the design note below for when that can diverge:
 
 ```bash
 PATH=/usr/local/bin:$PATH ./run.sh
 ```
 
 ```
-=== Phrase-as-key benchmark (num_vocab_per_key=3, num_keys_per_doc=5) ===
-Index build time: key_engine=34.18 ms, pisa=37.15 ms, xapian=388.75 ms
+=== Phrase-as-key benchmark (num_vocab_per_phrase=3, num_phrases_per_doc=5) ===
 
 Key                          Key p50   Key p95   Key QPS  Key Copy  PISA p50  PISA p95  PISA QPS PISA Copy Xapian p50 Xapian p95 Xapian QPS XapianCopy   Key#   PISA#  Xapian#
                                 (ms)      (ms)             p50(ms)      (ms)      (ms)             p50(ms)       (ms)       (ms)               p50(ms)
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-dekrbf ybleyr nzdxny          0.0001    0.0001  14925373    0.0000    0.0007    0.0018   1533742    0.0000     0.0052     0.0267     191351     0.0000      1       1        1
-pwaday sokbrl dbavrx          0.0001    0.0001  14084507    0.0000    0.0010    0.0018   1021450    0.0000     0.0054     0.0080     185874     0.0000      1       1        1
-ejomfy dycuec ixtlcs          0.0001    0.0001  14705882    0.0000    0.0007    0.0013   1335113    0.0000     0.0055     0.0081     181719     0.0000      1       1        1
-punqhn ltlfdj bmweae          0.0001    0.0001  14705882    0.0000    0.0007    0.0013   1492537    0.0000     0.0052     0.0075     193798     0.0000      1       1        1
-lmvprf ourwio ydohph          0.0001    0.0001  14084507    0.0000    0.0007    0.0013   1340483    0.0000     0.0055     0.0074     182448     0.0000      1       1        1
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+dhovhb bubpdo blthmm          0.0001    0.0001  13698630    0.0000    0.0008    0.0010   1215067    0.0000     0.0099     0.0107     101092     0.0000     53      53       53
+lekece rrslsz sfaiyz          0.0001    0.0001  13333333    0.0000    0.0008    0.0009   1225490    0.0000     0.0096     0.0102     104679     0.0000     52      52       52
+pswert lzvuxa dpnshv          0.0001    0.0001  11363636    0.0000    0.0008    0.0009   1221001    0.0000     0.0100     0.0103     100412     0.0000     55      55       55
+aavfss suupby jqdxww          0.0001    0.0001  12987013    0.0000    0.0008    0.0010   1216545    0.0000     0.0103     0.0136      97087     0.0000     58      58       58
+nagyec vudxmy ywehzi          0.0001    0.0001  14285714    0.0000    0.0007    0.0008   1336898    0.0000     0.0086     0.0093     115727     0.0000     42      42       42
 ```
 
-Phrase-as-key, same corpus size but a much smaller vocabulary (50 terms) and
-more keys/doc (10) -- showing `Key#` diverging well below `PISA#`/`Xapian#`
-once term reuse across keys becomes likely, and `PISA Copy`/`XapianCopy`
-growing as PISA#/Xapian# (result size) grows into the thousands:
-
-```bash
-PATH=/usr/local/bin:$PATH ./run.sh --vocab_card=50 --num_keys_per_doc=10
-```
-
-```
-=== Phrase-as-key benchmark (num_vocab_per_key=3, num_keys_per_doc=10) ===
-Index build time: key_engine=51.55 ms, pisa=56.57 ms, xapian=370.34 ms
-
-Key                          Key p50   Key p95   Key QPS  Key Copy  PISA p50  PISA p95  PISA QPS PISA Copy Xapian p50 Xapian p95 Xapian QPS XapianCopy   Key#   PISA#  Xapian#
-                                (ms)      (ms)             p50(ms)      (ms)      (ms)             p50(ms)       (ms)       (ms)               p50(ms)
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-cmaqim krppld lpoukj          0.0001    0.0001  13888889    0.0000    0.1563    0.1680      6399    0.0002     0.5935     0.6115       1685     0.0002      2    1709     1709
-epbuna cmaqim vvpljp          0.0001    0.0001  14925373    0.0000    0.1560    0.1640      6411    0.0002     0.5927     0.6212       1687     0.0002      3    1738     1738
-geivwb slmldq cmpcdd          0.0001    0.0001  13888889    0.0000    0.1603    0.1727      6239    0.0002     0.6092     0.6283       1641     0.0002      2    1777     1777
-clmsmi vvpljp hyxdfu          0.0001    0.0001  14925373    0.0000    0.1581    0.1650      6326    0.0002     0.5980     0.6171       1672     0.0002      1    1770     1770
-qfcfme krppld iwfcch          0.0001    0.0001  14492754    0.0000    0.1578    0.1755      6337    0.0002     0.6028     0.6186       1659     0.0002      1    1783     1783
-```
+Note that `Key#`/`PISA#`/`Xapian#` all grow with `num_docs / phrase_card`
+(here ~50-58, close to the expected `20000 * 5 / 2000 = 50`) -- each seed
+phrase recurs across roughly that many docs, which is the whole point of
+sampling from a fixed phrase pool instead of generating independent random
+terms per doc.
 
 ### Phrase-as-key benchmark: design
 
@@ -291,21 +284,32 @@ section compares three ways of answering that:
 These are **not** semantically equivalent, by design: `KeyEngine` only
 matches docs that contain that exact key (the terms together, as generated),
 whereas the AND query matches any doc containing all three terms anywhere --
-even if they come from different keys in that doc. So `Key#` is expected to
-be `<= PISA#`/`Xapian#`, and the gap widens as `vocab_card` shrinks relative
-to `num_vocab_per_key * num_keys_per_doc` (more chance of a doc incidentally
-containing all 3 terms outside of the generated key itself).
+even if they come from different keys in that doc. So in general `Key#` is
+expected to be `<= PISA#`/`Xapian#`. In this benchmark's corpus, every seed
+phrase's terms are generated fresh and distinct from every other phrase's
+terms (see "Corpus parameters" above), so that gap never actually opens up
+here -- `Key#` always equals `PISA#`/`Xapian#` in the example output.
+The gap would reappear with a corpus where individual terms (not whole
+phrases) are reused across different phrases, making it possible for a doc
+to incidentally contain all of a key's terms without containing that exact
+phrase.
 
-Keys for the benchmark queries are the first 5 distinct keys encountered in
-the generated corpus (guaranteed to exist).
+Keys for the benchmark queries are the first 5 distinct phrases encountered
+in the generated corpus (guaranteed to exist).
 
 ### Takeaways (from the runs above, not a general claim)
 
+- **Fixing a phrase-reuse bug**: an earlier version of this benchmark
+  generated each phrase's terms independently per doc from a shared term
+  vocabulary, so the same exact phrase almost never recurred across docs
+  (`Key#` was ~1 for nearly every query, regardless of corpus size). Sampling
+  `num_phrases_per_doc` phrases per doc from a *fixed* pool of `phrase_card`
+  seed phrases fixes this: `Key#` now scales with `num_docs / phrase_card`
+  as expected (see the phrase-as-key example above).
 - **Copy-out cost is small but not zero, and scales with result size, not
   query complexity**: in the default CPU-only runs, copying a handful of
   matching doc ids is unmeasurably fast (`0.0000 ms`), but copying hundreds
-  of thousands of doc ids (e.g. the wide-OR query at 200k docs, or the AND
-  queries at `vocab_card=50`) costs up to a few tenths of a millisecond --
+  of thousands of doc ids costs up to a few tenths of a millisecond --
   occasionally comparable to or larger than the lookup itself for PISA's
   fastest queries. With `--gpu_copy` on an actual GPU, the real
   `cudaMemcpy` D2H transfer is slower still at these result sizes (~0.3-0.5
@@ -318,12 +322,11 @@ the generated corpus (guaranteed to exist).
   `KeyEngine`'s single hash lookup runs in ~0.0001 ms regardless of corpus
   size/cardinality, versus PISA/Xapian needing to intersect/union real
   posting lists for the equivalent AND query -- a gap that grows as those
-  posting lists get longer (e.g. with a small vocabulary, PISA/Xapian's AND
-  queries took >0.1-0.6 ms per the second example above, ~1000-5000x
-  slower). The tradeoff is semantic, not just a performance knob: `KeyEngine`
-  can only answer "does this exact key exist", not "find all docs containing
-  these terms in any combination" -- use it only when the former is really
-  the question being asked.
+  posting lists get longer (e.g. at 200k docs, PISA/Xapian's AND queries
+  took up to ~1 ms, ~10000x slower). The tradeoff is semantic, not just a
+  performance knob: `KeyEngine` can only answer "does this exact key exist",
+  not "find all docs containing these terms in any combination" -- use it
+  only when the former is really the question being asked.
 - **Index build**: PISA-style in-memory `vector<vector<int>>` postings build
   roughly 10x faster than Xapian's `WritableDatabase::add_document`, which
   does more per-term bookkeeping (positions, term-frequency stats,

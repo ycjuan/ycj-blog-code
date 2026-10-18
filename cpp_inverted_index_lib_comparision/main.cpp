@@ -1,18 +1,20 @@
-// Benchmark: generates a synthetic corpus, builds both the PISA-style and
-// Xapian inverted-index engines, runs an identical set of boolean queries
-// (from simple single-term to multi-level nested AND/OR/NOT) against both,
-// and reports result count + latency for each engine/query pair. Also
-// cross-checks that both engines agree on the result doc-id set, as a
-// correctness sanity check.
+// Benchmark: generates a synthetic corpus (seed phrases sampled into docs,
+// so phrases naturally recur across docs), builds PISA-style, Xapian, and
+// KeyEngine indexes over it, runs an identical set of boolean queries
+// (from simple single-term to multi-level nested AND/OR/NOT) against PISA
+// and Xapian, and reports result count + latency for each engine/query
+// pair. Also cross-checks that both engines agree on the result doc-id
+// set, as a correctness sanity check.
 //
 // A second section benchmarks a "phrase-as-key" scenario: a simple
 // unordered_map<string, vector<docId>> KeyEngine where a whole multi-term
-// key (e.g. "vocA vocB vocC") is the lookup unit, compared against PISA and
-// Xapian answering the equivalent classic AND query.
+// phrase (e.g. "vocA vocB vocC") is the lookup unit, compared against PISA
+// and Xapian answering the equivalent classic AND query over the same
+// corpus.
 //
 // Usage:
-//   ./benchmark [--num_docs=N] [--num_vocab_per_doc=N] [--num_char_per_vocab=N]
-//               [--vocab_card=N] [--reps=N] [--num_vocab_per_key=N] [--num_keys_per_doc=N]
+//   ./benchmark [--num_docs=N] [--num_char_per_vocab=N] [--phrase_card=N]
+//               [--reps=N] [--num_vocab_per_phrase=N] [--num_phrases_per_doc=N]
 //
 // Build: see Makefile (requires `xapian-config` on PATH).
 
@@ -42,42 +44,39 @@ using Clock = chrono::high_resolution_clock;
 struct Args
 {
     CorpusConfig corpus;
-    int          numVocabPerKey = 3;     // terms per key, for the phrase-as-key benchmark
-    int          numKeysPerDoc  = 5;     // keys per doc, for the phrase-as-key benchmark
-    int          reps           = 20;    // repetitions per query; reports p50/p95 latency across these reps
-    bool         gpuCopy        = false; // if set, also measure a real cudaMalloc+cudaMemcpy D2H copy per query
+    int          reps    = 20;    // repetitions per query; reports p50/p95 latency across these reps
+    bool         gpuCopy = false; // if set, also measure a real cudaMalloc+cudaMemcpy D2H copy per query
 };
 
 static void printUsage(const char* program)
 {
     Args defaults; // show default values alongside each flag
     cout << "Usage: " << program << " [OPTIONS]\n\n"
-         << "Generates a synthetic corpus and benchmarks boolean query latency on a\n"
-         << "PISA-style index versus Xapian, cross-checking that both return the same\n"
-         << "result doc-id set for every query.\n\n"
+         << "Generates a synthetic corpus (built from a fixed pool of seed phrases,\n"
+         << "reused across docs) and benchmarks PISA, Xapian, and a phrase-as-key\n"
+         << "hash-map engine (KeyEngine) on it.\n\n"
          << "Options:\n"
-         << "  -d, --num_docs=N            Number of documents to generate (default: " << defaults.corpus.numDocs
+         << "  -d, --num_docs=N              Number of documents to generate (default: " << defaults.corpus.numDocs
          << ")\n"
-         << "  -v, --num_vocab_per_doc=N   Terms sampled (with replacement) into each doc (default: "
-         << defaults.corpus.numVocabPerDoc << ")\n"
-         << "  -l, --num_char_per_vocab=N  Character length of each distinct vocabulary term (default: "
+         << "  -l, --num_char_per_vocab=N    Character length of each distinct vocabulary term (default: "
          << defaults.corpus.numCharPerVocab << ")\n"
-         << "  -k, --vocab_card=N          Vocabulary cardinality, i.e. # of distinct terms overall (default: "
-         << defaults.corpus.vocabCard << ")\n"
-         << "  -r, --reps=N                Repetitions per query; reports p50/p95 latency across them (default: "
+         << "  -k, --phrase_card=N           Phrase cardinality, i.e. # of distinct seed phrases (default: "
+         << defaults.corpus.phraseCard << ")\n"
+         << "  -r, --reps=N                  Repetitions per query; reports p50/p95 latency across them (default: "
          << defaults.reps << ")\n"
-         << "  -p, --num_vocab_per_key=N   Terms per key, for the phrase-as-key benchmark (default: "
-         << defaults.numVocabPerKey << ")\n"
-         << "  -n, --num_keys_per_doc=N    Keys per doc, for the phrase-as-key benchmark (default: "
-         << defaults.numKeysPerDoc << ")\n"
-         << "  -g, --gpu_copy              Also measure a real cudaMalloc+cudaMemcpy D2H copy per\n"
-         << "                               query (requires building with nvcc/CUDA and running on a\n"
-         << "                               CUDA-capable GPU; see Makefile)\n"
-         << "  -h, --help                  Show this help message and exit\n\n"
+         << "  -p, --num_vocab_per_phrase=N  Terms per seed phrase (default: " << defaults.corpus.numVocabPerPhrase
+         << ")\n"
+         << "  -n, --num_phrases_per_doc=N   Seed phrases sampled into each doc (default: "
+         << defaults.corpus.numPhrasesPerDoc << ")\n"
+         << "  -g, --gpu_copy                Also measure a real cudaMalloc+cudaMemcpy D2H copy per\n"
+         << "                                 query (requires building with nvcc/CUDA and running on a\n"
+         << "                                 CUDA-capable GPU; see Makefile)\n"
+         << "  -h, --help                    Show this help message and exit\n\n"
          << "Example:\n"
-         << "  " << program << " --num_docs=200000 --num_vocab_per_doc=30 --vocab_card=5000 --num_char_per_vocab=8"
-         << " --reps=7 --num_vocab_per_key=3 --num_keys_per_doc=5\n"
-         << "  " << program << " -d 200000 -v 30 -k 5000 -l 8 -r 7 -p 3 -n 5\n";
+         << "  " << program
+         << " --num_docs=200000 --phrase_card=5000 --num_char_per_vocab=8 --reps=7 --num_vocab_per_phrase=3"
+         << " --num_phrases_per_doc=5\n"
+         << "  " << program << " -d 200000 -k 5000 -l 8 -r 7 -p 3 -n 5\n";
 }
 
 static Args parseArgs(int argc, char** argv)
@@ -88,18 +87,16 @@ static Args parseArgs(int argc, char** argv)
     {
         if (key == "num_docs" || key == "d")
             args.corpus.numDocs = value;
-        else if (key == "num_vocab_per_doc" || key == "v")
-            args.corpus.numVocabPerDoc = value;
         else if (key == "num_char_per_vocab" || key == "l")
             args.corpus.numCharPerVocab = value;
-        else if (key == "vocab_card" || key == "k")
-            args.corpus.vocabCard = value;
+        else if (key == "phrase_card" || key == "k")
+            args.corpus.phraseCard = value;
         else if (key == "reps" || key == "r")
             args.reps = value;
-        else if (key == "num_vocab_per_key" || key == "p")
-            args.numVocabPerKey = value;
-        else if (key == "num_keys_per_doc" || key == "n")
-            args.numKeysPerDoc = value;
+        else if (key == "num_vocab_per_phrase" || key == "p")
+            args.corpus.numVocabPerPhrase = value;
+        else if (key == "num_phrases_per_doc" || key == "n")
+            args.corpus.numPhrasesPerDoc = value;
     };
 
     for (int i = 1; i < argc; i++)
@@ -149,20 +146,20 @@ static vector<string> buildQueries(const vector<string>& vocab)
     };
 }
 
-// Picks a handful of distinct keys (in order of first appearance) from the
-// key corpus to use as benchmark queries -- guaranteed to exist, so results
-// are non-empty.
-static vector<string> buildKeyQueries(const vector<vector<string>>& keysPerDoc, int maxQueries = 5)
+// Picks a handful of distinct phrases (in order of first appearance) from
+// the corpus to use as phrase-as-key benchmark queries -- guaranteed to
+// exist, so results are non-empty.
+static vector<string> buildKeyQueries(const vector<vector<string>>& phrasesPerDoc, int maxQueries = 5)
 {
     vector<string>        queries;
     unordered_set<string> seen;
-    for (const auto& keys : keysPerDoc)
+    for (const auto& phrases : phrasesPerDoc)
     {
-        for (const string& key : keys)
+        for (const string& phrase : phrases)
         {
-            if (seen.insert(key).second)
+            if (seen.insert(phrase).second)
             {
-                queries.push_back(key);
+                queries.push_back(phrase);
                 if (static_cast<int>(queries.size()) >= maxQueries)
                     return queries;
             }
@@ -171,8 +168,8 @@ static vector<string> buildKeyQueries(const vector<vector<string>>& keysPerDoc, 
     return queries;
 }
 
-// Splits a key string ("vocA vocB vocC") into the equivalent classic boolean
-// AND query ("vocA AND vocB AND vocC") that PISA/Xapian can evaluate.
+// Splits a phrase string ("vocA vocB vocC") into the equivalent classic
+// boolean AND query ("vocA AND vocB AND vocC") that PISA/Xapian can evaluate.
 static string keyToAndQuery(const string& key)
 {
     istringstream iss(key);
@@ -285,8 +282,9 @@ int main(int argc, char** argv)
     }
 #endif
 
-    cout << "Corpus config: num_docs=" << cfg.numDocs << " num_vocab_per_doc=" << cfg.numVocabPerDoc
-         << " num_char_per_vocab=" << cfg.numCharPerVocab << " vocab_card=" << cfg.vocabCard << "\n\n";
+    cout << "Corpus config: num_docs=" << cfg.numDocs << " num_char_per_vocab=" << cfg.numCharPerVocab
+         << " phrase_card=" << cfg.phraseCard << " num_vocab_per_phrase=" << cfg.numVocabPerPhrase
+         << " num_phrases_per_doc=" << cfg.numPhrasesPerDoc << "\n\n";
 
     Corpus corpus = generateCorpus(cfg);
 
@@ -300,8 +298,13 @@ int main(int argc, char** argv)
     xapianEngine.build(corpus.docs);
     double xapianBuildMs = chrono::duration<double, milli>(Clock::now() - xapianBuildStart).count();
 
+    KeyEngine keyEngine;
+    auto      keyBuildStart = Clock::now();
+    keyEngine.build(corpus.phrasesPerDoc);
+    double keyBuildMs = chrono::duration<double, milli>(Clock::now() - keyBuildStart).count();
+
     cout << "Index build time: pisa=" << fixed << setprecision(2) << pisaBuildMs << " ms, xapian=" << xapianBuildMs
-         << " ms\n";
+         << " ms, key_engine=" << keyBuildMs << " ms\n";
     cout << "Indexed docs: pisa=" << pisaEngine.numDocs() << ", xapian=" << xapianEngine.numDocs() << "\n\n";
 
     vector<string> queries = buildQueries(corpus.vocab);
@@ -386,44 +389,17 @@ int main(int argc, char** argv)
     }
 
     // --- Phrase-as-key benchmark ---------------------------------------
-    // A separate corpus where each doc is composed of `num_keys_per_doc`
-    // keys, each a fixed-size tuple of `num_vocab_per_key` terms. KeyEngine
-    // looks the whole key up as one hash-map entry; PISA/Xapian answer the
-    // "same" query as a classic boolean AND of the key's individual terms.
-    // The two are NOT expected to return identical doc sets: AND matches
-    // any doc containing all terms anywhere (even split across different
-    // keys), while the key lookup only matches docs having that exact key.
-    KeyCorpusConfig keyCfg;
-    keyCfg.numDocs         = cfg.numDocs;
-    keyCfg.numCharPerVocab = cfg.numCharPerVocab;
-    keyCfg.vocabCard       = cfg.vocabCard;
-    keyCfg.numVocabPerKey  = args.numVocabPerKey;
-    keyCfg.numKeysPerDoc   = args.numKeysPerDoc;
+    // Uses the *same* corpus and PISA/Xapian indexes built above. KeyEngine
+    // looks a whole phrase up as one hash-map entry; PISA/Xapian answer the
+    // "same" query as a classic boolean AND of the phrase's individual
+    // terms. The two are NOT expected to return identical doc sets: AND
+    // matches any doc containing all terms anywhere (even split across
+    // different phrases), while the phrase lookup only matches docs having
+    // that exact phrase.
+    cout << "\n=== Phrase-as-key benchmark (num_vocab_per_phrase=" << cfg.numVocabPerPhrase
+         << ", num_phrases_per_doc=" << cfg.numPhrasesPerDoc << ") ===\n\n";
 
-    KeyCorpus keyCorpus = generateKeyCorpus(keyCfg);
-
-    cout << "\n=== Phrase-as-key benchmark (num_vocab_per_key=" << keyCfg.numVocabPerKey
-         << ", num_keys_per_doc=" << keyCfg.numKeysPerDoc << ") ===\n";
-
-    KeyEngine keyEngine;
-    auto      keyBuildStart = Clock::now();
-    keyEngine.build(keyCorpus.keysPerDoc);
-    double keyBuildMs = chrono::duration<double, milli>(Clock::now() - keyBuildStart).count();
-
-    PisaEngine keyPisaEngine;
-    auto       keyPisaBuildStart = Clock::now();
-    keyPisaEngine.build(keyCorpus.docs);
-    double keyPisaBuildMs = chrono::duration<double, milli>(Clock::now() - keyPisaBuildStart).count();
-
-    XapianEngine keyXapianEngine;
-    auto         keyXapianBuildStart = Clock::now();
-    keyXapianEngine.build(keyCorpus.docs);
-    double keyXapianBuildMs = chrono::duration<double, milli>(Clock::now() - keyXapianBuildStart).count();
-
-    cout << "Index build time: key_engine=" << fixed << setprecision(2) << keyBuildMs << " ms, pisa=" << keyPisaBuildMs
-         << " ms, xapian=" << keyXapianBuildMs << " ms\n\n";
-
-    vector<string> keyQueries = buildKeyQueries(keyCorpus.keysPerDoc);
+    vector<string> keyQueries = buildKeyQueries(corpus.phrasesPerDoc);
 
     ostringstream keyHeader1, keyHeader2;
     keyHeader1 << left << setw(26) << "Key" << right << setw(10) << "Key p50" << setw(10) << "Key p95" << setw(10)
@@ -461,8 +437,8 @@ int main(int argc, char** argv)
         unique_ptr<QueryNode> ast      = QueryParser::parse(andQuery);
 
         auto [keyResult, keyStats]       = timedEvaluate([&] { return keyEngine.evaluate(key); }, args.reps);
-        auto [pisaResult, pisaStats]     = timedEvaluate([&] { return keyPisaEngine.evaluate(*ast); }, args.reps);
-        auto [xapianResult, xapianStats] = timedEvaluate([&] { return keyXapianEngine.evaluate(*ast); }, args.reps);
+        auto [pisaResult, pisaStats]     = timedEvaluate([&] { return pisaEngine.evaluate(*ast); }, args.reps);
+        auto [xapianResult, xapianStats] = timedEvaluate([&] { return xapianEngine.evaluate(*ast); }, args.reps);
 
         LatencyStats keyCopyStats    = timedCopy(keyResult, args.reps);
         LatencyStats pisaCopyStats   = timedCopy(pisaResult, args.reps);
