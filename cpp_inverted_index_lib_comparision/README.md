@@ -86,6 +86,7 @@ PATH=/usr/local/bin:$PATH ./run.sh --num_docs=200000 --num_vocab_per_doc=30 --vo
 | `--reps` | `-r` | repetitions per query; reports p50/p95 latency across them | 20 |
 | `--num_vocab_per_key` | `-p` | terms per key, for the phrase-as-key benchmark | 3 |
 | `--num_keys_per_doc` | `-n` | keys per doc, for the phrase-as-key benchmark | 5 |
+| `--gpu_copy` | `-g` | also measure a real `cudaMalloc`+`cudaMemcpy` D2H copy per query | off |
 
 Long form takes `--flag=value`; short form takes `-f value` (e.g.
 `-d 200000 -v 30`). Run `./benchmark --help` for the full usage message.
@@ -149,11 +150,24 @@ examples below use reps=20).
 The `*Copy` column reports p50 latency for copying the query's result
 doc-id vector out of the engine into a fresh `vector<int>` (measured
 separately from the lookup/merge compute time above). All engines here are
-CPU-only, so this is a same-host copy, but it isolates the "transfer the
-result out" cost from the actual query compute -- the same idea as a
-device-to-host (D2H) copy would be for a GPU-resident index. It scales with
-result size, not query complexity (e.g. compare the wide-OR query's larger
-copy time against the narrow AND query's near-zero one below).
+CPU-only, so this is a same-host copy -- but it isolates the "transfer the
+result out" cost from the actual query compute. It scales with result size,
+not query complexity (e.g. compare the wide-OR query's larger copy time
+against the narrow AND query's near-zero one below).
+
+If a CUDA toolkit (`nvcc`) is available at build time, the Makefile also
+compiles [`cuda_copy.cu`](cuda_copy.cu) and the binary gains a `--gpu_copy`/
+`-g` flag. When passed, each query's result vector is additionally uploaded
+once (untimed) into real device memory via `cudaMalloc`+`cudaMemcpy`
+(host-to-device), and a `*GPUCopy` column reports the p50 latency of a real
+`cudaMemcpy(..., cudaMemcpyDeviceToHost)` call copying it back out -- an
+actual device-to-host transfer, not a same-host analogy. This requires a
+CUDA-capable GPU at runtime (`nvidia-smi` should show one); without
+`--gpu_copy`, the binary behaves exactly as before and needs no GPU. Because
+these result sets are small (tens to hundreds of thousands of ints), the
+measured GPU copy time is dominated by fixed `cudaMemcpy` launch/sync
+overhead (~0.003-0.008 ms here) rather than PCIe bandwidth -- it only starts
+to track transfer size once results reach the hundreds-of-thousands range.
 
 ### Example results
 
@@ -191,7 +205,31 @@ juyetupp OR elecblwi OR pdsqabzs ...      0.0937    0.1026      10674     0.0025
 (juyetupp OR elecblwi) AND NOT (p...      0.8151    0.8445       1227     0.0008      0.4119      0.4317       2428       0.0006     2447     2447    yes
 ```
 
-Phrase-as-key, 20,000 docs, 5 keys/doc, 3 terms/key, 2,000-term vocabulary
+With `--gpu_copy` on a Tesla T4 (real `cudaMemcpy` D2H instead of a
+same-host copy; same corpus as above) -- note the GPU copy's higher, more
+uniform floor (fixed launch/sync overhead) compared to the same-host
+`*Copy` column:
+
+```bash
+PATH=/usr/local/bin:$PATH ./run.sh --gpu_copy
+```
+
+```
+Index build time: pisa=46.89 ms, xapian=514.05 ms
+
+Query                                   PISA p50  PISA p95   PISA QPS  PISA Copy PISA GPUCopy  Xapian p50  Xapian p95 Xapian QPS  Xapian Copy Xapian GPUCopy    PISA#  Xapian#  Match
+                                            (ms)      (ms)               p50(ms)      p50(ms)        (ms)        (ms)                 p50(ms)        p50(ms)
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+juyetu                                    0.0001    0.0004   11363636     0.0000       0.0064      0.0174      0.0308      57386       0.0000         0.0063      191      191    yes
+juyetu AND ppelec                         0.0009    0.0020    1169591     0.0000       0.0062      0.0053      0.0099     190078       0.0000         0.0063        4        4    yes
+(juyetu AND ppelec) OR blwipd             0.0014    0.0028     698812     0.0000       0.0065      0.0260      0.0297      38442       0.0000         0.0065      198      198    yes
+(juyetu AND ppelec) OR (blwipd AN...      0.0016    0.0038     633714     0.0000       0.0064      0.0131      0.0301      76208       0.0000         0.0063        6        6    yes
+juyetu AND (ppelec OR blwipd) AND...      0.0841    0.0882      11889     0.0000       0.0064      0.0109      0.0171      91684       0.0000         0.0063        5        5    yes
+juyetu OR ppelec OR blwipd OR sqa...      0.0078    0.0140     128634     0.0001       0.0073      0.1237      0.1317       8085       0.0001         0.0072      944      944    yes
+(juyetu OR ppelec) AND NOT (blwip...      0.0772    0.0862      12960     0.0001       0.0065      0.0574      0.0630      17412       0.0001         0.0067      359      359    yes
+```
+
+
 (default settings -- `vocab_card` large relative to key size, so `Key#`
 almost always equals `PISA#`/`Xapian#`):
 
@@ -263,16 +301,19 @@ the generated corpus (guaranteed to exist).
 
 ### Takeaways (from the runs above, not a general claim)
 
-- **Copy-out ("D2H-style") cost is small but not zero, and scales with
-  result size, not query complexity**: in these all-CPU, same-host runs,
-  copying a handful of matching doc ids is unmeasurably fast (`0.0000 ms`),
-  but copying hundreds of thousands of doc ids (e.g. the wide-OR query at
-  200k docs, or the AND queries at `vocab_card=50`) costs up to a few tenths
-  of a millisecond -- occasionally comparable to or larger than the lookup
-  itself for PISA's fastest queries. Worth tracking separately from compute
-  time, especially if this index were ever moved to a different
-  address space (e.g. GPU device memory), where the equivalent transfer
-  would be a real D2H copy with much higher fixed and per-byte cost.
+- **Copy-out cost is small but not zero, and scales with result size, not
+  query complexity**: in the default CPU-only runs, copying a handful of
+  matching doc ids is unmeasurably fast (`0.0000 ms`), but copying hundreds
+  of thousands of doc ids (e.g. the wide-OR query at 200k docs, or the AND
+  queries at `vocab_card=50`) costs up to a few tenths of a millisecond --
+  occasionally comparable to or larger than the lookup itself for PISA's
+  fastest queries. With `--gpu_copy` on an actual GPU, the real
+  `cudaMemcpy` D2H transfer is slower still at these result sizes (~0.3-0.5
+  ms for 200k-400k ints vs ~0.03-0.12 ms for the same-host copy), and has a
+  non-trivial fixed floor (~0.003-0.008 ms) from kernel launch/sync
+  overhead even for tiny results -- both costs worth tracking separately
+  from lookup/merge compute time, especially for any design that would put
+  the index in device memory.
 - **Phrase-as-key wins by orders of magnitude when it's the right model**:
   `KeyEngine`'s single hash lookup runs in ~0.0001 ms regardless of corpus
   size/cardinality, versus PISA/Xapian needing to intersect/union real

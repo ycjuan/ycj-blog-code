@@ -1,10 +1,25 @@
+# CUDA support (real cudaMalloc + cudaMemcpy D2H, used by --gpu_copy) is
+# optional: only enabled when nvcc is found on PATH. Without it, the
+# benchmark still builds and runs fine; --gpu_copy just isn't available.
+NVCC := $(shell command -v nvcc 2>/dev/null)
+CUDA_PATH ?= /usr/local/cuda
+
 CFLAGS := -O3 -std=c++17 $(shell xapian-config --cxxflags)
 LDFLAGS := $(shell xapian-config --libs)
 
+ifneq ($(NVCC),)
+CFLAGS += -DHAVE_CUDA -I$(CUDA_PATH)/include
+LDFLAGS += -L$(CUDA_PATH)/lib64 -lcudart
+CUDA_OBJ := cuda_copy.o
+endif
+
 all: benchmark
 
-benchmark: main.cpp corpus_generator.h query_ast.h pisa_engine.h xapian_engine.h key_engine.h
-	g++ -o $@ main.cpp $(CFLAGS) $(LDFLAGS)
+benchmark: main.cpp corpus_generator.h query_ast.h pisa_engine.h xapian_engine.h key_engine.h cuda_copy.h $(CUDA_OBJ)
+	g++ -o $@ main.cpp $(CUDA_OBJ) $(CFLAGS) $(LDFLAGS)
+
+cuda_copy.o: cuda_copy.cu cuda_copy.h
+	$(NVCC) -O3 -std=c++17 -c cuda_copy.cu -o cuda_copy.o
 
 clean:
-	rm -f benchmark
+	rm -f benchmark cuda_copy.o

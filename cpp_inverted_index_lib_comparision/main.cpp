@@ -32,15 +32,20 @@
 #include "query_ast.h"
 #include "xapian_engine.h"
 
+#ifdef HAVE_CUDA
+#include "cuda_copy.h"
+#endif
+
 using namespace std;
 using Clock = chrono::high_resolution_clock;
 
 struct Args
 {
     CorpusConfig corpus;
-    int          numVocabPerKey = 3;  // terms per key, for the phrase-as-key benchmark
-    int          numKeysPerDoc  = 5;  // keys per doc, for the phrase-as-key benchmark
-    int          reps           = 20; // repetitions per query; reports p50/p95 latency across these reps
+    int          numVocabPerKey = 3;     // terms per key, for the phrase-as-key benchmark
+    int          numKeysPerDoc  = 5;     // keys per doc, for the phrase-as-key benchmark
+    int          reps           = 20;    // repetitions per query; reports p50/p95 latency across these reps
+    bool         gpuCopy        = false; // if set, also measure a real cudaMalloc+cudaMemcpy D2H copy per query
 };
 
 static void printUsage(const char* program)
@@ -65,6 +70,9 @@ static void printUsage(const char* program)
          << defaults.numVocabPerKey << ")\n"
          << "  -n, --num_keys_per_doc=N    Keys per doc, for the phrase-as-key benchmark (default: "
          << defaults.numKeysPerDoc << ")\n"
+         << "  -g, --gpu_copy              Also measure a real cudaMalloc+cudaMemcpy D2H copy per\n"
+         << "                               query (requires building with nvcc/CUDA and running on a\n"
+         << "                               CUDA-capable GPU; see Makefile)\n"
          << "  -h, --help                  Show this help message and exit\n\n"
          << "Example:\n"
          << "  " << program << " --num_docs=200000 --num_vocab_per_doc=30 --vocab_card=5000 --num_char_per_vocab=8"
@@ -101,6 +109,11 @@ static Args parseArgs(int argc, char** argv)
         {
             printUsage(argv[0]);
             exit(0);
+        }
+        if (arg == "-g" || arg == "--gpu_copy")
+        {
+            args.gpuCopy = true;
+            continue;
         }
         if (arg.rfind("--", 0) == 0)
         {
@@ -242,10 +255,35 @@ static LatencyStats timedCopy(const vector<int>& src, int reps)
     return stats;
 }
 
+// Wraps the real cudaMalloc+cudaMemcpy D2H helper (cuda_copy.cu, only built
+// when nvcc/CUDA is available) into a LatencyStats, so callers don't need
+// to care about the HAVE_CUDA ifdef at every call site. Only called when
+// args.gpuCopy is set, which main() already guards to require HAVE_CUDA.
+#ifdef HAVE_CUDA
+static LatencyStats timedGpuCopy(const vector<int>& src, int reps)
+{
+    GpuCopyStats gpu = timedCudaD2HCopy(src, reps);
+    LatencyStats stats;
+    stats.p50Us = gpu.p50Us;
+    stats.p95Us = gpu.p95Us;
+    return stats;
+}
+#endif
+
 int main(int argc, char** argv)
 {
     Args                args = parseArgs(argc, argv);
     const CorpusConfig& cfg  = args.corpus;
+
+#ifndef HAVE_CUDA
+    if (args.gpuCopy)
+    {
+        cerr << "--gpu_copy requires building with nvcc/CUDA (see Makefile: nvcc must be on PATH),\n"
+             << "but this binary was built without CUDA support. Rebuild on a machine with the CUDA\n"
+             << "toolkit installed, or omit --gpu_copy.\n";
+        return 1;
+    }
+#endif
 
     cout << "Corpus config: num_docs=" << cfg.numDocs << " num_vocab_per_doc=" << cfg.numVocabPerDoc
          << " num_char_per_vocab=" << cfg.numCharPerVocab << " vocab_card=" << cfg.vocabCard << "\n\n";
@@ -268,16 +306,31 @@ int main(int argc, char** argv)
 
     vector<string> queries = buildQueries(corpus.vocab);
 
-    cout << left << setw(38) << "Query" << right << setw(10) << "PISA p50" << setw(10) << "PISA p95" << setw(11)
-         << "PISA QPS" << setw(11) << "PISA Copy" << setw(12) << "Xapian p50" << setw(12) << "Xapian p95" << setw(11)
-         << "Xapian QPS" << setw(13) << "Xapian Copy" << setw(9) << "PISA#" << setw(9) << "Xapian#" << setw(7)
-         << "Match"
-         << "\n";
-    cout << left << setw(38) << "" << right << setw(10) << "(ms)" << setw(10) << "(ms)" << setw(11) << "" << setw(11)
-         << "p50(ms)" << setw(12) << "(ms)" << setw(12) << "(ms)" << setw(11) << "" << setw(13) << "p50(ms)" << setw(9)
-         << "" << setw(9) << "" << setw(7) << ""
-         << "\n";
-    cout << string(163, '-') << "\n";
+    // Headers are built into strings first (rather than streamed straight to
+    // cout) so the separator line below can be sized to match exactly,
+    // regardless of whether the GPU columns are present.
+    ostringstream header1, header2;
+    header1 << left << setw(38) << "Query" << right << setw(10) << "PISA p50" << setw(10) << "PISA p95" << setw(11)
+            << "PISA QPS" << setw(11) << "PISA Copy";
+    header2 << left << setw(38) << "" << right << setw(10) << "(ms)" << setw(10) << "(ms)" << setw(11) << "" << setw(11)
+            << "p50(ms)";
+    if (args.gpuCopy)
+    {
+        header1 << setw(13) << "PISA GPUCopy";
+        header2 << setw(13) << "p50(ms)";
+    }
+    header1 << setw(12) << "Xapian p50" << setw(12) << "Xapian p95" << setw(11) << "Xapian QPS" << setw(13)
+            << "Xapian Copy";
+    header2 << setw(12) << "(ms)" << setw(12) << "(ms)" << setw(11) << "" << setw(13) << "p50(ms)";
+    if (args.gpuCopy)
+    {
+        header1 << setw(15) << "Xapian GPUCopy";
+        header2 << setw(15) << "p50(ms)";
+    }
+    header1 << setw(9) << "PISA#" << setw(9) << "Xapian#" << setw(7) << "Match";
+
+    cout << header1.str() << "\n" << header2.str() << "\n";
+    cout << string(header1.str().size(), '-') << "\n";
 
     for (const string& query : queries)
     {
@@ -288,6 +341,14 @@ int main(int argc, char** argv)
 
         LatencyStats pisaCopyStats   = timedCopy(pisaResult, args.reps);
         LatencyStats xapianCopyStats = timedCopy(xapianResult, args.reps);
+#ifdef HAVE_CUDA
+        LatencyStats pisaGpuCopyStats, xapianGpuCopyStats;
+        if (args.gpuCopy)
+        {
+            pisaGpuCopyStats   = timedGpuCopy(pisaResult, args.reps);
+            xapianGpuCopyStats = timedGpuCopy(xapianResult, args.reps);
+        }
+#endif
 
         // QPS here means single-threaded queries/sec implied by one query's
         // p50 latency (1e6 / p50_latency_us), not a multi-threaded
@@ -300,10 +361,23 @@ int main(int argc, char** argv)
         string displayQuery = query.size() > 36 ? query.substr(0, 33) + "..." : query;
         cout << left << setw(38) << displayQuery << right << setw(10) << fixed << setprecision(4)
              << pisaStats.p50Us / 1000.0 << setw(10) << pisaStats.p95Us / 1000.0 << setw(11) << setprecision(0)
-             << pisaQps << setw(11) << setprecision(4) << pisaCopyStats.p50Us / 1000.0 << setw(12)
-             << xapianStats.p50Us / 1000.0 << setw(12) << xapianStats.p95Us / 1000.0 << setw(11) << setprecision(0)
-             << xapianQps << setw(13) << setprecision(4) << xapianCopyStats.p50Us / 1000.0 << setw(9)
-             << pisaResult.size() << setw(9) << xapianResult.size() << setw(7) << (match ? "yes" : "NO") << "\n";
+             << pisaQps << setw(11) << setprecision(4) << pisaCopyStats.p50Us / 1000.0;
+#ifdef HAVE_CUDA
+        if (args.gpuCopy)
+        {
+            cout << setw(13) << setprecision(4) << pisaGpuCopyStats.p50Us / 1000.0;
+        }
+#endif
+        cout << setw(12) << xapianStats.p50Us / 1000.0 << setw(12) << xapianStats.p95Us / 1000.0 << setw(11)
+             << setprecision(0) << xapianQps << setw(13) << setprecision(4) << xapianCopyStats.p50Us / 1000.0;
+#ifdef HAVE_CUDA
+        if (args.gpuCopy)
+        {
+            cout << setw(15) << setprecision(4) << xapianGpuCopyStats.p50Us / 1000.0;
+        }
+#endif
+        cout << setw(9) << pisaResult.size() << setw(9) << xapianResult.size() << setw(7) << (match ? "yes" : "NO")
+             << "\n";
 
         if (!match)
         {
@@ -351,17 +425,35 @@ int main(int argc, char** argv)
 
     vector<string> keyQueries = buildKeyQueries(keyCorpus.keysPerDoc);
 
-    cout << left << setw(26) << "Key" << right << setw(10) << "Key p50" << setw(10) << "Key p95" << setw(10)
-         << "Key QPS" << setw(10) << "Key Copy" << setw(10) << "PISA p50" << setw(10) << "PISA p95" << setw(10)
-         << "PISA QPS" << setw(10) << "PISA Copy" << setw(11) << "Xapian p50" << setw(11) << "Xapian p95" << setw(11)
-         << "Xapian QPS" << setw(11) << "XapianCopy" << setw(7) << "Key#" << setw(8) << "PISA#" << setw(9) << "Xapian#"
-         << "\n";
-    cout << left << setw(26) << "" << right << setw(10) << "(ms)" << setw(10) << "(ms)" << setw(10) << "" << setw(10)
-         << "p50(ms)" << setw(10) << "(ms)" << setw(10) << "(ms)" << setw(10) << "" << setw(10) << "p50(ms)" << setw(11)
-         << "(ms)" << setw(11) << "(ms)" << setw(11) << "" << setw(11) << "p50(ms)" << setw(7) << "" << setw(8) << ""
-         << setw(9) << ""
-         << "\n";
-    cout << string(192, '-') << "\n";
+    ostringstream keyHeader1, keyHeader2;
+    keyHeader1 << left << setw(26) << "Key" << right << setw(10) << "Key p50" << setw(10) << "Key p95" << setw(10)
+               << "Key QPS" << setw(10) << "Key Copy";
+    keyHeader2 << left << setw(26) << "" << right << setw(10) << "(ms)" << setw(10) << "(ms)" << setw(10) << ""
+               << setw(10) << "p50(ms)";
+    if (args.gpuCopy)
+    {
+        keyHeader1 << setw(12) << "Key GPUCopy";
+        keyHeader2 << setw(12) << "p50(ms)";
+    }
+    keyHeader1 << setw(10) << "PISA p50" << setw(10) << "PISA p95" << setw(10) << "PISA QPS" << setw(10) << "PISA Copy";
+    keyHeader2 << setw(10) << "(ms)" << setw(10) << "(ms)" << setw(10) << "" << setw(10) << "p50(ms)";
+    if (args.gpuCopy)
+    {
+        keyHeader1 << setw(13) << "PISA GPUCopy";
+        keyHeader2 << setw(13) << "p50(ms)";
+    }
+    keyHeader1 << setw(11) << "Xapian p50" << setw(11) << "Xapian p95" << setw(11) << "Xapian QPS" << setw(11)
+               << "XapianCopy";
+    keyHeader2 << setw(11) << "(ms)" << setw(11) << "(ms)" << setw(11) << "" << setw(11) << "p50(ms)";
+    if (args.gpuCopy)
+    {
+        keyHeader1 << setw(15) << "Xapian GPUCopy";
+        keyHeader2 << setw(15) << "p50(ms)";
+    }
+    keyHeader1 << setw(7) << "Key#" << setw(8) << "PISA#" << setw(9) << "Xapian#";
+
+    cout << keyHeader1.str() << "\n" << keyHeader2.str() << "\n";
+    cout << string(keyHeader1.str().size(), '-') << "\n";
 
     for (const string& key : keyQueries)
     {
@@ -375,6 +467,15 @@ int main(int argc, char** argv)
         LatencyStats keyCopyStats    = timedCopy(keyResult, args.reps);
         LatencyStats pisaCopyStats   = timedCopy(pisaResult, args.reps);
         LatencyStats xapianCopyStats = timedCopy(xapianResult, args.reps);
+#ifdef HAVE_CUDA
+        LatencyStats keyGpuCopyStats, pisaGpuCopyStats, xapianGpuCopyStats;
+        if (args.gpuCopy)
+        {
+            keyGpuCopyStats    = timedGpuCopy(keyResult, args.reps);
+            pisaGpuCopyStats   = timedGpuCopy(pisaResult, args.reps);
+            xapianGpuCopyStats = timedGpuCopy(xapianResult, args.reps);
+        }
+#endif
 
         double keyQps    = 1e6 / keyStats.p50Us;
         double pisaQps   = 1e6 / pisaStats.p50Us;
@@ -383,12 +484,30 @@ int main(int argc, char** argv)
         string displayKey = key.size() > 24 ? key.substr(0, 21) + "..." : key;
         cout << left << setw(26) << displayKey << right << setw(10) << fixed << setprecision(4)
              << keyStats.p50Us / 1000.0 << setw(10) << keyStats.p95Us / 1000.0 << setw(10) << setprecision(0) << keyQps
-             << setw(10) << setprecision(4) << keyCopyStats.p50Us / 1000.0 << setw(10) << pisaStats.p50Us / 1000.0
-             << setw(10) << pisaStats.p95Us / 1000.0 << setw(10) << setprecision(0) << pisaQps << setw(10)
-             << setprecision(4) << pisaCopyStats.p50Us / 1000.0 << setw(11) << xapianStats.p50Us / 1000.0 << setw(11)
-             << xapianStats.p95Us / 1000.0 << setw(11) << setprecision(0) << xapianQps << setw(11) << setprecision(4)
-             << xapianCopyStats.p50Us / 1000.0 << setw(7) << keyResult.size() << setw(8) << pisaResult.size() << setw(9)
-             << xapianResult.size() << "\n";
+             << setw(10) << setprecision(4) << keyCopyStats.p50Us / 1000.0;
+#ifdef HAVE_CUDA
+        if (args.gpuCopy)
+        {
+            cout << setw(12) << setprecision(4) << keyGpuCopyStats.p50Us / 1000.0;
+        }
+#endif
+        cout << setw(10) << pisaStats.p50Us / 1000.0 << setw(10) << pisaStats.p95Us / 1000.0 << setw(10)
+             << setprecision(0) << pisaQps << setw(10) << setprecision(4) << pisaCopyStats.p50Us / 1000.0;
+#ifdef HAVE_CUDA
+        if (args.gpuCopy)
+        {
+            cout << setw(13) << setprecision(4) << pisaGpuCopyStats.p50Us / 1000.0;
+        }
+#endif
+        cout << setw(11) << xapianStats.p50Us / 1000.0 << setw(11) << xapianStats.p95Us / 1000.0 << setw(11)
+             << setprecision(0) << xapianQps << setw(11) << setprecision(4) << xapianCopyStats.p50Us / 1000.0;
+#ifdef HAVE_CUDA
+        if (args.gpuCopy)
+        {
+            cout << setw(15) << setprecision(4) << xapianGpuCopyStats.p50Us / 1000.0;
+        }
+#endif
+        cout << setw(7) << keyResult.size() << setw(8) << pisaResult.size() << setw(9) << xapianResult.size() << "\n";
     }
 
     cout << "\nNote: Key# is expected to be <= PISA#/Xapian# -- the key lookup only matches docs with\n"
