@@ -33,13 +33,41 @@ struct Args
     int          reps = 5; // repetitions per query, report the median latency
 };
 
+static void printUsage(const char* program)
+{
+    Args defaults; // show default values alongside each flag
+    cout << "Usage: " << program << " [OPTIONS]\n\n"
+         << "Generates a synthetic corpus and benchmarks boolean query latency on a\n"
+         << "PISA-style index versus Xapian, cross-checking that both return the same\n"
+         << "result doc-id set for every query.\n\n"
+         << "Options:\n"
+         << "  --num_docs=N            Number of documents to generate (default: " << defaults.corpus.numDocs << ")\n"
+         << "  --num_vocab_per_doc=N   Terms sampled (with replacement) into each doc (default: "
+         << defaults.corpus.numVocabPerDoc << ")\n"
+         << "  --num_char_per_vocab=N  Character length of each distinct vocabulary term (default: "
+         << defaults.corpus.numCharPerVocab << ")\n"
+         << "  --vocab_card=N          Vocabulary cardinality, i.e. # of distinct terms overall (default: "
+         << defaults.corpus.vocabCard << ")\n"
+         << "  --reps=N                Repetitions per query; reported latency is the median (default: "
+         << defaults.reps << ")\n"
+         << "  -h, --help              Show this help message and exit\n\n"
+         << "Example:\n"
+         << "  " << program
+         << " --num_docs=200000 --num_vocab_per_doc=30 --vocab_card=5000 --num_char_per_vocab=8 --reps=7\n";
+}
+
 static Args parseArgs(int argc, char** argv)
 {
     Args args;
     for (int i = 1; i < argc; i++)
     {
         string arg = argv[i];
-        auto   eq  = arg.find('=');
+        if (arg == "-h" || arg == "--help")
+        {
+            printUsage(argv[0]);
+            exit(0);
+        }
+        auto eq = arg.find('=');
         if (arg.rfind("--", 0) != 0 || eq == string::npos)
             continue;
         string key   = arg.substr(2, eq - 2);
