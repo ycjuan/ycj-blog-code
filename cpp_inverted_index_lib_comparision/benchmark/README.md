@@ -15,7 +15,7 @@ side.
 | `--num_vocab_per_doc` | `-v` | terms sampled (with replacement) into each doc | 20 |
 | `--num_char_per_vocab` | `-l` | character length of each distinct vocabulary term | 6 |
 | `--vocab_card` | `-k` | vocabulary cardinality (# of distinct terms overall) | 2000 |
-| `--reps` | `-r` | repetitions per query; reported latency is the median | 5 |
+| `--reps` | `-r` | repetitions per query; reports p50/p95 latency across them | 20 |
 
 Long form takes `--flag=value`; short form takes `-f value` (e.g.
 `-d 200000 -v 30`). Run `./benchmark --help` for the full usage message.
@@ -62,46 +62,51 @@ exist in the corpus, so results are non-trivial).
 ```bash
 PATH=/usr/local/bin:$PATH ./run.sh
 # or with custom corpus parameters (long or short flags):
-PATH=/usr/local/bin:$PATH ./run.sh --num_docs=200000 --num_vocab_per_doc=30 --vocab_card=5000 --num_char_per_vocab=8 --reps=7
-PATH=/usr/local/bin:$PATH ./run.sh -d 200000 -v 30 -k 5000 -l 8 -r 7
+PATH=/usr/local/bin:$PATH ./run.sh --num_docs=200000 --num_vocab_per_doc=30 --vocab_card=5000 --num_char_per_vocab=8 --reps=20
+PATH=/usr/local/bin:$PATH ./run.sh -d 200000 -v 30 -k 5000 -l 8 -r 20
 ```
 
-Each row reports median latency in milliseconds and the implied QPS
-(`1e6 / median_latency_us`) -- i.e. single-threaded queries/sec implied by one
-query's latency, not a multi-threaded throughput measurement.
+Each row reports p50 and p95 latency (milliseconds, across `--reps`
+repetitions) and the implied QPS from p50 (`1e6 / p50_latency_us`) -- i.e.
+single-threaded queries/sec implied by one query's latency, not a
+multi-threaded throughput measurement. A higher `--reps` gives a more stable
+p95 estimate (the default of 20 is a reasonable floor; the included 20k/200k
+examples below use reps=20).
 
 ## Example results
 
 20,000 docs, 20 terms/doc, 2,000-term vocabulary:
 
 ```
-Index build time: pisa=44.72 ms, xapian=491.42 ms
+Index build time: pisa=45.94 ms, xapian=489.39 ms
 
-Query                                            PISA(ms)    PISA QPS  Xapian(ms)  Xapian QPS    PISA cnt  Xapian cnt   Match
------------------------------------------------------------------------------------------------------------------------------
-juyetu                                             0.0001     7142857      0.0316       31635         191         191     yes
-juyetu AND ppelec                                  0.0011      880282      0.0062      160875           4           4     yes
-(juyetu AND ppelec) OR blwipd                      0.0019      537346      0.0263       38003         198         198     yes
-(juyetu AND ppelec) OR (blwipd AND sqabzs)         0.0019      538503      0.0133       75165           6           6     yes
-juyetu AND (ppelec OR blwipd) AND NOT sq...        0.0728       13742      0.0126       79327           5           5     yes
-juyetu OR ppelec OR blwipd OR sqabzs OR ...        0.0137       72918      0.1318        7587         944         944     yes
-(juyetu OR ppelec) AND NOT (blwipd AND s...        0.0754       13269      0.0572       17494         359         359     yes
+Query                                   PISA p50  PISA p95   PISA QPS  Xapian p50  Xapian p95 Xapian QPS    PISA#  Xapian#  Match
+                                            (ms)      (ms)                   (ms)        (ms)
+-------------------------------------------------------------------------------------------------------------------------------------------
+juyetu                                    0.0001    0.0006    8333333      0.0317      0.0517      31590      191      191    yes
+juyetu AND ppelec                         0.0015    0.0026     679810      0.0086      0.0141     116550        4        4    yes
+(juyetu AND ppelec) OR blwipd             0.0025    0.0035     393546      0.0489      0.0515      20441      198      198    yes
+(juyetu AND ppelec) OR (blwipd AN...      0.0030    0.0053     332336      0.0217      0.0246      46051        6        6    yes
+juyetu AND (ppelec OR blwipd) AND...      0.0841    0.1738      11897      0.0176      0.0231      56912        5        5    yes
+juyetu OR ppelec OR blwipd OR sqa...      0.0122    0.0182      82095      0.2155      0.2414       4641      944      944    yes
+(juyetu OR ppelec) AND NOT (blwip...      0.1196    0.1322       8361      0.0975      0.1040      10257      359      359    yes
 ```
 
 200,000 docs, 30 terms/doc, 5,000-term vocabulary:
 
 ```
-Index build time: pisa=682.51 ms, xapian=8329.71 ms
+Index build time: pisa=650.45 ms, xapian=8132.42 ms
 
-Query                                            PISA(ms)    PISA QPS  Xapian(ms)  Xapian QPS    PISA cnt  Xapian cnt   Match
------------------------------------------------------------------------------------------------------------------------------
-juyetupp                                           0.0002     4132231      0.1174        8516        1194        1194     yes
-juyetupp AND elecblwi                              0.0067      149880      0.0335       29895           4           4     yes
-(juyetupp AND elecblwi) OR pdsqabzs                0.0127       78530      0.1733        5771        1226        1226     yes
-(juyetupp AND elecblwi) OR (pdsqabzs AND...        0.0229       43592      0.0711       14065           9           9     yes
-juyetupp AND (elecblwi OR pdsqabzs) AND ...        0.8172        1224      0.0722       13851          12          12     yes
-juyetupp OR elecblwi OR pdsqabzs OR vyfa...        0.0964       10370      0.8735        1145        6004        6004     yes
-(juyetupp OR elecblwi) AND NOT (pdsqabzs...        0.8193        1221      0.4138        2417        2447        2447     yes
+Query                                   PISA p50  PISA p95   PISA QPS  Xapian p50  Xapian p95 Xapian QPS    PISA#  Xapian#  Match
+                                            (ms)      (ms)                   (ms)        (ms)
+-------------------------------------------------------------------------------------------------------------------------------------------
+juyetupp                                  0.0002    0.0008    6060606      0.1170      0.1610       8550     1194     1194    yes
+juyetupp AND elecblwi                     0.0072    0.0127     138793      0.0311      0.0367      32135        4        4    yes
+(juyetupp AND elecblwi) OR pdsqabzs       0.0114    0.0174      87873      0.1704      0.1829       5868     1226     1226    yes
+(juyetupp AND elecblwi) OR (pdsqa...      0.0220    0.0265      45510      0.0675      0.0728      14810        9        9    yes
+juyetupp AND (elecblwi OR pdsqabz...      0.9333    0.9561       1071      0.0687      0.0759      14553       12       12    yes
+juyetupp OR elecblwi OR pdsqabzs ...      0.0782    0.0854      12793      0.8630      0.8912       1159     6004     6004    yes
+(juyetupp OR elecblwi) AND NOT (p...      0.9378    0.9520       1066      0.4115      0.4384       2430     2447     2447    yes
 ```
 
 ## Takeaways (from the runs above, not a general claim)

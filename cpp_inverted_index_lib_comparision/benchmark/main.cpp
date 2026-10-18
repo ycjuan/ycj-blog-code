@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -30,7 +31,7 @@ using Clock = chrono::high_resolution_clock;
 struct Args
 {
     CorpusConfig corpus;
-    int          reps = 5; // repetitions per query, report the median latency
+    int          reps = 20; // repetitions per query; reports p50/p95 latency across these reps
 };
 
 static void printUsage(const char* program)
@@ -49,7 +50,7 @@ static void printUsage(const char* program)
          << defaults.corpus.numCharPerVocab << ")\n"
          << "  -k, --vocab_card=N          Vocabulary cardinality, i.e. # of distinct terms overall (default: "
          << defaults.corpus.vocabCard << ")\n"
-         << "  -r, --reps=N                Repetitions per query; reported latency is the median (default: "
+         << "  -r, --reps=N                Repetitions per query; reports p50/p95 latency across them (default: "
          << defaults.reps << ")\n"
          << "  -h, --help                  Show this help message and exit\n\n"
          << "Example:\n"
@@ -118,8 +119,24 @@ static vector<string> buildQueries(const vector<string>& vocab)
     };
 }
 
+struct LatencyStats
+{
+    double p50Us = 0;
+    double p95Us = 0;
+};
+
+// Nearest-rank percentile over a *sorted* ascending vector.
+static double percentile(const vector<double>& sortedValues, double p)
+{
+    size_t n = sortedValues.size();
+    size_t rank = static_cast<size_t>(ceil(p / 100.0 * static_cast<double>(n)));
+    rank = max<size_t>(rank, 1);
+    rank = min(rank, n);
+    return sortedValues[rank - 1];
+}
+
 template <typename Engine>
-static pair<vector<int>, double> timedEvaluate(const Engine& engine, const QueryNode& ast, int reps)
+static pair<vector<int>, LatencyStats> timedEvaluate(const Engine& engine, const QueryNode& ast, int reps)
 {
     vector<double> latenciesUs;
     vector<int>    result;
@@ -131,8 +148,10 @@ static pair<vector<int>, double> timedEvaluate(const Engine& engine, const Query
         latenciesUs.push_back(chrono::duration<double, micro>(end - start).count());
     }
     sort(latenciesUs.begin(), latenciesUs.end());
-    double median = latenciesUs[latenciesUs.size() / 2];
-    return { result, median };
+    LatencyStats stats;
+    stats.p50Us = percentile(latenciesUs, 50.0);
+    stats.p95Us = percentile(latenciesUs, 95.0);
+    return { result, stats };
 }
 
 int main(int argc, char** argv)
@@ -161,34 +180,35 @@ int main(int argc, char** argv)
 
     vector<string> queries = buildQueries(corpus.vocab);
 
-    cout << left << setw(45) << "Query" << right << setw(12) << "PISA(ms)" << setw(12) << "PISA QPS" << setw(12)
-         << "Xapian(ms)" << setw(12) << "Xapian QPS" << setw(12) << "PISA cnt" << setw(12) << "Xapian cnt" << setw(8)
-         << "Match"
+    cout << left << setw(38) << "Query" << right << setw(10) << "PISA p50" << setw(10) << "PISA p95" << setw(11)
+         << "PISA QPS" << setw(12) << "Xapian p50" << setw(12) << "Xapian p95" << setw(11) << "Xapian QPS" << setw(9)
+         << "PISA#" << setw(9) << "Xapian#" << setw(7) << "Match"
          << "\n";
-    cout << string(125, '-') << "\n";
+    cout << left << setw(38) << "" << right << setw(10) << "(ms)" << setw(10) << "(ms)" << setw(11) << "" << setw(12)
+         << "(ms)" << setw(12) << "(ms)" << setw(11) << "" << setw(9) << "" << setw(9) << "" << setw(7) << "" << "\n";
+    cout << string(139, '-') << "\n";
 
     for (const string& query : queries)
     {
         unique_ptr<QueryNode> ast = QueryParser::parse(query);
 
-        auto [pisaResult, pisaLatencyUs]     = timedEvaluate(pisaEngine, *ast, args.reps);
-        auto [xapianResult, xapianLatencyUs] = timedEvaluate(xapianEngine, *ast, args.reps);
+        auto [pisaResult, pisaStats]     = timedEvaluate(pisaEngine, *ast, args.reps);
+        auto [xapianResult, xapianStats] = timedEvaluate(xapianEngine, *ast, args.reps);
 
         // QPS here means single-threaded queries/sec implied by one query's
-        // median latency (1e6 / latency_us), not a multi-threaded throughput
-        // measurement.
-        double pisaQps         = 1e6 / pisaLatencyUs;
-        double xapianQps       = 1e6 / xapianLatencyUs;
-        double pisaLatencyMs   = pisaLatencyUs / 1000.0;
-        double xapianLatencyMs = xapianLatencyUs / 1000.0;
+        // p50 latency (1e6 / p50_latency_us), not a multi-threaded
+        // throughput measurement.
+        double pisaQps   = 1e6 / pisaStats.p50Us;
+        double xapianQps = 1e6 / xapianStats.p50Us;
 
         bool match = (pisaResult == xapianResult);
 
-        string displayQuery = query.size() > 43 ? query.substr(0, 40) + "..." : query;
-        cout << left << setw(45) << displayQuery << right << setw(12) << fixed << setprecision(4) << pisaLatencyMs
-             << setw(12) << setprecision(0) << pisaQps << setw(12) << setprecision(4) << xapianLatencyMs << setw(12)
-             << setprecision(0) << xapianQps << setw(12) << pisaResult.size() << setw(12) << xapianResult.size()
-             << setw(8) << (match ? "yes" : "NO") << "\n";
+        string displayQuery = query.size() > 36 ? query.substr(0, 33) + "..." : query;
+        cout << left << setw(38) << displayQuery << right << setw(10) << fixed << setprecision(4)
+             << pisaStats.p50Us / 1000.0 << setw(10) << pisaStats.p95Us / 1000.0 << setw(11) << setprecision(0)
+             << pisaQps << setw(12) << setprecision(4) << xapianStats.p50Us / 1000.0 << setw(12)
+             << xapianStats.p95Us / 1000.0 << setw(11) << setprecision(0) << xapianQps << setw(9)
+             << pisaResult.size() << setw(9) << xapianResult.size() << setw(7) << (match ? "yes" : "NO") << "\n";
 
         if (!match)
         {
