@@ -14,14 +14,13 @@
 // meaningful (a key needs to actually recur across the corpus to have
 // anything interesting to look up).
 //
-// This single corpus is used for both halves of the benchmark:
+// This single corpus feeds both engines compared by the phrase-as-key
+// benchmark:
 //   - PISA/Xapian see each doc as the flat bag of all terms across its
-//     sampled phrases (`Corpus::docs`).
+//     sampled phrases (`Corpus::docs`), used to answer the classic boolean
+//     AND query equivalent to a phrase lookup.
 //   - KeyEngine sees each doc as its list of sampled phrase strings
 //     (`Corpus::phrasesPerDoc`), looking up a whole phrase as one key.
-//   - `Corpus::vocab` is a deduped list of all distinct terms seen across
-//     the seed phrases (in order of first appearance), used to build the
-//     classic boolean AND/OR/NOT query set.
 #pragma once
 
 #include <random>
@@ -44,7 +43,6 @@ struct Corpus
 {
     std::vector<std::string>              docs;          // doc_id -> space-joined terms of all its phrases
     std::vector<std::vector<std::string>> phrasesPerDoc; // doc_id -> list of phrase strings sampled for that doc
-    std::vector<std::string>              vocab;         // distinct terms across all seed phrases, first-seen order
 };
 
 inline Corpus generateCorpus(const CorpusConfig& cfg)
@@ -63,12 +61,10 @@ inline Corpus generateCorpus(const CorpusConfig& cfg)
     Corpus corpus;
 
     // Generate phrase_card distinct seed phrases, each num_vocab_per_phrase
-    // terms long, and collect the deduped vocabulary of terms used.
+    // terms long.
     std::vector<std::string>        seedPhrases;
     std::unordered_set<std::string> seenPhrases;
-    std::unordered_set<std::string> seenVocab;
     seedPhrases.reserve(cfg.phraseCard);
-    corpus.vocab.reserve(cfg.phraseCard * cfg.numVocabPerPhrase);
     while (static_cast<int>(seedPhrases.size()) < cfg.phraseCard)
     {
         std::ostringstream phraseOss;
@@ -78,8 +74,6 @@ inline Corpus generateCorpus(const CorpusConfig& cfg)
             if (i > 0)
                 phraseOss << ' ';
             phraseOss << term;
-            if (seenVocab.insert(term).second)
-                corpus.vocab.push_back(term);
         }
         std::string phrase = phraseOss.str();
         if (seenPhrases.insert(phrase).second)

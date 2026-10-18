@@ -1,16 +1,10 @@
-// Benchmark: generates a synthetic corpus (seed phrases sampled into docs,
-// so phrases naturally recur across docs), builds PISA-style, Xapian, and
-// KeyEngine indexes over it, runs an identical set of boolean queries
-// (from simple single-term to multi-level nested AND/OR/NOT) against PISA
-// and Xapian, and reports result count + latency for each engine/query
-// pair. Also cross-checks that both engines agree on the result doc-id
-// set, as a correctness sanity check.
-//
-// A second section benchmarks a "phrase-as-key" scenario: a simple
-// unordered_map<string, vector<docId>> KeyEngine where a whole multi-term
-// phrase (e.g. "vocA vocB vocC") is the lookup unit, compared against PISA
-// and Xapian answering the equivalent classic AND query over the same
-// corpus.
+// Benchmark for a "phrase-as-key" scenario: generates a synthetic corpus
+// (seed phrases sampled into docs, so phrases naturally recur across docs)
+// and compares a simple unordered_map<string, vector<docId>> KeyEngine --
+// where a whole multi-term phrase (e.g. "vocA vocB vocC") is looked up as
+// one atomic key -- against PISA-style and Xapian indexes answering the
+// equivalent classic boolean AND query ("vocA AND vocB AND vocC") over the
+// same corpus.
 //
 // Usage:
 //   ./benchmark [--num_docs=N] [--num_char_per_vocab=N] [--phrase_card=N]
@@ -127,23 +121,6 @@ static Args parseArgs(int argc, char** argv)
         }
     }
     return args;
-}
-
-// Builds the benchmark query set. Uses the first few vocab terms (guaranteed
-// to exist in the corpus) so every query produces a meaningful, non-empty
-// result on a non-trivial corpus.
-static vector<string> buildQueries(const vector<string>& vocab)
-{
-    auto v = [&](int i) { return vocab[i]; };
-    return {
-        v(0),
-        v(0) + " AND " + v(1),
-        "(" + v(0) + " AND " + v(1) + ") OR " + v(2),
-        "(" + v(0) + " AND " + v(1) + ") OR (" + v(2) + " AND " + v(3) + ")",
-        v(0) + " AND (" + v(1) + " OR " + v(2) + ") AND NOT " + v(3),
-        v(0) + " OR " + v(1) + " OR " + v(2) + " OR " + v(3) + " OR " + v(4),
-        "(" + v(0) + " OR " + v(1) + ") AND NOT (" + v(2) + " AND " + v(3) + ")",
-    };
 }
 
 // Picks a handful of distinct phrases (in order of first appearance) from
@@ -307,96 +284,14 @@ int main(int argc, char** argv)
          << " ms, key_engine=" << keyBuildMs << " ms\n";
     cout << "Indexed docs: pisa=" << pisaEngine.numDocs() << ", xapian=" << xapianEngine.numDocs() << "\n\n";
 
-    vector<string> queries = buildQueries(corpus.vocab);
-
-    // Headers are built into strings first (rather than streamed straight to
-    // cout) so the separator line below can be sized to match exactly,
-    // regardless of whether the GPU columns are present.
-    ostringstream header1, header2;
-    header1 << left << setw(38) << "Query" << right << setw(10) << "PISA p50" << setw(10) << "PISA p95" << setw(11)
-            << "PISA QPS" << setw(11) << "PISA Copy";
-    header2 << left << setw(38) << "" << right << setw(10) << "(ms)" << setw(10) << "(ms)" << setw(11) << "" << setw(11)
-            << "p50(ms)";
-    if (args.gpuCopy)
-    {
-        header1 << setw(13) << "PISA GPUCopy";
-        header2 << setw(13) << "p50(ms)";
-    }
-    header1 << setw(12) << "Xapian p50" << setw(12) << "Xapian p95" << setw(11) << "Xapian QPS" << setw(13)
-            << "Xapian Copy";
-    header2 << setw(12) << "(ms)" << setw(12) << "(ms)" << setw(11) << "" << setw(13) << "p50(ms)";
-    if (args.gpuCopy)
-    {
-        header1 << setw(15) << "Xapian GPUCopy";
-        header2 << setw(15) << "p50(ms)";
-    }
-    header1 << setw(9) << "PISA#" << setw(9) << "Xapian#" << setw(7) << "Match";
-
-    cout << header1.str() << "\n" << header2.str() << "\n";
-    cout << string(header1.str().size(), '-') << "\n";
-
-    for (const string& query : queries)
-    {
-        unique_ptr<QueryNode> ast = QueryParser::parse(query);
-
-        auto [pisaResult, pisaStats]     = timedEvaluate([&] { return pisaEngine.evaluate(*ast); }, args.reps);
-        auto [xapianResult, xapianStats] = timedEvaluate([&] { return xapianEngine.evaluate(*ast); }, args.reps);
-
-        LatencyStats pisaCopyStats   = timedCopy(pisaResult, args.reps);
-        LatencyStats xapianCopyStats = timedCopy(xapianResult, args.reps);
-#ifdef HAVE_CUDA
-        LatencyStats pisaGpuCopyStats, xapianGpuCopyStats;
-        if (args.gpuCopy)
-        {
-            pisaGpuCopyStats   = timedGpuCopy(pisaResult, args.reps);
-            xapianGpuCopyStats = timedGpuCopy(xapianResult, args.reps);
-        }
-#endif
-
-        // QPS here means single-threaded queries/sec implied by one query's
-        // p50 latency (1e6 / p50_latency_us), not a multi-threaded
-        // throughput measurement.
-        double pisaQps   = 1e6 / pisaStats.p50Us;
-        double xapianQps = 1e6 / xapianStats.p50Us;
-
-        bool match = (pisaResult == xapianResult);
-
-        string displayQuery = query.size() > 36 ? query.substr(0, 33) + "..." : query;
-        cout << left << setw(38) << displayQuery << right << setw(10) << fixed << setprecision(4)
-             << pisaStats.p50Us / 1000.0 << setw(10) << pisaStats.p95Us / 1000.0 << setw(11) << setprecision(0)
-             << pisaQps << setw(11) << setprecision(4) << pisaCopyStats.p50Us / 1000.0;
-#ifdef HAVE_CUDA
-        if (args.gpuCopy)
-        {
-            cout << setw(13) << setprecision(4) << pisaGpuCopyStats.p50Us / 1000.0;
-        }
-#endif
-        cout << setw(12) << xapianStats.p50Us / 1000.0 << setw(12) << xapianStats.p95Us / 1000.0 << setw(11)
-             << setprecision(0) << xapianQps << setw(13) << setprecision(4) << xapianCopyStats.p50Us / 1000.0;
-#ifdef HAVE_CUDA
-        if (args.gpuCopy)
-        {
-            cout << setw(15) << setprecision(4) << xapianGpuCopyStats.p50Us / 1000.0;
-        }
-#endif
-        cout << setw(9) << pisaResult.size() << setw(9) << xapianResult.size() << setw(7) << (match ? "yes" : "NO")
-             << "\n";
-
-        if (!match)
-        {
-            cerr << "  !! Mismatch for query: " << query << "\n";
-        }
-    }
-
     // --- Phrase-as-key benchmark ---------------------------------------
-    // Uses the *same* corpus and PISA/Xapian indexes built above. KeyEngine
-    // looks a whole phrase up as one hash-map entry; PISA/Xapian answer the
-    // "same" query as a classic boolean AND of the phrase's individual
-    // terms. The two are NOT expected to return identical doc sets: AND
-    // matches any doc containing all terms anywhere (even split across
-    // different phrases), while the phrase lookup only matches docs having
-    // that exact phrase.
-    cout << "\n=== Phrase-as-key benchmark (num_vocab_per_phrase=" << cfg.numVocabPerPhrase
+    // KeyEngine looks a whole phrase up as one hash-map entry; PISA/Xapian
+    // answer the "same" query as a classic boolean AND of the phrase's
+    // individual terms. The two are NOT expected to return identical doc
+    // sets: AND matches any doc containing all terms anywhere (even split
+    // across different phrases), while the phrase lookup only matches docs
+    // having that exact phrase.
+    cout << "=== Phrase-as-key benchmark (num_vocab_per_phrase=" << cfg.numVocabPerPhrase
          << ", num_phrases_per_doc=" << cfg.numPhrasesPerDoc << ") ===\n\n";
 
     vector<string> keyQueries = buildKeyQueries(corpus.phrasesPerDoc);
