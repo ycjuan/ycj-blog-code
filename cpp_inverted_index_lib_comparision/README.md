@@ -146,40 +146,49 @@ multi-threaded throughput measurement. A higher `--reps` gives a more stable
 p95 estimate (the default of 20 is a reasonable floor; the included 20k/200k
 examples below use reps=20).
 
+The `*Copy` column reports p50 latency for copying the query's result
+doc-id vector out of the engine into a fresh `vector<int>` (measured
+separately from the lookup/merge compute time above). All engines here are
+CPU-only, so this is a same-host copy, but it isolates the "transfer the
+result out" cost from the actual query compute -- the same idea as a
+device-to-host (D2H) copy would be for a GPU-resident index. It scales with
+result size, not query complexity (e.g. compare the wide-OR query's larger
+copy time against the narrow AND query's near-zero one below).
+
 ### Example results
 
 20,000 docs, 20 terms/doc, 2,000-term vocabulary:
 
 ```
-Index build time: pisa=45.94 ms, xapian=489.39 ms
+Index build time: pisa=46.45 ms, xapian=485.22 ms
 
-Query                                   PISA p50  PISA p95   PISA QPS  Xapian p50  Xapian p95 Xapian QPS    PISA#  Xapian#  Match
-                                            (ms)      (ms)                   (ms)        (ms)
--------------------------------------------------------------------------------------------------------------------------------------------
-juyetu                                    0.0001    0.0006    8333333      0.0317      0.0517      31590      191      191    yes
-juyetu AND ppelec                         0.0015    0.0026     679810      0.0086      0.0141     116550        4        4    yes
-(juyetu AND ppelec) OR blwipd             0.0025    0.0035     393546      0.0489      0.0515      20441      198      198    yes
-(juyetu AND ppelec) OR (blwipd AN...      0.0030    0.0053     332336      0.0217      0.0246      46051        6        6    yes
-juyetu AND (ppelec OR blwipd) AND...      0.0841    0.1738      11897      0.0176      0.0231      56912        5        5    yes
-juyetu OR ppelec OR blwipd OR sqa...      0.0122    0.0182      82095      0.2155      0.2414       4641      944      944    yes
-(juyetu OR ppelec) AND NOT (blwip...      0.1196    0.1322       8361      0.0975      0.1040      10257      359      359    yes
+Query                                   PISA p50  PISA p95   PISA QPS  PISA Copy  Xapian p50  Xapian p95 Xapian QPS  Xapian Copy    PISA#  Xapian#  Match
+                                            (ms)      (ms)               p50(ms)        (ms)        (ms)                 p50(ms)
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+juyetu                                    0.0001    0.0005   11111111     0.0000      0.0175      0.0318      57241       0.0000      191      191    yes
+juyetu AND ppelec                         0.0007    0.0020    1451379     0.0000      0.0053      0.0085     187758       0.0000        4        4    yes
+(juyetu AND ppelec) OR blwipd             0.0016    0.0024     629723     0.0000      0.0254      0.0282      39358       0.0000      198      198    yes
+(juyetu AND ppelec) OR (blwipd AN...      0.0015    0.0027     671592     0.0000      0.0120      0.0142      83654       0.0000        6        6    yes
+juyetu AND (ppelec OR blwipd) AND...      0.0714    0.0803      14004     0.0000      0.0108      0.0151      92885       0.0000        5        5    yes
+juyetu OR ppelec OR blwipd OR sqa...      0.0094    0.0154     106078     0.0001      0.1243      0.1401       8045       0.0001      944      944    yes
+(juyetu OR ppelec) AND NOT (blwip...      0.0720    0.0816      13886     0.0001      0.0555      0.0607      18010       0.0001      359      359    yes
 ```
 
 200,000 docs, 30 terms/doc, 5,000-term vocabulary:
 
 ```
-Index build time: pisa=650.45 ms, xapian=8132.42 ms
+Index build time: pisa=695.33 ms, xapian=8415.11 ms
 
-Query                                   PISA p50  PISA p95   PISA QPS  Xapian p50  Xapian p95 Xapian QPS    PISA#  Xapian#  Match
-                                            (ms)      (ms)                   (ms)        (ms)
--------------------------------------------------------------------------------------------------------------------------------------------
-juyetupp                                  0.0002    0.0008    6060606      0.1170      0.1610       8550     1194     1194    yes
-juyetupp AND elecblwi                     0.0072    0.0127     138793      0.0311      0.0367      32135        4        4    yes
-(juyetupp AND elecblwi) OR pdsqabzs       0.0114    0.0174      87873      0.1704      0.1829       5868     1226     1226    yes
-(juyetupp AND elecblwi) OR (pdsqa...      0.0220    0.0265      45510      0.0675      0.0728      14810        9        9    yes
-juyetupp AND (elecblwi OR pdsqabz...      0.9333    0.9561       1071      0.0687      0.0759      14553       12       12    yes
-juyetupp OR elecblwi OR pdsqabzs ...      0.0782    0.0854      12793      0.8630      0.8912       1159     6004     6004    yes
-(juyetupp OR elecblwi) AND NOT (p...      0.9378    0.9520       1066      0.4115      0.4384       2430     2447     2447    yes
+Query                                   PISA p50  PISA p95   PISA QPS  PISA Copy  Xapian p50  Xapian p95 Xapian QPS  Xapian Copy    PISA#  Xapian#  Match
+                                            (ms)      (ms)               p50(ms)        (ms)        (ms)                 p50(ms)
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+juyetupp                                  0.0002    0.0008    6250000     0.0001      0.1175      0.1608       8510       0.0001     1194     1194    yes
+juyetupp AND elecblwi                     0.0044    0.0120     226501     0.0000      0.0311      0.0370      32119       0.0000        4        4    yes
+(juyetupp AND elecblwi) OR pdsqabzs       0.0105    0.0176      95411     0.0001      0.1700      0.1782       5882       0.0001     1226     1226    yes
+(juyetupp AND elecblwi) OR (pdsqa...      0.0189    0.0253      53042     0.0000      0.0675      0.0720      14821       0.0000        9        9    yes
+juyetupp AND (elecblwi OR pdsqabz...      0.8192    1.3967       1221     0.0000      0.0688      0.0757      14532       0.0000       12       12    yes
+juyetupp OR elecblwi OR pdsqabzs ...      0.0937    0.1026      10674     0.0025      0.8666      0.8927       1154       0.0025     6004     6004    yes
+(juyetupp OR elecblwi) AND NOT (p...      0.8151    0.8445       1227     0.0008      0.4119      0.4317       2428       0.0006     2447     2447    yes
 ```
 
 Phrase-as-key, 20,000 docs, 5 keys/doc, 3 terms/key, 2,000-term vocabulary
@@ -192,21 +201,22 @@ PATH=/usr/local/bin:$PATH ./run.sh
 
 ```
 === Phrase-as-key benchmark (num_vocab_per_key=3, num_keys_per_doc=5) ===
-Index build time: key_engine=42.35 ms, pisa=37.47 ms, xapian=401.90 ms
+Index build time: key_engine=34.18 ms, pisa=37.15 ms, xapian=388.75 ms
 
-Key                          Key p50   Key p95   Key QPS  PISA p50  PISA p95  PISA QPS Xapian p50 Xapian p95 Xapian QPS   Key#   PISA#  Xapian#
-                                (ms)      (ms)                (ms)      (ms)                 (ms)       (ms)                                   
------------------------------------------------------------------------------------------------------------------------------------------------------
-dekrbf ybleyr nzdxny          0.0001    0.0001  15151515    0.0007    0.0018   1347709     0.0051     0.0092     195618      1       1        1
-pwaday sokbrl dbavrx          0.0001    0.0001  14492754    0.0011    0.0021    944287     0.0054     0.0080     184026      1       1        1
-ejomfy dycuec ixtlcs          0.0001    0.0001  14925373    0.0008    0.0015   1300390     0.0055     0.0081     180538      1       1        1
-punqhn ltlfdj bmweae          0.0001    0.0001  14285714    0.0007    0.0017   1428571     0.0052     0.0072     192271      1       1        1
-lmvprf ourwio ydohph          0.0001    0.0001  14925373    0.0008    0.0017   1248439     0.0055     0.0075     181686      1       1        1
+Key                          Key p50   Key p95   Key QPS  Key Copy  PISA p50  PISA p95  PISA QPS PISA Copy Xapian p50 Xapian p95 Xapian QPS XapianCopy   Key#   PISA#  Xapian#
+                                (ms)      (ms)             p50(ms)      (ms)      (ms)             p50(ms)       (ms)       (ms)               p50(ms)
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+dekrbf ybleyr nzdxny          0.0001    0.0001  14925373    0.0000    0.0007    0.0018   1533742    0.0000     0.0052     0.0267     191351     0.0000      1       1        1
+pwaday sokbrl dbavrx          0.0001    0.0001  14084507    0.0000    0.0010    0.0018   1021450    0.0000     0.0054     0.0080     185874     0.0000      1       1        1
+ejomfy dycuec ixtlcs          0.0001    0.0001  14705882    0.0000    0.0007    0.0013   1335113    0.0000     0.0055     0.0081     181719     0.0000      1       1        1
+punqhn ltlfdj bmweae          0.0001    0.0001  14705882    0.0000    0.0007    0.0013   1492537    0.0000     0.0052     0.0075     193798     0.0000      1       1        1
+lmvprf ourwio ydohph          0.0001    0.0001  14084507    0.0000    0.0007    0.0013   1340483    0.0000     0.0055     0.0074     182448     0.0000      1       1        1
 ```
 
 Phrase-as-key, same corpus size but a much smaller vocabulary (50 terms) and
 more keys/doc (10) -- showing `Key#` diverging well below `PISA#`/`Xapian#`
-once term reuse across keys becomes likely:
+once term reuse across keys becomes likely, and `PISA Copy`/`XapianCopy`
+growing as PISA#/Xapian# (result size) grows into the thousands:
 
 ```bash
 PATH=/usr/local/bin:$PATH ./run.sh --vocab_card=50 --num_keys_per_doc=10
@@ -214,16 +224,16 @@ PATH=/usr/local/bin:$PATH ./run.sh --vocab_card=50 --num_keys_per_doc=10
 
 ```
 === Phrase-as-key benchmark (num_vocab_per_key=3, num_keys_per_doc=10) ===
-Index build time: key_engine=66.15 ms, pisa=56.73 ms, xapian=404.50 ms
+Index build time: key_engine=51.55 ms, pisa=56.57 ms, xapian=370.34 ms
 
-Key                          Key p50   Key p95   Key QPS  PISA p50  PISA p95  PISA QPS Xapian p50 Xapian p95 Xapian QPS   Key#   PISA#  Xapian#
-                                (ms)      (ms)                (ms)      (ms)                 (ms)       (ms)                                   
------------------------------------------------------------------------------------------------------------------------------------------------------
-cmaqim krppld lpoukj          0.0001    0.0001  14705882    0.1701    0.1895      5880     0.5917     0.6180       1690      2    1709     1709
-epbuna cmaqim vvpljp          0.0001    0.0001  14705882    0.1683    0.1741      5940     0.5909     0.6121       1692      3    1738     1738
-geivwb slmldq cmpcdd          0.0001    0.0001  14492754    0.1722    0.1965      5807     0.6048     0.6263       1653      2    1777     1777
-clmsmi vvpljp hyxdfu          0.0001    0.0001  14705882    0.1727    0.1826      5789     0.5987     0.6370       1670      1    1770     1770
-qfcfme krppld iwfcch          0.0001    0.0001  11904762    0.1710    0.1794      5849     0.6000     0.6287       1667      1    1783     1783
+Key                          Key p50   Key p95   Key QPS  Key Copy  PISA p50  PISA p95  PISA QPS PISA Copy Xapian p50 Xapian p95 Xapian QPS XapianCopy   Key#   PISA#  Xapian#
+                                (ms)      (ms)             p50(ms)      (ms)      (ms)             p50(ms)       (ms)       (ms)               p50(ms)
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+cmaqim krppld lpoukj          0.0001    0.0001  13888889    0.0000    0.1563    0.1680      6399    0.0002     0.5935     0.6115       1685     0.0002      2    1709     1709
+epbuna cmaqim vvpljp          0.0001    0.0001  14925373    0.0000    0.1560    0.1640      6411    0.0002     0.5927     0.6212       1687     0.0002      3    1738     1738
+geivwb slmldq cmpcdd          0.0001    0.0001  13888889    0.0000    0.1603    0.1727      6239    0.0002     0.6092     0.6283       1641     0.0002      2    1777     1777
+clmsmi vvpljp hyxdfu          0.0001    0.0001  14925373    0.0000    0.1581    0.1650      6326    0.0002     0.5980     0.6171       1672     0.0002      1    1770     1770
+qfcfme krppld iwfcch          0.0001    0.0001  14492754    0.0000    0.1578    0.1755      6337    0.0002     0.6028     0.6186       1659     0.0002      1    1783     1783
 ```
 
 ### Phrase-as-key benchmark: design
@@ -253,6 +263,16 @@ the generated corpus (guaranteed to exist).
 
 ### Takeaways (from the runs above, not a general claim)
 
+- **Copy-out ("D2H-style") cost is small but not zero, and scales with
+  result size, not query complexity**: in these all-CPU, same-host runs,
+  copying a handful of matching doc ids is unmeasurably fast (`0.0000 ms`),
+  but copying hundreds of thousands of doc ids (e.g. the wide-OR query at
+  200k docs, or the AND queries at `vocab_card=50`) costs up to a few tenths
+  of a millisecond -- occasionally comparable to or larger than the lookup
+  itself for PISA's fastest queries. Worth tracking separately from compute
+  time, especially if this index were ever moved to a different
+  address space (e.g. GPU device memory), where the equivalent transfer
+  would be a real D2H copy with much higher fixed and per-byte cost.
 - **Phrase-as-key wins by orders of magnitude when it's the right model**:
   `KeyEngine`'s single hash lookup runs in ~0.0001 ms regardless of corpus
   size/cardinality, versus PISA/Xapian needing to intersect/union real

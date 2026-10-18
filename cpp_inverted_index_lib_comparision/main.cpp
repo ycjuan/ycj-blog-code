@@ -213,6 +213,35 @@ static pair<vector<int>, LatencyStats> timedEvaluate(EvalFn&& evalFn, int reps)
     return { result, stats };
 }
 
+// Times copying a result vector<int> out of the engine's ownership into a
+// fresh vector, repeated `reps` times. Models the "D2H"-style cost of
+// transferring a query's result doc-id list to the caller, isolated from
+// the lookup/merge compute time measured by timedEvaluate() above. All
+// three engines here are CPU-only (no device memory), so this is a
+// same-host copy, but it's still useful to see as its own line item since
+// it scales with result size, not query complexity.
+static LatencyStats timedCopy(const vector<int>& src, int reps)
+{
+    // volatile sink: forces the compiler to actually materialize each copy
+    // instead of proving it unused and eliding it.
+    static volatile size_t sink = 0;
+
+    vector<double> latenciesUs;
+    for (int r = 0; r < reps; r++)
+    {
+        auto        start = Clock::now();
+        vector<int> copy(src);
+        auto        end = Clock::now();
+        sink            = copy.size();
+        latenciesUs.push_back(chrono::duration<double, micro>(end - start).count());
+    }
+    sort(latenciesUs.begin(), latenciesUs.end());
+    LatencyStats stats;
+    stats.p50Us = percentile(latenciesUs, 50.0);
+    stats.p95Us = percentile(latenciesUs, 95.0);
+    return stats;
+}
+
 int main(int argc, char** argv)
 {
     Args                args = parseArgs(argc, argv);
@@ -240,13 +269,15 @@ int main(int argc, char** argv)
     vector<string> queries = buildQueries(corpus.vocab);
 
     cout << left << setw(38) << "Query" << right << setw(10) << "PISA p50" << setw(10) << "PISA p95" << setw(11)
-         << "PISA QPS" << setw(12) << "Xapian p50" << setw(12) << "Xapian p95" << setw(11) << "Xapian QPS" << setw(9)
-         << "PISA#" << setw(9) << "Xapian#" << setw(7) << "Match"
+         << "PISA QPS" << setw(11) << "PISA Copy" << setw(12) << "Xapian p50" << setw(12) << "Xapian p95" << setw(11)
+         << "Xapian QPS" << setw(13) << "Xapian Copy" << setw(9) << "PISA#" << setw(9) << "Xapian#" << setw(7)
+         << "Match"
          << "\n";
-    cout << left << setw(38) << "" << right << setw(10) << "(ms)" << setw(10) << "(ms)" << setw(11) << "" << setw(12)
-         << "(ms)" << setw(12) << "(ms)" << setw(11) << "" << setw(9) << "" << setw(9) << "" << setw(7) << ""
+    cout << left << setw(38) << "" << right << setw(10) << "(ms)" << setw(10) << "(ms)" << setw(11) << "" << setw(11)
+         << "p50(ms)" << setw(12) << "(ms)" << setw(12) << "(ms)" << setw(11) << "" << setw(13) << "p50(ms)" << setw(9)
+         << "" << setw(9) << "" << setw(7) << ""
          << "\n";
-    cout << string(139, '-') << "\n";
+    cout << string(163, '-') << "\n";
 
     for (const string& query : queries)
     {
@@ -254,6 +285,9 @@ int main(int argc, char** argv)
 
         auto [pisaResult, pisaStats]     = timedEvaluate([&] { return pisaEngine.evaluate(*ast); }, args.reps);
         auto [xapianResult, xapianStats] = timedEvaluate([&] { return xapianEngine.evaluate(*ast); }, args.reps);
+
+        LatencyStats pisaCopyStats   = timedCopy(pisaResult, args.reps);
+        LatencyStats xapianCopyStats = timedCopy(xapianResult, args.reps);
 
         // QPS here means single-threaded queries/sec implied by one query's
         // p50 latency (1e6 / p50_latency_us), not a multi-threaded
@@ -266,9 +300,10 @@ int main(int argc, char** argv)
         string displayQuery = query.size() > 36 ? query.substr(0, 33) + "..." : query;
         cout << left << setw(38) << displayQuery << right << setw(10) << fixed << setprecision(4)
              << pisaStats.p50Us / 1000.0 << setw(10) << pisaStats.p95Us / 1000.0 << setw(11) << setprecision(0)
-             << pisaQps << setw(12) << setprecision(4) << xapianStats.p50Us / 1000.0 << setw(12)
-             << xapianStats.p95Us / 1000.0 << setw(11) << setprecision(0) << xapianQps << setw(9) << pisaResult.size()
-             << setw(9) << xapianResult.size() << setw(7) << (match ? "yes" : "NO") << "\n";
+             << pisaQps << setw(11) << setprecision(4) << pisaCopyStats.p50Us / 1000.0 << setw(12)
+             << xapianStats.p50Us / 1000.0 << setw(12) << xapianStats.p95Us / 1000.0 << setw(11) << setprecision(0)
+             << xapianQps << setw(13) << setprecision(4) << xapianCopyStats.p50Us / 1000.0 << setw(9)
+             << pisaResult.size() << setw(9) << xapianResult.size() << setw(7) << (match ? "yes" : "NO") << "\n";
 
         if (!match)
         {
@@ -317,15 +352,16 @@ int main(int argc, char** argv)
     vector<string> keyQueries = buildKeyQueries(keyCorpus.keysPerDoc);
 
     cout << left << setw(26) << "Key" << right << setw(10) << "Key p50" << setw(10) << "Key p95" << setw(10)
-         << "Key QPS" << setw(10) << "PISA p50" << setw(10) << "PISA p95" << setw(10) << "PISA QPS" << setw(11)
-         << "Xapian p50" << setw(11) << "Xapian p95" << setw(11) << "Xapian QPS" << setw(7) << "Key#" << setw(8)
-         << "PISA#" << setw(9) << "Xapian#"
+         << "Key QPS" << setw(10) << "Key Copy" << setw(10) << "PISA p50" << setw(10) << "PISA p95" << setw(10)
+         << "PISA QPS" << setw(10) << "PISA Copy" << setw(11) << "Xapian p50" << setw(11) << "Xapian p95" << setw(11)
+         << "Xapian QPS" << setw(11) << "XapianCopy" << setw(7) << "Key#" << setw(8) << "PISA#" << setw(9) << "Xapian#"
          << "\n";
     cout << left << setw(26) << "" << right << setw(10) << "(ms)" << setw(10) << "(ms)" << setw(10) << "" << setw(10)
-         << "(ms)" << setw(10) << "(ms)" << setw(10) << "" << setw(11) << "(ms)" << setw(11) << "(ms)" << setw(11) << ""
-         << setw(7) << "" << setw(8) << "" << setw(9) << ""
+         << "p50(ms)" << setw(10) << "(ms)" << setw(10) << "(ms)" << setw(10) << "" << setw(10) << "p50(ms)" << setw(11)
+         << "(ms)" << setw(11) << "(ms)" << setw(11) << "" << setw(11) << "p50(ms)" << setw(7) << "" << setw(8) << ""
+         << setw(9) << ""
          << "\n";
-    cout << string(149, '-') << "\n";
+    cout << string(192, '-') << "\n";
 
     for (const string& key : keyQueries)
     {
@@ -336,6 +372,10 @@ int main(int argc, char** argv)
         auto [pisaResult, pisaStats]     = timedEvaluate([&] { return keyPisaEngine.evaluate(*ast); }, args.reps);
         auto [xapianResult, xapianStats] = timedEvaluate([&] { return keyXapianEngine.evaluate(*ast); }, args.reps);
 
+        LatencyStats keyCopyStats    = timedCopy(keyResult, args.reps);
+        LatencyStats pisaCopyStats   = timedCopy(pisaResult, args.reps);
+        LatencyStats xapianCopyStats = timedCopy(xapianResult, args.reps);
+
         double keyQps    = 1e6 / keyStats.p50Us;
         double pisaQps   = 1e6 / pisaStats.p50Us;
         double xapianQps = 1e6 / xapianStats.p50Us;
@@ -343,10 +383,12 @@ int main(int argc, char** argv)
         string displayKey = key.size() > 24 ? key.substr(0, 21) + "..." : key;
         cout << left << setw(26) << displayKey << right << setw(10) << fixed << setprecision(4)
              << keyStats.p50Us / 1000.0 << setw(10) << keyStats.p95Us / 1000.0 << setw(10) << setprecision(0) << keyQps
-             << setw(10) << setprecision(4) << pisaStats.p50Us / 1000.0 << setw(10) << pisaStats.p95Us / 1000.0
-             << setw(10) << setprecision(0) << pisaQps << setw(11) << setprecision(4) << xapianStats.p50Us / 1000.0
-             << setw(11) << xapianStats.p95Us / 1000.0 << setw(11) << setprecision(0) << xapianQps << setw(7)
-             << keyResult.size() << setw(8) << pisaResult.size() << setw(9) << xapianResult.size() << "\n";
+             << setw(10) << setprecision(4) << keyCopyStats.p50Us / 1000.0 << setw(10) << pisaStats.p50Us / 1000.0
+             << setw(10) << pisaStats.p95Us / 1000.0 << setw(10) << setprecision(0) << pisaQps << setw(10)
+             << setprecision(4) << pisaCopyStats.p50Us / 1000.0 << setw(11) << xapianStats.p50Us / 1000.0 << setw(11)
+             << xapianStats.p95Us / 1000.0 << setw(11) << setprecision(0) << xapianQps << setw(11) << setprecision(4)
+             << xapianCopyStats.p50Us / 1000.0 << setw(7) << keyResult.size() << setw(8) << pisaResult.size() << setw(9)
+             << xapianResult.size() << "\n";
     }
 
     cout << "\nNote: Key# is expected to be <= PISA#/Xapian# -- the key lookup only matches docs with\n"
