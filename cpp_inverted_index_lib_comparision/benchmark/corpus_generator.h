@@ -8,6 +8,10 @@
 // (with replacement) from a fixed vocabulary of `vocab_card` distinct terms,
 // each `num_char_per_vocab` characters long. Generation is seeded for
 // reproducibility across engines/runs.
+//
+// Also provides generateKeyCorpus()/KeyCorpusConfig for the "phrase-as-key"
+// benchmark, where each doc is a set of multi-term keys instead of a flat
+// bag of terms (see struct comments below).
 #pragma once
 
 #include <random>
@@ -71,6 +75,85 @@ inline Corpus generateCorpus(const CorpusConfig& cfg)
             oss << corpus.vocab[vocabDist(rng)];
         }
         corpus.docs.push_back(oss.str());
+    }
+
+    return corpus;
+}
+
+// Corpus generator for the "phrase-as-key" benchmark: each doc is made of
+// `numKeysPerDoc` *keys*, each key being `numVocabPerKey` terms (sampled with
+// replacement from the same kind of fixed vocabulary as generateCorpus()),
+// space-joined in the order generated. A key is the atomic lookup unit for
+// KeyEngine; for PISA/Xapian the doc is exposed as the bag of all terms
+// across all its keys (their classic view has no notion of "key").
+struct KeyCorpusConfig
+{
+    int      numDocs         = 20000;
+    int      numVocabPerKey  = 3;
+    int      numKeysPerDoc   = 5;
+    int      numCharPerVocab = 6;
+    int      vocabCard       = 2000;
+    unsigned seed            = 43;
+};
+
+struct KeyCorpus
+{
+    std::vector<std::string>              docs;      // doc_id -> space-joined terms of all its keys
+    std::vector<std::vector<std::string>> keysPerDoc; // doc_id -> list of key strings (terms space-joined)
+    std::vector<std::string>              vocab;      // vocab_id -> term string
+};
+
+inline KeyCorpus generateKeyCorpus(const KeyCorpusConfig& cfg)
+{
+    std::mt19937                       rng(cfg.seed);
+    std::uniform_int_distribution<int> charDist(0, 25); // a-z
+
+    auto randomTerm = [&]()
+    {
+        std::string term(cfg.numCharPerVocab, 'a');
+        for (char& c : term)
+            c = static_cast<char>('a' + charDist(rng));
+        return term;
+    };
+
+    KeyCorpus corpus;
+    corpus.vocab.reserve(cfg.vocabCard);
+    {
+        std::unordered_set<std::string> seen;
+        seen.reserve(cfg.vocabCard * 2);
+        while (static_cast<int>(corpus.vocab.size()) < cfg.vocabCard)
+        {
+            std::string term = randomTerm();
+            if (seen.insert(term).second)
+                corpus.vocab.push_back(term);
+        }
+    }
+
+    std::uniform_int_distribution<int> vocabDist(0, cfg.vocabCard - 1);
+    corpus.docs.reserve(cfg.numDocs);
+    corpus.keysPerDoc.reserve(cfg.numDocs);
+    for (int docId = 0; docId < cfg.numDocs; docId++)
+    {
+        std::ostringstream      fullText;
+        std::vector<std::string> keys;
+        keys.reserve(cfg.numKeysPerDoc);
+        for (int k = 0; k < cfg.numKeysPerDoc; k++)
+        {
+            std::ostringstream keyOss;
+            for (int i = 0; i < cfg.numVocabPerKey; i++)
+            {
+                const std::string& term = corpus.vocab[vocabDist(rng)];
+                if (i > 0)
+                    keyOss << ' ';
+                keyOss << term;
+                if (fullText.tellp() > 0)
+                    fullText << ' ';
+                fullText << term;
+            }
+            keys.push_back(keyOss.str());
+        }
+        corpus.docs.push_back(fullText.str());
+        corpus.keysPerDoc.push_back(std::move(keys));
     }
 
     return corpus;

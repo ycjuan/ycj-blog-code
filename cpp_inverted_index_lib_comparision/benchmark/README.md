@@ -5,7 +5,8 @@ the hand-rolled PISA-style index ([`../pisa`](../pisa)) and a real
 [Xapian](https://xapian.org) index ([`../xapian`](../xapian)) over the same
 documents, runs an identical set of boolean queries against both (via a
 shared query AST, see below), and reports result counts + latency side by
-side.
+side. A second section benchmarks a "phrase-as-key" scenario against both
+libraries plus a bespoke hash-map engine (see below).
 
 ## Corpus parameters
 
@@ -16,6 +17,8 @@ side.
 | `--num_char_per_vocab` | `-l` | character length of each distinct vocabulary term | 6 |
 | `--vocab_card` | `-k` | vocabulary cardinality (# of distinct terms overall) | 2000 |
 | `--reps` | `-r` | repetitions per query; reports p50/p95 latency across them | 20 |
+| `--num_vocab_per_key` | `-p` | terms per key, for the phrase-as-key benchmark | 3 |
+| `--num_keys_per_doc` | `-n` | keys per doc, for the phrase-as-key benchmark | 5 |
 
 Long form takes `--flag=value`; short form takes `-f value` (e.g.
 `-d 200000 -v 30`). Run `./benchmark --help` for the full usage message.
@@ -23,6 +26,9 @@ Long form takes `--flag=value`; short form takes `-f value` (e.g.
 Generation is seeded (`seed=42`) for reproducibility. Each doc is a
 space-joined string of `num_vocab_per_doc` terms drawn uniformly from a fixed
 vocabulary of `vocab_card` distinct, `num_char_per_vocab`-character terms.
+The phrase-as-key benchmark uses a separate corpus (seeded independently,
+`seed=43`) that reuses `num_docs`/`num_char_per_vocab`/`vocab_card` but
+generates docs as `num_keys_per_doc` multi-term keys instead (see below).
 
 ## Design: one query AST, two evaluators
 
@@ -109,8 +115,87 @@ juyetupp OR elecblwi OR pdsqabzs ...      0.0782    0.0854      12793      0.863
 (juyetupp OR elecblwi) AND NOT (p...      0.9378    0.9520       1066      0.4115      0.4384       2430     2447     2447    yes
 ```
 
+Phrase-as-key, 20,000 docs, 5 keys/doc, 3 terms/key, 2,000-term vocabulary
+(default settings -- `vocab_card` large relative to key size, so `Key#`
+almost always equals `PISA#`/`Xapian#`):
+
+```bash
+PATH=/usr/local/bin:$PATH ./run.sh
+```
+
+```
+=== Phrase-as-key benchmark (num_vocab_per_key=3, num_keys_per_doc=5) ===
+Index build time: key_engine=42.35 ms, pisa=37.47 ms, xapian=401.90 ms
+
+Key                          Key p50   Key p95   Key QPS  PISA p50  PISA p95  PISA QPS Xapian p50 Xapian p95 Xapian QPS   Key#   PISA#  Xapian#
+                                (ms)      (ms)                (ms)      (ms)                 (ms)       (ms)                                   
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+dekrbf ybleyr nzdxny          0.0001    0.0001  15151515    0.0007    0.0018   1347709     0.0051     0.0092     195618      1       1        1
+pwaday sokbrl dbavrx          0.0001    0.0001  14492754    0.0011    0.0021    944287     0.0054     0.0080     184026      1       1        1
+ejomfy dycuec ixtlcs          0.0001    0.0001  14925373    0.0008    0.0015   1300390     0.0055     0.0081     180538      1       1        1
+punqhn ltlfdj bmweae          0.0001    0.0001  14285714    0.0007    0.0017   1428571     0.0052     0.0072     192271      1       1        1
+lmvprf ourwio ydohph          0.0001    0.0001  14925373    0.0008    0.0017   1248439     0.0055     0.0075     181686      1       1        1
+```
+
+Phrase-as-key, same corpus size but a much smaller vocabulary (50 terms) and
+more keys/doc (10) -- showing `Key#` diverging well below `PISA#`/`Xapian#`
+once term reuse across keys becomes likely:
+
+```bash
+PATH=/usr/local/bin:$PATH ./run.sh --vocab_card=50 --num_keys_per_doc=10
+```
+
+```
+=== Phrase-as-key benchmark (num_vocab_per_key=3, num_keys_per_doc=10) ===
+Index build time: key_engine=66.15 ms, pisa=56.73 ms, xapian=404.50 ms
+
+Key                          Key p50   Key p95   Key QPS  PISA p50  PISA p95  PISA QPS Xapian p50 Xapian p95 Xapian QPS   Key#   PISA#  Xapian#
+                                (ms)      (ms)                (ms)      (ms)                 (ms)       (ms)                                   
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+cmaqim krppld lpoukj          0.0001    0.0001  14705882    0.1701    0.1895      5880     0.5917     0.6180       1690      2    1709     1709
+epbuna cmaqim vvpljp          0.0001    0.0001  14705882    0.1683    0.1741      5940     0.5909     0.6121       1692      3    1738     1738
+geivwb slmldq cmpcdd          0.0001    0.0001  14492754    0.1722    0.1965      5807     0.6048     0.6263       1653      2    1777     1777
+clmsmi vvpljp hyxdfu          0.0001    0.0001  14705882    0.1727    0.1826      5789     0.5987     0.6370       1670      1    1770     1770
+qfcfme krppld iwfcch          0.0001    0.0001  11904762    0.1710    0.1794      5849     0.6000     0.6287       1667      1    1783     1783
+```
+
+## Phrase-as-key benchmark: design
+
+Some use cases treat a fixed-size tuple of terms (e.g. `"vocA vocB vocC"`) as
+one atomic lookup key, not three independent terms to AND together. This
+section compares three ways of answering that:
+
+- [`key_engine.h`](key_engine.h) — `KeyEngine`: a plain
+  `unordered_map<string, vector<docId>>` keyed by the *entire* key string.
+  No tokenization, no posting-list merge -- a single O(1) average-case hash
+  lookup per query.
+- `PisaEngine`/`XapianEngine` (same engines as above) answering the
+  equivalent classic boolean query `vocA AND vocB AND vocC`, i.e. decomposing
+  the key into its terms and intersecting their posting lists.
+
+These are **not** semantically equivalent, by design: `KeyEngine` only
+matches docs that contain that exact key (the terms together, as generated),
+whereas the AND query matches any doc containing all three terms anywhere --
+even if they come from different keys in that doc. So `Key#` is expected to
+be `<= PISA#`/`Xapian#`, and the gap widens as `vocab_card` shrinks relative
+to `num_vocab_per_key * num_keys_per_doc` (more chance of a doc incidentally
+containing all 3 terms outside of the generated key itself).
+
+Keys for the benchmark queries are the first 5 distinct keys encountered in
+the generated corpus (guaranteed to exist).
+
 ## Takeaways (from the runs above, not a general claim)
 
+- **Phrase-as-key wins by orders of magnitude when it's the right model**:
+  `KeyEngine`'s single hash lookup runs in ~0.0001 ms regardless of corpus
+  size/cardinality, versus PISA/Xapian needing to intersect/union real
+  posting lists for the equivalent AND query -- a gap that grows as those
+  posting lists get longer (e.g. with a small vocabulary, PISA/Xapian's AND
+  queries took >0.1-0.6 ms per the second example above, ~1000-5000x
+  slower). The tradeoff is semantic, not just a performance knob: `KeyEngine`
+  can only answer "does this exact key exist", not "find all docs containing
+  these terms in any combination" -- use it only when the former is really
+  the question being asked.
 - **Index build**: PISA-style in-memory `vector<vector<int>>` postings build
   roughly 10x faster than Xapian's `WritableDatabase::add_document`, which
   does more per-term bookkeeping (positions, term-frequency stats,
