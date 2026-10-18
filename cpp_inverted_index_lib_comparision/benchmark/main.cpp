@@ -41,24 +41,40 @@ static void printUsage(const char* program)
          << "PISA-style index versus Xapian, cross-checking that both return the same\n"
          << "result doc-id set for every query.\n\n"
          << "Options:\n"
-         << "  --num_docs=N            Number of documents to generate (default: " << defaults.corpus.numDocs << ")\n"
-         << "  --num_vocab_per_doc=N   Terms sampled (with replacement) into each doc (default: "
+         << "  -d, --num_docs=N            Number of documents to generate (default: " << defaults.corpus.numDocs
+         << ")\n"
+         << "  -v, --num_vocab_per_doc=N   Terms sampled (with replacement) into each doc (default: "
          << defaults.corpus.numVocabPerDoc << ")\n"
-         << "  --num_char_per_vocab=N  Character length of each distinct vocabulary term (default: "
+         << "  -l, --num_char_per_vocab=N  Character length of each distinct vocabulary term (default: "
          << defaults.corpus.numCharPerVocab << ")\n"
-         << "  --vocab_card=N          Vocabulary cardinality, i.e. # of distinct terms overall (default: "
+         << "  -k, --vocab_card=N          Vocabulary cardinality, i.e. # of distinct terms overall (default: "
          << defaults.corpus.vocabCard << ")\n"
-         << "  --reps=N                Repetitions per query; reported latency is the median (default: "
+         << "  -r, --reps=N                Repetitions per query; reported latency is the median (default: "
          << defaults.reps << ")\n"
-         << "  -h, --help              Show this help message and exit\n\n"
+         << "  -h, --help                  Show this help message and exit\n\n"
          << "Example:\n"
-         << "  " << program
-         << " --num_docs=200000 --num_vocab_per_doc=30 --vocab_card=5000 --num_char_per_vocab=8 --reps=7\n";
+         << "  " << program << " --num_docs=200000 --num_vocab_per_doc=30 --vocab_card=5000 --num_char_per_vocab=8"
+         << " --reps=7\n"
+         << "  " << program << " -d 200000 -v 30 -k 5000 -l 8 -r 7\n";
 }
 
 static Args parseArgs(int argc, char** argv)
 {
     Args args;
+    // Maps a flag (long or short form) to the Args field it sets.
+    auto apply = [&](const string& key, int value) {
+        if (key == "num_docs" || key == "d")
+            args.corpus.numDocs = value;
+        else if (key == "num_vocab_per_doc" || key == "v")
+            args.corpus.numVocabPerDoc = value;
+        else if (key == "num_char_per_vocab" || key == "l")
+            args.corpus.numCharPerVocab = value;
+        else if (key == "vocab_card" || key == "k")
+            args.corpus.vocabCard = value;
+        else if (key == "reps" || key == "r")
+            args.reps = value;
+    };
+
     for (int i = 1; i < argc; i++)
     {
         string arg = argv[i];
@@ -67,21 +83,19 @@ static Args parseArgs(int argc, char** argv)
             printUsage(argv[0]);
             exit(0);
         }
-        auto eq = arg.find('=');
-        if (arg.rfind("--", 0) != 0 || eq == string::npos)
-            continue;
-        string key   = arg.substr(2, eq - 2);
-        int    value = stoi(arg.substr(eq + 1));
-        if (key == "num_docs")
-            args.corpus.numDocs = value;
-        else if (key == "num_vocab_per_doc")
-            args.corpus.numVocabPerDoc = value;
-        else if (key == "num_char_per_vocab")
-            args.corpus.numCharPerVocab = value;
-        else if (key == "vocab_card")
-            args.corpus.vocabCard = value;
-        else if (key == "reps")
-            args.reps = value;
+        if (arg.rfind("--", 0) == 0)
+        {
+            // Long form: --key=value
+            auto eq = arg.find('=');
+            if (eq == string::npos)
+                continue;
+            apply(arg.substr(2, eq - 2), stoi(arg.substr(eq + 1)));
+        }
+        else if (arg.rfind("-", 0) == 0 && arg.size() == 2 && i + 1 < argc)
+        {
+            // Short form: -x value
+            apply(arg.substr(1), stoi(argv[++i]));
+        }
     }
     return args;
 }

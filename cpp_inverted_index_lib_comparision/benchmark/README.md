@@ -9,13 +9,16 @@ side.
 
 ## Corpus parameters
 
-| Flag | Meaning | Default |
-|---|---|---|
-| `--num_docs` | number of documents | 20000 |
-| `--num_vocab_per_doc` | terms sampled (with replacement) into each doc | 20 |
-| `--num_char_per_vocab` | character length of each distinct vocabulary term | 6 |
-| `--vocab_card` | vocabulary cardinality (# of distinct terms overall) | 2000 |
-| `--reps` | repetitions per query; reported latency is the median | 5 |
+| Flag | Short | Meaning | Default |
+|---|---|---|---|
+| `--num_docs` | `-d` | number of documents | 20000 |
+| `--num_vocab_per_doc` | `-v` | terms sampled (with replacement) into each doc | 20 |
+| `--num_char_per_vocab` | `-l` | character length of each distinct vocabulary term | 6 |
+| `--vocab_card` | `-k` | vocabulary cardinality (# of distinct terms overall) | 2000 |
+| `--reps` | `-r` | repetitions per query; reported latency is the median | 5 |
+
+Long form takes `--flag=value`; short form takes `-f value` (e.g.
+`-d 200000 -v 30`). Run `./benchmark --help` for the full usage message.
 
 Generation is seeded (`seed=42`) for reproducibility. Each doc is a
 space-joined string of `num_vocab_per_doc` terms drawn uniformly from a fixed
