@@ -38,8 +38,7 @@ using Clock = chrono::high_resolution_clock;
 struct Args
 {
     CorpusConfig corpus;
-    int          reps    = 20;    // repetitions per query; reports p50/p95 latency across these reps
-    bool         gpuCopy = false; // if set, also measure a real cudaMalloc+cudaMemcpy D2H copy per query
+    int          reps = 20; // repetitions per query; reports p50/p95 latency across these reps
 };
 
 static void printUsage(const char* program)
@@ -62,9 +61,6 @@ static void printUsage(const char* program)
          << ")\n"
          << "  -n, --num_phrases_per_doc=N   Seed phrases sampled into each doc (default: "
          << defaults.corpus.numPhrasesPerDoc << ")\n"
-         << "  -g, --gpu_copy                Also measure a real cudaMalloc+cudaMemcpy D2H copy per\n"
-         << "                                 query (requires building with nvcc/CUDA and running on a\n"
-         << "                                 CUDA-capable GPU; see Makefile)\n"
          << "  -h, --help                    Show this help message and exit\n\n"
          << "Example:\n"
          << "  " << program
@@ -100,11 +96,6 @@ static Args parseArgs(int argc, char** argv)
         {
             printUsage(argv[0]);
             exit(0);
-        }
-        if (arg == "-g" || arg == "--gpu_copy")
-        {
-            args.gpuCopy = true;
-            continue;
         }
         if (arg.rfind("--", 0) == 0)
         {
@@ -230,9 +221,9 @@ static LatencyStats timedCopy(const vector<int>& src, int reps)
 }
 
 // Wraps the real cudaMalloc+cudaMemcpy D2H helper (cuda_copy.cu, only built
-// when nvcc/CUDA is available) into a LatencyStats, so callers don't need
-// to care about the HAVE_CUDA ifdef at every call site. Only called when
-// args.gpuCopy is set, which main() already guards to require HAVE_CUDA.
+// and called when nvcc/CUDA was available at build time) into a
+// LatencyStats, so callers don't need to care about the GpuCopyStats type
+// at every call site.
 #ifdef HAVE_CUDA
 static LatencyStats timedGpuCopy(const vector<int>& src, int reps)
 {
@@ -248,16 +239,6 @@ int main(int argc, char** argv)
 {
     Args                args = parseArgs(argc, argv);
     const CorpusConfig& cfg  = args.corpus;
-
-#ifndef HAVE_CUDA
-    if (args.gpuCopy)
-    {
-        cerr << "--gpu_copy requires building with nvcc/CUDA (see Makefile: nvcc must be on PATH),\n"
-             << "but this binary was built without CUDA support. Rebuild on a machine with the CUDA\n"
-             << "toolkit installed, or omit --gpu_copy.\n";
-        return 1;
-    }
-#endif
 
     cout << "Corpus config: num_docs=" << cfg.numDocs << " num_char_per_vocab=" << cfg.numCharPerVocab
          << " phrase_card=" << cfg.phraseCard << " num_vocab_per_phrase=" << cfg.numVocabPerPhrase
@@ -301,26 +282,23 @@ int main(int argc, char** argv)
                << "Key QPS" << setw(10) << "Key Copy";
     keyHeader2 << left << setw(26) << "" << right << setw(10) << "(ms)" << setw(10) << "(ms)" << setw(10) << ""
                << setw(10) << "p50(ms)";
-    if (args.gpuCopy)
-    {
-        keyHeader1 << setw(12) << "Key GPUCopy";
-        keyHeader2 << setw(12) << "p50(ms)";
-    }
+#ifdef HAVE_CUDA
+    keyHeader1 << setw(12) << "Key GPUCopy";
+    keyHeader2 << setw(12) << "p50(ms)";
+#endif
     keyHeader1 << setw(10) << "PISA p50" << setw(10) << "PISA p95" << setw(10) << "PISA QPS" << setw(10) << "PISA Copy";
     keyHeader2 << setw(10) << "(ms)" << setw(10) << "(ms)" << setw(10) << "" << setw(10) << "p50(ms)";
-    if (args.gpuCopy)
-    {
-        keyHeader1 << setw(13) << "PISA GPUCopy";
-        keyHeader2 << setw(13) << "p50(ms)";
-    }
+#ifdef HAVE_CUDA
+    keyHeader1 << setw(13) << "PISA GPUCopy";
+    keyHeader2 << setw(13) << "p50(ms)";
+#endif
     keyHeader1 << setw(11) << "Xapian p50" << setw(11) << "Xapian p95" << setw(11) << "Xapian QPS" << setw(11)
                << "XapianCopy";
     keyHeader2 << setw(11) << "(ms)" << setw(11) << "(ms)" << setw(11) << "" << setw(11) << "p50(ms)";
-    if (args.gpuCopy)
-    {
-        keyHeader1 << setw(15) << "Xapian GPUCopy";
-        keyHeader2 << setw(15) << "p50(ms)";
-    }
+#ifdef HAVE_CUDA
+    keyHeader1 << setw(15) << "Xapian GPUCopy";
+    keyHeader2 << setw(15) << "p50(ms)";
+#endif
     keyHeader1 << setw(7) << "Key#" << setw(8) << "PISA#" << setw(9) << "Xapian#";
 
     cout << keyHeader1.str() << "\n" << keyHeader2.str() << "\n";
@@ -339,13 +317,9 @@ int main(int argc, char** argv)
         LatencyStats pisaCopyStats   = timedCopy(pisaResult, args.reps);
         LatencyStats xapianCopyStats = timedCopy(xapianResult, args.reps);
 #ifdef HAVE_CUDA
-        LatencyStats keyGpuCopyStats, pisaGpuCopyStats, xapianGpuCopyStats;
-        if (args.gpuCopy)
-        {
-            keyGpuCopyStats    = timedGpuCopy(keyResult, args.reps);
-            pisaGpuCopyStats   = timedGpuCopy(pisaResult, args.reps);
-            xapianGpuCopyStats = timedGpuCopy(xapianResult, args.reps);
-        }
+        LatencyStats keyGpuCopyStats    = timedGpuCopy(keyResult, args.reps);
+        LatencyStats pisaGpuCopyStats   = timedGpuCopy(pisaResult, args.reps);
+        LatencyStats xapianGpuCopyStats = timedGpuCopy(xapianResult, args.reps);
 #endif
 
         double keyQps    = 1e6 / keyStats.p50Us;
@@ -357,26 +331,17 @@ int main(int argc, char** argv)
              << keyStats.p50Us / 1000.0 << setw(10) << keyStats.p95Us / 1000.0 << setw(10) << setprecision(0) << keyQps
              << setw(10) << setprecision(4) << keyCopyStats.p50Us / 1000.0;
 #ifdef HAVE_CUDA
-        if (args.gpuCopy)
-        {
-            cout << setw(12) << setprecision(4) << keyGpuCopyStats.p50Us / 1000.0;
-        }
+        cout << setw(12) << setprecision(4) << keyGpuCopyStats.p50Us / 1000.0;
 #endif
         cout << setw(10) << pisaStats.p50Us / 1000.0 << setw(10) << pisaStats.p95Us / 1000.0 << setw(10)
              << setprecision(0) << pisaQps << setw(10) << setprecision(4) << pisaCopyStats.p50Us / 1000.0;
 #ifdef HAVE_CUDA
-        if (args.gpuCopy)
-        {
-            cout << setw(13) << setprecision(4) << pisaGpuCopyStats.p50Us / 1000.0;
-        }
+        cout << setw(13) << setprecision(4) << pisaGpuCopyStats.p50Us / 1000.0;
 #endif
         cout << setw(11) << xapianStats.p50Us / 1000.0 << setw(11) << xapianStats.p95Us / 1000.0 << setw(11)
              << setprecision(0) << xapianQps << setw(11) << setprecision(4) << xapianCopyStats.p50Us / 1000.0;
 #ifdef HAVE_CUDA
-        if (args.gpuCopy)
-        {
-            cout << setw(15) << setprecision(4) << xapianGpuCopyStats.p50Us / 1000.0;
-        }
+        cout << setw(15) << setprecision(4) << xapianGpuCopyStats.p50Us / 1000.0;
 #endif
         cout << setw(7) << keyResult.size() << setw(8) << pisaResult.size() << setw(9) << xapianResult.size() << "\n";
     }

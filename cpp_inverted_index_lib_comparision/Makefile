@@ -1,6 +1,7 @@
-# CUDA support (real cudaMalloc + cudaMemcpy D2H, used by --gpu_copy) is
-# optional: only enabled when nvcc is found on PATH. Without it, the
-# benchmark still builds and runs fine; --gpu_copy just isn't available.
+# CUDA support (real cudaMalloc + cudaMemcpy D2H GPU-copy columns) is
+# optional at build time: only enabled when nvcc is found on PATH. Without
+# it, the benchmark still builds and runs fine; it just omits the GPU-copy
+# columns. When enabled, the GPU copy is always measured (no runtime flag).
 NVCC := $(shell command -v nvcc 2>/dev/null)
 CUDA_PATH ?= /usr/local/cuda
 

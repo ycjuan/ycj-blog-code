@@ -65,7 +65,6 @@ PATH=/usr/local/bin:$PATH ./run.sh --num_docs=200000 --phrase_card=5000
 | `--reps` | `-r` | repetitions per query; reports p50/p95 latency across them | 20 |
 | `--num_vocab_per_phrase` | `-p` | terms per seed phrase | 3 |
 | `--num_phrases_per_doc` | `-n` | seed phrases sampled into each doc | 5 |
-| `--gpu_copy` | `-g` | also measure a real `cudaMalloc`+`cudaMemcpy` D2H copy per query | off |
 
 Long form takes `--flag=value`; short form takes `-f value` (e.g.
 `-d 200000 -k 5000`). Run `./benchmark --help` for the full usage message.
@@ -111,14 +110,15 @@ result out" cost from the actual query compute. It scales with result size,
 not query complexity.
 
 If a CUDA toolkit (`nvcc`) is available at build time, the Makefile also
-compiles [`cuda_copy.cu`](cuda_copy.cu) and the binary gains a `--gpu_copy`/
-`-g` flag. When passed, each query's result vector is additionally uploaded
-once (untimed) into real device memory via `cudaMalloc`+`cudaMemcpy`
-(host-to-device), and a `*GPUCopy` column reports the p50 latency of a real
-`cudaMemcpy(..., cudaMemcpyDeviceToHost)` call copying it back out -- an
-actual device-to-host transfer, not a same-host analogy. This requires a
-CUDA-capable GPU at runtime (`nvidia-smi` should show one); without
-`--gpu_copy`, the binary behaves exactly as before and needs no GPU. Because
+compiles [`cuda_copy.cu`](cuda_copy.cu) and the binary always additionally
+measures a real GPU D2H copy per query (no runtime flag needed): each
+query's result vector is uploaded once (untimed) into real device memory
+via `cudaMalloc`+`cudaMemcpy` (host-to-device), and a `*GPUCopy` column
+reports the p50 latency of a real `cudaMemcpy(..., cudaMemcpyDeviceToHost)`
+call copying it back out -- an actual device-to-host transfer, not a
+same-host analogy. This requires a CUDA-capable GPU at runtime
+(`nvidia-smi` should show one). Without `nvcc` at build time, the binary
+still builds and runs fine; it just omits the `*GPUCopy` columns. Because
 these result sets are small (tens to hundreds of thousands of ints), the
 measured GPU copy time is dominated by fixed `cudaMemcpy` launch/sync
 overhead (~0.003-0.008 ms here) rather than PCIe bandwidth -- it only starts
@@ -127,19 +127,20 @@ to track transfer size once results reach the hundreds-of-thousands range.
 ### Example results
 
 20,000 docs, phrase_card=2000, 3 terms/phrase, 5 phrases/doc (default
-settings):
+settings), on a Tesla T4 (real `cudaMemcpy` D2H GPU copy, always measured
+when built with CUDA):
 
 ```
-Index build time: pisa=59.16 ms, xapian=412.38 ms, key_engine=8.21 ms
+Index build time: pisa=40.49 ms, xapian=404.14 ms, key_engine=8.37 ms
 
-Key                          Key p50   Key p95   Key QPS  Key Copy  PISA p50  PISA p95  PISA QPS PISA Copy Xapian p50 Xapian p95 Xapian QPS XapianCopy   Key#   PISA#  Xapian#
-                                (ms)      (ms)             p50(ms)      (ms)      (ms)             p50(ms)       (ms)       (ms)               p50(ms)
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-dhovhb bubpdo blthmm          0.0001    0.0001  13698630    0.0000    0.0008    0.0010   1215067    0.0000     0.0099     0.0107     101092     0.0000     53      53       53
-lekece rrslsz sfaiyz          0.0001    0.0001  13333333    0.0000    0.0008    0.0009   1225490    0.0000     0.0096     0.0102     104679     0.0000     52      52       52
-pswert lzvuxa dpnshv          0.0001    0.0001  11363636    0.0000    0.0008    0.0009   1221001    0.0000     0.0100     0.0103     100412     0.0000     55      55       55
-aavfss suupby jqdxww          0.0001    0.0001  12987013    0.0000    0.0008    0.0010   1216545    0.0000     0.0103     0.0136      97087     0.0000     58      58       58
-nagyec vudxmy ywehzi          0.0001    0.0001  14285714    0.0000    0.0007    0.0008   1336898    0.0000     0.0086     0.0093     115727     0.0000     42      42       42
+Key                          Key p50   Key p95   Key QPS  Key Copy Key GPUCopy  PISA p50  PISA p95  PISA QPS PISA Copy PISA GPUCopy Xapian p50 Xapian p95 Xapian QPS XapianCopy Xapian GPUCopy   Key#   PISA#  Xapian#
+                                (ms)      (ms)             p50(ms)     p50(ms)      (ms)      (ms)             p50(ms)      p50(ms)       (ms)       (ms)               p50(ms)        p50(ms)
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+dhovhb bubpdo blthmm          0.0001    0.0001  14285714    0.0000      0.0068    0.0008    0.0010   1240695    0.0000       0.0067     0.0100     0.0229     100050     0.0000         0.0070     53      53       53
+lekece rrslsz sfaiyz          0.0001    0.0002  14285714    0.0000      0.0068    0.0008    0.0013   1280410    0.0000       0.0068     0.0101     0.0128      98824     0.0000         0.0071     52      52       52
+pswert lzvuxa dpnshv          0.0001    0.0002  12820513    0.0000      0.0070    0.0008    0.0010   1240695    0.0000       0.0070     0.0106     0.0121      94038     0.0000         0.0083     55      55       55
+aavfss suupby jqdxww          0.0001    0.0002   9708738    0.0000      0.0085    0.0012    0.0016    805802    0.0000       0.0082     0.0202     0.0211      49397     0.0000         0.0081     58      58       58
+nagyec vudxmy ywehzi          0.0001    0.0002   8620690    0.0001      0.0094    0.0016    0.0022    629723    0.0001       0.0096     0.0169     0.0193      59067     0.0001         0.0085     42      42       42
 ```
 
 200,000 docs, phrase_card=5000, 8-char terms:
@@ -149,45 +150,25 @@ PATH=/usr/local/bin:$PATH ./run.sh -d 200000 -k 5000 -l 8
 ```
 
 ```
-Index build time: pisa=461.70 ms, xapian=4680.73 ms, key_engine=113.81 ms
-
-Key                          Key p50   Key p95   Key QPS  Key Copy  PISA p50  PISA p95  PISA QPS PISA Copy Xapian p50 Xapian p95 Xapian QPS XapianCopy   Key#   PISA#  Xapian#
-                                (ms)      (ms)             p50(ms)      (ms)      (ms)             p50(ms)       (ms)       (ms)               p50(ms)
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-awdcutwm zxdjnsct efe...      0.0001    0.0004  11111111    0.0000    0.0014    0.0019    703730    0.0000     0.0282     0.0429      35447     0.0000    191     191      191
-pspxuzvh aytmuhsz swb...      0.0001    0.0003  11627907    0.0000    0.0013    0.0014    781861    0.0000     0.0249     0.0348      40180     0.0000    162     162      162
-vgmgruty ppjedbqg tee...      0.0001    0.0001  11363636    0.0000    0.0015    0.0017    660939    0.0000     0.0311     0.0317      32109     0.0000    216     216      216
-vyehomkt oyqphjxz yac...      0.0001    0.0001  13157895    0.0000    0.0014    0.0015    691563    0.0000     0.0286     0.0357      34947     0.0000    194     194      194
-qrlsvlxl petjbzoh ttm...      0.0001    0.0002   9009009    0.0000    0.0015    0.0016    665779    0.0000     0.0308     0.0318      32458     0.0000    216     216      216
-```
-
-With `--gpu_copy` on a Tesla T4 (real `cudaMemcpy` D2H instead of a
-same-host copy; 20,000-doc corpus) -- note the GPU copy's higher, more
-uniform floor (fixed launch/sync overhead) compared to the same-host
-`*Copy` column:
-
-```bash
-PATH=/usr/local/bin:$PATH ./run.sh --gpu_copy
-```
-
-```
-Index build time: pisa=39.99 ms, xapian=400.60 ms, key_engine=8.42 ms
+Index build time: pisa=481.76 ms, xapian=4666.68 ms, key_engine=113.92 ms
 
 Key                          Key p50   Key p95   Key QPS  Key Copy Key GPUCopy  PISA p50  PISA p95  PISA QPS PISA Copy PISA GPUCopy Xapian p50 Xapian p95 Xapian QPS XapianCopy Xapian GPUCopy   Key#   PISA#  Xapian#
                                 (ms)      (ms)             p50(ms)     p50(ms)      (ms)      (ms)             p50(ms)      p50(ms)       (ms)       (ms)               p50(ms)        p50(ms)
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-dhovhb bubpdo blthmm          0.0001    0.0001  13513514    0.0000      0.0065    0.0007    0.0009   1394700    0.0000       0.0065     0.0101     0.0229      99069     0.0000         0.0065     53      53       53
-lekece rrslsz sfaiyz          0.0001    0.0001  13888889    0.0000      0.0066    0.0007    0.0013   1377410    0.0000       0.0065     0.0103     0.0135      97494     0.0000         0.0065     52      52       52
-pswert lzvuxa dpnshv          0.0001    0.0002  12987013    0.0000      0.0068    0.0007    0.0011   1362398    0.0000       0.0068     0.0105     0.0226      94940     0.0000         0.0068     55      55       55
-aavfss suupby jqdxww          0.0001    0.0001  12820513    0.0000      0.0064    0.0008    0.0011   1329787    0.0000       0.0066     0.0112     0.0131      89238     0.0000         0.0081     58      58       58
-nagyec vudxmy ywehzi          0.0001    0.0002  11764706    0.0000      0.0068    0.0010    0.0013   1023541    0.0000       0.0068     0.0149     0.0169      67024     0.0000         0.0067     42      42       42
+awdcutwm zxdjnsct efe...      0.0001    0.0005  11904762    0.0000      0.0065    0.0017    0.0022    603865    0.0000       0.0065     0.0287     0.0448      34844     0.0000         0.0064    191     191      191
+pspxuzvh aytmuhsz swb...      0.0001    0.0002  12048193    0.0000      0.0063    0.0015    0.0029    672495    0.0000       0.0063     0.0256     0.0277      39096     0.0000         0.0067    162     162      162
+vgmgruty ppjedbqg tee...      0.0001    0.0001  11764706    0.0000      0.0065    0.0018    0.0022    549753    0.0000       0.0065     0.0321     0.0434      31170     0.0000         0.0063    216     216      216
+vyehomkt oyqphjxz yac...      0.0001    0.0003  12987013    0.0001      0.0084    0.0017    0.0019    604595    0.0001       0.0077     0.0298     0.0409      33574     0.0000         0.0081    194     194      194
+qrlsvlxl petjbzoh ttm...      0.0002    0.0004   6493506    0.0001      0.0080    0.0028    0.0035    363372    0.0001       0.0080     0.0600     0.0710      16674     0.0001         0.0081    216     216      216
 ```
 
 Note that `Key#`/`PISA#`/`Xapian#` all grow with `num_docs / phrase_card`
 (e.g. ~42-58 at 20k docs, close to the expected `20000 * 5 / 2000 = 50`) --
 each seed phrase recurs across roughly that many docs, which is the whole
 point of sampling from a fixed phrase pool instead of generating
-independent random terms per doc.
+independent random terms per doc. The `*GPUCopy` columns' higher, more
+uniform floor (fixed launch/sync overhead) compared to the same-host
+`*Copy` columns is visible even at these small result sizes.
 
 ### Phrase-as-key benchmark: design
 
@@ -236,14 +217,14 @@ containing that exact phrase.
   as expected (see the example above).
 - **Copy-out cost is small but not zero, and scales with result size, not
   query complexity**: in these runs, copying a handful of matching doc ids
-  is unmeasurably fast (`0.0000 ms`) for all three engines. With
-  `--gpu_copy` on an actual GPU, the real `cudaMemcpy` D2H transfer has a
-  non-trivial fixed floor (~0.0065-0.008 ms here) from kernel launch/sync
-  overhead that dominates at these small result sizes -- it only starts to
-  track transfer size (PCIe bandwidth) once results reach the
-  hundreds-of-thousands range, a cost worth tracking separately from
-  lookup/merge compute time, especially for any design that would put the
-  index in device memory.
+  is unmeasurably fast (`0.0000 ms`) for the same-host `*Copy` columns. The
+  real `cudaMemcpy` D2H transfer (`*GPUCopy` columns, measured whenever
+  built with CUDA) has a non-trivial fixed floor (~0.0065-0.008 ms here)
+  from kernel launch/sync overhead that dominates at these small result
+  sizes -- it only starts to track transfer size (PCIe bandwidth) once
+  results reach the hundreds-of-thousands range, a cost worth tracking
+  separately from lookup/merge compute time, especially for any design that
+  would put the index in device memory.
 - **Index build**: PISA-style in-memory `vector<vector<int>>` postings build
   roughly 10x faster than Xapian's `WritableDatabase::add_document`, which
   does more per-term bookkeeping (positions, term-frequency stats,
