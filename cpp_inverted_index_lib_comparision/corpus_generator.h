@@ -98,7 +98,7 @@ struct KeyCorpusConfig
 
 struct KeyCorpus
 {
-    std::vector<std::string>              docs;      // doc_id -> space-joined terms of all its keys
+    std::vector<std::string>              docs;       // doc_id -> space-joined terms of all its keys
     std::vector<std::vector<std::string>> keysPerDoc; // doc_id -> list of key strings (terms space-joined)
     std::vector<std::string>              vocab;      // vocab_id -> term string
 };
@@ -134,7 +134,7 @@ inline KeyCorpus generateKeyCorpus(const KeyCorpusConfig& cfg)
     corpus.keysPerDoc.reserve(cfg.numDocs);
     for (int docId = 0; docId < cfg.numDocs; docId++)
     {
-        std::ostringstream      fullText;
+        std::ostringstream       fullText;
         std::vector<std::string> keys;
         keys.reserve(cfg.numKeysPerDoc);
         for (int k = 0; k < cfg.numKeysPerDoc; k++)

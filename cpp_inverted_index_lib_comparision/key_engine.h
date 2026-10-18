@@ -47,5 +47,5 @@ public:
 
 private:
     std::unordered_map<std::string, std::vector<int>> index_;
-    int                                                numDocs_ = 0;
+    int                                               numDocs_ = 0;
 };

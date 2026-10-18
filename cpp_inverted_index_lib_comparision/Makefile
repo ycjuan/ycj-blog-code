@@ -3,7 +3,7 @@ LDFLAGS := $(shell xapian-config --libs)
 
 all: benchmark
 
-benchmark: main.cpp corpus_generator.h query_ast.h pisa_engine.h xapian_engine.h
+benchmark: main.cpp corpus_generator.h query_ast.h pisa_engine.h xapian_engine.h key_engine.h
 	g++ -o $@ main.cpp $(CFLAGS) $(LDFLAGS)
 
 clean:

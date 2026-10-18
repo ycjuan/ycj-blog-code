@@ -2,9 +2,8 @@
 
 Compares how different C++ approaches handle an inverted index and boolean
 (AND/OR/NOT) retrieval over the same synthetic corpus and identical queries.
-All code lives in [`benchmark/`](benchmark) -- see
-[`benchmark/README.md`](benchmark/README.md) for full methodology and
-example results.
+All code lives in this directory -- see [`BENCHMARK.md`](BENCHMARK.md) for
+full methodology and example results.
 
 | | Hand-rolled ("PISA-style") | Xapian | KeyEngine |
 |---|---|---|---|
@@ -21,7 +20,7 @@ PISA is primarily designed for large-scale, SIMD-compressed, *ranked* top-k
 retrieval (WAND/MaxScore/BlockMax-WAND over disjunctive term lists) -- it
 does not ship a general nested-boolean-expression query layer. To support
 queries like `(quick AND dog) OR (NOT fox)` on top of PISA's primitives, you
-have to write your own recursive evaluator, so the benchmark's `pisa_engine.h`
+have to write your own recursive evaluator, so `pisa_engine.h`
 demonstrates exactly that: a minimal from-scratch inverted index plus a
 shared boolean query parser/evaluator, to show what PISA (or any engine
 offering only flat AND/OR primitives) would need glued on top.
@@ -37,7 +36,7 @@ tuple (e.g. `"vocA vocB vocC"`) is itself the atomic lookup key, rather than
 three terms to be ANDed together. There's no tokenization or posting-list
 merge -- just a single hash-map lookup. This is **not** semantically
 equivalent to the AND query over the same terms (see
-[`benchmark/README.md`](benchmark/README.md) for why), but is dramatically
+[`BENCHMARK.md`](BENCHMARK.md) for why), but is dramatically
 faster when that exact-key semantics is really what's needed.
 
 The PISA-style and Xapian engines produce **identical results** for all
@@ -48,15 +47,15 @@ yourself, and in each library's internal performance characteristics.
 ## Quick summary
 
 - **Want to learn the fundamentals, or need a tiny dependency-free
-  component?** See `benchmark/pisa_engine.h` -- dictionary + posting lists +
+  component?** See `pisa_engine.h` -- dictionary + posting lists +
   merge-based set ops from scratch, with a nested-boolean parser
-  (`benchmark/query_ast.h`) layered on top of flat AND/OR primitives.
+  (`query_ast.h`) layered on top of flat AND/OR primitives.
 - **Want pure boolean retrieval in production without writing your own query
-  tree evaluator?** See `benchmark/xapian_engine.h` -- a mature, actively
+  tree evaluator?** See `xapian_engine.h` -- a mature, actively
   maintained C++ library with native nested boolean queries (and ranking
   available if later needed, unlike PISA).
 - **Have a fixed-size multi-term key that's always looked up as a whole,
-  not via arbitrary AND/OR combinations?** See `benchmark/key_engine.h` -- a
+  not via arbitrary AND/OR combinations?** See `key_engine.h` -- a
   plain hash map outperforms both inverted-index approaches by orders of
   magnitude for this narrower case.
 - **Want large-scale ranked top-k retrieval over huge compressed indexes?**
@@ -66,13 +65,13 @@ yourself, and in each library's internal performance characteristics.
 
 ## Running the benchmark
 
-[`benchmark/`](benchmark) generates a size-configurable synthetic corpus,
-builds all engines over it, and runs an identical set of boolean queries
-(parsed once into a shared AST, then evaluated by each engine) plus a
-separate phrase-as-key benchmark, reporting result counts and p50/p95
-latency side by side -- see [`benchmark/README.md`](benchmark/README.md) for
-full methodology and example results.
+The benchmark (`main.cpp` + the engine headers) generates a
+size-configurable synthetic corpus, builds all engines over it, and runs an
+identical set of boolean queries (parsed once into a shared AST, then
+evaluated by each engine) plus a separate phrase-as-key benchmark, reporting
+result counts and p50/p95 latency side by side -- see
+[`BENCHMARK.md`](BENCHMARK.md) for full methodology and example results.
 
 ```bash
-cd benchmark && PATH=/usr/local/bin:$PATH ./run.sh --num_docs=200000 --num_vocab_per_doc=30 --vocab_card=5000
+PATH=/usr/local/bin:$PATH ./run.sh --num_docs=200000 --num_vocab_per_doc=30 --vocab_card=5000
 ```

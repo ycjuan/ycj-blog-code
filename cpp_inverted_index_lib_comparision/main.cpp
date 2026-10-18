@@ -38,8 +38,8 @@ using Clock = chrono::high_resolution_clock;
 struct Args
 {
     CorpusConfig corpus;
-    int          numVocabPerKey = 3; // terms per key, for the phrase-as-key benchmark
-    int          numKeysPerDoc  = 5; // keys per doc, for the phrase-as-key benchmark
+    int          numVocabPerKey = 3;  // terms per key, for the phrase-as-key benchmark
+    int          numKeysPerDoc  = 5;  // keys per doc, for the phrase-as-key benchmark
     int          reps           = 20; // repetitions per query; reports p50/p95 latency across these reps
 };
 
@@ -141,7 +141,7 @@ static vector<string> buildQueries(const vector<string>& vocab)
 // are non-empty.
 static vector<string> buildKeyQueries(const vector<vector<string>>& keysPerDoc, int maxQueries = 5)
 {
-    vector<string>           queries;
+    vector<string>        queries;
     unordered_set<string> seen;
     for (const auto& keys : keysPerDoc)
     {
@@ -183,10 +183,10 @@ struct LatencyStats
 // Nearest-rank percentile over a *sorted* ascending vector.
 static double percentile(const vector<double>& sortedValues, double p)
 {
-    size_t n = sortedValues.size();
+    size_t n    = sortedValues.size();
     size_t rank = static_cast<size_t>(ceil(p / 100.0 * static_cast<double>(n)));
-    rank = max<size_t>(rank, 1);
-    rank = min(rank, n);
+    rank        = max<size_t>(rank, 1);
+    rank        = min(rank, n);
     return sortedValues[rank - 1];
 }
 
@@ -244,14 +244,15 @@ int main(int argc, char** argv)
          << "PISA#" << setw(9) << "Xapian#" << setw(7) << "Match"
          << "\n";
     cout << left << setw(38) << "" << right << setw(10) << "(ms)" << setw(10) << "(ms)" << setw(11) << "" << setw(12)
-         << "(ms)" << setw(12) << "(ms)" << setw(11) << "" << setw(9) << "" << setw(9) << "" << setw(7) << "" << "\n";
+         << "(ms)" << setw(12) << "(ms)" << setw(11) << "" << setw(9) << "" << setw(9) << "" << setw(7) << ""
+         << "\n";
     cout << string(139, '-') << "\n";
 
     for (const string& query : queries)
     {
         unique_ptr<QueryNode> ast = QueryParser::parse(query);
 
-        auto [pisaResult, pisaStats] = timedEvaluate([&] { return pisaEngine.evaluate(*ast); }, args.reps);
+        auto [pisaResult, pisaStats]     = timedEvaluate([&] { return pisaEngine.evaluate(*ast); }, args.reps);
         auto [xapianResult, xapianStats] = timedEvaluate([&] { return xapianEngine.evaluate(*ast); }, args.reps);
 
         // QPS here means single-threaded queries/sec implied by one query's
@@ -266,8 +267,8 @@ int main(int argc, char** argv)
         cout << left << setw(38) << displayQuery << right << setw(10) << fixed << setprecision(4)
              << pisaStats.p50Us / 1000.0 << setw(10) << pisaStats.p95Us / 1000.0 << setw(11) << setprecision(0)
              << pisaQps << setw(12) << setprecision(4) << xapianStats.p50Us / 1000.0 << setw(12)
-             << xapianStats.p95Us / 1000.0 << setw(11) << setprecision(0) << xapianQps << setw(9)
-             << pisaResult.size() << setw(9) << xapianResult.size() << setw(7) << (match ? "yes" : "NO") << "\n";
+             << xapianStats.p95Us / 1000.0 << setw(11) << setprecision(0) << xapianQps << setw(9) << pisaResult.size()
+             << setw(9) << xapianResult.size() << setw(7) << (match ? "yes" : "NO") << "\n";
 
         if (!match)
         {
@@ -321,32 +322,31 @@ int main(int argc, char** argv)
          << "PISA#" << setw(9) << "Xapian#"
          << "\n";
     cout << left << setw(26) << "" << right << setw(10) << "(ms)" << setw(10) << "(ms)" << setw(10) << "" << setw(10)
-         << "(ms)" << setw(10) << "(ms)" << setw(10) << "" << setw(11) << "(ms)" << setw(11) << "(ms)" << setw(11)
-         << "" << setw(7) << "" << setw(8) << "" << setw(9) << "" << "\n";
+         << "(ms)" << setw(10) << "(ms)" << setw(10) << "" << setw(11) << "(ms)" << setw(11) << "(ms)" << setw(11) << ""
+         << setw(7) << "" << setw(8) << "" << setw(9) << ""
+         << "\n";
     cout << string(149, '-') << "\n";
 
     for (const string& key : keyQueries)
     {
-        string                 andQuery = keyToAndQuery(key);
+        string                andQuery = keyToAndQuery(key);
         unique_ptr<QueryNode> ast      = QueryParser::parse(andQuery);
 
-        auto [keyResult, keyStats] = timedEvaluate([&] { return keyEngine.evaluate(key); }, args.reps);
-        auto [pisaResult, pisaStats] = timedEvaluate([&] { return keyPisaEngine.evaluate(*ast); }, args.reps);
-        auto [xapianResult, xapianStats] =
-            timedEvaluate([&] { return keyXapianEngine.evaluate(*ast); }, args.reps);
+        auto [keyResult, keyStats]       = timedEvaluate([&] { return keyEngine.evaluate(key); }, args.reps);
+        auto [pisaResult, pisaStats]     = timedEvaluate([&] { return keyPisaEngine.evaluate(*ast); }, args.reps);
+        auto [xapianResult, xapianStats] = timedEvaluate([&] { return keyXapianEngine.evaluate(*ast); }, args.reps);
 
         double keyQps    = 1e6 / keyStats.p50Us;
-        double pisaQps    = 1e6 / pisaStats.p50Us;
-        double xapianQps  = 1e6 / xapianStats.p50Us;
+        double pisaQps   = 1e6 / pisaStats.p50Us;
+        double xapianQps = 1e6 / xapianStats.p50Us;
 
         string displayKey = key.size() > 24 ? key.substr(0, 21) + "..." : key;
         cout << left << setw(26) << displayKey << right << setw(10) << fixed << setprecision(4)
-             << keyStats.p50Us / 1000.0 << setw(10) << keyStats.p95Us / 1000.0 << setw(10) << setprecision(0)
-             << keyQps << setw(10) << setprecision(4) << pisaStats.p50Us / 1000.0 << setw(10)
-             << pisaStats.p95Us / 1000.0 << setw(10) << setprecision(0) << pisaQps << setw(11) << setprecision(4)
-             << xapianStats.p50Us / 1000.0 << setw(11) << xapianStats.p95Us / 1000.0 << setw(11)
-             << setprecision(0) << xapianQps << setw(7) << keyResult.size() << setw(8) << pisaResult.size()
-             << setw(9) << xapianResult.size() << "\n";
+             << keyStats.p50Us / 1000.0 << setw(10) << keyStats.p95Us / 1000.0 << setw(10) << setprecision(0) << keyQps
+             << setw(10) << setprecision(4) << pisaStats.p50Us / 1000.0 << setw(10) << pisaStats.p95Us / 1000.0
+             << setw(10) << setprecision(0) << pisaQps << setw(11) << setprecision(4) << xapianStats.p50Us / 1000.0
+             << setw(11) << xapianStats.p95Us / 1000.0 << setw(11) << setprecision(0) << xapianQps << setw(7)
+             << keyResult.size() << setw(8) << pisaResult.size() << setw(9) << xapianResult.size() << "\n";
     }
 
     cout << "\nNote: Key# is expected to be <= PISA#/Xapian# -- the key lookup only matches docs with\n"

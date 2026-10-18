@@ -1,8 +1,8 @@
 # PISA-style vs Xapian benchmark
 
 Generates a synthetic corpus with configurable size/cardinality, builds both
-the hand-rolled PISA-style index ([`../pisa`](../pisa)) and a real
-[Xapian](https://xapian.org) index ([`../xapian`](../xapian)) over the same
+a hand-rolled PISA-style index (`pisa_engine.h`) and a real
+[Xapian](https://xapian.org) index (`xapian_engine.h`) over the same
 documents, runs an identical set of boolean queries against both (via a
 shared query AST, see below), and reports result counts + latency side by
 side. A second section benchmarks a "phrase-as-key" scenario against both
@@ -32,14 +32,14 @@ generates docs as `num_keys_per_doc` multi-term keys instead (see below).
 
 ## Design: one query AST, two evaluators
 
-[`query_ast.h`](query_ast.h) parses a query string (same grammar as the PISA
-demo's `BooleanQueryEngine`: `NOT` > `AND` > `OR`, with parentheses) into a
+[`query_ast.h`](query_ast.h) parses a query string (grammar: `NOT` > `AND` >
+`OR`, with parentheses) into a
 `QueryNode` tree exactly once per query. Both engines then evaluate the
 *same* tree:
 
 - [`pisa_engine.h`](pisa_engine.h) — `PisaEngine::evaluate(node)` recurses
   over the AST, combining posting lists with merge-based
-  intersect/union/difference (same approach as `../pisa/main.cpp`).
+  intersect/union/difference.
 - [`xapian_engine.h`](xapian_engine.h) — `XapianEngine::evaluate(node)`
   recurses over the same AST, building an `Xapian::Query` tree
   (`OP_AND`/`OP_OR`/`OP_AND_NOT`) and executing it with `Xapian::BoolWeight`
