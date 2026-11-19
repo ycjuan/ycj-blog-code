@@ -9,10 +9,10 @@ int main()
 
     Ort::Session session(env, "../model.onnx", session_options);
 
-    // query: [64], docs: [5, 128]
+    // query: [1, 64] (num_reqs=1 is just a batch of size 1), docs: [5, 128]
     std::vector<float>   query_data(64);
     std::vector<float>   docs_data(5 * 128);
-    std::vector<int64_t> query_shape = { 64 };
+    std::vector<int64_t> query_shape = { 1, 64 };
     std::vector<int64_t> docs_shape  = { 5, 128 };
 
     // Fill with dummy data
@@ -44,13 +44,16 @@ int main()
     float* scores    = output_tensors[0].GetTensorMutableData<float>();
     auto   out_shape = output_tensors[0].GetTensorTypeAndShapeInfo().GetShape();
 
-    std::cout << "Scores shape: [" << out_shape[0] << ", " << out_shape[1] << "]\n";
+    std::cout << "Scores shape: [" << out_shape[0] << ", " << out_shape[1] << ", " << out_shape[2] << "]\n";
     std::cout << "Scores:\n";
-    for (int d = 0; d < out_shape[0]; ++d)
+    for (int r = 0; r < out_shape[0]; ++r)
     {
-        for (int h = 0; h < out_shape[1]; ++h)
-            std::cout << scores[d * out_shape[1] + h] << " ";
-        std::cout << "\n";
+        for (int d = 0; d < out_shape[1]; ++d)
+        {
+            for (int h = 0; h < out_shape[2]; ++h)
+                std::cout << scores[(r * out_shape[1] + d) * out_shape[2] + h] << " ";
+            std::cout << "\n";
+        }
     }
 
     return 0;

@@ -16,7 +16,7 @@ struct OnnxRuntimeBackend : InferBackend
     {
         Ort::MemoryInfo mem = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 
-        std::vector<int64_t> query_shape = { in.query_dim };
+        std::vector<int64_t> query_shape = { in.num_reqs, in.query_dim };
         std::vector<int64_t> docs_shape  = { in.num_docs, in.doc_dim };
 
         Ort::Value input_tensors[2] = {
@@ -38,7 +38,7 @@ struct OnnxRuntimeBackend : InferBackend
         auto out = session.Run(Ort::RunOptions { nullptr }, input_names, input_tensors, 2, output_names, 1);
 
         float* data = out[0].GetTensorMutableData<float>();
-        return std::vector<float>(data, data + in.num_docs * in.num_heads);
+        return std::vector<float>(data, data + in.num_reqs * in.num_docs * in.num_heads);
     }
 };
 

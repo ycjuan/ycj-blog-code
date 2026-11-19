@@ -37,13 +37,14 @@ struct TensorRTBackend : InferBackend
         parser->parseFromFile(paths.onnx_model.c_str(), static_cast<int>(nvinfer1::ILogger::Severity::kWARNING));
 
         std::unique_ptr<nvinfer1::IBuilderConfig> config(builder->createBuilderConfig());
-        config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, 256 << 20);
+        config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, 1u << 30);
 
+        const int                       max_reqs = profile_input.num_reqs;
         const int                       max_docs = profile_input.num_docs;
         nvinfer1::IOptimizationProfile* profile  = builder->createOptimizationProfile();
-        profile->setDimensions("query", nvinfer1::OptProfileSelector::kMIN, nvinfer1::Dims { 1, { query_dim } });
-        profile->setDimensions("query", nvinfer1::OptProfileSelector::kOPT, nvinfer1::Dims { 1, { query_dim } });
-        profile->setDimensions("query", nvinfer1::OptProfileSelector::kMAX, nvinfer1::Dims { 1, { query_dim } });
+        profile->setDimensions("query", nvinfer1::OptProfileSelector::kMIN, nvinfer1::Dims2(1, query_dim));
+        profile->setDimensions("query", nvinfer1::OptProfileSelector::kOPT, nvinfer1::Dims2(max_reqs, query_dim));
+        profile->setDimensions("query", nvinfer1::OptProfileSelector::kMAX, nvinfer1::Dims2(max_reqs, query_dim));
         profile->setDimensions("docs", nvinfer1::OptProfileSelector::kMIN, nvinfer1::Dims2(1, doc_dim));
         profile->setDimensions("docs", nvinfer1::OptProfileSelector::kOPT, nvinfer1::Dims2(max_docs, doc_dim));
         profile->setDimensions("docs", nvinfer1::OptProfileSelector::kMAX, nvinfer1::Dims2(max_docs, doc_dim));
@@ -58,12 +59,13 @@ struct TensorRTBackend : InferBackend
     void infer_device(const float* d_query,
                       const float* d_docs,
                       float*       d_scores,
+                      int          num_reqs,
                       int          query_dim_,
                       int          doc_dim_,
                       int          num_docs,
                       int          num_heads_) override
     {
-        context->setInputShape("query", nvinfer1::Dims { 1, { query_dim_ } });
+        context->setInputShape("query", nvinfer1::Dims2(num_reqs, query_dim_));
         context->setInputShape("docs", nvinfer1::Dims2(num_docs, doc_dim_));
         context->setTensorAddress("query", const_cast<float*>(d_query));
         context->setTensorAddress("docs", const_cast<float*>(d_docs));
@@ -79,7 +81,7 @@ struct TensorRTBackend : InferBackend
         void* d_scores = nullptr;
         cudaMalloc(&d_query, in.query.size() * sizeof(float));
         cudaMalloc(&d_docs, in.docs.size() * sizeof(float));
-        cudaMalloc(&d_scores, in.num_docs * in.num_heads * sizeof(float));
+        cudaMalloc(&d_scores, in.num_reqs * in.num_docs * in.num_heads * sizeof(float));
 
         cudaMemcpy(d_query, in.query.data(), in.query.size() * sizeof(float), cudaMemcpyHostToDevice);
         cudaMemcpy(d_docs, in.docs.data(), in.docs.size() * sizeof(float), cudaMemcpyHostToDevice);
@@ -87,12 +89,13 @@ struct TensorRTBackend : InferBackend
         infer_device(static_cast<float*>(d_query),
                      static_cast<float*>(d_docs),
                      static_cast<float*>(d_scores),
+                     in.num_reqs,
                      in.query_dim,
                      in.doc_dim,
                      in.num_docs,
                      in.num_heads);
 
-        std::vector<float> scores(in.num_docs * in.num_heads);
+        std::vector<float> scores(in.num_reqs * in.num_docs * in.num_heads);
         cudaMemcpy(scores.data(), d_scores, scores.size() * sizeof(float), cudaMemcpyDeviceToHost);
 
         cudaFree(d_query);

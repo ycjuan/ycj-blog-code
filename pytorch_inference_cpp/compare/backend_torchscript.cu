@@ -13,8 +13,10 @@ struct TorchScriptBackend : InferBackend
 
     std::vector<float> infer(const Input& in) override
     {
-        auto query = torch::from_blob(const_cast<float*>(in.query.data()), { in.query_dim }, torch::kFloat32).clone();
-        auto docs  = torch::from_blob(const_cast<float*>(in.docs.data()), { in.num_docs, in.doc_dim }, torch::kFloat32)
+        auto query
+            = torch::from_blob(const_cast<float*>(in.query.data()), { in.num_reqs, in.query_dim }, torch::kFloat32)
+                  .clone();
+        auto docs = torch::from_blob(const_cast<float*>(in.docs.data()), { in.num_docs, in.doc_dim }, torch::kFloat32)
                         .clone();
 
         std::vector<torch::jit::IValue> inputs = { query, docs };
