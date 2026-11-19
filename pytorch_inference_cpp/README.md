@@ -4,10 +4,13 @@ Demonstrates five approaches to serve a PyTorch model in pure C++ with no Python
 
 ## Model
 
-A 2-tower MLP scorer (query + doc):
-- Layer 1: separate projections for query and doc, additively fused with ReLU
+A 2-tower MLP scorer (query + doc), batched over R queries x N docs:
+- Layer 1: separate projections for query and doc, additively fused with ReLU.
+  The query projection is computed once per query and broadcast across docs;
+  the doc projection is computed once per doc and broadcast across queries.
+  `num_reqs == 1` is just a batch of size 1, not a separate code path.
 - Hidden layers: linear + ReLU stack
-- Output: linear → sigmoid, with `num_heads` scores per doc
+- Output: linear → sigmoid, with `num_heads` scores per (query, doc) pair
 
 ## Dependency comparison
 
@@ -107,44 +110,66 @@ cd compare && ./compile.sh && ./run.sh
 Expected output:
 
 ```
+Checking correctness (num_reqs=32, num_docs=10000)...
 [PASS] ONNX Runtime  vs TorchScript
 [PASS] TensorRT      vs TorchScript
 [PASS] AOTInductor   vs TorchScript
 [PASS] Pure CUDA     vs TorchScript
 
-Benchmarking (num_docs=10000, 3 warmup + 10 trials)...
+Benchmarking (num_reqs=32, num_docs=10000, 3 warmup + 10 trials)...
 
   [A] H2D transfer              :   1.14 ms
-  [C] D2H transfer              :   0.04 ms
-  [A+C] total transfer          :   1.18 ms
+  [C] D2H transfer              :   0.66 ms
+  [A+C] total transfer          :   1.80 ms
 
-  TorchScript     e2e:  10.75 ms
-  ONNX Runtime    e2e:  12.63 ms
-  TensorRT        e2e:   1.77 ms  kernel:   0.59 ms
-  AOTInductor     e2e:   1.80 ms  kernel:   0.62 ms
-  Pure CUDA       e2e:   2.62 ms  kernel:   1.44 ms
+  TorchScript     e2e: 485.57 ms
+  ONNX Runtime    e2e: 171.80 ms
+  TensorRT        e2e:  10.96 ms  kernel:   9.16 ms
+  AOTInductor     e2e:  11.90 ms  kernel:  10.11 ms
+  Pure CUDA       e2e:  22.31 ms  kernel:  20.52 ms
+
+  Batched (32 reqs/call) vs one-req-at-a-time (32 calls):
+  TensorRT        batched:    9.16 ms   1-by-1:   15.70 ms   speedup:  1.71x  (kernel-only)
+  AOTInductor     batched:   10.11 ms   1-by-1:   17.49 ms   speedup:  1.73x  (kernel-only)
+  Pure CUDA       batched:   20.52 ms   1-by-1:   42.64 ms   speedup:  2.08x  (kernel-only)
+  TorchScript     batched:  485.57 ms   1-by-1:  341.30 ms   speedup:  0.70x  (e2e)
+  ONNX Runtime    batched:  171.80 ms   1-by-1:  266.58 ms   speedup:  1.55x  (e2e)
 ```
 
 ## Benchmark
 
 Config: Amazon Linux 2023, CUDA 12.9, TensorRT 11, T4 GPU.
-Model: query\_dim=64, doc\_dim=128, hidden=[256, 128], num\_heads=2, num\_docs=10000.
+Model: query\_dim=64, doc\_dim=128, hidden=[256, 128], num\_heads=2, num\_reqs=32, num\_docs=10000.
 
 The benchmark separately times three segments: **[A]** copying query and doc embeddings from CPU to GPU (H2D), **[B]** the inference kernel itself, and **[C]** copying scores back from GPU to CPU (D2H). This makes the comparison fair — H2D/D2H costs are the same across all GPU backends, so kernel time isolates each approach's actual compute efficiency.
 
 | Backend | e2e | kernel only |
 |---|---|---|
-| TorchScript | 10.75 ms | — |
-| ONNX Runtime | 12.63 ms | — |
-| **TensorRT** | **1.77 ms** | **0.59 ms** |
-| AOTInductor | 1.80 ms | 0.62 ms |
-| Pure CUDA | 2.62 ms | 1.44 ms |
+| TorchScript | 485.57 ms | — |
+| ONNX Runtime | 171.80 ms | — |
+| **TensorRT** | **10.96 ms** | **9.16 ms** |
+| AOTInductor | 11.90 ms | 10.11 ms |
+| Pure CUDA | 22.31 ms | 20.52 ms |
 
-H2D transfer (1.14 ms) and D2H transfer (0.04 ms) are shared across all GPU backends. The e2e column is kernel + transfer.
+H2D transfer (1.14 ms) and D2H transfer (0.66 ms) are shared across all GPU backends. The e2e column is kernel + transfer.
 
 **TorchScript and ONNX Runtime cannot report kernel-only time.** They are CPU-side runtimes that manage their own internal GPU memory, so there is no API to inject pre-allocated device pointers and skip the H2D step — inference is always an end-to-end black box.
 
-TensorRT and AOTInductor are both ~5x faster than TorchScript/ONNX Runtime because they compile GPU kernels ahead of time and auto-tune tiling for the exact input shape. Pure CUDA uses generic cuBLAS GEMMs without that auto-tuning.
+TensorRT and AOTInductor are both ~2x faster than Pure CUDA, and far faster than TorchScript/ONNX Runtime, because they compile GPU kernels ahead of time and auto-tune tiling for the exact input shape. Pure CUDA uses generic cuBLAS GEMMs without that auto-tuning.
+
+### Batching 32 reqs vs scoring them one at a time
+
+Scoring 32 queries in a single batched call is faster than looping over `infer`/`infer_device` 32 times with `num_reqs=1`, because the doc-side GEMMs (the dominant cost at `num_docs=10000`) and the doc-to-GPU transfer are shared across all 32 queries instead of repeated per query:
+
+| Backend | batched (32 reqs/call) | 1-by-1 (32 calls) | speedup |
+|---|---|---|---|
+| TensorRT (kernel) | 9.16 ms | 15.70 ms | 1.71x |
+| AOTInductor (kernel) | 10.11 ms | 17.49 ms | 1.73x |
+| Pure CUDA (kernel) | 20.52 ms | 42.64 ms | 2.08x |
+| ONNX Runtime (e2e) | 171.80 ms | 266.58 ms | 1.55x |
+| TorchScript (e2e) | 485.57 ms | 341.30 ms | 0.70x |
+
+TorchScript is the outlier: batching made it *slower*, likely due to its eager CPU interpreter allocating one large `[32, 10000, 2]` intermediate activation tensor per hidden layer instead of 32 smaller ones, which hurts cache locality more than it saves on call overhead. The other four backends all benefit from batching, with the hand-written CUDA kernel benefiting the most since it has no per-call setup cost to amortize differently.
 
 ## TensorRT vs AOTInductor
 

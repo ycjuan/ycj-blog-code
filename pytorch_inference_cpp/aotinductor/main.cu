@@ -11,13 +11,13 @@ int main()
     const int num_docs  = 5;
 
     auto opts  = torch::TensorOptions().device(torch::kCUDA).dtype(torch::kFloat32);
-    auto query = torch::randn({ query_dim }, opts);
+    auto query = torch::randn({ 1, query_dim }, opts); // num_reqs=1 is just a batch of size 1
     auto docs  = torch::randn({ num_docs, doc_dim }, opts);
 
     auto outputs = loader.run({ query, docs });
     auto scores  = outputs[0].cpu();
 
-    std::cout << "Scores shape: [" << scores.size(0) << ", " << scores.size(1) << "]\n";
+    std::cout << "Scores shape: [" << scores.size(0) << ", " << scores.size(1) << ", " << scores.size(2) << "]\n";
     std::cout << "Scores:\n" << scores << "\n";
 
     return 0;

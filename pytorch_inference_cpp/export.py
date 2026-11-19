@@ -4,12 +4,14 @@ import torch.nn as nn
 
 class MlpScorer(nn.Module):
     """
-    2-tower MLP scorer (query + doc).
+    2-tower MLP scorer (query + doc), batched over R queries x N docs.
 
     Layer 1 uses separate weight matrices for query and doc. The query
-    projection (W1_query * query + b1) is computed once and broadcast as a
-    bias across all docs: h1 = ReLU(W1_doc * docs + query_proj).
-    This avoids concatenating query into every doc row.
+    projection (W1_query * query + b1) is computed once per query (not per
+    doc) and broadcast across the doc dimension, and the doc projection is
+    computed once and broadcast across the query dimension:
+    h1 = ReLU(query_proj[:, None, :] + docs_proj[None, :, :]).
+    This avoids recomputing either projection for every (query, doc) pair.
 
     Config:
         query_dim    (Dq): embedding dim of the query tower
@@ -39,14 +41,15 @@ class MlpScorer(nn.Module):
 
     def forward(self, query: torch.Tensor, docs: torch.Tensor) -> torch.Tensor:
         """
-        query : [Dq]      — single query embedding
-        docs  : [N, Dd]   — N doc embeddings
-        returns [N, num_heads] — scores in (0, 1)
+        query : [R, Dq]   — R query embeddings (R == 1 is just a batch of size 1)
+        docs  : [N, Dd]   — N doc embeddings, scored against every query
+        returns [R, N, num_heads] — scores in (0, 1)
         """
-        query_proj = self.w1_query(query)        # [H1]  broadcast bias
-        h = torch.relu(self.w1_doc(docs) + query_proj)  # [N, H1]
-        h = self.hidden(h)                       # [N, H_last]
-        return torch.sigmoid(self.output(h))     # [N, num_heads]
+        query_proj = self.w1_query(query)                      # [R, H1]
+        docs_proj  = self.w1_doc(docs)                         # [N, H1]
+        h = torch.relu(query_proj.unsqueeze(1) + docs_proj.unsqueeze(0))  # [R, N, H1]
+        h = self.hidden(h)                                     # [R, N, H_last]
+        return torch.sigmoid(self.output(h))                   # [R, N, num_heads]
 
 
 # ---------------------------------------------------------------------------
@@ -60,13 +63,13 @@ NUM_HEADS    = 2
 model = MlpScorer(QUERY_DIM, DOC_DIM, HIDDEN_SIZES, NUM_HEADS)
 model.eval()
 
-dummy_query = torch.randn(QUERY_DIM)
-dummy_docs  = torch.randn(5, DOC_DIM)   # 5 docs
+dummy_query = torch.randn(3, QUERY_DIM)  # 3 queries (R == 1 is just a special case)
+dummy_docs  = torch.randn(5, DOC_DIM)    # 5 docs
 
 # Sanity check
 with torch.no_grad():
     out = model(dummy_query, dummy_docs)
-print(f"Output shape: {out.shape}")   # expect [5, 2]
+print(f"Output shape: {out.shape}")   # expect [3, 5, 2]
 print(f"Output:\n{out}")
 
 # --- Approach 1: TorchScript ---
@@ -82,8 +85,9 @@ torch.onnx.export(
     input_names=["query", "docs"],
     output_names=["scores"],
     dynamic_axes={
+        "query":  {0: "num_reqs"},
         "docs":   {0: "num_docs"},
-        "scores": {0: "num_docs"},
+        "scores": {0: "num_reqs", 1: "num_docs"},
     },
     opset_version=17,
 )
@@ -116,15 +120,20 @@ save_tensor(model.output.bias,   "b_out.bin")        # [num_heads]
 # --- Approach 5: AOTInductor ---
 # Weights are baked into the compiled .pt2 package.
 # The model is moved to CUDA for GPU-optimized kernel generation.
-model_cuda = model.cuda()
-num_docs_dim = torch.export.Dim("num_docs", min=1, max=100000)
-ep = torch.export.export(
-    model_cuda,
-    (dummy_query.cuda(), dummy_docs.cuda()),
-    dynamic_shapes=(None, {0: num_docs_dim}),
-)
-torch._inductor.aoti_compile_and_package(ep, package_path="model.pt2")
-print("Saved model.pt2 (AOTInductor)")
+if torch.cuda.is_available():
+    model_cuda = model.cuda()
+    num_reqs_dim = torch.export.Dim("num_reqs", min=1, max=100000)
+    num_docs_dim = torch.export.Dim("num_docs", min=1, max=100000)
+    ep = torch.export.export(
+        model_cuda,
+        (dummy_query.cuda(), dummy_docs.cuda()),
+        dynamic_shapes=({0: num_reqs_dim}, {0: num_docs_dim}),
+    )
+    torch._inductor.aoti_compile_and_package(ep, package_path="model.pt2")
+    print("Saved model.pt2 (AOTInductor)")
+else:
+    print("Skipping model.pt2 (AOTInductor): no CUDA device available. "
+          "Rerun export.py on a GPU machine to regenerate it.")
 
 # Also save config so the C++ side knows the dims
 import json

@@ -28,13 +28,13 @@ int main()
     parser->parseFromFile("../model.onnx", static_cast<int>(nvinfer1::ILogger::Severity::kWARNING));
 
     TrtUniquePtr<nvinfer1::IBuilderConfig> config(builder->createBuilderConfig());
-    config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, 1 << 20);
+    config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, 256 << 20);
 
-    // query is static [64]; docs has dynamic num_docs dim
+    // query is dynamic [num_reqs, 64]; docs has dynamic num_docs dim
     nvinfer1::IOptimizationProfile* profile = builder->createOptimizationProfile();
-    profile->setDimensions("query", nvinfer1::OptProfileSelector::kMIN, nvinfer1::Dims { 1, { 64 } });
-    profile->setDimensions("query", nvinfer1::OptProfileSelector::kOPT, nvinfer1::Dims { 1, { 64 } });
-    profile->setDimensions("query", nvinfer1::OptProfileSelector::kMAX, nvinfer1::Dims { 1, { 64 } });
+    profile->setDimensions("query", nvinfer1::OptProfileSelector::kMIN, nvinfer1::Dims2(1, 64));
+    profile->setDimensions("query", nvinfer1::OptProfileSelector::kOPT, nvinfer1::Dims2(1, 64));
+    profile->setDimensions("query", nvinfer1::OptProfileSelector::kMAX, nvinfer1::Dims2(32, 64));
     profile->setDimensions("docs", nvinfer1::OptProfileSelector::kMIN, nvinfer1::Dims2(1, 128));
     profile->setDimensions("docs", nvinfer1::OptProfileSelector::kOPT, nvinfer1::Dims2(5, 128));
     profile->setDimensions("docs", nvinfer1::OptProfileSelector::kMAX, nvinfer1::Dims2(100, 128));
@@ -43,15 +43,16 @@ int main()
     TrtUniquePtr<nvinfer1::ICudaEngine>       engine(builder->buildEngineWithConfig(*network, *config));
     TrtUniquePtr<nvinfer1::IExecutionContext> context(engine->createExecutionContext());
 
-    // --- Set dynamic shapes for this call: 5 docs ---
+    // --- Set dynamic shapes for this call: 1 query, 5 docs ---
+    const int num_reqs = 1;
     const int num_docs = 5;
-    context->setInputShape("query", nvinfer1::Dims { 1, { 64 } });
+    context->setInputShape("query", nvinfer1::Dims2(num_reqs, 64));
     context->setInputShape("docs", nvinfer1::Dims2(num_docs, 128));
 
     // --- Allocate GPU buffers ---
-    std::vector<float> h_query(64, 0.5f);
+    std::vector<float> h_query(num_reqs * 64, 0.5f);
     std::vector<float> h_docs(num_docs * 128, 0.5f);
-    std::vector<float> h_scores(num_docs * 2);
+    std::vector<float> h_scores(num_reqs * num_docs * 2);
 
     void* d_query  = nullptr;
     void* d_docs   = nullptr;
@@ -72,10 +73,11 @@ int main()
 
     cudaMemcpy(h_scores.data(), d_scores, h_scores.size() * sizeof(float), cudaMemcpyDeviceToHost);
 
-    std::cout << "Scores shape: [" << num_docs << ", 2]\n";
+    std::cout << "Scores shape: [" << num_reqs << ", " << num_docs << ", 2]\n";
     std::cout << "Scores:\n";
-    for (int d = 0; d < num_docs; ++d)
-        std::cout << h_scores[d * 2] << " " << h_scores[d * 2 + 1] << "\n";
+    for (int r = 0; r < num_reqs; ++r)
+        for (int d = 0; d < num_docs; ++d)
+            std::cout << h_scores[(r * num_docs + d) * 2] << " " << h_scores[(r * num_docs + d) * 2 + 1] << "\n";
 
     cudaFree(d_query);
     cudaFree(d_docs);

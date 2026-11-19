@@ -125,6 +125,21 @@ __global__ void sigmoidInPlace(float* x, int n)
         x[i] = 1.0f / (1.0f + expf(-x[i]));
 }
 
+// Combines the per-query and per-doc layer-1 projections into h1[H1, R*N] (col-major),
+// where column c = r * N + n pairs query r with doc n. Equivalent to the broadcast add
+// query_proj.unsqueeze(1) + docs_proj.unsqueeze(0) in export.py's forward().
+__global__ void addBroadcastQueryDoc(float* out, const float* query_proj, const float* docs_proj, int H1, int R, int N)
+{
+    int h = blockIdx.x * blockDim.x + threadIdx.x;
+    int c = blockIdx.y * blockDim.y + threadIdx.y;
+    if (h < H1 && c < R * N)
+    {
+        int r           = c / N;
+        int n           = c % N;
+        out[h + c * H1] = query_proj[h + r * H1] + docs_proj[h + n * H1];
+    }
+}
+
 // ---------------------------------------------------------------------------
 // cuBLAS helper: C [out_dim x N, col-major] = W [out_dim x in_dim, row-major]
 //                                             @ X [in_dim  x N,  col-major]
@@ -155,17 +170,6 @@ void gemm(cublasHandle_t handle, const float* W, int out_dim, int in_dim, const 
 }
 
 // ---------------------------------------------------------------------------
-// cuBLAS helper: y [out_dim, col-major] = W [out_dim x in_dim, row-major] @ x [in_dim]
-// ---------------------------------------------------------------------------
-void gemv(cublasHandle_t handle, const float* W, int out_dim, int in_dim, const float* x, float* y)
-{
-    const float alpha = 1.0f, beta = 0.0f;
-    // W row-major [out_dim x in_dim] = W^T col-major [in_dim x out_dim], lda=in_dim
-    // CUBLAS_OP_T on that gives W, result is y [out_dim]
-    CHECK_CUBLAS(cublasSgemv(handle, CUBLAS_OP_T, in_dim, out_dim, &alpha, W, in_dim, x, 1, &beta, y, 1));
-}
-
-// ---------------------------------------------------------------------------
 // launch helpers
 // ---------------------------------------------------------------------------
 static void launchAddBias(float* A, const float* b, int rows, int cols)
@@ -189,6 +193,7 @@ int main()
     const int              doc_dim      = 128;
     const std::vector<int> hidden_sizes = { 256, 128 };
     const int              num_heads    = 2;
+    const int              num_reqs     = 3; // num_reqs=1 is just a batch of size 1
     const int              num_docs     = 5;
     const std::string      wdir         = "../weights/";
 
@@ -220,38 +225,43 @@ int main()
     GpuBuf d_b_out = upload("b_out.bin"); // [num_heads]
 
     // --- Upload inputs (random, same shape as export.py dummy inputs) ---
-    std::vector<float> h_query(query_dim, 0.5f);
+    std::vector<float> h_query(num_reqs * query_dim, 0.5f);
     std::vector<float> h_docs(num_docs * doc_dim, 0.5f);
 
-    GpuBuf d_query(query_dim);
+    // query row-major [num_reqs x query_dim] == col-major [query_dim x num_reqs]: same memory layout
+    GpuBuf d_query(num_reqs * query_dim);
     d_query.upload(h_query);
 
     // docs row-major [num_docs x doc_dim] == col-major [doc_dim x num_docs]: same memory layout
     GpuBuf d_docs(num_docs * doc_dim);
     d_docs.upload(h_docs);
 
-    // --- Activation buffers (col-major: [dim x num_docs]) ---
+    // --- Activation buffers (col-major: [dim x (num_reqs * num_docs)]) ---
     const int H1   = hidden_sizes[0];
     const int maxH = *std::max_element(hidden_sizes.begin(), hidden_sizes.end());
-    GpuBuf    d_act_a(maxH * num_docs); // ping
-    GpuBuf    d_act_b(maxH * num_docs); // pong
-    GpuBuf    d_query_proj(H1);         // [H1] — query contribution broadcast as bias
-    GpuBuf    d_scores(num_heads * num_docs);
+    const int cols = num_reqs * num_docs;  // one column per (query, doc) pair
+    GpuBuf    d_act_a(maxH * cols);        // ping
+    GpuBuf    d_act_b(maxH * cols);        // pong
+    GpuBuf    d_query_proj(H1 * num_reqs); // [H1 x num_reqs]
+    GpuBuf    d_docs_proj(H1 * num_docs);  // [H1 x num_docs]
+    GpuBuf    d_scores(num_heads * cols);
 
     // --- Forward pass ---
 
-    // Layer 1a: query_proj [H1] = W1_query [H1 x Dq] @ query [Dq] + b1
-    gemv(handle, d_w1_query.ptr, H1, query_dim, d_query.ptr, d_query_proj.ptr);
-    { // add b1 to query_proj (both [H1])
-        const float alpha = 1.0f;
-        CHECK_CUBLAS(cublasSaxpy(handle, H1, &alpha, d_b1.ptr, 1, d_query_proj.ptr, 1));
-    }
+    // Layer 1a: query_proj [H1 x R] = W1_query [H1 x Dq] @ query^T [Dq x R] + b1 (broadcast over R)
+    gemm(handle, d_w1_query.ptr, H1, query_dim, d_query.ptr, num_reqs, d_query_proj.ptr);
+    launchAddBias(d_query_proj.ptr, d_b1.ptr, H1, num_reqs);
 
-    // Layer 1b: act_a [H1 x N] = W1_doc [H1 x Dd] @ docs [Dd x N]
-    //           + broadcast query_proj as bias, then ReLU
-    gemm(handle, d_w1_doc.ptr, H1, doc_dim, d_docs.ptr, num_docs, d_act_a.ptr);
-    launchAddBias(d_act_a.ptr, d_query_proj.ptr, H1, num_docs);
-    launchRelu(d_act_a.ptr, H1 * num_docs);
+    // Layer 1b: docs_proj [H1 x N] = W1_doc [H1 x Dd] @ docs^T [Dd x N] (bias lives on the query side only)
+    gemm(handle, d_w1_doc.ptr, H1, doc_dim, d_docs.ptr, num_docs, d_docs_proj.ptr);
+
+    // Combine: act_a[:, r*N+n] = query_proj[:, r] + docs_proj[:, n], then ReLU
+    {
+        dim3 block(16, 16);
+        dim3 grid((H1 + 15) / 16, (cols + 15) / 16);
+        addBroadcastQueryDoc<<<grid, block>>>(d_act_a.ptr, d_query_proj.ptr, d_docs_proj.ptr, H1, num_reqs, num_docs);
+    }
+    launchRelu(d_act_a.ptr, H1 * cols);
 
     // Hidden layers: ping-pong between d_act_a and d_act_b
     GpuBuf* src = &d_act_a;
@@ -260,30 +270,34 @@ int main()
     {
         const int prev_h = hidden_sizes[i];
         const int curr_h = hidden_sizes[i + 1];
-        gemm(handle, d_w_hidden[i].ptr, curr_h, prev_h, src->ptr, num_docs, dst->ptr);
-        launchAddBias(dst->ptr, d_b_hidden[i].ptr, curr_h, num_docs);
-        launchRelu(dst->ptr, curr_h * num_docs);
+        gemm(handle, d_w_hidden[i].ptr, curr_h, prev_h, src->ptr, cols, dst->ptr);
+        launchAddBias(dst->ptr, d_b_hidden[i].ptr, curr_h, cols);
+        launchRelu(dst->ptr, curr_h * cols);
         std::swap(src, dst);
     }
 
-    // Output layer: scores [num_heads x N] = W_out [num_heads x H_last] @ last_act [H_last x N] + b_out
+    // Output layer: scores [num_heads x (R*N)] = W_out [num_heads x H_last] @ last_act [H_last x (R*N)] + b_out
     const int H_last = hidden_sizes.back();
-    gemm(handle, d_w_out.ptr, num_heads, H_last, src->ptr, num_docs, d_scores.ptr);
-    launchAddBias(d_scores.ptr, d_b_out.ptr, num_heads, num_docs);
-    launchSigmoid(d_scores.ptr, num_heads * num_docs);
+    gemm(handle, d_w_out.ptr, num_heads, H_last, src->ptr, cols, d_scores.ptr);
+    launchAddBias(d_scores.ptr, d_b_out.ptr, num_heads, cols);
+    launchSigmoid(d_scores.ptr, num_heads * cols);
 
     CHECK_CUDA(cudaDeviceSynchronize());
 
     // --- Print results ---
-    // d_scores is [num_heads x num_docs] col-major → read as [num_docs x num_heads]
+    // d_scores is col-major [num_heads x (num_reqs * num_docs)], column c = r*N + n
     auto h_scores = d_scores.download();
-    std::cout << "Scores shape: [" << num_docs << ", " << num_heads << "]\n";
+    std::cout << "Scores shape: [" << num_reqs << ", " << num_docs << ", " << num_heads << "]\n";
     std::cout << "Scores:\n";
-    for (int d = 0; d < num_docs; ++d)
+    for (int r = 0; r < num_reqs; ++r)
     {
-        for (int h = 0; h < num_heads; ++h)
-            std::cout << h_scores[h + d * num_heads] << " ";
-        std::cout << "\n";
+        for (int d = 0; d < num_docs; ++d)
+        {
+            int c = r * num_docs + d;
+            for (int h = 0; h < num_heads; ++h)
+                std::cout << h_scores[h + c * num_heads] << " ";
+            std::cout << "\n";
+        }
     }
 
     cublasDestroy(handle);
